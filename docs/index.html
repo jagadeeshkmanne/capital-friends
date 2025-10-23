@@ -1,12 +1,173 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec">
-    <title>Redirecting to Capital Friends...</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="3; url=https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec">
+  <title>Capital Friends - Family Wealth Tracking & Portfolio Rebalancing</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #e5e7eb; background: #111827; overflow-x: hidden; }
+
+    .nav { position: fixed; top: 0; left: 0; right: 0; height: 65px; background: #1f2937; border-bottom: 2px solid #374151; display: flex; align-items: center; justify-content: space-between; padding: 0 5%; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: #10b981; }
+    .logo-icon { font-size: 24px; }
+
+    .hero { margin-top: 65px; padding: 40px 5% 35px; background: linear-gradient(135deg, #111827 0%, #1f2937 50%, #111827 100%); position: relative; overflow: hidden; }
+    .hero::before { content: ''; position: absolute; top: -10%; right: -5%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%); border-radius: 50%; }
+    .hero-container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: stretch; position: relative; z-index: 1; min-height: 500px; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(52,211,153,0.08) 100%); border: 1px solid #374151; padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: 700; color: #10b981; margin-bottom: 20px; letter-spacing: 0.5px; }
+    .hero-content h1 { font-size: 38px; font-weight: 800; line-height: 1.25; color: #fff; margin-bottom: 18px; }
+    .hero-content h1 .highlight { color: #10b981; }
+    .hero-content .subtitle { font-size: 16px; color: #9ca3af; margin-bottom: 28px; line-height: 1.7; }
+
+    /* Redirect-specific styles */
+    .redirect-box { background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(52,211,153,0.08) 100%); border: 2px solid #10b981; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .redirect-title { font-size: 18px; font-weight: 700; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+    .redirect-text { font-size: 15px; color: #e5e7eb; margin-bottom: 16px; line-height: 1.6; }
+    .countdown-display { font-size: 48px; font-weight: 800; color: #10b981; text-align: center; margin: 16px 0; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    
+    .loading-bar-container { width: 100%; height: 8px; background: #1f2937; border-radius: 10px; overflow: hidden; margin-bottom: 20px; border: 1px solid #374151; }
+    .loading-bar { height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%); border-radius: 10px; animation: loading 3s linear forwards; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
+    @keyframes loading { from { width: 0%; } to { width: 100%; } }
+
+    .redirect-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px 28px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.3s; box-shadow: 0 6px 20px rgba(16,185,129,0.4); }
+    .redirect-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(16,185,129,0.6); }
+
+    .privacy-note { background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(52,211,153,0.05) 100%); border: 1px solid #374151; border-radius: 8px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    .privacy-icon { flex-shrink: 0; width: 40px; height: 40px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+    .privacy-icon svg { width: 20px; height: 20px; color: #fff; }
+    .privacy-text { flex: 1; font-size: 13px; color: #9ca3af; line-height: 1.5; }
+    .privacy-text strong { color: #10b981; font-weight: 700; }
+
+    .dashboard-mockup { padding: 16px; background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(52,211,153,0.04) 100%); border-radius: 12px; border: 1px solid #374151; position: relative; overflow: hidden; display: flex; flex-direction: column; height: 100%; }
+    .mockup-window { background: #1f2937; border-radius: 10px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.4); flex: 1; display: flex; flex-direction: column; }
+    .mockup-header { background: #111827; padding: 10px 14px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #374151; }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; background: #10b981; opacity: 0.7; }
+    .mockup-content { padding: 18px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .mockup-card { background: linear-gradient(135deg, #111827 0%, #1a2332 100%); padding: 16px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #374151; transition: all 0.3s; }
+    .mockup-card:last-child { margin-bottom: 0; }
+    .mockup-card:hover { border-color: #10b981; transform: translateX(5px); }
+    .mockup-title { font-size: 10px; color: #9ca3af; font-weight: 600; letter-spacing: 0.8px; margin-bottom: 5px; }
+    .mockup-value { font-size: 18px; font-weight: 700; color: #fff; }
+    .mockup-change { font-size: 12px; color: #10b981; font-weight: 600; margin-left: 6px; }
+
+    .footer { background: #0f172a; border-top: 1px solid #374151; padding: 20px 5%; text-align: center; }
+    .footer-text { font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
+    .footer-links { font-size: 12px; }
+    .footer-links a { color: #10b981; text-decoration: none; margin: 0 12px; transition: color 0.3s; }
+    .footer-links a:hover { color: #34d399; text-decoration: underline; }
+    .footer-links span { color: #475569; }
+
+    @media (max-width: 968px) {
+      .hero-container { grid-template-columns: 1fr; text-align: center; gap: 35px; }
+      .hero-content h1 { font-size: 32px; }
+      .dashboard-mockup { max-width: 450px; margin: 0 auto; }
+    }
+    @media (max-width: 640px) {
+      .hero-content h1 { font-size: 28px; }
+      .hero-content .subtitle { font-size: 15px; }
+      .countdown-display { font-size: 36px; }
+    }
+  </style>
 </head>
 <body>
-    <p>Redirecting to Capital Friends...</p>
-    <p>If not redirected, <a href="https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec">click here</a></p>
+  <nav class="nav">
+    <div class="logo"><span class="logo-icon">💰</span><span>Capital Friends</span></div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-badge"><span>💎</span><span>FREE • PRIVATE • NO ADS</span></div>
+        <h1>Protect Your Family's <span class="highlight">Financial Future</span> with Smart Wealth Tracking</h1>
+        <p class="subtitle">One organized spreadsheet with all investments, mutual funds, bank accounts, loans, and insurance. Get smart rebalancing suggestions via email. Everything stays in your Google Drive - 100% private.</p>
+
+        <div class="redirect-box">
+          <div class="redirect-title">
+            <span>🚀</span>
+            <span>Launching Capital Friends...</span>
+          </div>
+          <div class="redirect-text">
+            You're being automatically redirected to the Capital Friends app. Get ready to take control of your family's wealth!
+          </div>
+          
+          <div class="countdown-display" id="countdown">3</div>
+          
+          <div class="loading-bar-container">
+            <div class="loading-bar"></div>
+          </div>
+
+          <a href="https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec" class="redirect-btn">
+            <span>🎯</span>
+            <span>Click Here if Not Redirected</span>
+          </a>
+        </div>
+
+        <div class="privacy-note">
+          <div class="privacy-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <div class="privacy-text"><strong>100% Data Privacy:</strong> Everything stays in YOUR Google Drive. We never access, store, or share your financial data.</div>
+        </div>
+      </div>
+
+      <div class="dashboard-mockup">
+        <div class="mockup-window">
+          <div class="mockup-header">
+            <div class="mockup-dot"></div>
+            <div class="mockup-dot" style="opacity: 0.6;"></div>
+            <div class="mockup-dot" style="opacity: 0.4;"></div>
+          </div>
+          <div class="mockup-content">
+            <div style="font-size: 11px; color: #10b981; font-weight: 700; margin-bottom: 12px; letter-spacing: 0.5px;">📊 FAMILY DASHBOARD</div>
+            <div class="mockup-card"><div class="mockup-title">TOTAL NET WORTH</div><div class="mockup-value">₹XX,XX,XXX<span class="mockup-change">+XX%</span></div></div>
+            <div class="mockup-card"><div class="mockup-title">TOTAL INVESTMENTS</div><div class="mockup-value">₹XX,XX,XXX</div></div>
+            <div class="mockup-card"><div class="mockup-title">TOTAL LIABILITIES</div><div class="mockup-value">₹XX,XX,XXX</div></div>
+            <div class="mockup-card"><div class="mockup-title">INSURANCE COVER</div><div class="mockup-value">₹X.X Cr</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div style="max-width: 1200px; margin: 0 auto;">
+      <div class="footer-text">
+        💰 Capital Friends - Free Family Wealth Tracking
+      </div>
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
+        Open Source • Privacy First • Your Data Stays in YOUR Drive
+      </div>
+      <div class="footer-links">
+        <a href="privacy-policy.html" target="_blank">Privacy Policy</a>
+        <span>•</span>
+        <a href="terms-of-service.html" target="_blank">Terms of Service</a>
+        <span>•</span>
+        <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank">GitHub</a>
+      </div>
+      <div style="font-size: 11px; color: #475569; margin-top: 12px;">
+        © 2025 Capital Friends • Made with ❤️ for families
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Countdown timer
+    let countdown = 3;
+    const countdownElement = document.getElementById('countdown');
+
+    const timer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        countdownElement.textContent = countdown;
+      } else {
+        countdownElement.textContent = '✓';
+        clearInterval(timer);
+        // Redirect happens automatically via meta refresh
+      }
+    }, 1000);
+  </script>
 </body>
 </html>
