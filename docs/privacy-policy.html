@@ -5,678 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - Capital Friends</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.8;
             color: #1f2937;
-            background: #f9fafb;
+            background: #f3f4f6;
+            padding: 20px;
         }
-
-        .nav {
-            background: #1f2937;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .logo img {
-            height: 60px;
-            width: auto;
-        }
-
         .container {
             max-width: 900px;
             margin: 0 auto;
-            padding: 3rem 2rem;
             background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
         h1 {
-            color: #059669;
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
+            color: #10b981;
+            margin-bottom: 10px;
+            font-size: 2em;
         }
-
+        h2 {
+            color: #374151;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        p, li { margin-bottom: 12px; color: #4b5563; }
+        ul { margin-left: 30px; }
         .last-updated {
             color: #6b7280;
-            font-size: 0.9rem;
-            margin-bottom: 2rem;
-        }
-
-        h2 {
-            color: #1f2937;
-            font-size: 1.75rem;
-            margin-top: 2.5rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #059669;
-        }
-
-        h3 {
-            color: #374151;
-            font-size: 1.25rem;
-            margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
-        }
-
-        p {
-            margin-bottom: 1rem;
-            color: #4b5563;
-        }
-
-        ul, ol {
-            margin-left: 2rem;
-            margin-bottom: 1rem;
-            color: #4b5563;
-        }
-
-        li {
-            margin-bottom: 0.5rem;
-        }
-
-        .highlight-box {
-            background: #ecfdf5;
-            border-left: 4px solid #059669;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-            border-radius: 4px;
-        }
-
-        .highlight-box strong {
-            color: #059669;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.5rem 0;
-        }
-
-        th, td {
-            padding: 0.75rem;
-            text-align: left;
-            border: 1px solid #e5e7eb;
-        }
-
-        th {
-            background: #f3f4f6;
-            font-weight: 600;
-            color: #1f2937;
-        }
-
-        .contact-info {
-            background: #f9fafb;
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin-top: 2rem;
-        }
-
-        .contact-info a {
-            color: #059669;
-            text-decoration: none;
-        }
-
-        .contact-info a:hover {
-            text-decoration: underline;
-        }
-
-        code {
-            background: #f3f4f6;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
-            font-family: "Courier New", monospace;
             font-size: 0.9em;
+            margin-bottom: 30px;
         }
-
-        .footer {
-            text-align: center;
-            padding: 2rem;
-            color: #6b7280;
-            font-size: 0.9rem;
-        }
+        a { color: #10b981; text-decoration: none; }
+        a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <nav class="nav">
-        <div class="logo">
-            <img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png" alt="Capital Friends">
-        </div>
-    </nav>
-
     <div class="container">
         <h1>Privacy Policy</h1>
         <p class="last-updated"><strong>Last Updated:</strong> January 2025</p>
-        <p class="last-updated"><strong>Effective Date:</strong> January 2025</p>
 
-        <div class="highlight-box">
-            <p><strong>In Plain English:</strong> Capital Friends is a free Google Sheets template you copy to your own Google Drive. After you answer a short questionnaire, the template becomes 100% yours - we transfer complete ownership to you. We only collect your email address and questionnaire answers for statistical purposes. We NEVER have access to your financial data, family information, or any sensitive details you enter into your copy.</p>
-        </div>
+        <h2>1. Overview</h2>
+        <p>
+            Capital Friends ("we", "our", or "the app") is a free, open-source financial tracking
+            tool built with Google Apps Script. This Privacy Policy explains how we handle your data.
+        </p>
 
-        <h2>1. Introduction</h2>
-        <p>Welcome to <strong>Capital Friends by Jagadeesh Manne</strong> ("we," "our," or "us"). This Privacy Policy explains how we collect, use, and protect your information when you use our Google Sheets-based family wealth tracking template.</p>
-
-        <p><strong>Capital Friends</strong> is an open-source project hosted on GitHub that provides a Google Sheets template for personal family finance management. Unlike traditional web applications, Capital Friends operates entirely within your Google Drive after initial setup.</p>
-
-        <h3>How Capital Friends Works</h3>
-        <ol>
-            <li><strong>You Request a Copy:</strong> You visit our web app and request a personalized copy of the Capital Friends template</li>
-            <li><strong>We Create Your Copy:</strong> Our system creates a copy of the master template in our Google Drive</li>
-            <li><strong>You Answer Questions:</strong> A brief 8-question questionnaire helps us understand your needs (answers are optional)</li>
-            <li><strong>Ownership Transfers to You:</strong> Immediately after you submit the questionnaire, the Google Sheet is transferred to your ownership using Google's <code>setOwner()</code> function</li>
-            <li><strong>You Own Everything:</strong> From that moment forward, the sheet is 100% yours. It lives in your Google Drive, and we have ZERO access to it</li>
-        </ol>
-
-        <div class="highlight-box">
-            <p><strong>Key Privacy Principle:</strong> After ownership transfer, we cannot access your sheet even if we wanted to. Google's permission system ensures that once ownership is transferred, the original creator (us) loses all access unless you explicitly grant it back.</p>
-        </div>
-
-        <h2>2. Information We Collect</h2>
-        <p>We collect minimal information, and ONLY during the initial template copy and questionnaire process. Here's exactly what we collect:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Data Type</th>
-                    <th>What We Collect</th>
-                    <th>Why We Collect It</th>
-                    <th>Where It's Stored</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Email Address</strong></td>
-                    <td>Your Google account email (e.g., you@gmail.com)</td>
-                    <td>To transfer ownership of the template to you; for statistics on how many users have copied the template</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>Name</strong></td>
-                    <td>Your name from your Google profile (if available)</td>
-                    <td>For reference in our tracking sheet</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>Questionnaire Answers</strong></td>
-                    <td>8 Yes/No answers about your financial security practices</td>
-                    <td>To customize security recommendations and email reminders in YOUR copy; aggregate statistics</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>Creation Timestamp</strong></td>
-                    <td>Date and time you requested the template</td>
-                    <td>Usage statistics</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>Sheet ID & URL</strong></td>
-                    <td>The Google Sheets ID of your copy (e.g., <code>1abc...xyz</code>)</td>
-                    <td>Technical tracking; note: we CANNOT access the sheet even with this ID after ownership transfer</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>Sheet Name</strong></td>
-                    <td>The name of your Google Sheet (usually auto-generated)</td>
-                    <td>Reference only</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>Version Number</strong></td>
-                    <td>The version of Capital Friends you received (e.g., v1.0)</td>
-                    <td>To track which features users have</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-                <tr>
-                    <td><strong>User ID</strong></td>
-                    <td>A random UUID we generate for your copy (e.g., <code>a1b2c3d4...</code>)</td>
-                    <td>Internal tracking without relying on email</td>
-                    <td>Our private master tracking spreadsheet</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>The 8 Questionnaire Questions</h3>
-        <p>These are the exact questions we ask, and your answers are stored as simple Yes/No values:</p>
-        <ol>
-            <li>Do you have a single place where you track all your family's bank accounts and investments?</li>
-            <li>Do you regularly review your family's complete net worth (at least quarterly)?</li>
-            <li>Do you have a written plan for asset distribution if something happens to you?</li>
-            <li>Does at least one other trusted family member know where all your important documents are located?</li>
-            <li>Do you have a list of all your family members' important IDs (PAN, Aadhar, etc.) in one place?</li>
-            <li>Do you regularly backup your critical financial documents?</li>
-            <li>Do you have clear instructions for your family on accessing accounts in case of emergency?</li>
-            <li>Do you track your investment portfolio's actual allocation vs. your target allocation?</li>
-        </ol>
-
-        <p><strong>Important:</strong> These answers are used to:</p>
+        <h2>2. What Data We Collect</h2>
+        <p>When you use Capital Friends, we collect minimal data via email notification only:</p>
         <ul>
-            <li>Customize the security reminder emails that YOUR sheet will send to YOU (via YOUR Gmail account, not ours)</li>
-            <li>Generate recommendations in your "Security Questionnaire Results" tab</li>
-            <li>Provide us with aggregate statistics (e.g., "73% of users don't have a backup plan")</li>
+            <li><strong>Email Address:</strong> Your Google account email (sent to developer via email notification)</li>
+            <li><strong>Security Questionnaire Answers:</strong> Your 10 Yes/No answers to financial security questions</li>
+            <li><strong>Creation Timestamp:</strong> Date and time when you created your copy</li>
+            <li><strong>Questionnaire Score:</strong> Your calculated financial readiness score (out of 10)</li>
+        </ul>
+        <p><strong>Important:</strong> We do NOT maintain a central database. Data is sent to the developer via email notification only.</p>
+
+        <h2>3. What Data We DO NOT Collect</h2>
+        <p>We explicitly DO NOT collect, store, or access:</p>
+        <ul>
+            <li>Your financial data (account balances, transactions, net worth, etc.)</li>
+            <li>Personal financial information entered in your spreadsheet</li>
+            <li>Contents of your Google Drive files</li>
+            <li>Spreadsheet IDs or tracking identifiers</li>
+            <li>Any data beyond the email notification mentioned in Section 2</li>
         </ul>
 
-        <h2>3. Information We DO NOT Collect</h2>
-        <p>This is just as important as what we DO collect. Here's what we NEVER have access to:</p>
-
+        <h2>4. How We Use Your Data</h2>
+        <p>We use the minimal collected data ONLY for:</p>
         <ul>
-            <li><strong>Your Financial Data:</strong> Bank balances, account numbers, investment values, transaction history, net worth calculations</li>
-            <li><strong>Family Member Information:</strong> Names, dates of birth, PAN numbers, Aadhar numbers, passport details, phone numbers, addresses</li>
-            <li><strong>Bank Account Details:</strong> Account numbers, IFSC codes, branch names, account types, balances</li>
-            <li><strong>Investment Details:</strong> Stock holdings, mutual fund investments, FD details, gold holdings, real estate values</li>
-            <li><strong>Document Information:</strong> Locations of wills, deeds, insurance policies, or any documents you track</li>
-            <li><strong>Email Content:</strong> The security reminder emails are sent FROM your Gmail account TO your email address. We never see the content or have access to your Gmail</li>
-            <li><strong>Usage Patterns:</strong> How often you use the sheet, what features you use, what calculations you perform</li>
-            <li><strong>Device Information:</strong> Your device type, browser, IP address, location</li>
+            <li><strong>Creating Your Spreadsheet Copy:</strong> Created directly in YOUR Google Drive using your account permissions</li>
+            <li><strong>Developer Notifications:</strong> Email sent to developer when a new user creates a copy (for support purposes)</li>
+            <li><strong>No Central Tracking:</strong> We do NOT track usage, store user lists, or maintain databases</li>
         </ul>
 
-        <div class="highlight-box">
-            <p><strong>Why We Don't Have Access:</strong> After the ownership transfer, Google's permission system treats you as the sole owner. The Apps Script code bound to your sheet runs under YOUR Google account permissions, not ours. Even if we kept the Sheet ID, attempting to access your sheet would result in a "Permission Denied" error.</p>
-        </div>
-
-        <h2>4. How We Use Your Information</h2>
-        <p>The limited information we collect is used for:</p>
-
-        <h3>4.1 Ownership Transfer (Required)</h3>
-        <ul>
-            <li>Your email address is used to execute the <code>file.setOwner(userEmail)</code> function</li>
-            <li>This is a Google API requirement - we need your email to transfer ownership</li>
-            <li>This happens automatically after you complete the questionnaire</li>
-        </ul>
-
-        <h3>4.2 Usage Statistics (Anonymous)</h3>
-        <ul>
-            <li>Count how many people have used Capital Friends</li>
-            <li>Track which versions are in use</li>
-            <li>Understand questionnaire response patterns to improve recommendations</li>
-            <li>Example: "1,247 users have copied the template; 68% said they don't track net worth regularly"</li>
-        </ul>
-
-        <h3>4.3 Technical Support (Rare)</h3>
-        <ul>
-            <li>If you contact us with a technical issue, we may use your email to respond</li>
-            <li>We may look up your copy's creation date/version to help troubleshoot</li>
-            <li>We CANNOT access your actual sheet data even for support</li>
-        </ul>
-
-        <h3>4.4 Feature Customization (In Your Copy)</h3>
-        <ul>
-            <li>Your questionnaire answers are stored IN YOUR COPY (not just our tracking sheet)</li>
-            <li>The Apps Script in your copy uses these answers to customize email reminders</li>
-            <li>Example: If you answered "No" to Question 3 (asset distribution plan), your copy will remind you about this</li>
-        </ul>
-
-        <h2>5. Data Storage & Security</h2>
-
-        <h3>5.1 Master Tracking Spreadsheet</h3>
-        <p>We maintain a private Google Spreadsheet (ID: <code>16QXJW6PSVP-NRcZV3UIw_xcRAT4bZD5IujzXMxjvy1M</code>) that contains:</p>
-        <ul>
-            <li>Email addresses of users who requested copies</li>
-            <li>Creation timestamps</li>
-            <li>Sheet IDs and names</li>
-            <li>Questionnaire answers (8 Yes/No values)</li>
-            <li>Version numbers and status flags</li>
-        </ul>
-
-        <p><strong>Security measures:</strong></p>
-        <ul>
-            <li>This sheet is NOT publicly accessible</li>
-            <li>Only Jagadeesh Manne (jagadeeshi.k.manne@gmail.com) has access</li>
-            <li>Stored on Google's secure infrastructure with 2-factor authentication enabled</li>
-            <li>No third-party integrations or external access</li>
-        </ul>
-
-        <h3>5.2 Your Copy (Your Google Drive)</h3>
-        <p>After ownership transfer, your copy is stored in YOUR Google Drive with:</p>
-        <ul>
-            <li>Google's enterprise-grade security</li>
-            <li>Your own Google account's privacy settings</li>
-            <li>Your choice of sharing permissions (we recommend keeping it private)</li>
-            <li>Your own backup and retention policies</li>
-        </ul>
-
-        <h3>5.3 No External Servers</h3>
-        <p>Capital Friends does not use any external servers, databases, or third-party storage. Everything operates within Google's ecosystem:</p>
-        <ul>
-            <li>Apps Script code runs on Google's serverless platform</li>
-            <li>All data is stored in Google Sheets (Yours and our tracking sheet)</li>
-            <li>No data is transmitted to external APIs or services</li>
-        </ul>
+        <h2>5. Where Your Data is Stored</h2>
+        <p>
+            <strong>100% of your data stays in YOUR Google Drive.</strong> When you create a copy, the spreadsheet is
+            created directly in your Drive and you are the owner from the start.
+        </p>
+        <p><strong>Your Financial Data Location:</strong> 100% in your personal Google Drive account</p>
+        <p><strong>Developer Access:</strong> We have ZERO access to your spreadsheet after creation. The app runs with YOUR permissions only.</p>
+        <p><strong>No Central Database:</strong> We do NOT maintain a user database or store any information centrally.</p>
 
         <h2>6. Data Sharing & Third Parties</h2>
-        <p><strong>We do NOT sell, rent, or share your information with any third parties.</strong></p>
-
-        <p>The only "sharing" that occurs is:</p>
-
-        <h3>6.1 Google Services (Required)</h3>
+        <p><strong>We do NOT sell, rent, or share your data with any third parties.</strong></p>
+        <p>The only data sharing that occurs:</p>
         <ul>
-            <li>Your data is processed by Google Apps Script (Google's platform)</li>
-            <li>Your copy is stored in Google Drive</li>
-            <li>Emails are sent via Gmail (from YOUR account, not ours)</li>
+            <li><strong>Google Services:</strong> The app runs on Google's infrastructure (Apps Script, Drive, Sheets)</li>
+            <li><strong>Email Notifications:</strong> When you create a copy, an email is sent to the developer with your email, score, and timestamp</li>
         </ul>
 
-        <p>This is unavoidable because Capital Friends is built on Google Workspace. By using Capital Friends, you're subject to <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a>.</p>
-
-        <h3>6.2 No Marketing, No Analytics, No Advertising</h3>
+        <h2>7. Data Retention & Deletion</h2>
         <ul>
-            <li>We don't use Google Analytics or any tracking pixels</li>
-            <li>We don't integrate with advertising networks</li>
-            <li>We don't send marketing emails (the only emails are security reminders from YOUR copy to YOU)</li>
-            <li>We don't share data with data brokers or marketing companies</li>
+            <li><strong>Your Spreadsheet:</strong> Stored indefinitely in YOUR Google Drive until you delete it</li>
+            <li><strong>Email Notifications:</strong> Developer may retain email notifications for support purposes</li>
+            <li><strong>No Centralized Storage:</strong> We do not maintain a database, so there's no central data to delete</li>
+            <li><strong>Deletion Requests:</strong> Contact us at <strong>jagadeesh.k.manne@gmail.com</strong> to request email deletion</li>
         </ul>
 
-        <h3>6.3 Open Source Code</h3>
-        <p>Capital Friends is open source on GitHub: <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank">https://github.com/jagadeeshkmanne/capital-friends</a></p>
+        <h2>8. Google API Services User Data Policy</h2>
+        <p>
+            Capital Friends' use and transfer of information received from Google APIs adheres to
+            <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">
+            Google API Services User Data Policy</a>, including the Limited Use requirements.
+        </p>
+
+        <h2>9. OAuth Scopes & Permissions</h2>
+        <p>Capital Friends requests these Google OAuth scopes:</p>
         <ul>
-            <li>Anyone can review our code to verify our privacy claims</li>
-            <li>The Apps Script code in your copy is visible to you (Tools → Script editor)</li>
-            <li>No hidden functionality or data collection</li>
+            <li><strong>https://www.googleapis.com/auth/spreadsheets:</strong> To create and set up your financial tracking spreadsheet</li>
+            <li><strong>https://www.googleapis.com/auth/drive.file:</strong> To create the spreadsheet file in YOUR Google Drive</li>
+            <li><strong>https://www.googleapis.com/auth/gmail.send:</strong> To send weekly email reports from YOUR Gmail account</li>
+            <li><strong>https://www.googleapis.com/auth/script.scriptapp:</strong> To run the web app and process your requests</li>
+        </ul>
+        <p>
+            <strong>Important:</strong> The app runs as "Execute as: User accessing the web app" which means:
+        </p>
+        <ul>
+            <li>The spreadsheet is created directly in YOUR Drive using YOUR permissions</li>
+            <li>YOU are the owner from the moment it's created</li>
+            <li>The developer has ZERO access to your spreadsheet or data</li>
+            <li>The app can ONLY access files it creates for you, not your other Drive files</li>
         </ul>
 
-        <h2>7. Your Email Reports (Important Clarification)</h2>
-        <p>Capital Friends includes an optional feature that sends daily security reminder emails. Here's how it works:</p>
-
-        <h3>These Emails Are Sent BY You, TO You</h3>
+        <h2>10. Security Measures</h2>
         <ul>
-            <li>The Apps Script code in YOUR copy uses YOUR Gmail account to send emails</li>
-            <li>The emails are sent TO your own email address (the one you used to request the copy)</li>
-            <li>We (the developers) are NOT involved in this email process</li>
-            <li>We don't see the email content, recipients, or delivery status</li>
+            <li>App runs on Google's secure Apps Script infrastructure</li>
+            <li>All data transmission uses HTTPS encryption</li>
+            <li>App executes with YOUR permissions only (not developer's)</li>
+            <li>No central database means no central point of attack</li>
+            <li>No third-party analytics or tracking scripts</li>
         </ul>
 
-        <h3>What Triggers These Emails</h3>
+        <h2>11. Your Rights</h2>
+        <p>You have the right to:</p>
         <ul>
-            <li>You can set up time-based triggers in YOUR copy (via the "⚙️ Setup Email Reports" menu)</li>
-            <li>The triggers run under YOUR Google account permissions</li>
-            <li>The email content is based on YOUR questionnaire answers</li>
+            <li><strong>Full Ownership:</strong> You own your spreadsheet 100% from creation</li>
+            <li><strong>Control:</strong> Delete your spreadsheet copy from your Drive anytime</li>
+            <li><strong>Revoke Access:</strong> Revoke app permissions in Google Account settings</li>
+            <li><strong>Email Deletion:</strong> Request deletion of email notifications sent to developer</li>
+            <li><strong>No Database Access:</strong> Since we don't maintain a database, there's no central data to access</li>
         </ul>
 
-        <h3>You Can Disable This Anytime</h3>
+        <h2>12. Children's Privacy</h2>
+        <p>
+            Capital Friends is not intended for users under 18 years old. We do not knowingly
+            collect data from children.
+        </p>
+
+        <h2>13. Changes to This Policy</h2>
+        <p>
+            We may update this Privacy Policy occasionally. Changes will be posted on this page
+            with an updated "Last Updated" date. Continued use of the app after changes constitutes
+            acceptance of the revised policy.
+        </p>
+
+        <h2>14. Open Source & Transparency</h2>
+        <p>
+            Capital Friends is open source. You can review the complete code on
+            <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank">GitHub</a>
+            to verify our privacy practices.
+        </p>
+
+        <h2>15. Contact Us</h2>
+        <p>For privacy concerns, data requests, or questions:</p>
         <ul>
-            <li>Go to your Google Account → Security → Manage third-party access</li>
-            <li>Or delete the triggers from YOUR sheet's Apps Script project</li>
-            <li>Or simply ignore the menu item and never set up email reports</li>
+            <li><strong>Email:</strong> jagadeeshi.k.manne@gmail.com</li>
+            <li><strong>GitHub Issues:</strong> <a href="https://github.com/jagadeeshkmanne/capital-friends/issues" target="_blank">Report an issue</a></li>
         </ul>
 
-        <h2>8. Google Apps Script Permissions (OAuth Scopes)</h2>
-        <p>When you create your copy and start using features, Google will ask you to authorize specific permissions. These are called "OAuth scopes" and control what the Apps Script code can do within YOUR Google account.</p>
-
-        <h3>8.1 Required Scopes (Appear on First Menu Use)</h3>
-        <p>The first time you use any menu feature (like Add Family Member), Google shows an authorization screen requesting these permissions:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Scope</th>
-                    <th>Permission Name</th>
-                    <th>Why Needed</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><code>spreadsheets</code></td>
-                    <td>See, edit, create, and delete spreadsheets</td>
-                    <td>To read and write your financial data (family members, investments, transactions) in YOUR Capital Friends spreadsheet. All calculations, data storage, and dashboard updates require this permission.</td>
-                </tr>
-                <tr>
-                    <td><code>send_mail</code></td>
-                    <td>Send email on your behalf</td>
-                    <td>To send automated portfolio summary emails FROM your Gmail account TO your family members. This allows daily/weekly/monthly reports and rebalancing alerts. <strong>Important:</strong> Emails come from YOUR account, not ours.</td>
-                </tr>
-                <tr>
-                    <td><code>drive.file</code></td>
-                    <td>See and download files created with this app</td>
-                    <td>To access and work with the Capital Friends spreadsheet that we created for you. This is the minimum "file scope" permission - we can ONLY access files we create, never your other Drive files.</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>8.2 Optional Scope (Appears When Enabling Email Schedule)</h3>
-        <p>If you choose to enable automated email scheduling (daily/weekly/monthly reports), you'll see a second authorization request:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Scope</th>
-                    <th>Permission Name</th>
-                    <th>Why Needed</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><code>script.scriptapp</code></td>
-                    <td>Manage your Apps Script triggers</td>
-                    <td>To create time-based triggers that automatically run email reports at your chosen schedule (e.g., daily at 9 AM). <strong>This is optional</strong> - you can skip automated emails and send reports manually instead.</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>8.3 Important Notes About OAuth</h3>
-        <ul>
-            <li><strong>Progressive Authorization:</strong> You're only asked for permissions when you actually use features that need them</li>
-            <li><strong>Runs Under YOUR Account:</strong> The Apps Script code executes using YOUR Google account authentication, not ours</li>
-            <li><strong>You Control Access:</strong> You can revoke these permissions anytime from your Google Account settings (Security → Third-party apps)</li>
-            <li><strong>After Ownership Transfer:</strong> The code runs entirely in your copy - we have no access to your data even with these scopes</li>
-            <li><strong>Time-Based Triggers:</strong> Email schedule triggers run under YOUR account permissions and can be deleted from Extensions → Apps Script → Triggers</li>
-        </ul>
-
-        <h2>9. Master Database Access (IMPORTRANGE)</h2>
-        <p>Capital Friends uses Google Sheets' IMPORTRANGE formula to connect to public reference databases. This is different from OAuth permissions.</p>
-
-        <h3>9.1 What are the Master Databases?</h3>
-        <p>Your spreadsheet includes two sheets that import reference data from public databases:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Sheet Name</th>
-                    <th>Database ID</th>
-                    <th>Contains</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>MutualFundData</strong></td>
-                    <td><code>1pSvGDFTgcCkW6Fk9P2mZ5FSpROVClz7Vu0sW9JnPz9s</code></td>
-                    <td>1000+ mutual fund names, AMC names, fund categories, and codes for search/lookup functionality</td>
-                </tr>
-                <tr>
-                    <td><strong>StockMasterData</strong></td>
-                    <td>Public stock database</td>
-                    <td>1000+ NSE and BSE stock symbols, company names, and ISIN codes for stock lookup</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>9.2 IMPORTRANGE Permission (Required)</h3>
-        <p>When you first open the MutualFundData or StockMasterData sheets, you'll see a <code>#REF!</code> error with the message: "You need permission to access this external data."</p>
-
-        <p><strong>What you need to do:</strong></p>
-        <ol>
-            <li>Click the <strong>"Allow access"</strong> button that appears in the cell</li>
-            <li>This grants permission for YOUR spreadsheet to read data from OUR public master databases</li>
-            <li>Data will then load and update automatically</li>
-        </ol>
-
-        <p><strong>Important clarifications:</strong></p>
-        <ul>
-            <li><strong>One-way connection:</strong> Data flows FROM master database TO your sheet only. Your financial data NEVER goes to the master database.</li>
-            <li><strong>Read-only access:</strong> The master databases are publicly shared as "Anyone with link can view" - they contain NO user information</li>
-            <li><strong>Reference data only:</strong> These databases contain publicly available mutual fund and stock information (names, symbols, codes), not your personal holdings or values</li>
-            <li><strong>Updated automatically:</strong> Master databases refresh daily from public sources (AMFI, NSE, BSE APIs), keeping fund/stock information current</li>
-            <li><strong>No privacy risk:</strong> IMPORTRANGE cannot access your financial data or other sheets in your Drive</li>
-            <li><strong>Can be revoked:</strong> You can remove access by deleting the MutualFundData and StockMasterData sheets (though you'll lose search functionality)</li>
-        </ul>
-
-        <h3>9.3 Why This is Safe</h3>
-        <p>The IMPORTRANGE formula is a standard Google Sheets feature that:</p>
-        <ul>
-            <li>Only allows reading data from the specified external spreadsheet</li>
-            <li>Cannot write data back to the source</li>
-            <li>Cannot access other sheets in your Drive</li>
-            <li>Is visible and auditable - you can see the formula in cell A1 of each data sheet</li>
-            <li>Is completely separate from OAuth permissions - it's a spreadsheet-level permission, not an API permission</li>
-        </ul>
-
-        <p><strong>You can verify the master databases are public:</strong> Visit the spreadsheet IDs listed above in any browser (while logged into Google) to see they're shared publicly with view-only access.</p>
-
-        <h2>10. Cookies & Tracking Technologies</h2>
-        <p><strong>Capital Friends does NOT use cookies.</strong></p>
-
-        <p>Our web app (the initial page where you request a copy) is a simple Google Apps Script web app that:</p>
-        <ul>
-            <li>Does not set any cookies in your browser</li>
-            <li>Does not use localStorage or sessionStorage</li>
-            <li>Does not include third-party tracking scripts</li>
-            <li>Does not use fingerprinting or device tracking</li>
-        </ul>
-
-        <p>Google's Apps Script platform may set its own session cookies for authentication purposes, but we don't control or access these.</p>
-
-        <h2>9. Data Retention & Deletion</h2>
-
-        <h3>9.1 Our Master Tracking Sheet</h3>
-        <p><strong>Retention:</strong> We retain your email and questionnaire answers indefinitely for the following reasons:</p>
-        <ul>
-            <li>To maintain usage statistics over time</li>
-            <li>To prevent duplicate copies if you request again with the same email</li>
-            <li>To provide support if you contact us months or years later</li>
-        </ul>
-
-        <p><strong>Deletion Rights:</strong> You can request deletion of your data from our tracking sheet by emailing jagadeeshi.k.manne@gmail.com with:</p>
-        <ul>
-            <li>Subject: "Capital Friends - Delete My Data"</li>
-            <li>The email address you used to request the template</li>
-            <li>Confirmation that you want your record removed</li>
-        </ul>
-
-        <p>We'll delete your row from our tracking sheet within 30 days. Note: This does NOT affect your copy of the template (which you own).</p>
-
-        <h3>9.2 Your Copy (Your Responsibility)</h3>
-        <p>Your copy of the Capital Friends template is YOUR property. You can:</p>
-        <ul>
-            <li>Delete it anytime from your Google Drive</li>
-            <li>Move it to Trash (can be restored for 30 days)</li>
-            <li>Permanently delete it (cannot be restored)</li>
-            <li>Download it as Excel/CSV and delete the Google Sheets version</li>
-        </ul>
-
-        <p>We have no control over your copy and cannot delete it for you.</p>
-
-        <h2>10. Your Privacy Rights</h2>
-        <p>You have the following rights regarding your information:</p>
-
-        <h3>10.1 Right to Access</h3>
-        <p>Request a copy of the data we have about you (email + questionnaire answers from our tracking sheet).</p>
-
-        <h3>10.2 Right to Rectification</h3>
-        <p>Request correction if your email or other data in our tracking sheet is incorrect.</p>
-
-        <h3>10.3 Right to Erasure ("Right to Be Forgotten")</h3>
-        <p>Request deletion of your data from our master tracking sheet (see section 9.1).</p>
-
-        <h3>10.4 Right to Data Portability</h3>
-        <p>Request a machine-readable export of your data (JSON or CSV format).</p>
-
-        <h3>10.5 Right to Object</h3>
-        <p>Object to our processing of your data (though this effectively means we'd delete your record since we only use it for statistics).</p>
-
-        <h3>10.6 Right to Withdraw Consent</h3>
-        <p>Since ownership was transferred to you, your ongoing use of the template is entirely under your control. You can stop using it anytime.</p>
-
-        <p><strong>To exercise any of these rights:</strong> Email jagadeeshi.k.manne@gmail.com with your request.</p>
-
-        <h2>11. Children's Privacy</h2>
-        <p>Capital Friends is intended for adults managing family finances. We do not knowingly collect information from children under 13 (or the applicable age of digital consent in your jurisdiction).</p>
-
-        <p>If you are under 18, please obtain parental consent before using Capital Friends.</p>
-
-        <p>If we discover we've collected data from a child without proper consent, we'll delete it immediately.</p>
-
-        <h2>12. International Data Transfers</h2>
-        <p>Capital Friends is hosted on Google's infrastructure, which is global. Your data may be processed in:</p>
-        <ul>
-            <li>Google data centers in various countries</li>
-            <li>The developer's location (India)</li>
-        </ul>
-
-        <p>Google complies with international data protection laws (GDPR, etc.). By using Capital Friends, you consent to this international processing.</p>
-
-        <h2>13. Changes to This Privacy Policy</h2>
-        <p>We may update this Privacy Policy to reflect:</p>
-        <ul>
-            <li>New features in Capital Friends</li>
-            <li>Changes in privacy laws</li>
-            <li>User feedback and clarifications</li>
-        </ul>
-
-        <p><strong>When we make changes:</strong></p>
-        <ul>
-            <li>We'll update the "Last Updated" date at the top</li>
-            <li>We'll post the new policy on our GitHub Pages site</li>
-            <li>We'll note material changes in our GitHub repository's release notes</li>
-        </ul>
-
-        <p><strong>Your continued use of Capital Friends after changes constitutes acceptance of the new policy.</strong></p>
-
-        <h2>14. Legal Compliance & Disclosure</h2>
-        <p>We may disclose your information if required by law or legal process:</p>
-        <ul>
-            <li>In response to court orders or subpoenas</li>
-            <li>To comply with government investigations</li>
-            <li>To protect our legal rights or property</li>
-            <li>To prevent fraud or abuse</li>
-        </ul>
-
-        <p>In such cases, we'll only disclose the minimum necessary information (likely just email and creation date from our tracking sheet).</p>
-
-        <h2>15. Open Source Transparency</h2>
-        <p>Capital Friends is fully open source. You can verify our privacy claims by:</p>
-        <ul>
-            <li>Reviewing the code on GitHub: <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank">https://github.com/jagadeeshkmanne/capital-friends</a></li>
-            <li>Inspecting the Apps Script code in your copy (Tools → Script editor)</li>
-            <li>Searching for data collection functions (look for references to the master tracking sheet)</li>
-            <li>Verifying the ownership transfer code (search for <code>setOwner</code> function)</li>
-        </ul>
-
-        <p>If you find any privacy-related issues in the code, please report them via GitHub Issues.</p>
-
-        <h2>16. Contact Information</h2>
-        <div class="contact-info">
-            <p><strong>Capital Friends by Jagadeesh Manne</strong></p>
-            <p><strong>Developer:</strong> Jagadeesh Manne</p>
-            <p><strong>Email:</strong> <a href="mailto:jagadeeshi.k.manne@gmail.com">jagadeeshi.k.manne@gmail.com</a></p>
-            <p><strong>GitHub:</strong> <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank">https://github.com/jagadeeshkmanne/capital-friends</a></p>
-            <p><strong>Website:</strong> <a href="https://jagadeeshkmanne.github.io/capital-friends/" target="_blank">https://jagadeeshkmanne.github.io/capital-friends/</a></p>
-            <p><strong>Jurisdiction:</strong> India</p>
-        </div>
-
-        <p>For privacy-related questions, data requests, or to report concerns, please email jagadeeshi.k.manne@gmail.com with "Privacy" in the subject line.</p>
-
-        <hr style="margin: 3rem 0; border: none; border-top: 1px solid #e5e7eb;">
-
-        <h2>Summary: What You Need to Know</h2>
-        <div class="highlight-box">
-            <p><strong>✅ What We Collect:</strong> Your email address, name, and 8 Yes/No questionnaire answers</p>
-            <p><strong>✅ Why We Collect It:</strong> To transfer ownership of the template to you and for anonymous usage statistics</p>
-            <p><strong>✅ What We DON'T Collect:</strong> Your financial data, family information, bank details, investment values - NONE of this!</p>
-            <p><strong>✅ After Ownership Transfer:</strong> We have ZERO access to your copy, even with the Sheet ID</p>
-            <p><strong>✅ Your Rights:</strong> Access, correction, deletion, data portability - just email us</p>
-            <p><strong>✅ No Sharing:</strong> We don't sell or share your data with anyone</p>
-            <p><strong>✅ Open Source:</strong> All code is public on GitHub - verify our claims yourself</p>
-        </div>
-    </div>
-
-    <div class="footer">
-        <p>&copy; 2025 Capital Friends by Jagadeesh Manne. Open Source Project.</p>
-        <p><a href="https://jagadeeshkmanne.github.io/capital-friends/" style="color: #059669;">Home</a> |
-           <a href="https://jagadeeshkmanne.github.io/capital-friends/privacy-policy.html" style="color: #059669;">Privacy Policy</a> |
-           <a href="https://jagadeeshkmanne.github.io/capital-friends/terms-of-service.html" style="color: #059669;">Terms of Service</a> |
-           <a href="https://github.com/jagadeeshkmanne/capital-friends" style="color: #059669;">GitHub</a></p>
+        <p style="margin-top: 40px; text-align: center;">
+            <a href="index.html">← Back to Home</a> |
+            <a href="terms-of-service.html">Terms of Service</a>
+        </p>
     </div>
 </body>
 </html>
