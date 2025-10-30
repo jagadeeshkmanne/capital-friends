@@ -332,7 +332,14 @@
             <li>May be marked as spam by email filters</li>
             <li>Is dependent on Google's Apps Script trigger reliability</li>
             <li>Runs under YOUR account, not ours (we can't troubleshoot delivery issues)</li>
+            <li><strong>Gmail Quota Limits:</strong> Consumer Gmail accounts are limited to 100 emails per day. If you exceed this (e.g., by sending bulk emails from other scripts), Capital Friends email reports will fail.</li>
+            <li><strong>Trigger Reliability:</strong> Time-based triggers may occasionally fail or be delayed by Google Apps Script's execution queues</li>
+            <li><strong>No Delivery Guarantee:</strong> We cannot guarantee emails will be delivered, arrive on time, or avoid spam filters</li>
         </ul>
+
+        <div class="warning-box">
+            <p><strong>⚠️ Email Quota Warning:</strong> If you use automated email features heavily or have other Apps Scripts sending emails, you may hit Google's 100 emails/day limit for consumer accounts. Consider using Google Workspace (500 emails/day limit) for higher volumes.</p>
+        </div>
 
         <h2>6. User Conduct</h2>
         <p>You agree NOT to:</p>
@@ -393,7 +400,117 @@
             <li>Payment processors (it's 100% free)</li>
         </ul>
 
-        <h2>8. Data & Privacy</h2>
+        <h2>8. Google Apps Script Limitations</h2>
+        <p>Capital Friends runs on Google Apps Script, which is a cloud-based scripting platform provided by Google. This platform has inherent limitations that may affect your experience.</p>
+
+        <h3>8.1 Execution Time Limits</h3>
+        <p><strong>6-Minute Script Timeout:</strong> Google Apps Script enforces a maximum execution time of 6 minutes per script run. This means:</p>
+        <ul>
+            <li>Complex operations (e.g., calculating portfolio values across hundreds of transactions) may timeout</li>
+            <li>Custom menu functions that process large datasets may fail to complete</li>
+            <li>Email report generation with extensive data may be interrupted</li>
+            <li>You may see error messages like "Script timeout: exceeded maximum execution time"</li>
+        </ul>
+
+        <p><strong>Workaround:</strong> If you encounter timeouts, try reducing the amount of data processed at once or simplifying calculations.</p>
+
+        <h3>8.2 Email Quotas</h3>
+        <p>Google enforces strict daily email sending limits to prevent spam:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+            <thead>
+                <tr style="background: #f3f4f6; border-bottom: 2px solid #059669;">
+                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #e5e7eb;">Account Type</th>
+                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #e5e7eb;">Daily Email Limit</th>
+                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #e5e7eb;">Impact on Capital Friends</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;"><strong>Consumer Gmail</strong> (free)</td>
+                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">100 emails/day</td>
+                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">Sufficient for daily/weekly reports to 3-5 family members. May fail if you send many emails from other sources.</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;"><strong>Google Workspace</strong> (paid)</td>
+                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">500 emails/day (Business Starter)</td>
+                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">Handles large families and frequent reports comfortably.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p><strong>What Counts Toward Your Quota:</strong></p>
+        <ul>
+            <li>Each email sent to each recipient counts as 1 email (e.g., sending to 5 family members = 5 emails)</li>
+            <li>Emails sent by ALL your Apps Scripts count toward the same quota</li>
+            <li>Manual emails sent from Gmail also count toward the quota</li>
+            <li>The quota resets at midnight Pacific Time (PT)</li>
+        </ul>
+
+        <div class="warning-box">
+            <p><strong>⚠️ Quota Exceeded Error:</strong> If you hit the email limit, you'll see errors like "Service invoked too many times for one day: email." Email sending will resume automatically the next day. To avoid this, limit the number of recipients or reduce email frequency.</p>
+        </div>
+
+        <h3>8.3 Spreadsheet API Quotas</h3>
+        <p>Google Apps Script has read/write quotas for accessing Google Sheets:</p>
+        <ul>
+            <li><strong>Read Requests:</strong> 20,000 calls per day (consumer), 100,000 calls per day (Workspace)</li>
+            <li><strong>Write Requests:</strong> 20,000 calls per day (consumer), 100,000 calls per day (Workspace)</li>
+            <li><strong>Simultaneous Executions:</strong> Maximum 30 concurrent script executions per user</li>
+        </ul>
+
+        <p><strong>When This Matters:</strong> These quotas are very high and unlikely to be reached with normal Capital Friends usage. However, if you:</p>
+        <ul>
+            <li>Run automated triggers very frequently (e.g., hourly updates)</li>
+            <li>Have many other Apps Scripts running simultaneously</li>
+            <li>Process extremely large datasets (10,000+ rows)</li>
+        </ul>
+        <p>...you may encounter "Service invoked too many times" errors.</p>
+
+        <h3>8.4 Trigger Limits</h3>
+        <p>Google Apps Script limits the number of time-based triggers per script:</p>
+        <ul>
+            <li><strong>Maximum Triggers:</strong> 20 time-based triggers per user per script</li>
+            <li><strong>Minimum Interval:</strong> Hourly (you cannot schedule triggers to run every minute)</li>
+            <li><strong>Trigger Reliability:</strong> Triggers may be delayed by up to 15 minutes during high Google Apps Script platform load</li>
+            <li><strong>Trigger Failures:</strong> If a trigger fails 10 times in a row, Google may automatically disable it</li>
+        </ul>
+
+        <p><strong>For Capital Friends:</strong> You'll only use 1-2 triggers (daily/weekly email reports), so this limit is not a concern for typical usage.</p>
+
+        <h3>8.5 Apps Script Environment Limitations</h3>
+        <p>Other technical limitations to be aware of:</p>
+        <ul>
+            <li><strong>No External Libraries:</strong> Cannot use npm packages or external JavaScript libraries (only Google's built-in services)</li>
+            <li><strong>No Persistent State:</strong> Scripts cannot maintain state between executions (data must be stored in sheets)</li>
+            <li><strong>No Direct Database Access:</strong> Cannot connect to MySQL, PostgreSQL, or other databases directly</li>
+            <li><strong>Single-Threaded Execution:</strong> Scripts run sequentially, not in parallel (no multi-threading)</li>
+            <li><strong>Memory Limits:</strong> Large data operations may fail due to memory constraints</li>
+            <li><strong>Network Request Limits:</strong> Limited to 20,000 UrlFetch calls per day</li>
+        </ul>
+
+        <h3>8.6 No Control Over Platform Changes</h3>
+        <p>Google may change Apps Script functionality at any time:</p>
+        <ul>
+            <li>Deprecated features may stop working without warning</li>
+            <li>New restrictions or quotas may be introduced</li>
+            <li>Google Sheets formulas may change behavior in updates</li>
+            <li>Apps Script APIs may be sunset or replaced</li>
+        </ul>
+
+        <p><strong>We are not responsible if Google changes affect Capital Friends' functionality.</strong> As an open-source project, the community may adapt to changes, but there are no guarantees.</p>
+
+        <h3>8.7 Authorization and Permissions</h3>
+        <p>Capital Friends requires specific Google OAuth scopes to function. For detailed information, see our <a href="https://jagadeeshkmanne.github.io/capital-friends/privacy-policy.html#oauth-scopes">Privacy Policy (Section 8: OAuth Scopes)</a>.</p>
+
+        <p><strong>Important Authorization Notes:</strong></p>
+        <ul>
+            <li><strong>First-Time Authorization:</strong> You'll be asked to authorize permissions when you first use menu features (e.g., "Add Family Member")</li>
+            <li><strong>Unverified App Warning:</strong> You may see "This app isn't verified" because Capital Friends is not reviewed by Google. This is normal for open-source scripts.</li>
+            <li><strong>Advanced Settings:</strong> Click "Advanced" → "Go to Capital Friends (unsafe)" to proceed. This is safe because the code runs in YOUR copy under YOUR account.</li>
+            <li><strong>Revocable Permissions:</strong> You can revoke permissions anytime from Google Account Settings → Security → Third-party apps with account access</li>
+        </ul>
+
+        <h2>9. Data & Privacy</h2>
         <p>For detailed information about data collection and privacy, see our <a href="https://jagadeeshkmanne.github.io/capital-friends/privacy-policy.html">Privacy Policy</a>.</p>
 
         <h3>Summary</h3>
@@ -404,9 +521,9 @@
             <li>Your financial data never leaves your Google Drive</li>
         </ul>
 
-        <h2>9. Modifications to Service</h2>
+        <h2>10. Modifications to Service</h2>
 
-        <h3>9.1 Right to Modify</h3>
+        <h3>10.1 Right to Modify</h3>
         <p>We reserve the right to:</p>
         <ul>
             <li>Update the master template with new features or bug fixes</li>
@@ -415,7 +532,7 @@
             <li>Update these Terms of Service</li>
         </ul>
 
-        <h3>9.2 Your Copy is Frozen</h3>
+        <h3>10.2 Your Copy is Frozen</h3>
         <p><strong>Important:</strong> Once you receive your copy, it's a snapshot of the template at that moment. Updates to the master template do NOT automatically apply to your copy.</p>
 
         <p>If you want new features:</p>
@@ -425,7 +542,7 @@
             <li>You can modify your copy yourself (it's yours!)</li>
         </ul>
 
-        <h3>9.3 Discontinuation</h3>
+        <h3>10.3 Discontinuation</h3>
         <p>We may discontinue Capital Friends at any time by:</p>
         <ul>
             <li>Stopping distribution of new copies</li>
@@ -435,9 +552,9 @@
 
         <p><strong>Your existing copy will continue to work</strong> because it's in your Google Drive. However, you'll lose the ability to get new copies or access the web app.</p>
 
-        <h2>10. Support & Maintenance</h2>
+        <h2>11. Support & Maintenance</h2>
 
-        <h3>10.1 No Guaranteed Support</h3>
+        <h3>11.1 No Guaranteed Support</h3>
         <p>Capital Friends is a free, open-source project. We provide:</p>
         <ul>
             <li><strong>No guaranteed response time</strong> for questions or issues</li>
@@ -446,7 +563,7 @@
             <li><strong>No priority support options</strong></li>
         </ul>
 
-        <h3>10.2 Community Support</h3>
+        <h3>11.2 Community Support</h3>
         <p>You can seek help through:</p>
         <ul>
             <li><strong>GitHub Issues:</strong> Report bugs or request features at <a href="https://github.com/jagadeeshkmanne/capital-friends/issues" target="_blank">https://github.com/jagadeeshkmanne/capital-friends/issues</a></li>
@@ -454,7 +571,7 @@
             <li><strong>Code Review:</strong> Inspect the open-source code yourself</li>
         </ul>
 
-        <h3>10.3 No Maintenance Obligations</h3>
+        <h3>11.3 No Maintenance Obligations</h3>
         <p>We are not obligated to:</p>
         <ul>
             <li>Fix bugs in your copy</li>
@@ -463,9 +580,9 @@
             <li>Provide migration tools if we release a new version</li>
         </ul>
 
-        <h2>11. Termination</h2>
+        <h2>12. Termination</h2>
 
-        <h3>11.1 Your Right to Terminate</h3>
+        <h3>12.1 Your Right to Terminate</h3>
         <p>You can stop using Capital Friends at any time by:</p>
         <ul>
             <li>Deleting your copy from Google Drive</li>
@@ -473,7 +590,7 @@
             <li>Requesting deletion of your data from our tracking sheet (see Privacy Policy)</li>
         </ul>
 
-        <h3>11.2 Our Right to Terminate</h3>
+        <h3>12.2 Our Right to Terminate</h3>
         <p>We may refuse to provide copies or block access if:</p>
         <ul>
             <li>You abuse the system (e.g., requesting hundreds of copies)</li>
@@ -484,7 +601,7 @@
 
         <p><strong>Note:</strong> Even if we block you, your existing copy will continue to work (we can't delete it - you own it).</p>
 
-        <h2>12. Indemnification</h2>
+        <h2>13. Indemnification</h2>
         <p>You agree to indemnify and hold harmless Jagadeesh Manne, Capital Friends, and any contributors from any claims, damages, or expenses (including legal fees) arising from:</p>
         <ul>
             <li>Your use of Capital Friends</li>
@@ -495,35 +612,35 @@
             <li>Your modifications to the template that cause harm to others</li>
         </ul>
 
-        <h2>13. Dispute Resolution</h2>
+        <h2>14. Dispute Resolution</h2>
 
-        <h3>13.1 Governing Law</h3>
+        <h3>14.1 Governing Law</h3>
         <p>These Terms are governed by the laws of <strong>India</strong>, without regard to conflict of law principles.</p>
 
-        <h3>13.2 Jurisdiction</h3>
+        <h3>14.2 Jurisdiction</h3>
         <p>Any disputes will be resolved in the courts of <strong>India</strong>.</p>
 
-        <h3>13.3 Informal Resolution First</h3>
+        <h3>14.3 Informal Resolution First</h3>
         <p>Before filing any legal claim, you agree to contact us at jagadeeshi.k.manne@gmail.com and attempt to resolve the issue informally.</p>
 
-        <h2>14. Miscellaneous</h2>
+        <h2>15. Miscellaneous</h2>
 
-        <h3>14.1 Entire Agreement</h3>
+        <h3>15.1 Entire Agreement</h3>
         <p>These Terms, along with our Privacy Policy, constitute the entire agreement between you and Capital Friends.</p>
 
-        <h3>14.2 Severability</h3>
+        <h3>15.2 Severability</h3>
         <p>If any provision of these Terms is found invalid, the remaining provisions remain in effect.</p>
 
-        <h3>14.3 No Waiver</h3>
+        <h3>15.3 No Waiver</h3>
         <p>Our failure to enforce any provision doesn't constitute a waiver of that provision.</p>
 
-        <h3>14.4 Assignment</h3>
+        <h3>15.4 Assignment</h3>
         <p>You may not assign these Terms to anyone else. We may assign our rights to any successor or acquirer.</p>
 
-        <h3>14.5 Force Majeure</h3>
+        <h3>15.5 Force Majeure</h3>
         <p>We're not liable for failures due to circumstances beyond our control (natural disasters, Google outages, etc.).</p>
 
-        <h2>15. Changes to These Terms</h2>
+        <h2>16. Changes to These Terms</h2>
         <p>We may update these Terms at any time. When we do:</p>
         <ul>
             <li>We'll update the "Last Updated" date at the top</li>
@@ -535,7 +652,7 @@
 
         <p>If you don't agree with the new Terms, stop using Capital Friends and delete your copy.</p>
 
-        <h2>16. Contact Information</h2>
+        <h2>17. Contact Information</h2>
         <div class="contact-info">
             <p><strong>Capital Friends by Jagadeesh Manne</strong></p>
             <p><strong>Developer:</strong> Jagadeesh Manne</p>
