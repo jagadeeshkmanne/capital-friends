@@ -402,7 +402,129 @@
             <li>Or simply ignore the menu item and never set up email reports</li>
         </ul>
 
-        <h2>8. Cookies & Tracking Technologies</h2>
+        <h2>8. Google Apps Script Permissions (OAuth Scopes)</h2>
+        <p>When you create your copy and start using features, Google will ask you to authorize specific permissions. These are called "OAuth scopes" and control what the Apps Script code can do within YOUR Google account.</p>
+
+        <h3>8.1 Required Scopes (Appear on First Menu Use)</h3>
+        <p>The first time you use any menu feature (like Add Family Member), Google shows an authorization screen requesting these permissions:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Permission Name</th>
+                    <th>Why Needed</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>spreadsheets</code></td>
+                    <td>See, edit, create, and delete spreadsheets</td>
+                    <td>To read and write your financial data (family members, investments, transactions) in YOUR Capital Friends spreadsheet. All calculations, data storage, and dashboard updates require this permission.</td>
+                </tr>
+                <tr>
+                    <td><code>send_mail</code></td>
+                    <td>Send email on your behalf</td>
+                    <td>To send automated portfolio summary emails FROM your Gmail account TO your family members. This allows daily/weekly/monthly reports and rebalancing alerts. <strong>Important:</strong> Emails come from YOUR account, not ours.</td>
+                </tr>
+                <tr>
+                    <td><code>drive.file</code></td>
+                    <td>See and download files created with this app</td>
+                    <td>To access and work with the Capital Friends spreadsheet that we created for you. This is the minimum "file scope" permission - we can ONLY access files we create, never your other Drive files.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.2 Optional Scope (Appears When Enabling Email Schedule)</h3>
+        <p>If you choose to enable automated email scheduling (daily/weekly/monthly reports), you'll see a second authorization request:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Permission Name</th>
+                    <th>Why Needed</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>script.scriptapp</code></td>
+                    <td>Manage your Apps Script triggers</td>
+                    <td>To create time-based triggers that automatically run email reports at your chosen schedule (e.g., daily at 9 AM). <strong>This is optional</strong> - you can skip automated emails and send reports manually instead.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>8.3 Important Notes About OAuth</h3>
+        <ul>
+            <li><strong>Progressive Authorization:</strong> You're only asked for permissions when you actually use features that need them</li>
+            <li><strong>Runs Under YOUR Account:</strong> The Apps Script code executes using YOUR Google account authentication, not ours</li>
+            <li><strong>You Control Access:</strong> You can revoke these permissions anytime from your Google Account settings (Security → Third-party apps)</li>
+            <li><strong>After Ownership Transfer:</strong> The code runs entirely in your copy - we have no access to your data even with these scopes</li>
+            <li><strong>Time-Based Triggers:</strong> Email schedule triggers run under YOUR account permissions and can be deleted from Extensions → Apps Script → Triggers</li>
+        </ul>
+
+        <h2>9. Master Database Access (IMPORTRANGE)</h2>
+        <p>Capital Friends uses Google Sheets' IMPORTRANGE formula to connect to public reference databases. This is different from OAuth permissions.</p>
+
+        <h3>9.1 What are the Master Databases?</h3>
+        <p>Your spreadsheet includes two sheets that import reference data from public databases:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Sheet Name</th>
+                    <th>Database ID</th>
+                    <th>Contains</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>MutualFundData</strong></td>
+                    <td><code>1pSvGDFTgcCkW6Fk9P2mZ5FSpROVClz7Vu0sW9JnPz9s</code></td>
+                    <td>1000+ mutual fund names, AMC names, fund categories, and codes for search/lookup functionality</td>
+                </tr>
+                <tr>
+                    <td><strong>StockMasterData</strong></td>
+                    <td>Public stock database</td>
+                    <td>1000+ NSE and BSE stock symbols, company names, and ISIN codes for stock lookup</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>9.2 IMPORTRANGE Permission (Required)</h3>
+        <p>When you first open the MutualFundData or StockMasterData sheets, you'll see a <code>#REF!</code> error with the message: "You need permission to access this external data."</p>
+
+        <p><strong>What you need to do:</strong></p>
+        <ol>
+            <li>Click the <strong>"Allow access"</strong> button that appears in the cell</li>
+            <li>This grants permission for YOUR spreadsheet to read data from OUR public master databases</li>
+            <li>Data will then load and update automatically</li>
+        </ol>
+
+        <p><strong>Important clarifications:</strong></p>
+        <ul>
+            <li><strong>One-way connection:</strong> Data flows FROM master database TO your sheet only. Your financial data NEVER goes to the master database.</li>
+            <li><strong>Read-only access:</strong> The master databases are publicly shared as "Anyone with link can view" - they contain NO user information</li>
+            <li><strong>Reference data only:</strong> These databases contain publicly available mutual fund and stock information (names, symbols, codes), not your personal holdings or values</li>
+            <li><strong>Updated automatically:</strong> Master databases refresh daily from public sources (AMFI, NSE, BSE APIs), keeping fund/stock information current</li>
+            <li><strong>No privacy risk:</strong> IMPORTRANGE cannot access your financial data or other sheets in your Drive</li>
+            <li><strong>Can be revoked:</strong> You can remove access by deleting the MutualFundData and StockMasterData sheets (though you'll lose search functionality)</li>
+        </ul>
+
+        <h3>9.3 Why This is Safe</h3>
+        <p>The IMPORTRANGE formula is a standard Google Sheets feature that:</p>
+        <ul>
+            <li>Only allows reading data from the specified external spreadsheet</li>
+            <li>Cannot write data back to the source</li>
+            <li>Cannot access other sheets in your Drive</li>
+            <li>Is visible and auditable - you can see the formula in cell A1 of each data sheet</li>
+            <li>Is completely separate from OAuth permissions - it's a spreadsheet-level permission, not an API permission</li>
+        </ul>
+
+        <p><strong>You can verify the master databases are public:</strong> Visit the spreadsheet IDs listed above in any browser (while logged into Google) to see they're shared publicly with view-only access.</p>
+
+        <h2>10. Cookies & Tracking Technologies</h2>
         <p><strong>Capital Friends does NOT use cookies.</strong></p>
 
         <p>Our web app (the initial page where you request a copy) is a simple Google Apps Script web app that:</p>
