@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="3; url=https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec">
   <title>Capital Friends - Family Wealth Tracking & Portfolio Rebalancing</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,19 +20,16 @@
     .hero-content h1 .highlight { color: #10b981; }
     .hero-content .subtitle { font-size: 16px; color: #9ca3af; margin-bottom: 28px; line-height: 1.7; }
 
-    /* Redirect-specific styles */
-    .redirect-box { background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(52,211,153,0.08) 100%); border: 2px solid #10b981; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
-    .redirect-title { font-size: 18px; font-weight: 700; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
-    .redirect-text { font-size: 15px; color: #e5e7eb; margin-bottom: 16px; line-height: 1.6; }
-    .countdown-display { font-size: 48px; font-weight: 800; color: #10b981; text-align: center; margin: 16px 0; animation: pulse 1s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-    
-    .loading-bar-container { width: 100%; height: 8px; background: #1f2937; border-radius: 10px; overflow: hidden; margin-bottom: 20px; border: 1px solid #374151; }
-    .loading-bar { height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%); border-radius: 10px; animation: loading 3s linear forwards; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
-    @keyframes loading { from { width: 0%; } to { width: 100%; } }
+    /* CTA Button styles */
+    .cta-container { margin-bottom: 20px; }
+    .cta-primary { display: inline-flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 18px 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 12px; font-size: 18px; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.3s; box-shadow: 0 8px 24px rgba(16,185,129,0.4); }
+    .cta-primary:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(16,185,129,0.6); }
+    .cta-primary:active { transform: translateY(-1px); }
 
-    .redirect-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px 28px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.3s; box-shadow: 0 6px 20px rgba(16,185,129,0.4); }
-    .redirect-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(16,185,129,0.6); }
+    .copy-counter { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(52,211,153,0.08) 100%); border: 1px solid #10b981; padding: 12px 20px; border-radius: 10px; margin-top: 12px; width: 100%; }
+    .copy-count { font-size: 24px; font-weight: 800; color: #10b981; }
+    .copy-label { font-size: 13px; color: #9ca3af; }
+    .copy-label strong { color: #fff; font-size: 14px; }
 
     .privacy-note { background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(52,211,153,0.05) 100%); border: 1px solid #374151; border-radius: 8px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
     .privacy-icon { flex-shrink: 0; width: 40px; height: 40px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
@@ -86,25 +82,20 @@
         <h1>Protect Your Family's <span class="highlight">Financial Future</span> with Smart Wealth Tracking</h1>
         <p class="subtitle">One organized spreadsheet with all investments, mutual funds, bank accounts, loans, and insurance. Get smart rebalancing suggestions via email. Everything stays in your Google Drive - 100% private.</p>
 
-        <div class="redirect-box">
-          <div class="redirect-title">
-            <span>🚀</span>
-            <span>Launching Capital Friends...</span>
-          </div>
-          <div class="redirect-text">
-            You're being automatically redirected to the Capital Friends app. Get ready to take control of your family's wealth!
-          </div>
-          
-          <div class="countdown-display" id="countdown">3</div>
-          
-          <div class="loading-bar-container">
-            <div class="loading-bar"></div>
-          </div>
-
-          <a href="https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec" class="redirect-btn">
-            <span>🎯</span>
-            <span>Click Here if Not Redirected</span>
+        <div class="cta-container">
+          <a href="https://script.google.com/macros/s/AKfycbxI2J5JBXN1BD4GGDaevWQ2qj9HEYiRkCw-a1QGX176kFk_Nz0YgCFimhpvQusuTQq3/exec" class="cta-primary" target="_blank">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <span>Get Your Free Copy</span>
           </a>
+
+          <div class="copy-counter">
+            <div class="copy-count" id="copyCount">...</div>
+            <div class="copy-label">
+              <strong>copies</strong> created!
+            </div>
+          </div>
         </div>
 
         <div class="privacy-note">
@@ -156,20 +147,16 @@
   </footer>
 
   <script>
-    // Countdown timer
-    let countdown = 3;
-    const countdownElement = document.getElementById('countdown');
+    // Load copy count on page load (optional - can be removed if not using backend counter)
+    window.addEventListener('DOMContentLoaded', function() {
+      const countElement = document.getElementById('copyCount');
 
-    const timer = setInterval(() => {
-      countdown--;
-      if (countdown > 0) {
-        countdownElement.textContent = countdown;
-      } else {
-        countdownElement.textContent = '✓';
-        clearInterval(timer);
-        // Redirect happens automatically via meta refresh
-      }
-    }, 1000);
+      // You can fetch the actual count from your backend API here
+      // For now, showing placeholder
+      setTimeout(() => {
+        countElement.textContent = '1,200+'; // Update this with actual count from your tracking sheet
+      }, 500);
+    });
   </script>
 </body>
 </html>
