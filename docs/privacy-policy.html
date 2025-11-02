@@ -55,14 +55,24 @@
         </p>
 
         <h2>2. What Data We Collect</h2>
-        <p>When you use Capital Friends, we collect minimal data via email notification only:</p>
+
+        <h3>2.1 Web App Usage Tracking</h3>
+        <p>When you click "Get Your Free Copy" on the web app, we collect:</p>
         <ul>
-            <li><strong>Email Address:</strong> Your Google account email (sent to developer via email notification)</li>
+            <li><strong>Email Address:</strong> Your Google account email (obtained when you sign in)</li>
+            <li><strong>Timestamp:</strong> Date and time when you clicked the button</li>
+            <li><strong>Copy URL:</strong> The Google Sheets template link you were directed to</li>
+        </ul>
+        <p><strong>Storage:</strong> This data is logged in a secure admin Google Sheet (ID: 16QXJW6PSVP-NRcZV3UIw_xcRAT4bZD5IujzXMxjvy1M) accessible only to the developer.</p>
+        <p><strong>Purpose:</strong> To count how many users are using Capital Friends and how many times each user creates copies (for support and analytics).</p>
+
+        <h3>2.2 Spreadsheet Copy Data (Legacy - If Applicable)</h3>
+        <p>For older versions that included questionnaires:</p>
+        <ul>
             <li><strong>Security Questionnaire Answers:</strong> Your 10 Yes/No answers to financial security questions</li>
-            <li><strong>Creation Timestamp:</strong> Date and time when you created your copy</li>
             <li><strong>Questionnaire Score:</strong> Your calculated financial readiness score (out of 10)</li>
         </ul>
-        <p><strong>Important:</strong> We do NOT maintain a central database. Data is sent to the developer via email notification only.</p>
+        <p><strong>Note:</strong> The current web app version does NOT collect questionnaire data.</p>
 
         <h2>3. What Data We DO NOT Collect</h2>
         <p>We explicitly DO NOT collect, store, or access:</p>
@@ -77,10 +87,12 @@
         <h2>4. How We Use Your Data</h2>
         <p>We use the minimal collected data ONLY for:</p>
         <ul>
-            <li><strong>Creating Your Spreadsheet Copy:</strong> Created directly in YOUR Google Drive using your account permissions</li>
-            <li><strong>Developer Notifications:</strong> Email sent to developer when a new user creates a copy (for support purposes)</li>
-            <li><strong>No Central Tracking:</strong> We do NOT track usage, store user lists, or maintain databases</li>
+            <li><strong>User Count Analytics:</strong> To understand how many people are using Capital Friends</li>
+            <li><strong>Copy Frequency Tracking:</strong> To see how many times each user creates copies (helps identify issues)</li>
+            <li><strong>Support & Troubleshooting:</strong> If you contact us for help, we can look up your usage history</li>
+            <li><strong>Creating Your Spreadsheet Copy:</strong> Copy is created directly in YOUR Google Drive using your permissions</li>
         </ul>
+        <p><strong>We do NOT:</strong> Sell your data, show ads, share with third parties, or use it for marketing.</p>
 
         <h2>5. Where Your Data is Stored</h2>
         <p>
@@ -96,15 +108,16 @@
         <p>The only data sharing that occurs:</p>
         <ul>
             <li><strong>Google Services:</strong> The app runs on Google's infrastructure (Apps Script, Drive, Sheets)</li>
-            <li><strong>Email Notifications:</strong> When you create a copy, an email is sent to the developer with your email, score, and timestamp</li>
+            <li><strong>Admin Sheet Tracking:</strong> Your email and timestamp are logged in our admin Google Sheet when you click "Get Your Free Copy"</li>
+            <li><strong>Developer Access Only:</strong> Only the developer (jagadeesh.k.manne@gmail.com) has access to the tracking sheet</li>
         </ul>
 
         <h2>7. Data Retention & Deletion</h2>
         <ul>
             <li><strong>Your Spreadsheet:</strong> Stored indefinitely in YOUR Google Drive until you delete it</li>
-            <li><strong>Email Notifications:</strong> Developer may retain email notifications for support purposes</li>
-            <li><strong>No Centralized Storage:</strong> We do not maintain a database, so there's no central data to delete</li>
-            <li><strong>Deletion Requests:</strong> Contact us at <strong>jagadeesh.k.manne@gmail.com</strong> to request email deletion</li>
+            <li><strong>Admin Sheet Tracking:</strong> Your email and timestamps are retained in the admin sheet for analytics and support</li>
+            <li><strong>Deletion Requests:</strong> Contact us at <strong>jagadeesh.k.manne@gmail.com</strong> to request removal of your tracking data</li>
+            <li><strong>Your Rights:</strong> You can delete your spreadsheet copy from your Drive anytime - we cannot delete it for you since it's in YOUR account</li>
         </ul>
 
         <h2>8. Google API Services User Data Policy</h2>
@@ -115,20 +128,30 @@
         </p>
 
         <h2>9. OAuth Scopes & Permissions</h2>
-        <p>Capital Friends requests these Google OAuth scopes:</p>
+
+        <h3>9.1 Web App Scopes (When You Click "Get Your Free Copy")</h3>
+        <p>The web app requests minimal scopes:</p>
         <ul>
-            <li><strong>https://www.googleapis.com/auth/spreadsheets:</strong> To create and set up your financial tracking spreadsheet in YOUR Google Drive</li>
-            <li><strong>https://www.googleapis.com/auth/gmail.send:</strong> To send automated weekly email reports from YOUR Gmail account to recipients you configure</li>
-            <li><strong>https://www.googleapis.com/auth/script.scriptapp:</strong> To run the web app, create the custom menu system, and process your requests</li>
+            <li><strong>https://www.googleapis.com/auth/spreadsheets:</strong> To access the template spreadsheet and redirect you to the copy URL</li>
+            <li><strong>https://www.googleapis.com/auth/userinfo.email:</strong> To get your Google account email for tracking purposes</li>
+        </ul>
+        <p><strong>Deployment Mode:</strong> "Execute as: User deploying the web app" with access set to "Anyone"</p>
+
+        <h3>9.2 Spreadsheet Copy Scopes (After You Create Your Copy)</h3>
+        <p>Your spreadsheet copy will request these scopes when you first use features:</p>
+        <ul>
+            <li><strong>https://www.googleapis.com/auth/spreadsheets:</strong> To manage your spreadsheet data, update NAVs, and generate reports</li>
+            <li><strong>https://www.googleapis.com/auth/gmail.send:</strong> To send automated weekly email reports from YOUR Gmail to recipients you configure</li>
+            <li><strong>https://www.googleapis.com/auth/script.scriptapp:</strong> To run the custom menu system, triggers, and automation features</li>
         </ul>
         <p>
-            <strong>Important:</strong> The app runs as "Execute as: User accessing the web app" which means:
+            <strong>Important:</strong> These spreadsheet permissions apply ONLY to YOUR copy in YOUR Drive:
         </p>
         <ul>
-            <li>The spreadsheet is created directly in YOUR Drive using YOUR permissions</li>
+            <li>The spreadsheet runs with YOUR permissions only</li>
             <li>YOU are the owner from the moment it's created</li>
-            <li>The developer has ZERO access to your spreadsheet or data</li>
-            <li>The app can ONLY access files it creates for you, not your other Drive files</li>
+            <li>The developer has ZERO access to your spreadsheet or financial data</li>
+            <li>The app can ONLY access the specific spreadsheet you're using, not your other Drive files</li>
         </ul>
 
         <h2>10. Security Measures</h2>
