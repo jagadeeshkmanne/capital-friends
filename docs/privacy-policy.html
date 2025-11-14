@@ -304,6 +304,165 @@
             <li><strong>No user data sent:</strong> IMPORTRANGE only reads public reference data - your personal financial data never leaves your Drive</li>
         </ul>
 
+        <h2>5A. Data Protection Mechanisms & Security Safeguards</h2>
+        <p>Capital Friends implements multiple layers of security to protect sensitive user data. This section details the technical and organizational measures we employ.</p>
+
+        <h3>5A.1 Encryption & Data Protection</h3>
+
+        <h4>Encryption at Rest</h4>
+        <ul>
+            <li><strong>Google Drive Encryption:</strong> All user data (financial information, family details, PAN/Aadhar numbers) is stored in Google Drive, which uses AES-256 encryption at rest</li>
+            <li><strong>Server-Side Encryption:</strong> Google automatically encrypts all files before writing them to disk across multiple data centers</li>
+            <li><strong>No Local Storage:</strong> Capital Friends does not store sensitive data in browser localStorage, sessionStorage, or cookies - all data resides encrypted in Google's infrastructure</li>
+            <li><strong>Apps Script Properties:</strong> Document-specific properties (used for tracking first-time setup) are encrypted by Google Apps Script platform</li>
+        </ul>
+
+        <h4>Encryption in Transit</h4>
+        <ul>
+            <li><strong>TLS 1.2+:</strong> All communications between your browser and Google's servers use TLS (Transport Layer Security) version 1.2 or higher</li>
+            <li><strong>HTTPS Only:</strong> The web app, landing page, and all API calls are served exclusively over HTTPS (HTTP Strict Transport Security enabled)</li>
+            <li><strong>Encrypted Email Transmission:</strong> Emails sent via Gmail use TLS for delivery (encrypted in transit between mail servers)</li>
+            <li><strong>No Plaintext Transmission:</strong> Sensitive data is never transmitted in plaintext over the network</li>
+        </ul>
+
+        <h3>5A.2 Access Controls & Authentication</h3>
+
+        <h4>User Authentication</h4>
+        <ul>
+            <li><strong>Google OAuth 2.0:</strong> All access to your data requires Google account authentication - no separate passwords or credentials</li>
+            <li><strong>Session Management:</strong> Google Apps Script manages secure sessions with automatic timeout after inactivity</li>
+            <li><strong>Multi-Factor Authentication Support:</strong> Capital Friends respects your Google account's 2FA settings (we recommend enabling 2FA)</li>
+            <li><strong>No Password Storage:</strong> Capital Friends never stores, transmits, or has access to your Google account password</li>
+        </ul>
+
+        <h4>Ownership-Based Access Control</h4>
+        <ul>
+            <li><strong>Immediate Ownership Transfer:</strong> The <code>file.setOwner(userEmail)</code> API transfers full ownership to you, removing developer access</li>
+            <li><strong>Permission Revocation:</strong> After transfer, the original creator (developer) has ZERO access - enforced by Google Drive's permission model</li>
+            <li><strong>Granular Sharing Controls:</strong> You control who can view/edit your copy via Google Drive's sharing settings</li>
+            <li><strong>Private by Default:</strong> Newly created copies are private to your account only (not shared publicly)</li>
+        </ul>
+
+        <h4>OAuth Scope Restrictions</h4>
+        <ul>
+            <li><strong>Minimal Scopes:</strong> Capital Friends requests only 3 OAuth scopes (gmail.send, script.scriptapp, script.container.ui)</li>
+            <li><strong>No Broad Permissions:</strong> Does NOT request access to all Google Drive files, Gmail inbox, Calendar, or Contacts</li>
+            <li><strong>No Drive Access:</strong> Does not request <code>drive.file</code> or other Drive scopes - the spreadsheet already exists in your Drive after ownership transfer</li>
+            <li><strong>User-Revocable:</strong> You can revoke permissions anytime via Google Account Settings → Security → Third-party apps</li>
+        </ul>
+
+        <h3>5A.3 Data Minimization & Retention</h3>
+
+        <h4>Minimal Data Collection</h4>
+        <ul>
+            <li><strong>Email Only:</strong> We collect only your email address for ownership transfer (not stored permanently)</li>
+            <li><strong>No Financial Data Collection:</strong> We never access, collect, or store your bank balances, investment values, or transaction history</li>
+            <li><strong>No PII Harvesting:</strong> We don't collect PAN numbers, Aadhar numbers, phone numbers, addresses, or other personally identifiable information</li>
+            <li><strong>Optional Questionnaire:</strong> The 8-question security assessment is stored only in YOUR copy, not our systems</li>
+        </ul>
+
+        <h4>Data Retention Policies</h4>
+        <ul>
+            <li><strong>No Long-Term Storage:</strong> Email addresses are used only during the ownership transfer process and are not retained in our systems</li>
+            <li><strong>User-Controlled Retention:</strong> All financial data in your copy is retained according to YOUR deletion schedule</li>
+            <li><strong>Automatic Cleanup:</strong> No data accumulates on our servers - each copy request is stateless</li>
+            <li><strong>Right to Deletion:</strong> You can request deletion of your copy tracking record anytime (see Section 10: Your Privacy Rights)</li>
+        </ul>
+
+        <h3>5A.4 Secure Development Practices</h3>
+
+        <h4>Code Security</h4>
+        <ul>
+            <li><strong>Open Source Transparency:</strong> All source code is publicly available on GitHub for security audits</li>
+            <li><strong>No Obfuscation:</strong> Code is readable and auditable - no minification or obfuscation of Apps Script code</li>
+            <li><strong>Input Validation:</strong> All user inputs are validated and sanitized to prevent injection attacks</li>
+            <li><strong>No eval() Usage:</strong> Capital Friends does not use <code>eval()</code> or <code>Function()</code> constructors that could execute arbitrary code</li>
+            <li><strong>XSS Prevention:</strong> HTML output is sanitized to prevent cross-site scripting attacks</li>
+        </ul>
+
+        <h4>Dependency Management</h4>
+        <ul>
+            <li><strong>Minimal External Dependencies:</strong> Uses only trusted CDN libraries (Tailwind CSS from cdn.tailwindcss.com, Fuse.js from cdn.jsdelivr.net)</li>
+            <li><strong>No npm Packages:</strong> Does not use unvetted third-party npm modules</li>
+            <li><strong>Subresource Integrity (SRI):</strong> External scripts loaded with integrity hashes where supported</li>
+            <li><strong>Google-Only APIs:</strong> Server-side code uses only Google's built-in Apps Script services (no external API keys or credentials)</li>
+        </ul>
+
+        <h3>5A.5 Infrastructure Security (Google Cloud Platform)</h3>
+        <p>Capital Friends inherits Google Cloud Platform's enterprise-grade security infrastructure:</p>
+
+        <ul>
+            <li><strong>SOC 2/3 Compliance:</strong> Google's data centers are SOC 2 Type II and SOC 3 certified</li>
+            <li><strong>ISO 27001 Certified:</strong> Google's information security management system meets ISO 27001 standards</li>
+            <li><strong>Physical Security:</strong> Data centers have 24/7 security, biometric access controls, and video surveillance</li>
+            <li><strong>Network Segmentation:</strong> Google's network is segmented to isolate services and limit attack surface</li>
+            <li><strong>DDoS Protection:</strong> Google's infrastructure includes built-in distributed denial-of-service attack mitigation</li>
+            <li><strong>Redundancy & Disaster Recovery:</strong> Data is replicated across multiple geographically distributed data centers</li>
+        </ul>
+
+        <h3>5A.6 Monitoring & Incident Response</h3>
+
+        <h4>Security Monitoring</h4>
+        <ul>
+            <li><strong>Google Cloud Logging:</strong> All Apps Script executions are logged for security auditing and debugging</li>
+            <li><strong>Error Tracking:</strong> Execution failures are logged to help identify potential security issues</li>
+            <li><strong>No Third-Party Analytics:</strong> We do NOT use external monitoring services that could access user data</li>
+        </ul>
+
+        <h4>Incident Response</h4>
+        <ul>
+            <li><strong>GitHub Security Advisories:</strong> Critical security issues can be reported privately via GitHub's security advisory feature</li>
+            <li><strong>Responsible Disclosure:</strong> Security researchers can email jagadeesh.k.manne@gmail.com with "SECURITY" in the subject</li>
+            <li><strong>Coordinated Disclosure:</strong> We commit to responding to security reports within 72 hours and coordinating public disclosure</li>
+            <li><strong>User Notification:</strong> In the event of a security breach affecting user data, we will notify affected users via email and GitHub announcements</li>
+        </ul>
+
+        <h3>5A.7 User Security Responsibilities</h3>
+        <p>While we implement robust security measures, user security also depends on YOUR actions:</p>
+
+        <ul>
+            <li><strong>Strong Passwords:</strong> Use a strong, unique password for your Google account (12+ characters, mixed case, numbers, symbols)</li>
+            <li><strong>Enable 2FA:</strong> Activate two-factor authentication on your Google account (authenticator app recommended over SMS)</li>
+            <li><strong>Private Sharing:</strong> Keep your Capital Friends copy private - do NOT share it publicly or with untrusted individuals</li>
+            <li><strong>Regular Backups:</strong> Download backup copies as Excel/PDF files regularly (File → Download → Microsoft Excel)</li>
+            <li><strong>Secure Devices:</strong> Access Capital Friends only from secure, malware-free devices</li>
+            <li><strong>Review Permissions:</strong> Periodically audit which apps have access to your Google account (Google Account → Security → Third-party apps)</li>
+            <li><strong>Phishing Awareness:</strong> Be cautious of emails claiming to be from Capital Friends asking for credentials (we never ask for passwords)</li>
+        </ul>
+
+        <h3>5A.8 Compliance & Certifications</h3>
+
+        <h4>Data Protection Regulations</h4>
+        <ul>
+            <li><strong>GDPR Compliance:</strong> Capital Friends respects EU General Data Protection Regulation principles (data minimization, purpose limitation, storage limitation)</li>
+            <li><strong>Right to Access:</strong> You can request a copy of any data we store about you (email us at jagadeesh.k.manne@gmail.com)</li>
+            <li><strong>Right to Erasure:</strong> You can request deletion of your copy tracking record (see Section 10: Your Privacy Rights)</li>
+            <li><strong>Data Portability:</strong> Your financial data is already in Google Sheets format (portable by design)</li>
+        </ul>
+
+        <h4>Google's Compliance</h4>
+        <p>By building on Google Workspace, Capital Friends benefits from Google's compliance with:</p>
+        <ul>
+            <li>GDPR (General Data Protection Regulation)</li>
+            <li>CCPA (California Consumer Privacy Act)</li>
+            <li>HIPAA (Health Insurance Portability and Accountability Act) - Google Workspace Enterprise</li>
+            <li>COPPA (Children's Online Privacy Protection Act)</li>
+            <li>FERPA (Family Educational Rights and Privacy Act)</li>
+        </ul>
+
+        <h3>5A.9 Data Breach Notification</h3>
+        <p>In the unlikely event of a data breach:</p>
+        <ul>
+            <li><strong>72-Hour Notification:</strong> We will notify affected users within 72 hours of discovering a breach involving personal data</li>
+            <li><strong>Transparent Communication:</strong> We will clearly explain what data was compromised, what we're doing to resolve it, and recommended user actions</li>
+            <li><strong>Public Disclosure:</strong> Material breaches will be disclosed publicly via GitHub repository announcements</li>
+            <li><strong>Regulatory Reporting:</strong> We will report breaches to relevant data protection authorities as required by law</li>
+        </ul>
+
+        <div class="highlight-box">
+            <p><strong>Security Summary:</strong> Your sensitive financial data is protected by Google's enterprise-grade encryption (AES-256 at rest, TLS 1.2+ in transit), ownership-based access controls (zero developer access after transfer), minimal OAuth scopes (only 3 scopes: gmail.send, script.scriptapp, script.container.ui), and Google Cloud Platform's SOC 2/ISO 27001 certified infrastructure. We implement defense-in-depth security with open-source code transparency, input validation, and no long-term data retention.</p>
+        </div>
+
         <h2>6. Data Sharing & Third Parties</h2>
         <p><strong>We do NOT sell, rent, or share your information with any third parties.</strong></p>
 
@@ -363,7 +522,7 @@
         <p>When you create your copy and start using features, Google will ask you to authorize specific permissions. These are called "OAuth scopes" and control what the Apps Script code can do within YOUR Google account.</p>
 
         <h3>8.1 Required Scopes</h3>
-        <p>Capital Friends requires these 4 OAuth scopes to function. Google will show an authorization screen requesting these permissions:</p>
+        <p>Capital Friends requires these 3 OAuth scopes to function. Google will show an authorization screen requesting these permissions:</p>
 
         <table>
             <thead>
@@ -375,24 +534,19 @@
             </thead>
             <tbody>
                 <tr>
-                    <td><code>drive.file</code></td>
-                    <td>See, edit, create and delete only the specific Google Drive files you use with this app</td>
-                    <td>Creates Capital Friends spreadsheet in your Drive. Only accesses files it creates - cannot see other Drive files. Required for copy creation and sheet setup.</td>
-                </tr>
-                <tr>
-                    <td><code>gmail.send</code></td>
+                    <td><code>https://www.googleapis.com/auth/gmail.send</code></td>
                     <td>Send email on your behalf</td>
-                    <td>Sends optional weekly portfolio summary to your email every Monday (total wealth, weekly change, top performers). No inbox access. Only sends to you. Disable anytime in Settings.</td>
+                    <td>Sends optional security reminders and weekly portfolio summary emails to your email address. No inbox access - only sends emails. All emails are sent from YOUR Gmail account to YOU. Disable anytime in Settings menu.</td>
                 </tr>
                 <tr>
-                    <td><code>spreadsheets.currentonly</code></td>
-                    <td>See, edit, create, and delete spreadsheets that this application has been installed in</td>
-                    <td>Creates and manages sheets within the Capital Friends spreadsheet only (Portfolio, Dashboard, Goals, etc.). Reads portfolio data for weekly reports if enabled. Uses IMPORTRANGE to fetch mutual fund NAV data from public master database. Only accesses the bound spreadsheet - cannot access your other spreadsheets.</td>
-                </tr>
-                <tr>
-                    <td><code>script.scriptapp</code></td>
+                    <td><code>https://www.googleapis.com/auth/script.scriptapp</code></td>
                     <td>Manage your Apps Script triggers</td>
-                    <td>Installs optional weekly email trigger if enabled in Settings. Allows managing/deleting triggers through the sheet. Users control all automation.</td>
+                    <td>Installs optional time-based triggers for automated email reports and reminders. Allows you to manage/delete triggers through the Settings menu. Users have full control over all automation.</td>
+                </tr>
+                <tr>
+                    <td><code>https://www.googleapis.com/auth/script.container.ui</code></td>
+                    <td>Display and run third-party web content in prompts and sidebars inside Google applications</td>
+                    <td>Displays custom dialog boxes and sidebars for features like adding investments, managing portfolios, viewing dashboards, and generating reports. Enables the interactive user interface within the Google Sheets environment.</td>
                 </tr>
             </tbody>
         </table>
