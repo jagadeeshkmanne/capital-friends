@@ -1,83 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Capital Friends - Family Wealth Tracking & Portfolio Rebalancing</title>
-    <meta name="description" content="Track your family's investments, mutual funds, and get smart rebalancing suggestions. 100% free and private - everything stays in your Google Drive.">
-    <link rel="icon" href="https://img.icons8.com/fluency/48/money-bag.png">
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1a3a2a" />
+    <meta name="description" content="Capital Friends - Family Portfolio Management" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/logo-small.png" />
+    <title>Capital Friends</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      // SPA routing fix for GitHub Pages 404 redirect
+      (function() {
+        var p = new URLSearchParams(window.location.search).get('p');
+        if (p) {
+          window.history.replaceState(null, '', decodeURIComponent(p) + window.location.hash);
         }
-
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-
-        body {
-            display: flex;
-            flex-direction: column;
-        }
-
-        iframe {
-            flex: 1;
-            width: 100%;
-            border: none;
-            display: block;
-        }
-
-        footer {
-            background: #1f2937;
-            border-top: 1px solid #374151;
-            padding: 12px 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-shrink: 0;
-        }
-
-        footer a {
-            color: #9ca3af;
-            text-decoration: none;
-            font-size: 13px;
-            transition: color 0.3s;
-        }
-
-        footer a:hover {
-            color: #10b981;
-        }
-
-        footer span {
-            color: #4b5563;
-            font-size: 13px;
-        }
-    </style>
-</head>
-<body>
-    <iframe
-        src="https://script.google.com/macros/s/AKfycbz5DaoVCYaG4FGMVSxS69ZE_PNXmwrn9Aa4129zFlKR4lEJl43H2RkKuysk5YhtPXF-/exec"
-        title="Capital Friends Web Application"
-        allow="clipboard-write; popups; popups-to-escape-sandbox"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation">
-    </iframe>
-
-    <footer>
-        <span style="color: #6b7280; font-size: 12px; margin-right: 15px;">Capital Friends - Open Source Family Wealth Management</span>
-        <a href="https://capitalfriends.in/privacy-policy.html" target="_blank">Privacy Policy</a>
-        <span>•</span>
-        <a href="https://capitalfriends.in/terms-of-service.html" target="_blank">Terms of Service</a>
-        <span>•</span>
-        <a href="https://capitalfriends.in/fund-universe.html" target="_blank">Fund Unviverse</a>
-        <span>•</span>
-        <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank">GitHub</a>
-    </footer>
-</body>
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-izScgZoZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BOlDDUEu.css">
+  </head>
+  <body class="bg-slate-50 antialiased">
+    <div id="root"></div>
+  </body>
 </html>

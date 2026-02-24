@@ -5,15 +5,11 @@
   <title>Capital Friends</title>
   <script>
     // SPA redirect for GitHub Pages
-    // If the path starts with /app/, redirect to /app/ with the path as a query param
+    // Preserve the path so React Router can handle it
     var path = window.location.pathname;
-    if (path.startsWith('/app')) {
-      var query = path.slice('/app'.length);
-      window.location.replace('/app/' + '?p=' + encodeURIComponent(query) + window.location.hash);
-    } else {
-      // Non-app 404 — redirect to home
-      window.location.replace('/');
-    }
+    var search = window.location.search;
+    var hash = window.location.hash;
+    window.location.replace('/' + '?p=' + encodeURIComponent(path + search) + hash);
   </script>
 </head>
 <body></body>
