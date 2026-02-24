@@ -15,15 +15,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
-      // SPA routing fix for GitHub Pages 404 redirect
+      // SPA routing fix for GitHub Pages — restore path from 404 redirect
       (function() {
-        var p = new URLSearchParams(window.location.search).get('p');
-        if (p) {
-          window.history.replaceState(null, '', decodeURIComponent(p) + window.location.hash);
+        var redirect = sessionStorage.getItem('spa-redirect');
+        if (redirect) {
+          sessionStorage.removeItem('spa-redirect');
+          window.history.replaceState(null, '', redirect);
         }
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-izScgZoZ.js"></script>
+    <script type="module" crossorigin src="/assets/index-BC1JConB.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-BOlDDUEu.css">
   </head>
   <body class="bg-slate-50 antialiased">

@@ -5,11 +5,9 @@
   <title>Capital Friends</title>
   <script>
     // SPA redirect for GitHub Pages
-    // Preserve the path so React Router can handle it
-    var path = window.location.pathname;
-    var search = window.location.search;
-    var hash = window.location.hash;
-    window.location.replace('/' + '?p=' + encodeURIComponent(path + search) + hash);
+    // Stores the path and redirects to index.html so React Router can handle it
+    sessionStorage.setItem('spa-redirect', window.location.pathname + window.location.search + window.location.hash);
+    window.location.replace('/');
   </script>
 </head>
 <body></body>
