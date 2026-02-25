@@ -4,12 +4,21 @@ import { useData } from '../context/DataContext'
 import BrandedLoading from './BrandedLoading'
 
 export default function ProtectedRoute() {
-  const { isAuthenticated, loading } = useAuth()
-  const { healthCheckCompleted } = useData()
+  const { isAuthenticated, loading: authLoading } = useAuth()
+  const { healthCheckCompleted, loading: dataLoading } = useData()
   const location = useLocation()
 
-  if (loading) {
-    return <BrandedLoading />
+  // Determine loading phase for progress display
+  if (authLoading) {
+    return <BrandedLoading phase="auth" />
+  }
+
+  if (isAuthenticated && dataLoading) {
+    return <BrandedLoading phase="data" />
+  }
+
+  if (isAuthenticated && healthCheckCompleted === null) {
+    return <BrandedLoading phase="health" />
   }
 
   if (!isAuthenticated) {

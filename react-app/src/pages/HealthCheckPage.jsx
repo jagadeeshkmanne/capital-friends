@@ -5,7 +5,7 @@ import { useData } from '../context/DataContext'
 import * as api from '../services/api'
 
 const QUESTIONS = [
-  { id: 'healthIns', question: 'Does your family have Health Insurance?', tip: 'Minimum ₹5L cover per member or family floater', category: 'Insurance' },
+  { id: 'healthIns', question: 'Does your family have Health Insurance?', tip: '₹50L to ₹1Cr family floater recommended (considering inflation & future expenses)', category: 'Insurance' },
   { id: 'termLife', question: 'Do you have adequate Term Life Insurance?', tip: 'Recommended: 10-15x annual income', category: 'Insurance' },
   { id: 'emergencyFund', question: 'Do you have an Emergency Fund?', tip: '6-12 months of monthly expenses in liquid assets', category: 'Savings' },
   { id: 'familyAware', question: 'Is your family aware of all investments?', tip: 'Ensure nominees and family know about all assets', category: 'Planning' },
@@ -120,7 +120,7 @@ export default function HealthCheckPage() {
   }, [allAnswered, answers, yesCount, completeHealthCheck, navigate])
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4 max-w-2xl mx-auto">
       {/* First-time banner */}
       {isFirstTime && (
         <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
@@ -195,9 +195,9 @@ export default function HealthCheckPage() {
                   </button>
                 </div>
               </div>
-              {autoDetected[q.id] !== undefined && (
+              {autoDetected[q.id] && (
                 <p className="text-xs text-violet-400 mt-1 ml-5">
-                  Auto-detected: {autoDetected[q.id] ? 'Found in your data' : 'Not found'}
+                  Auto-detected from your data
                 </p>
               )}
             </div>
