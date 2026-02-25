@@ -172,8 +172,8 @@ export default function Header({ onMenuClick }) {
 
   return (
     <header className="sticky top-0 z-30 shrink-0">
-      {/* Top bar */}
-      <div className="bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
+      {/* Top bar — z-10 so dropdowns render above ticker/NW sections */}
+      <div className="relative z-10 bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
           {/* Left: hamburger + logo */}
           <div className="flex items-center gap-2">
@@ -193,7 +193,7 @@ export default function Header({ onMenuClick }) {
             {notifCount > 0 && (
               <div className="relative" ref={notifRef}>
                 <button
-                  onClick={() => setNotifOpen(!notifOpen)}
+                  onClick={() => { setNotifOpen(!notifOpen); setDropdownOpen(false) }}
                   className="relative p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <Bell size={18} />
@@ -255,7 +255,7 @@ export default function Header({ onMenuClick }) {
             {/* Member avatar + dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
+                onClick={() => { setDropdownOpen(!dropdownOpen); setNotifOpen(false) }}
                 className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full hover:bg-[var(--bg-hover)] transition-colors"
               >
                 {selectedObj ? (
