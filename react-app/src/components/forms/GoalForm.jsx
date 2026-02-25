@@ -43,7 +43,10 @@ const STEPS = [
 export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
   const isEdit = !!initial
   const { activeMembers } = useData()
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: m.memberName }))
+  const memberOptions = [
+    { value: '', label: 'Family (Default)' },
+    ...activeMembers.map((m) => ({ value: m.memberId, label: m.memberName })),
+  ]
 
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(() => {
@@ -202,7 +205,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
     if (s === 0) {
       if (!form.goalType) e.goalType = 'Required'
       if (!form.goalName.trim()) e.goalName = 'Required'
-      if (!form.familyMemberId) e.familyMemberId = 'Required'
     }
     if (s === 1) {
       if (!form.targetDate) e.targetDate = 'Required'
@@ -220,7 +222,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
     const e = {}
     if (!form.goalType) e.goalType = 'Required'
     if (!form.goalName.trim()) e.goalName = 'Required'
-    if (!form.familyMemberId) e.familyMemberId = 'Required'
     if (!form.targetDate) e.targetDate = 'Required'
     if (isRetirement || isEmergency) {
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
@@ -238,11 +239,13 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
 
   function handleSubmit() {
     if (!validateAll()) return
-    const memberName = activeMembers.find((m) => m.memberId === form.familyMemberId)?.memberName || ''
+    const memberName = form.familyMemberId
+      ? activeMembers.find((m) => m.memberId === form.familyMemberId)?.memberName || 'Family'
+      : 'Family'
     onSave({
       goalType: form.goalType,
       goalName: form.goalName,
-      familyMemberId: form.familyMemberId,
+      familyMemberId: form.familyMemberId || '',
       familyMember: memberName,
       targetAmount: calc.inflatedTarget,
       targetDate: form.targetDate,
@@ -261,7 +264,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
   }
 
   // Computed for review
-  const memberName = activeMembers.find((m) => m.memberId === form.familyMemberId)?.memberName || ''
+  const memberName = form.familyMemberId
+    ? activeMembers.find((m) => m.memberId === form.familyMemberId)?.memberName || 'Family'
+    : 'Family'
 
   // ── Edit mode: single form ──
   if (isEdit) {
@@ -276,8 +281,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
           </FormField>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Family Member" required error={errors.familyMemberId}>
-            <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Select member..." />
+          <FormField label="Family Member" error={errors.familyMemberId}>
+            <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
           </FormField>
           <FormField label="Target Date" required error={errors.targetDate}>
             <FormInput type="date" value={form.targetDate} onChange={(v) => set('targetDate', v)} />
@@ -394,8 +399,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
             <FormInput value={form.goalName} onChange={(v) => set('goalName', v)} placeholder="e.g., Retirement Fund (2045)" />
           </FormField>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Family Member" required error={errors.familyMemberId}>
-              <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Select member..." />
+            <FormField label="Family Member" error={errors.familyMemberId}>
+              <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
             </FormField>
             <FormField label="Priority">
               <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
