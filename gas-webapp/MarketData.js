@@ -81,12 +81,22 @@ function fetchMarketData() {
  */
 function fetchIndianIndices() {
   var indices = [
+    // Broad market
     { symbol: 'INDEXNSE:NIFTY_50', name: 'Nifty 50' },
-    { symbol: 'INDEXNSE:NIFTY_100', name: 'Nifty 100' },
     { symbol: 'INDEXNSE:NIFTY_NEXT_50', name: 'Nifty Next 50' },
+    { symbol: 'INDEXNSE:NIFTY_100', name: 'Nifty 100' },
     { symbol: 'INDEXNSE:NIFTY_MIDCAP_150', name: 'Midcap 150' },
     { symbol: 'INDEXNSE:NIFTY_SMLCAP_250', name: 'Smallcap 250' },
-    { symbol: 'INDEXNSE:NIFTY_BANK', name: 'Bank Nifty' }
+    // Sector indices
+    { symbol: 'INDEXNSE:NIFTY_BANK', name: 'Bank Nifty' },
+    { symbol: 'INDEXNSE:NIFTY_IT', name: 'Nifty IT' },
+    { symbol: 'INDEXNSE:NIFTY_PHARMA', name: 'Nifty Pharma' },
+    { symbol: 'INDEXNSE:NIFTY_AUTO', name: 'Nifty Auto' },
+    { symbol: 'INDEXNSE:NIFTY_FIN_SERVICE', name: 'Fin Services' },
+    { symbol: 'INDEXNSE:NIFTY_FMCG', name: 'Nifty FMCG' },
+    { symbol: 'INDEXNSE:NIFTY_METAL', name: 'Nifty Metal' },
+    { symbol: 'INDEXNSE:NIFTY_REALTY', name: 'Nifty Realty' },
+    { symbol: 'INDEXNSE:NIFTY_ENERGY', name: 'Nifty Energy' }
   ];
 
   // Use a temporary sheet with GOOGLEFINANCE formulas
