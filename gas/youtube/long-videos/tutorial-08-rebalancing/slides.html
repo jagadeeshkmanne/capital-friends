@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tutorial 8: Rebalancing — Capital Friends</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+  .slide-wrapper {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    z-index: 100;
+  }
+  .slide {
+    width: 1920px;
+    height: 1080px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    background: linear-gradient(165deg, #101828 0%, #15202e 50%, #111a27 100%);
+    transform-origin: top left;
+  }
+  .slide-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 64px;
+    z-index: 10;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .slide-bar .brand img { height: 70px; width: auto; }
+  .slide-bar .right-info { display: flex; align-items: center; gap: 18px; }
+  .slide-bar .website { color: rgba(255,255,255,0.35); font-size: 17px; font-weight: 500; letter-spacing: 0.2px; }
+  .slide-bar .free-pill {
+    background: rgba(125,211,192,0.12); color: #7dd3c0;
+    font-size: 13px; font-weight: 700;
+    padding: 6px 16px; border-radius: 20px;
+    letter-spacing: 0.8px;
+    border: 1px solid rgba(125,211,192,0.2);
+  }
+  .slide-footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 64px;
+    z-index: 10;
+    background: rgba(0,0,0,0.25);
+    border-top: 1px solid rgba(255,255,255,0.03);
+  }
+  .slide-footer .gs-tag {
+    display: flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.25); font-size: 14px; font-weight: 500;
+  }
+  .slide-footer .gs-tag .gs-box {
+    width: 17px; height: 17px; background: #5eae9a;
+    border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  }
+  .slide-footer .gs-box span { color: #fff; font-size: 10px; font-weight: 900; }
+  .slide-footer .video-num { color: rgba(255,255,255,0.15); font-size: 14px; font-weight: 500; }
+  .glow { position: absolute; border-radius: 50%; z-index: 1; }
+  .glow-tl { width: 700px; height: 700px; background: radial-gradient(circle, rgba(125,211,192,0.04) 0%, transparent 70%); top: -250px; left: -200px; }
+  .glow-br { width: 600px; height: 600px; background: radial-gradient(circle, rgba(212,168,83,0.025) 0%, transparent 70%); bottom: -200px; right: -150px; }
+  .content {
+    position: relative; z-index: 5;
+    padding: 120px 80px 80px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .video-title {
+    font-size: 48px; font-weight: 700; line-height: 1.2;
+    color: rgba(255,255,255,0.93);
+    letter-spacing: -0.5px;
+    margin-bottom: 16px;
+  }
+  .hl-green { color: #4ecca3; }
+  .hl-yellow { color: #ffd369; }
+  .section-heading {
+    font-size: 34px; color: #4ecca3;
+    margin-top: 32px; margin-bottom: 24px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .bullets {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+    justify-content: center;
+  }
+  .bullet-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    font-size: 32px;
+    line-height: 1.4;
+    color: rgba(255,255,255,0.85);
+    font-weight: 400;
+  }
+  .bullet-item .number {
+    font-size: 28px;
+    min-width: 42px;
+    color: #ffd369;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info">
+        <span class="website">www.capitalfriends.in</span>
+        <span class="free-pill">100% FREE</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="video-num">Tutorial 8 of 13</div>
+    </div>
+
+    <div class="content">
+      <div class="video-title">
+        Tutorial 8: <span class="hl-green">Rebalancing</span>
+      </div>
+
+      <div class="section-heading">What we'll cover in this video</div>
+
+      <div class="bullets">
+        <div class="bullet-item">
+          <span class="number">1.</span>
+          <span>Why asset allocation matters — target vs current</span>
+        </div>
+        <div class="bullet-item">
+          <span class="number">2.</span>
+          <span>Rebalance threshold — when it activates</span>
+        </div>
+        <div class="bullet-item">
+          <span class="number">3.</span>
+          <span>Rebalance SIP — smarter monthly investment split</span>
+        </div>
+        <div class="bullet-item">
+          <span class="number">4.</span>
+          <span>Rebalance Lumpsum — where to put extra money</span>
+        </div>
+        <div class="bullet-item">
+          <span class="number">5.</span>
+          <span>Buy/Sell — instant rebalancing with Switch</span>
+        </div>
+        <div class="bullet-item">
+          <span class="number">6.</span>
+          <span>Manage Portfolio Allocation — visual view</span>
+        </div>
+        <div class="bullet-item">
+          <span class="number">7.</span>
+          <span>Fund Composition Breakdown — equity/debt/market cap split</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function fitSlide() {
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var scale = vw / 1920;
+    var scaledHeight = 1080 * scale;
+    var offsetY = Math.max(0, (vh - scaledHeight) / 2);
+    var slide = document.querySelector('.slide');
+    slide.style.transform = 'scale(' + scale + ')';
+    slide.style.top = offsetY + 'px';
+  }
+  fitSlide();
+  window.addEventListener('resize', fitSlide);
+  document.addEventListener('fullscreenchange', function() { setTimeout(fitSlide, 100); });
+})();
+</script>
+
+</body>
+</html>

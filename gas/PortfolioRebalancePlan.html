@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    .plan-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .plan-table th {
+      background: #4a5568;
+      color: white;
+      padding: 10px 8px;
+      text-align: left;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .plan-table td {
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: middle;
+    }
+    .plan-table tr:hover {
+      background: #f9fafb;
+    }
+    .new-fund-row {
+      background: #fef3c7 !important;
+    }
+    .text-green {
+      color: #059669;
+      font-weight: 600;
+    }
+    .text-red {
+      color: #dc2626;
+      font-weight: 600;
+    }
+    .target-input {
+      width: 70px;
+      padding: 4px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      text-align: right;
+      font-size: 11px;
+    }
+    .target-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+    .fund-search-container {
+      position: relative;
+      width: 100%;
+    }
+    .fund-search-results {
+      position: fixed;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 9999;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      min-width: 300px;
+    }
+    .fund-search-result {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 11px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .fund-search-result:last-child {
+      border-bottom: none;
+    }
+    .fund-search-result:hover {
+      background: #f3f4f6;
+    }
+    .fund-search-result-code {
+      color: #6b7280;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body class="m-0 p-0 bg-gray-50 font-sans">
+
+  <!-- Portfolio Selection -->
+  <div class="px-6 py-4 bg-white border-b border-gray-200">
+    <div class="flex items-start justify-between gap-6">
+      <div class="flex-shrink-0" style="width: 320px;">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Select Portfolio <span class="text-red-600">*</span></label>
+        <select id="portfolioSelect" onchange="loadPortfolioPlan()"
+          class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <option value="">-- Select Portfolio --</option>
+        </select>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm text-gray-700 pt-7 leading-relaxed">
+          💡 <strong>Manage Allocation:</strong> Adjust target allocations and add new funds. Click "Save Changes" to update your portfolio.
+        </p>
+      </div>
+      <div class="flex-shrink-0 pt-7">
+        <button onclick="google.script.host.close()"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold transition-all border border-gray-300">
+          ✕ Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Table Container -->
+  <div id="planContainer" class="px-6 py-3 hidden">
+    <!-- Add New Fund Button -->
+    <div class="mb-3">
+      <button onclick="addNewFundRow()"
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold transition-all shadow-sm">
+        ➕ Add New Fund
+      </button>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div class="overflow-x-auto" style="max-height: calc(100vh - 280px); overflow-y: auto;">
+        <table class="plan-table" id="planTable">
+          <thead>
+            <tr>
+              <th style="min-width: 300px;">Fund Name</th>
+              <th style="width: 130px;" class="text-right">Current Value (₹)</th>
+              <th style="width: 110px;" class="text-right">Current %</th>
+              <th style="width: 110px;" class="text-right">Target %</th>
+              <th style="width: 130px;" class="text-right">Target Value (₹)</th>
+              <th style="width: 150px;" class="text-right">Rebalance Action</th>
+            </tr>
+          </thead>
+          <tbody id="planTableBody">
+            <!-- Data will be populated here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="mt-3 grid grid-cols-2 gap-3">
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div class="text-xs font-semibold text-blue-700 mb-0.5">Current Total Value</div>
+        <div class="text-xl font-bold text-blue-900" id="currentTotal">₹0</div>
+      </div>
+      <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+        <div class="text-xs font-semibold text-orange-700 mb-0.5">Target Allocation Sum</div>
+        <div class="text-xl font-bold text-orange-900" id="targetSum">0%</div>
+        <div class="text-xs text-orange-600 mt-0.5" id="targetSumHint">Should equal 100%</div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="mt-4 flex gap-3">
+      <button onclick="saveAllocationChanges()"
+        id="saveButton"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded font-semibold text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled>
+        💾 Save Changes
+      </button>
+      <button onclick="google.script.host.close()"
+        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2.5 rounded font-semibold text-sm transition-all border border-gray-300">
+        Cancel
+      </button>
+      <div id="saveStatus" class="flex items-center text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div id="loadingState" class="px-6 py-12 text-center text-gray-500 hidden">
+    <div class="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600 mx-auto mb-4"></div>
+    <p>Loading portfolio data...</p>
+  </div>
+
+  <!-- Success Section with Planning Tabs -->
+  <div id="successSection" class="px-6 py-4 hidden">
+    <!-- Success Header -->
+    <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 mb-4">
+      <div class="flex items-center gap-3">
+        <div class="text-3xl">✓</div>
+        <div class="flex-1">
+          <h3 class="text-lg font-bold text-green-900 m-0" id="successTitle">Allocation Saved Successfully!</h3>
+          <p class="text-sm text-green-700 m-0 mt-1" id="successStats">Updated: 2 | Added: 3 | Removed: 1</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Planning Tabs -->
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <!-- Tab Headers -->
+      <div class="flex bg-gray-50 border-b border-gray-200">
+        <button onclick="switchPlanningTab('gap')" id="tab-gap"
+          class="flex-1 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-white transition-all border-b-2 border-blue-600 bg-white">
+          📊 Gap Analysis
+        </button>
+        <button onclick="switchPlanningTab('sip')" id="tab-sip"
+          class="flex-1 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-white transition-all border-b-2 border-transparent">
+          📈 SIP Plan
+        </button>
+        <button onclick="switchPlanningTab('lumpsum')" id="tab-lumpsum"
+          class="flex-1 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-white transition-all border-b-2 border-transparent">
+          💰 Lumpsum Plan
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="p-4">
+        <!-- Gap Analysis Tab -->
+        <div id="tab-content-gap" class="tab-content">
+          <h4 class="text-sm font-semibold text-gray-800 mb-3">Rebalancing Actions Needed</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs border border-gray-200">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="py-2 px-3 text-left font-semibold text-gray-800">Fund Name</th>
+                  <th class="py-2 px-3 text-right font-semibold text-gray-800">Current Value</th>
+                  <th class="py-2 px-3 text-right font-semibold text-gray-800">Target Value</th>
+                  <th class="py-2 px-3 text-right font-semibold text-gray-800">Gap</th>
+                  <th class="py-2 px-3 text-right font-semibold text-gray-800">Action</th>
+                </tr>
+              </thead>
+              <tbody id="gapAnalysisBody">
+                <!-- Will be populated by JS -->
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-3 text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+            💡 <strong>What this means:</strong> Green (+) = need to buy more, Red (-) = need to sell/reduce. Execute trades manually in your broker app, then track them here.
+          </div>
+        </div>
+
+        <!-- SIP Plan Tab -->
+        <div id="tab-content-sip" class="tab-content hidden">
+          <h4 class="text-sm font-semibold text-gray-800 mb-3">Monthly SIP Distribution</h4>
+          <div id="sipPlanContent">
+            <!-- Will be populated by JS -->
+          </div>
+        </div>
+
+        <!-- Lumpsum Plan Tab -->
+        <div id="tab-content-lumpsum" class="tab-content hidden">
+          <h4 class="text-sm font-semibold text-gray-800 mb-3">Lumpsum Investment Distribution</h4>
+          <div id="lumpsumPlanContent">
+            <!-- Will be populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="mt-4 flex gap-3">
+      <button onclick="google.script.host.close()"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded font-semibold text-sm transition-all shadow-sm">
+        ✓ Done
+      </button>
+      <button onclick="viewPortfolioSheet()"
+        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2.5 rounded font-semibold text-sm transition-all border border-gray-300">
+        🔍 View Portfolio Sheet
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let currentPortfolioData = null;
+    let newFunds = [];
+    let allMutualFunds = [];
+    let fuse = null;
+
+    // Load portfolios and mutual funds on page load
+    window.onload = function() {
+      // Load portfolios
+      google.script.run
+        .withSuccessHandler(function(portfolios) {
+          const select = document.getElementById('portfolioSelect');
+          portfolios.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.portfolioName;
+            option.textContent = p.portfolioName;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(showError)
+        .getAllPortfolios();
+
+      // Load all mutual funds for search
+      google.script.run
+        .withSuccessHandler(function(funds) {
+          allMutualFunds = funds;
+          // Initialize Fuse.js for fuzzy search
+          const options = {
+            keys: ['name', 'code'],
+            threshold: 0.3,
+            includeScore: true
+          };
+          fuse = new Fuse(allMutualFunds, options);
+        })
+        .withFailureHandler(showError)
+        .getAllMutualFunds();
+    };
+
+    function loadPortfolioPlan() {
+      const portfolioName = document.getElementById('portfolioSelect').value;
+      if (!portfolioName) {
+        document.getElementById('planContainer').classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('loadingState').classList.remove('hidden');
+      document.getElementById('planContainer').classList.add('hidden');
+
+      // Reset new funds when switching portfolios
+      newFunds = [];
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          currentPortfolioData = data;
+          renderPlan();
+          document.getElementById('loadingState').classList.add('hidden');
+          document.getElementById('planContainer').classList.remove('hidden');
+        })
+        .withFailureHandler(function(error) {
+          showError(error);
+          document.getElementById('loadingState').classList.add('hidden');
+        })
+        .getPortfolioRebalancePlanData(portfolioName);
+    }
+
+    function addNewFundRow() {
+      const newFund = {
+        schemeCode: '',
+        fundName: '',
+        currentValue: 0,
+        currentPercent: 0,
+        targetPercent: 0,
+        isNew: true,
+        id: Date.now() // Unique ID for this row
+      };
+      newFunds.push(newFund);
+      renderPlan();
+    }
+
+    function removeNewFund(id) {
+      newFunds = newFunds.filter(f => f.id !== id);
+      renderPlan();
+    }
+
+    function removeExistingFund(index) {
+      const fund = currentPortfolioData.funds[index];
+      if (confirm(`Remove "${fund.fundName}" from portfolio?\n\nThis fund has 0 units and can be safely removed.`)) {
+        currentPortfolioData.funds.splice(index, 1);
+        renderPlan();
+      }
+    }
+
+    function updateTargetPercent(index, value, isNew) {
+      const targetPercent = parseFloat(value) || 0;
+
+      if (isNew) {
+        newFunds[index].targetPercent = targetPercent;
+      } else {
+        currentPortfolioData.funds[index].targetPercent = targetPercent;
+      }
+
+      renderPlan();
+    }
+
+    function searchFund(query, inputId, fundIndex) {
+      if (!query || query.length < 2) {
+        closeSearchResults(inputId);
+        return;
+      }
+
+      // Get existing fund codes to exclude
+      const existingCodes = [
+        ...currentPortfolioData.funds.map(f => f.schemeCode),
+        ...newFunds.filter(f => f.schemeCode).map(f => f.schemeCode)
+      ];
+
+      // Search using Fuse.js
+      const results = fuse.search(query)
+        .filter(result => !existingCodes.includes(result.item.code))
+        .slice(0, 10);
+
+      displaySearchResults(results, inputId, fundIndex);
+    }
+
+    function displaySearchResults(results, inputId, fundIndex) {
+      // Remove existing results
+      closeSearchResults(inputId);
+
+      if (results.length === 0) return;
+
+      const input = document.getElementById(inputId);
+
+      // Get input position
+      const rect = input.getBoundingClientRect();
+
+      const resultsDiv = document.createElement('div');
+      resultsDiv.className = 'fund-search-results';
+      resultsDiv.id = inputId + '_results';
+
+      // Position below the input
+      resultsDiv.style.top = (rect.bottom + window.scrollY) + 'px';
+      resultsDiv.style.left = rect.left + 'px';
+      resultsDiv.style.width = rect.width + 'px';
+
+      results.forEach(result => {
+        const fund = result.item;
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'fund-search-result';
+        resultDiv.innerHTML = `
+          <div style="font-weight: 500;">${fund.name}</div>
+          <div class="fund-search-result-code">Code: ${fund.code}</div>
+        `;
+        resultDiv.onclick = function() {
+          selectFund(fund, fundIndex);
+          closeSearchResults(inputId);
+        };
+        resultsDiv.appendChild(resultDiv);
+      });
+
+      document.body.appendChild(resultsDiv);
+    }
+
+    function closeSearchResults(inputId) {
+      const resultsDiv = document.getElementById(inputId + '_results');
+      if (resultsDiv) {
+        resultsDiv.remove();
+      }
+    }
+
+    function selectFund(fund, fundIndex) {
+      newFunds[fundIndex].schemeCode = fund.code;
+      newFunds[fundIndex].fundName = fund.name;
+      renderPlan();
+    }
+
+    function renderPlan() {
+      if (!currentPortfolioData) return;
+
+      const tbody = document.getElementById('planTableBody');
+      tbody.innerHTML = '';
+
+      // Calculate current total (existing funds only)
+      const currentTotal = currentPortfolioData.funds.reduce((sum, f) => sum + f.currentValue, 0);
+
+      // Render existing funds
+      currentPortfolioData.funds.forEach((fund, index) => {
+        const row = tbody.insertRow();
+        const targetValue = currentTotal * (fund.targetPercent || 0) / 100;
+        const gap = targetValue - fund.currentValue;
+        const hasUnits = fund.units > 0;
+
+        // Allow delete only if fund has 0 units
+        const deleteButton = !hasUnits ?
+          `<button onclick="removeExistingFund(${index})"
+             class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2">
+             ✕ Remove
+           </button>` : '';
+
+        const fundNameCell = `
+          <div class="flex items-center justify-between">
+            <span>${fund.fundName}</span>
+            ${deleteButton}
+          </div>
+        `;
+
+        row.innerHTML = `
+          <td>${fundNameCell}</td>
+          <td class="text-right">₹${formatCurrency(fund.currentValue)}</td>
+          <td class="text-right">${formatPercent(fund.currentPercent)}</td>
+          <td class="text-right">
+            <input type="number"
+              class="target-input"
+              value="${fund.targetPercent || 0}"
+              min="0"
+              max="100"
+              step="0.01"
+              onchange="updateTargetPercent(${index}, this.value, false)"
+              onblur="updateTargetPercent(${index}, this.value, false)">
+          </td>
+          <td class="text-right">₹${formatCurrency(targetValue)}</td>
+          <td class="text-right ${gap > 0 ? 'text-green' : (gap < 0 ? 'text-red' : '')}">${getActionText(gap)}</td>
+        `;
+      });
+
+      // Render new funds
+      newFunds.forEach((fund, index) => {
+        const row = tbody.insertRow();
+        row.className = 'new-fund-row';
+
+        const targetValue = currentTotal * (fund.targetPercent || 0) / 100;
+
+        const fundNameCell = fund.fundName ?
+          `<div class="flex items-center justify-between">
+             <span>${fund.fundName}</span>
+             <button onclick="removeNewFund(${fund.id})"
+               class="text-red-600 hover:text-red-800 text-xs font-semibold">
+               ✕ Remove
+             </button>
+           </div>` :
+          `<div class="fund-search-container">
+             <input type="text"
+               id="fundSearch_${fund.id}"
+               placeholder="🔍 Search fund..."
+               class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+               oninput="searchFund(this.value, 'fundSearch_${fund.id}', ${index})"
+               autocomplete="off">
+             <button onclick="removeNewFund(${fund.id})"
+               class="mt-1 text-red-600 hover:text-red-800 text-xs font-semibold">
+               ✕ Remove
+             </button>
+           </div>`;
+
+        row.innerHTML = `
+          <td>${fundNameCell}</td>
+          <td class="text-right">₹0</td>
+          <td class="text-right">0.00%</td>
+          <td class="text-right">
+            <input type="number"
+              class="target-input"
+              value="${fund.targetPercent || 0}"
+              min="0"
+              max="100"
+              step="0.01"
+              ${!fund.fundName ? 'disabled' : ''}
+              onchange="updateTargetPercent(${index}, this.value, true)"
+              onblur="updateTargetPercent(${index}, this.value, true)">
+          </td>
+          <td class="text-right">₹${formatCurrency(targetValue)}</td>
+          <td class="text-right text-green">${fund.fundName && fund.targetPercent ? 'Buy ₹' + formatCurrency(targetValue) : '-'}</td>
+        `;
+      });
+
+      // Update summary
+      const targetSum = [
+        ...currentPortfolioData.funds.map(f => f.targetPercent || 0),
+        ...newFunds.map(f => f.targetPercent || 0)
+      ].reduce((sum, val) => sum + val, 0);
+
+      document.getElementById('currentTotal').textContent = '₹' + formatCurrency(currentTotal);
+      document.getElementById('targetSum').textContent = formatPercent(targetSum);
+
+      // Highlight if target sum != 100%
+      const targetSumElement = document.getElementById('targetSum');
+      const targetSumHint = document.getElementById('targetSumHint');
+
+      if (Math.abs(targetSum - 100) > 0.01) {
+        targetSumElement.classList.add('text-red');
+        targetSumElement.classList.remove('text-orange-900');
+        targetSumHint.textContent = targetSum > 100 ? 'Over allocated!' : 'Under allocated!';
+        targetSumHint.classList.add('text-red-600');
+        targetSumHint.classList.remove('text-orange-600');
+      } else {
+        targetSumElement.classList.remove('text-red');
+        targetSumElement.classList.add('text-orange-900');
+        targetSumHint.textContent = '✓ Perfect allocation';
+        targetSumHint.classList.remove('text-red-600');
+        targetSumHint.classList.add('text-green-600');
+      }
+
+      // Enable/disable save button based on validation
+      const saveButton = document.getElementById('saveButton');
+      const hasValidAllocation = Math.abs(targetSum - 100) < 0.01;
+      const hasNewFundsWithoutNames = newFunds.some(f => !f.fundName);
+
+      if (hasValidAllocation && !hasNewFundsWithoutNames) {
+        saveButton.disabled = false;
+      } else {
+        saveButton.disabled = true;
+      }
+    }
+
+    function getActionText(gap) {
+      if (Math.abs(gap) < 1) return '-';
+      if (gap > 0) return `Buy ₹${formatCurrency(gap)}`;
+      return `Sell ₹${formatCurrency(Math.abs(gap))}`;
+    }
+
+    function formatCurrency(value) {
+      if (!value && value !== 0) return '0';
+      const abs = Math.abs(value);
+      if (abs >= 10000000) return (value / 10000000).toFixed(2) + ' Cr';
+      if (abs >= 100000) return (value / 100000).toFixed(2) + ' L';
+      return value.toFixed(2).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    }
+
+    function formatPercent(value) {
+      if (!value && value !== 0) return '0.00%';
+      return value.toFixed(2) + '%';
+    }
+
+    function showError(error) {
+      alert('Error: ' + error.message);
+      console.error(error);
+    }
+
+    function saveAllocationChanges() {
+      const portfolioSelect = document.getElementById('portfolioSelect');
+      const portfolioName = portfolioSelect.value;
+
+      if (!portfolioName) {
+        alert('Please select a portfolio');
+        return;
+      }
+
+      // Prepare data to save
+      const allocationData = {
+        portfolioName: portfolioName,
+        fundsToUpdate: currentPortfolioData.funds.map(f => ({
+          schemeCode: f.schemeCode,
+          fundName: f.fundName,
+          targetPercent: f.targetPercent || 0,
+          units: f.units
+        })),
+        fundsToAdd: newFunds.filter(f => f.fundName).map(f => ({
+          schemeCode: f.schemeCode,
+          fundName: f.fundName,
+          targetPercent: f.targetPercent || 0
+        }))
+      };
+
+      // Show loading state
+      const saveButton = document.getElementById('saveButton');
+      const saveStatus = document.getElementById('saveStatus');
+      saveButton.disabled = true;
+      saveButton.textContent = '⏳ Saving...';
+      saveStatus.innerHTML = '<span class="text-gray-600">Please wait...</span>';
+
+      // Call backend to save
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            saveStatus.innerHTML = '<span class="text-green-600">✓ Saved successfully!</span>';
+            setTimeout(function() {
+              // Show success with planning data
+              showSuccessDialog(result);
+            }, 500);
+          } else {
+            saveButton.disabled = false;
+            saveButton.textContent = '💾 Save Changes';
+            saveStatus.innerHTML = '<span class="text-red-600">✗ ' + (result.error || 'Save failed') + '</span>';
+          }
+        })
+        .withFailureHandler(function(error) {
+          saveButton.disabled = false;
+          saveButton.textContent = '💾 Save Changes';
+          saveStatus.innerHTML = '<span class="text-red-600">✗ Error: ' + error.message + '</span>';
+          showError(error);
+        })
+        .savePortfolioAllocation(allocationData);
+    }
+
+    function showSuccessDialog(result) {
+      // Hide plan container, show success section
+      document.getElementById('planContainer').classList.add('hidden');
+      document.getElementById('successSection').classList.remove('hidden');
+
+      // Update success stats
+      const stats = result.stats || { updated: 0, added: 0, deleted: 0 };
+      document.getElementById('successStats').textContent =
+        `Updated: ${stats.updated} | Added: ${stats.added} | Removed: ${stats.deleted}`;
+
+      // Populate tabs with planning data
+      if (result.planning) {
+        populateGapAnalysis(result.planning.gapAnalysis);
+        populateSIPPlan(result.planning.sipPlan);
+        populateLumpsumPlan(result.planning.lumpsumPlan);
+      }
+    }
+
+    function switchPlanningTab(tabName) {
+      // Update tab buttons
+      ['gap', 'sip', 'lumpsum'].forEach(name => {
+        const tab = document.getElementById('tab-' + name);
+        const content = document.getElementById('tab-content-' + name);
+
+        if (name === tabName) {
+          tab.classList.add('border-blue-600', 'bg-white');
+          tab.classList.remove('border-transparent');
+          content.classList.remove('hidden');
+        } else {
+          tab.classList.remove('border-blue-600', 'bg-white');
+          tab.classList.add('border-transparent');
+          content.classList.add('hidden');
+        }
+      });
+    }
+
+    function populateGapAnalysis(data) {
+      const tbody = document.getElementById('gapAnalysisBody');
+      tbody.innerHTML = '';
+
+      if (!data || !data.funds || data.funds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-3 px-3 text-center text-gray-500">No gap analysis data available</td></tr>';
+        return;
+      }
+
+      data.funds.forEach(fund => {
+        const row = tbody.insertRow();
+        const gap = fund.targetValue - fund.currentValue;
+        const isPositive = gap > 0;
+        const gapClass = isPositive ? 'text-green-600' : (gap < 0 ? 'text-red-600' : 'text-gray-600');
+        const action = Math.abs(gap) < 1 ? '-' : (isPositive ? 'Buy' : 'Sell');
+
+        row.innerHTML = `
+          <td class="py-2 px-3 border-b border-gray-200">${fund.fundName}</td>
+          <td class="py-2 px-3 border-b border-gray-200 text-right">₹${formatCurrency(fund.currentValue)}</td>
+          <td class="py-2 px-3 border-b border-gray-200 text-right">₹${formatCurrency(fund.targetValue)}</td>
+          <td class="py-2 px-3 border-b border-gray-200 text-right font-semibold ${gapClass}">
+            ${isPositive ? '+' : ''}₹${formatCurrency(gap)}
+          </td>
+          <td class="py-2 px-3 border-b border-gray-200 text-right ${gapClass}">${action}</td>
+        `;
+      });
+    }
+
+    function populateSIPPlan(data) {
+      const container = document.getElementById('sipPlanContent');
+
+      if (!data || !data.funds || data.funds.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">No SIP plan available. Set a Monthly SIP Target in portfolio settings.</p>';
+        return;
+      }
+
+      let html = `
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs border border-gray-200">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="py-2 px-3 text-left font-semibold text-gray-800">Fund Name</th>
+                <th class="py-2 px-3 text-right font-semibold text-gray-800">Target %</th>
+                <th class="py-2 px-3 text-right font-semibold text-gray-800">Monthly SIP</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      data.funds.forEach(fund => {
+        html += `
+          <tr>
+            <td class="py-2 px-3 border-b border-gray-200">${fund.fundName}</td>
+            <td class="py-2 px-3 border-b border-gray-200 text-right">${fund.targetPercent.toFixed(2)}%</td>
+            <td class="py-2 px-3 border-b border-gray-200 text-right font-semibold text-blue-600">₹${formatCurrency(fund.sipAmount)}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+              <tr class="bg-gray-50 font-bold">
+                <td class="py-2 px-3">Total</td>
+                <td class="py-2 px-3 text-right">100%</td>
+                <td class="py-2 px-3 text-right text-blue-600">₹${formatCurrency(data.totalSIP)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3 text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+          💡 <strong>How to use:</strong> Set up SIP for these amounts in your broker app. Track each SIP investment using "Buy (SIP)" menu.
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    function populateLumpsumPlan(data) {
+      const container = document.getElementById('lumpsumPlanContent');
+
+      if (!data || !data.funds || data.funds.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">No lumpsum plan available. Set a Lumpsum Target in portfolio settings.</p>';
+        return;
+      }
+
+      let html = `
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs border border-gray-200">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="py-2 px-3 text-left font-semibold text-gray-800">Fund Name</th>
+                <th class="py-2 px-3 text-right font-semibold text-gray-800">Target %</th>
+                <th class="py-2 px-3 text-right font-semibold text-gray-800">Lumpsum Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      data.funds.forEach(fund => {
+        html += `
+          <tr>
+            <td class="py-2 px-3 border-b border-gray-200">${fund.fundName}</td>
+            <td class="py-2 px-3 border-b border-gray-200 text-right">${fund.targetPercent.toFixed(2)}%</td>
+            <td class="py-2 px-3 border-b border-gray-200 text-right font-semibold text-green-600">₹${formatCurrency(fund.lumpsumAmount)}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+              <tr class="bg-gray-50 font-bold">
+                <td class="py-2 px-3">Total</td>
+                <td class="py-2 px-3 text-right">100%</td>
+                <td class="py-2 px-3 text-right text-green-600">₹${formatCurrency(data.totalLumpsum)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3 text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+          💡 <strong>How to use:</strong> Invest these amounts as lumpsum in your broker app. Track using "Buy (Lumpsum)" menu.
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    function viewPortfolioSheet() {
+      const portfolioSelect = document.getElementById('portfolioSelect');
+      const portfolioName = portfolioSelect.value;
+      if (portfolioName) {
+        google.script.run.activatePortfolioSheet(portfolioName);
+      }
+      google.script.host.close();
+    }
+
+    // Close search results when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.fund-search-container')) {
+        document.querySelectorAll('.fund-search-results').forEach(r => r.remove());
+      }
+    });
+
+    // Close search results on scroll
+    window.addEventListener('scroll', function() {
+      document.querySelectorAll('.fund-search-results').forEach(r => r.remove());
+    });
+  </script>
+</body>
+</html>

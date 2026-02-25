@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-gray-50 font-sans">
+
+  <!-- Dashboard Container -->
+  <div class="min-h-screen p-6">
+
+    <!-- Dashboard Header -->
+    <div class="flex justify-end mb-4">
+      <button onclick="addNewGoal()"
+        class="px-4 py-2 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        ➕ Add Goal
+      </button>
+    </div>
+
+    <!-- Goals Container - Grid Layout -->
+    <div id="goalsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="col-span-full text-center py-8 text-gray-600">
+        Loading goals...
+      </div>
+    </div>
+
+  </div>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let allGoals = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadGoals();
+    });
+
+    function loadGoals() {
+      console.log('Loading goals...');
+      google.script.run
+        .withSuccessHandler(function(goals) {
+          console.log('=== SUCCESS HANDLER CALLED ===');
+          console.log('Goals received:', goals);
+          console.log('Goals type:', typeof goals);
+          console.log('Goals is array:', Array.isArray(goals));
+          console.log('Number of goals:', goals ? goals.length : 0);
+
+          if (goals && goals.length > 0) {
+            console.log('First goal:', JSON.stringify(goals[0]));
+          }
+
+          allGoals = goals || [];
+          displayGoals(goals);
+        })
+        .withFailureHandler(function(error) {
+          console.error('=== FAILURE HANDLER CALLED ===');
+          console.error('Error loading goals:', error);
+          showError(error);
+        })
+        .getAllGoalsWithMappings();
+    }
+
+    function displayGoals(goals) {
+      const container = document.getElementById('goalsContainer');
+
+      if (!goals || goals.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <div class="text-6xl mb-4">🎯</div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No Goals Yet</h3>
+            <p class="text-gray-600 mb-6">Start planning your financial future by creating your first goal</p>
+            <button onclick="showGoalPlanner()"
+              class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+              🎯 Start Goal Planner
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      goals.forEach(goal => {
+        const card = createGoalCard(goal);
+        container.innerHTML += card;
+      });
+    }
+
+    function createGoalCard(goal) {
+      const progressPercent = (goal.progressPercent * 100).toFixed(1);
+      const statusClass = goal.status.toLowerCase().replace(' ', '-');
+
+      // Status badge colors
+      let statusBg = 'bg-emerald-100 text-emerald-800';
+      let progressBg = 'from-emerald-500 to-emerald-400';
+      let statusIcon = '🟢';
+
+      if (statusClass === 'behind') {
+        statusBg = 'bg-amber-100 text-amber-800';
+        progressBg = 'from-amber-500 to-amber-400';
+        statusIcon = '🟡';
+      } else if (statusClass === 'critical') {
+        statusBg = 'bg-red-100 text-red-800';
+        progressBg = 'from-red-500 to-red-400';
+        statusIcon = '🔴';
+      } else if (statusClass === 'achieved') {
+        statusBg = 'bg-blue-100 text-blue-800';
+        progressBg = 'from-blue-500 to-blue-400';
+        statusIcon = '🔵';
+      }
+
+      // Calculate years remaining
+      const today = new Date();
+      const targetDate = new Date(goal.targetDate);
+      const yearsRemaining = ((targetDate - today) / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1);
+
+      return `
+        <div class="bg-white rounded-lg border border-gray-200 p-4 mb-3 shadow-sm hover:shadow-md transition-all"
+          data-status="${statusClass}" data-active="${goal.isActive}">
+
+          <!-- Card Header - Compact -->
+          <div class="flex justify-between items-start mb-3">
+            <div class="flex-1">
+              <h3 class="text-base font-bold text-gray-900 mb-0.5">${goal.goalName}</h3>
+              <div class="text-xs text-gray-500">${goal.goalType} • ${goal.familyMemberName}</div>
+            </div>
+            <span class="px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${statusBg}">
+              ${statusIcon} ${goal.status}
+            </span>
+          </div>
+
+          <!-- Progress Bar - Compact -->
+          <div class="mb-3">
+            <div class="flex justify-between items-center text-xs text-gray-600 mb-1">
+              <span>₹${formatCurrency(goal.currentValue)} / ₹${formatCurrency(goal.targetAmount)}</span>
+              <span class="font-semibold">${progressPercent}%</span>
+            </div>
+            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r ${progressBg} transition-all duration-300"
+                style="width: ${Math.min(progressPercent, 100)}%">
+              </div>
+            </div>
+          </div>
+
+          <!-- Key Info Grid - Compact -->
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="bg-gray-50 rounded px-2 py-1.5">
+              <div class="text-xs text-gray-500">Gap</div>
+              <div class="text-sm font-bold text-gray-900">₹${formatCurrency(goal.gapAmount)}</div>
+            </div>
+            <div class="bg-gray-50 rounded px-2 py-1.5">
+              <div class="text-xs text-gray-500">Time Left</div>
+              <div class="text-sm font-bold text-gray-900">${yearsRemaining} years</div>
+            </div>
+            <div class="bg-sky-50 rounded px-2 py-1.5">
+              <div class="text-xs text-sky-600">SIP Needed</div>
+              <div class="text-sm font-bold text-sky-700">₹${formatCurrency(goal.monthlyInvestment)}/mo</div>
+            </div>
+            <div class="bg-sky-50 rounded px-2 py-1.5">
+              <div class="text-xs text-sky-600">Lumpsum</div>
+              <div class="text-sm font-bold text-sky-700">₹${formatCurrency(goal.lumpsumNeeded)}</div>
+            </div>
+          </div>
+
+          ${goal.portfolioMappings && goal.portfolioMappings.length > 0 ? `
+            <!-- Portfolio Section - Compact -->
+            <div class="bg-blue-50 rounded p-2 mb-2">
+              <div class="text-xs font-semibold text-blue-900 mb-1.5">💼 Mapped Portfolios</div>
+              <div class="space-y-1">
+                ${goal.portfolioMappings.map(mapping => `
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-gray-700">${mapping.portfolioName}</span>
+                    <span class="font-semibold text-blue-700">${(mapping.allocationPct * 100).toFixed(0)}%</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : `
+            <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+              <div class="text-xs text-amber-800">
+                <strong>⚠️ No Portfolios Mapped</strong> - Map portfolios to track progress
+              </div>
+            </div>
+          `}
+
+          ${generateActionSuggestions(goal, progressPercent)}
+
+          <!-- Action Buttons - Compact -->
+          <div class="flex gap-1.5 flex-wrap">
+            ${goal.status !== 'Achieved' ? `
+              <button onclick="editGoal('${goal.goalId}')"
+                class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs font-semibold hover:bg-gray-200 transition-colors">
+                ✏️ Edit
+              </button>
+              <button onclick="mapPortfolios('${goal.goalId}')"
+                class="px-3 py-1.5 bg-sky-100 text-sky-700 rounded text-xs font-semibold hover:bg-sky-200 transition-colors">
+                🔗 Map
+              </button>
+              ${progressPercent >= 80 ? `
+                <button onclick="markAsAchieved('${goal.goalId}')"
+                  class="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700 transition-colors">
+                  🎉 Achieved
+                </button>
+              ` : ''}
+            ` : `
+              <button onclick="showAchievedDialog('${goal.goalId}')"
+                class="px-3 py-1.5 bg-sky-600 text-white rounded text-xs font-semibold hover:bg-sky-700 transition-colors">
+                🎉 View
+              </button>
+            `}
+            ${goal.currentValue > 0 ? `
+              <button onclick="viewWithdrawalOptions('${goal.goalId}')"
+                class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs font-semibold hover:bg-gray-200 transition-colors">
+                💸 Withdraw
+              </button>
+            ` : ''}
+            <button onclick="deleteGoal('${goal.goalId}')"
+              class="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs font-semibold hover:bg-red-200 transition-colors">
+              🗑️ Delete
+            </button>
+          </div>
+
+        </div>
+      `;
+    }
+
+    function generateActionSuggestions(goal, progressPercent) {
+      // Don't show suggestions if goal is achieved
+      if (goal.status === 'Achieved') {
+        return `
+          <div class="bg-emerald-50 rounded p-2 mb-2">
+            <div class="text-xs text-emerald-800">
+              <strong>🎉 Achieved!</strong> Congratulations on reaching your goal!
+            </div>
+          </div>
+        `;
+      }
+
+      const hasPortfolios = goal.portfolioMappings && goal.portfolioMappings.length > 0;
+
+      // No portfolios mapped - show getting started suggestions
+      if (!hasPortfolios) {
+        return `
+          <div class="bg-amber-50 rounded p-2 mb-2">
+            <div class="text-xs text-amber-800">
+              <strong>⚠️ Action Needed:</strong> Start investing or map existing portfolios to track progress
+            </div>
+          </div>
+        `;
+      }
+
+      // Behind or Critical - show increase investment suggestion
+      if (goal.status === 'Behind' || goal.status === 'Critical') {
+        const currentSIP = goal.monthlyInvestment;
+        const increasedSIP = Math.round(currentSIP * 1.2);
+        const statusIcon = goal.status === 'Critical' ? '🔴' : '🟡';
+
+        return `
+          <div class="bg-amber-50 rounded p-2 mb-2">
+            <div class="text-xs text-amber-800">
+              <strong>${statusIcon} ${goal.status}:</strong> Consider increasing SIP to ₹${formatCurrency(increasedSIP)}/month or adding lumpsum
+            </div>
+          </div>
+        `;
+      }
+
+      // On Track - show encouraging message
+      return `
+        <div class="bg-emerald-50 rounded p-2 mb-2">
+          <div class="text-xs text-emerald-800">
+            <strong>🟢 On Track!</strong> Keep up the good work!
+          </div>
+        </div>
+      `;
+    }
+
+
+    function addNewGoal() {
+      google.script.run.showAddGoalDialog();
+    }
+
+    function editGoal(goalId) {
+      google.script.run.showEditGoalDialog();
+    }
+
+    function mapPortfolios(goalId) {
+      google.script.run.showMapPortfoliosToGoalDialog();
+    }
+
+    function viewWithdrawalOptions(goalId) {
+      google.script.run.showGoalWithdrawalPlanDialog();
+    }
+
+    function markAsAchieved(goalId) {
+      const confirmed = confirm(
+        '🎉 Mark Goal as Achieved\n\n' +
+        'This will:\n' +
+        '• Update status to "Achieved"\n' +
+        '• Set progress to 100%\n' +
+        '• Show celebration dialog\n\n' +
+        'Have you reached your goal?'
+      );
+
+      if (confirmed) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert('✅ ' + result.message);
+              loadGoals();
+              setTimeout(() => showAchievedDialog(goalId), 500);
+            } else {
+              alert('❌ ' + result.error);
+            }
+          })
+          .withFailureHandler(showError)
+          .markGoalAsAchieved(goalId);
+      }
+    }
+
+    function showAchievedDialog(goalId) {
+      google.script.run.showGoalAchievedDialog();
+      closeDialog();
+    }
+
+    function archiveGoal(goalId) {
+      const confirmed = confirm(
+        '📦 Archive Goal\n\n' +
+        'This will:\n' +
+        '• Mark goal as Inactive (hidden from active list)\n' +
+        '• Keep all data in Goals sheet\n' +
+        '• Preserve portfolio mappings\n\n' +
+        'Archive this goal?'
+      );
+
+      if (confirmed) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert('✅ ' + result.message);
+              loadGoals();
+            } else {
+              alert('❌ ' + result.error);
+            }
+          })
+          .withFailureHandler(showError)
+          .archiveGoal(goalId);
+      }
+    }
+
+    function deleteGoal(goalId) {
+      const confirmed = confirm('⚠️ Are you sure you want to delete this goal?\n\nThis will also remove all portfolio mappings for this goal.');
+
+      if (confirmed) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert('✅ ' + result.message);
+              loadGoals();
+            } else {
+              alert('❌ ' + result.error);
+            }
+          })
+          .withFailureHandler(showError)
+          .deleteGoal(goalId);
+      }
+    }
+
+    function showGoalPlanner() {
+      google.script.run.showGoalPlannerDialog();
+      closeDialog();
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-IN').format(Math.round(value));
+    }
+
+    function showError(message) {
+      alert('❌ ' + (message.message || message));
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>

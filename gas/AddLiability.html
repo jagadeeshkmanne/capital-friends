@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      font-family: 'Inter', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .dialog-container {
+      background: white;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .dialog-header {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .dialog-body {
+      padding: 1.5rem;
+      max-height: 450px;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-label .required {
+      color: #ef4444;
+      margin-left: 2px;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .btn {
+      padding: 0.625rem 1.25rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+
+    .dialog-footer {
+      padding: 1rem 1.5rem;
+      background: #f9fafb;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .alert {
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .alert-error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .alert-success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* Scrollbar styling */
+    .dialog-body::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .dialog-body::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .dialog-body::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+
+    .dialog-body::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="dialog-container">
+    <!-- Header -->
+    <div class="dialog-header">
+      <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">💳 Add Liability</h2>
+      <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem; opacity: 0.9;">Track loans, debts, and financial obligations</p>
+    </div>
+
+    <!-- Body -->
+    <div class="dialog-body">
+      <!-- Alert Messages -->
+      <div id="alertError" class="alert alert-error hidden"></div>
+      <div id="alertSuccess" class="alert alert-success hidden"></div>
+
+      <!-- Form -->
+      <form id="liabilityForm">
+        <!-- Liability Type -->
+        <div class="form-group">
+          <label class="form-label">Liability Type <span class="required">*</span></label>
+          <select id="liabilityType" class="form-select" required>
+            <option value="">-- Select Liability Type --</option>
+          </select>
+        </div>
+
+        <!-- Lender Name & Family Member Row -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Lender/Bank Name <span class="required">*</span></label>
+            <input type="text" id="lenderName" class="form-input" placeholder="e.g., HDFC Bank, ICICI Bank" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Family Member</label>
+            <select id="familyMember" class="form-select">
+              <option value="">-- Select Family Member --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Principal & Interest Rate Row -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Principal Amount (₹)</label>
+            <input type="number" id="principalAmount" class="form-input" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Interest Rate (%)</label>
+            <input type="number" id="interestRate" class="form-input" step="0.01" min="0" max="100" placeholder="0.00">
+          </div>
+        </div>
+
+        <!-- EMI & Tenure Row -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">EMI Amount (₹)</label>
+            <input type="number" id="emi" class="form-input" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tenure (months)</label>
+            <input type="number" id="tenure" class="form-input" min="0" placeholder="e.g., 240 for 20 years">
+          </div>
+        </div>
+
+        <!-- Outstanding Balance -->
+        <div class="form-group">
+          <label class="form-label">Outstanding Balance (₹) <span class="required">*</span></label>
+          <input type="number" id="outstandingBalance" class="form-input" step="0.01" min="0" placeholder="0.00" required>
+          <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #6b7280;">💡 Tip: Link investments to this loan from the investment screen</p>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea id="notes" class="form-textarea" placeholder="Any additional information..."></textarea>
+        </div>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="dialog-footer">
+      <button type="button" class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="handleSubmit()">💾 Add Liability</button>
+    </div>
+  </div>
+
+  <!-- Developer Credit -->
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    // Load liability types on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      loadLiabilityTypes();
+      loadFamilyMembers();
+    });
+
+    /**
+     * Load all liability types into dropdown
+     */
+    function loadLiabilityTypes() {
+      google.script.run
+        .withSuccessHandler(function(types) {
+          const select = document.getElementById('liabilityType');
+          select.innerHTML = '<option value="">-- Select Liability Type --</option>';
+
+          types.forEach(function(type) {
+            const option = document.createElement('option');
+            option.value = type.typeName;
+            option.textContent = (type.icon || '📝') + ' ' + type.typeName +
+                                (type.category ? ' (' + type.category + ')' : '');
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          showError('Failed to load liability types: ' + error.message);
+        })
+        .getAllLiabilityTypes();
+    }
+
+    /**
+     * Load family members into dropdown
+     */
+    function loadFamilyMembers() {
+      google.script.run
+        .withSuccessHandler(function(members) {
+          const select = document.getElementById('familyMember');
+          members.forEach(function(member) {
+            const option = document.createElement('option');
+            option.value = member.memberId;  // ✅ FIX: Use memberId instead of memberName
+            option.textContent = member.memberName + ' (' + member.relationship + ')';
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load family members:', error);
+        })
+        .getAllFamilyMembers();
+    }
+
+    function formatNumber(num) {
+      if (!num) return '0.00';
+      return parseFloat(num).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    /**
+     * Handle form submission
+     */
+    function handleSubmit() {
+      // Validate form
+      const liabilityType = document.getElementById('liabilityType').value.trim();
+      const lenderName = document.getElementById('lenderName').value.trim();
+      const outstandingBalance = document.getElementById('outstandingBalance').value;
+
+      if (!liabilityType) {
+        showError('Please select a Liability Type.');
+        return;
+      }
+
+      if (!lenderName) {
+        showError('Please enter Lender/Bank Name.');
+        return;
+      }
+
+      if (!outstandingBalance || parseFloat(outstandingBalance) <= 0) {
+        showError('Please enter a valid Outstanding Balance.');
+        return;
+      }
+
+      // Gather dynamic fields
+      const dynamicFields = {};
+      const accountNumber = document.getElementById('accountNumber') ? document.getElementById('accountNumber').value.trim() : '';
+      const principalAmount = document.getElementById('principalAmount').value;
+      const interestRate = document.getElementById('interestRate').value;
+      const emi = document.getElementById('emi').value;
+      const tenure = document.getElementById('tenure').value;
+      const startDate = document.getElementById('startDate') ? document.getElementById('startDate').value : '';
+
+      // Store optional fields as dynamic fields if they have values
+      if (accountNumber) dynamicFields['Account Number'] = accountNumber;
+      if (principalAmount) dynamicFields['Principal Amount'] = principalAmount;
+      if (interestRate) dynamicFields['Interest Rate'] = interestRate;
+      if (emi) dynamicFields['EMI'] = emi;
+      if (tenure) dynamicFields['Tenure (months)'] = tenure;
+      if (startDate) dynamicFields['Start Date'] = startDate;
+
+      // Gather form data
+      const data = {
+        liabilityType: liabilityType,
+        lenderName: lenderName,
+        familyMember: document.getElementById('familyMember').value,
+        outstandingBalance: outstandingBalance,
+        dynamicFields: dynamicFields,
+        notes: document.getElementById('notes').value.trim()
+      };
+
+      // Disable submit button
+      const submitBtn = event.target;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Adding...';
+
+      // Submit to backend
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            showSuccess(response.message);
+            // Close dialog after 1.5 seconds
+            setTimeout(function() {
+              google.script.host.close();
+            }, 1500);
+          } else {
+            showError(response.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = '💾 Add Liability';
+          }
+        })
+        .withFailureHandler(function(error) {
+          showError('Failed to add liability: ' + error.message);
+          submitBtn.disabled = false;
+          submitBtn.textContent = '💾 Add Liability';
+        })
+        .processAddLiability(data);
+    }
+
+    /**
+     * Show error message
+     */
+    function showError(message) {
+      const alertError = document.getElementById('alertError');
+      const alertSuccess = document.getElementById('alertSuccess');
+      alertError.textContent = message;
+      alertError.classList.remove('hidden');
+      alertSuccess.classList.add('hidden');
+      // Scroll to top to show error
+      document.querySelector('.dialog-body').scrollTop = 0;
+    }
+
+    /**
+     * Show success message
+     */
+    function showSuccess(message) {
+      const alertSuccess = document.getElementById('alertSuccess');
+      const alertError = document.getElementById('alertError');
+      alertSuccess.textContent = message;
+      alertSuccess.classList.remove('hidden');
+      alertError.classList.add('hidden');
+      // Scroll to top to show success
+      document.querySelector('.dialog-body').scrollTop = 0;
+    }
+  </script>
+</body>
+</html>

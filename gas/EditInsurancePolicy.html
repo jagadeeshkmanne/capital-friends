@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <div id="selectionView" class="bg-white">
+    <!-- Loading State -->
+    <div id="loadingPolicies" class="py-12 px-6 text-center text-gray-600">
+      <div class="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full mx-auto mb-3 animate-spin"></div>
+      <p>Loading insurance policies...</p>
+    </div>
+
+    <!-- Selection Content (hidden until loaded) -->
+    <div id="selectionContent" class="hidden">
+      <!-- Info Box -->
+      <div class="px-6 pt-6 pb-3">
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+          <p class="text-sm text-blue-800">
+            <strong>✏️ Edit Insurance Policy</strong> - Select a policy to view or update its details.
+          </p>
+        </div>
+      </div>
+
+      <!-- Policy Selection -->
+      <div class="px-6 pb-6">
+        <div class="px-4 py-3 bg-gray-50 rounded">
+          <label class="text-xs font-semibold text-gray-700 mb-2 block">Select Policy to Edit</label>
+          <select id="policySelect" onchange="loadPolicyForEdit()"
+            class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+            <option value="">-- Select a policy --</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+        <button type="button" onclick="google.script.host.close()"
+          class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <form id="editInsurancePolicyForm" class="bg-white hidden" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Updating insurance policy...</div>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="px-6 pt-6 pb-3">
+      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+        <p class="text-sm text-blue-800">
+          <strong>✏️ Edit Insurance Policy</strong> - Update policy details below.
+          <button type="button" onclick="showSelectionView()" class="ml-2 text-blue-600 underline text-xs">← Back to selection</button>
+        </p>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white px-6 pb-6">
+
+      <!-- Policy ID (Read-only) -->
+      <div class="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Policy ID</label>
+        <input type="text" id="policyId" readonly
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm bg-gray-100 cursor-not-allowed font-semibold">
+      </div>
+
+      <!-- Row 1: Policy Type + Insurance Company -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Policy Type <span class="text-red-600">*</span></label>
+          <select id="policyType" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+            <option value="">Select type</option>
+            <option value="Life Insurance">Life Insurance</option>
+            <option value="Health Insurance">Health Insurance</option>
+            <option value="Term Insurance">Term Insurance</option>
+            <option value="Motor Insurance">Motor Insurance</option>
+            <option value="Home Insurance">Home Insurance</option>
+            <option value="Travel Insurance">Travel Insurance</option>
+            <option value="Personal Accident">Personal Accident</option>
+            <option value="Others">Others</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="policyTypeError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Insurance Company <span class="text-red-600">*</span></label>
+          <input type="text" id="company" required placeholder="e.g., HDFC Life, ICICI Lombard"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="companyError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Policy Number -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Policy Number <span class="text-red-600">*</span></label>
+        <input type="text" id="policyNumber" required placeholder="e.g., 12345678, P/HDF/2024/001"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+        <span class="text-xs text-gray-500 mt-0.5 block">Unique policy identification number</span>
+        <span class="text-red-600 text-xs hidden mt-0.5 block" id="policyNumberError">Required</span>
+      </div>
+
+      <!-- Row 3: Policy Name -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Policy Name <span class="text-red-600">*</span></label>
+        <input type="text" id="policyName" required placeholder="e.g., Family Health Plus, Term Plan"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+        <span class="text-xs text-gray-500 mt-0.5 block">Short description of the policy</span>
+        <span class="text-red-600 text-xs hidden mt-0.5 block" id="policyNameError">Required</span>
+      </div>
+
+      <!-- Row 4: Insured Member + Nominee -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Insured Member <span class="text-red-600">*</span></label>
+          <select id="insuredMember" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+            <option value="">Loading...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="insuredMemberError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Nominee</label>
+          <select id="nominee"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+            <option value="">Loading...</option>
+          </select>
+          <span class="text-xs text-gray-500 mt-0.5 block">Beneficiary</span>
+        </div>
+      </div>
+
+      <!-- Row 5: Sum Assured + Policy Status -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Sum Assured (₹) <span class="text-red-600">*</span></label>
+          <input type="number" id="sumAssured" required placeholder="e.g., 1000000" min="0" step="1000"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Coverage/protection amount</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="sumAssuredError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Policy Status</label>
+          <select id="status"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+            <option value="Active">Active</option>
+            <option value="Expired">Expired</option>
+            <option value="Surrendered">Surrendered</option>
+            <option value="Lapsed">Lapsed</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 6: Notes -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Notes</label>
+        <input type="text" id="notes" placeholder="Additional information"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+      </div>
+
+      <!-- Dynamic Fields Section -->
+      <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div class="mb-2">
+          <span class="text-xs font-semibold text-gray-700">Optional Details</span>
+          <span class="text-xs text-gray-500 ml-1">(Premium, Dates, Agent Info)</span>
+        </div>
+        <div id="dynamicFieldsContainer" class="space-y-2"></div>
+        <button type="button" onclick="addDynamicField()"
+          class="mt-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors inline-flex items-center gap-1.5">
+          + Add Custom Field
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="showSelectionView()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm">
+        Update Policy
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    console.log('EditInsurancePolicy.html loaded - Version 2.1 - Improved Loading State & Dynamic Fields UI');
+
+    let allFamilyMembers = [];
+    let allPolicies = [];
+    let selectedPolicyId = null;
+    let dynamicFieldCount = 0;
+
+    // Load all policies on page load
+    window.onload = function() {
+      console.log('EditInsurancePolicy: window.onload triggered');
+
+      // Load family members first
+      google.script.run
+        .withSuccessHandler(function(members) {
+          console.log('Received family members:', members);
+          allFamilyMembers = members || [];
+        })
+        .getAllFamilyMembers();
+
+      // Load all insurance policies
+      console.log('EditInsurancePolicy: Calling getAllInsurancePolicies()...');
+      google.script.run
+        .withSuccessHandler(function(policies) {
+          console.log('EditInsurancePolicy: Received policies:', policies);
+          console.log('EditInsurancePolicy: Type of policies:', typeof policies);
+          console.log('EditInsurancePolicy: Is Array:', Array.isArray(policies));
+          console.log('EditInsurancePolicy: Policies length:', policies ? policies.length : 'N/A');
+
+          // Handle null or undefined policies
+          if (!policies) {
+            console.error('EditInsurancePolicy: Policies is null or undefined');
+            document.getElementById('loadingPolicies').innerHTML = `
+              <div class="py-12 px-6 text-center text-amber-600">
+                <p class="font-semibold mb-2">No insurance policies found</p>
+                <p class="text-sm">Please add insurance policies first using "➕ Add Insurance Policy" menu.</p>
+                <button onclick="google.script.host.close()"
+                  class="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300">
+                  Close
+                </button>
+              </div>
+            `;
+            return;
+          }
+
+          allPolicies = policies;
+          console.log('EditInsurancePolicy: All policies stored:', allPolicies.length);
+          console.log('EditInsurancePolicy: First policy (if exists):', allPolicies[0]);
+          populatePolicyDropdown();
+        })
+        .withFailureHandler(function(error) {
+          console.error('EditInsurancePolicy: Error loading policies:', error);
+          console.error('EditInsurancePolicy: Error type:', typeof error);
+          console.error('EditInsurancePolicy: Error details:', JSON.stringify(error));
+          document.getElementById('loadingPolicies').innerHTML = `
+            <div class="py-12 px-6 text-center text-red-600">
+              <p class="font-semibold mb-2">Error loading insurance policies</p>
+              <p class="text-sm">${error.message || error}</p>
+              <button onclick="google.script.host.close()"
+                class="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300">
+                Close
+              </button>
+            </div>
+          `;
+        })
+        .getAllInsurancePolicies();
+    };
+
+    function populatePolicyDropdown() {
+      const select = document.getElementById('policySelect');
+
+      if (allPolicies.length === 0) {
+        document.getElementById('loadingPolicies').innerHTML = `
+          <div class="py-12 px-6 text-center text-amber-600">
+            <p class="font-semibold mb-2">No insurance policies found</p>
+            <p class="text-sm">Please add insurance policies first using "➕ Add Insurance Policy" menu.</p>
+            <button onclick="google.script.host.close()"
+              class="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300">
+              Close
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      allPolicies.forEach(policy => {
+        const option = document.createElement('option');
+        option.value = policy.policyId;
+        option.textContent = `${policy.policyId} - ${policy.policyType} (${policy.company})`;
+        select.appendChild(option);
+      });
+
+      document.getElementById('loadingPolicies').classList.add('hidden');
+      document.getElementById('selectionContent').classList.remove('hidden');
+      console.log('EditInsurancePolicy: Dropdown populated with', allPolicies.length, 'policies');
+    }
+
+    function loadPolicyForEdit() {
+      const policyId = document.getElementById('policySelect').value;
+      if (!policyId) return;
+
+      const policy = allPolicies.find(p => p.policyId === policyId);
+      if (!policy) {
+        alert('Policy not found');
+        return;
+      }
+
+      selectedPolicyId = policyId;
+
+      // Populate essential fields
+      document.getElementById('policyId').value = policy.policyId;
+      document.getElementById('policyType').value = policy.policyType;
+      document.getElementById('company').value = policy.company;
+      document.getElementById('policyNumber').value = policy.policyNumber || '';
+      document.getElementById('policyName').value = policy.policyName;
+      document.getElementById('sumAssured').value = policy.sumAssured;
+      document.getElementById('status').value = policy.status;
+      document.getElementById('notes').value = policy.notes || '';
+
+      // Populate family member dropdowns
+      populateFamilyMemberDropdowns(policy.insuredMember, policy.nominee);
+
+      // Populate dynamic fields
+      populateDynamicFields(policy.dynamicFields || {});
+
+      // Show edit form, hide selection
+      document.getElementById('selectionView').classList.add('hidden');
+      document.getElementById('editInsurancePolicyForm').classList.remove('hidden');
+    }
+
+    function populateFamilyMemberDropdowns(selectedInsured, selectedNominee) {
+      const insuredSelect = document.getElementById('insuredMember');
+      const nomineeSelect = document.getElementById('nominee');
+
+      insuredSelect.innerHTML = '<option value="">Select member</option>';
+      nomineeSelect.innerHTML = '<option value="">Select nominee (optional)</option>';
+
+      if (!allFamilyMembers || allFamilyMembers.length === 0) {
+        insuredSelect.innerHTML = '<option value="">No family members found</option>';
+        nomineeSelect.innerHTML = '<option value="">No family members found</option>';
+        return;
+      }
+
+      allFamilyMembers.forEach(member => {
+        // Insured member dropdown
+        const option1 = document.createElement('option');
+        option1.value = member.memberName;
+        option1.setAttribute('data-member-id', member.memberId);  // Store member ID
+        option1.textContent = member.memberName + ' (' + member.relationship + ')';
+        if (member.memberName === selectedInsured) {
+          option1.selected = true;
+        }
+        insuredSelect.appendChild(option1);
+
+        // Nominee dropdown
+        const option2 = document.createElement('option');
+        option2.value = member.memberName;
+        option2.textContent = member.memberName + ' (' + member.relationship + ')';
+        if (member.memberName === selectedNominee) {
+          option2.selected = true;
+        }
+        nomineeSelect.appendChild(option2);
+      });
+    }
+
+    function populateDynamicFields(fields) {
+      const container = document.getElementById('dynamicFieldsContainer');
+      container.innerHTML = '';  // Clear existing fields
+      dynamicFieldCount = 0;
+
+      // Add each dynamic field from the policy
+      for (const [key, value] of Object.entries(fields)) {
+        if (key && value) {
+          addDynamicField(key, value);
+        }
+      }
+    }
+
+    function addDynamicField(fieldName = '', fieldValue = '') {
+      dynamicFieldCount++;
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRow = document.createElement('div');
+      fieldRow.className = 'flex gap-3 items-start';
+      fieldRow.id = `dynamicField${dynamicFieldCount}`;
+      fieldRow.innerHTML = `
+        <input type="text" id="fieldName${dynamicFieldCount}" placeholder="Field name (e.g., Policy Number, Premium)" value="${fieldName}"
+          class="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+        <input type="text" id="fieldValue${dynamicFieldCount}" placeholder="Value" value="${fieldValue}"
+          class="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+        <button type="button" onclick="removeDynamicField(${dynamicFieldCount})"
+          class="px-3 py-1.5 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
+          ✕
+        </button>
+      `;
+      container.appendChild(fieldRow);
+    }
+
+    function removeDynamicField(id) {
+      const fieldRow = document.getElementById(`dynamicField${id}`);
+      if (fieldRow) {
+        fieldRow.remove();
+      }
+    }
+
+    function collectDynamicFields() {
+      const fields = {};
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRows = container.querySelectorAll('[id^="dynamicField"]');
+
+      fieldRows.forEach(row => {
+        const id = row.id.replace('dynamicField', '');
+        const nameInput = document.getElementById(`fieldName${id}`);
+        const valueInput = document.getElementById(`fieldValue${id}`);
+
+        if (nameInput && valueInput && nameInput.value.trim() && valueInput.value.trim()) {
+          fields[nameInput.value.trim()] = valueInput.value.trim();
+        }
+      });
+
+      return fields;
+    }
+
+    function showSelectionView() {
+      document.getElementById('editInsurancePolicyForm').classList.add('hidden');
+      document.getElementById('selectionView').classList.remove('hidden');
+      clearAllErrors();
+    }
+
+    function showError(fieldId, message) {
+      const errorEl = document.getElementById(fieldId + 'Error');
+      const inputEl = document.getElementById(fieldId);
+      if (errorEl) { errorEl.textContent = message; errorEl.classList.remove('hidden'); }
+      if (inputEl) { inputEl.classList.remove('border-gray-300'); inputEl.classList.add('border-red-600'); }
+    }
+
+    function clearError(fieldId) {
+      const errorEl = document.getElementById(fieldId + 'Error');
+      const inputEl = document.getElementById(fieldId);
+      if (errorEl) errorEl.classList.add('hidden');
+      if (inputEl) { inputEl.classList.remove('border-red-600'); inputEl.classList.add('border-gray-300'); }
+    }
+
+    function clearAllErrors() {
+      document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('input, select').forEach(el => {
+        el.classList.remove('border-red-600');
+        el.classList.add('border-gray-300');
+      });
+    }
+
+    document.getElementById('editInsurancePolicyForm').onsubmit = function(e) {
+      e.preventDefault();
+      clearAllErrors();
+
+      const policyType = document.getElementById('policyType').value;
+      const company = document.getElementById('company').value;
+      const policyNumber = document.getElementById('policyNumber').value;
+      const policyName = document.getElementById('policyName').value;
+      const insuredMember = document.getElementById('insuredMember').value;
+      const sumAssured = document.getElementById('sumAssured').value;
+
+      let isValid = true;
+
+      if (!policyType) { showError('policyType', 'Policy type is required'); isValid = false; }
+      if (!company) { showError('company', 'Insurance company is required'); isValid = false; }
+      if (!policyNumber) { showError('policyNumber', 'Policy number is required'); isValid = false; }
+      if (!policyName) { showError('policyName', 'Policy name is required'); isValid = false; }
+      if (!insuredMember) { showError('insuredMember', 'Insured member is required'); isValid = false; }
+      if (!sumAssured || parseFloat(sumAssured) <= 0) { showError('sumAssured', 'Valid sum assured is required'); isValid = false; }
+
+      if (!isValid) return;
+
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      // Collect dynamic fields
+      const dynamicFields = collectDynamicFields();
+
+      // Get Member ID from selected option
+      const insuredMemberSelect = document.getElementById('insuredMember');
+      const selectedOption = insuredMemberSelect.options[insuredMemberSelect.selectedIndex];
+      const memberId = selectedOption ? selectedOption.getAttribute('data-member-id') : '';
+
+      const policyData = {
+        policyType: policyType,
+        company: company,
+        policyNumber: policyNumber,
+        policyName: policyName,
+        insuredMember: insuredMember,
+        memberId: memberId,  // Add Member ID
+        sumAssured: parseFloat(sumAssured),
+        nominee: document.getElementById('nominee').value,
+        status: document.getElementById('status').value,
+        notes: document.getElementById('notes').value,
+        dynamicFields: dynamicFields  // Send as object
+      };
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-blue-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').innerHTML = '✓';
+            document.getElementById('progressText').textContent = 'Success! Policy updated.';
+            // CRITICAL FIX: Remove setTimeout delay - backend now uses SpreadsheetApp.flush()
+            google.script.host.close();
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .updateInsurancePolicy(selectedPolicyId, policyData);
+    };
+
+    document.querySelectorAll('input, select').forEach(function(el) {
+      el.oninput = function() { clearError(this.id); };
+    });
+  </script>
+</body>
+</html>

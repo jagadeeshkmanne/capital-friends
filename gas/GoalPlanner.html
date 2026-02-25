@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="goalPlannerForm" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Creating your goals...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait</div>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+
+      <!-- Section 1: Your Profile -->
+      <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs font-semibold text-gray-700 mb-1 block">
+              Your Current Age <span class="text-red-600">*</span>
+            </label>
+            <input type="number" id="age" required placeholder="e.g., 30" min="18" max="100"
+              class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
+              onchange="updateRetirementCorpus()">
+            <p class="text-xs text-gray-500 mt-1">For retirement calculation</p>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-700 mb-1 block">
+              Monthly Expenses (₹)
+            </label>
+            <input type="number" id="monthlyExpenses" placeholder="e.g., 50000" min="0"
+              class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
+              onchange="updateRetirementCorpus()">
+            <p class="text-xs text-gray-500 mt-1">For auto-calculating retirement corpus</p>
+          </div>
+          <div>
+            <div class="bg-blue-50 border border-blue-200 rounded p-2">
+              <p class="text-xs text-blue-900">
+                <strong>💡 How it works:</strong> Select your goals below, and we'll calculate the exact monthly SIP or lumpsum needed to achieve them.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Select Goals -->
+      <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-xs font-bold text-gray-700 uppercase">Select Your Goals</h3>
+        <button type="button" onclick="addCustomGoal()" class="text-xs font-semibold text-sky-600 hover:text-sky-700">
+          + Add Custom Goal
+        </button>
+      </div>
+
+      <div class="px-4 py-3 grid grid-cols-2 gap-2">
+
+        <!-- Emergency Fund -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="emergencyCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createEmergencyFund" onchange="toggleGoalCard('emergency')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🚨</span>
+                  <div class="text-sm font-bold text-gray-900">Emergency Fund</div>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5">6 months expenses safety net</p>
+              </div>
+            </label>
+            <div id="emergencyInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter your monthly expenses above. We'll calculate emergency fund as: Monthly Expenses × Number of Months.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Number of Months</label>
+                  <input type="number" id="emergencyMonths" value="6" min="3" max="12" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateEmergencyFund()">
+                  <p class="text-xs text-gray-500 mt-0.5">Typically 6 months</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Amount (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="emergencyAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('emergency')">
+                  <p class="text-xs text-gray-500 mt-0.5">Monthly expenses × months</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="emergencyYear" placeholder="2026" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('emergency')">
+                </div>
+                <div>
+                  <!-- Empty for alignment -->
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="emergencyInflation" value="4" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('emergency')">
+                  <p class="text-xs text-gray-500 mt-0.5">To show today's value</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="emergencyCagr" value="7" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('emergency')">
+                  <p class="text-xs text-gray-500 mt-0.5">Debt/Liquid funds</p>
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="emergencyLumpsumInvest" placeholder="e.g. 100000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('emergency')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="emergencyCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="emergencySIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="emergencySIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="emergencyLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="emergencyLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retirement -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="retirementCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createRetirement" onchange="toggleGoalCard('retirement')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🏖️</span>
+                  <div class="text-sm font-bold text-gray-900">Retirement Corpus</div>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5">Financial independence for later years</p>
+              </div>
+            </label>
+            <div id="retirementInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter your monthly expenses above. We'll calculate corpus using the 25x rule (expenses × 12 months × 25 years), adjusted for inflation till retirement.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Retirement Age</label>
+                  <input type="number" id="retirementAge" placeholder="60" min="40" max="80" value="60" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateRetirementCorpus()">
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Corpus (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="retirementAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('retirement')">
+                  <p class="text-xs text-gray-500 mt-0.5">25x annual expenses at retirement</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="retirementInflation" value="6" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateRetirementCorpus()">
+                  <p class="text-xs text-gray-500 mt-0.5">Applied to future expenses</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="retirementCagr" value="12" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('retirement')">
+                  <p class="text-xs text-gray-500 mt-0.5">Expected from investments</p>
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="retirementLumpsumInvest" placeholder="e.g. 500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('retirement')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="retirementCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2 mb-1.5">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="retirementSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="retirementSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="retirementLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="retirementLumpsum">₹0</span>
+                  </div>
+                </div>
+                <div class="border-t border-sky-200 pt-1.5 space-y-1">
+                  <div class="flex justify-between text-xs">
+                    <span class="text-gray-600">Current monthly expenses:</span>
+                    <span class="font-semibold text-gray-800" id="retirementCurrentExpense">₹0</span>
+                  </div>
+                  <div class="flex justify-between text-xs">
+                    <span class="text-gray-600">At retirement (inflated):</span>
+                    <span class="font-semibold text-gray-800" id="retirementFutureExpense">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- House Purchase -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="houseCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createHousePurchase" onchange="toggleGoalCard('house')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🏠</span>
+                  <div class="text-sm font-bold text-gray-900">House Purchase</div>
+                </div>
+              </div>
+            </label>
+            <div id="houseInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter today's cost and target year. We'll calculate the inflated future cost automatically.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Current Cost Today (₹)</label>
+                  <input type="number" id="houseCurrentCost" placeholder="5000000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateHouseAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">What it costs today</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="houseYear" placeholder="2030" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateHouseAmount()">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="houseInflation" value="8" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateHouseAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">Real estate inflation</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Amount (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="houseAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('house')">
+                  <p class="text-xs text-gray-500 mt-0.5">Inflated future cost</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="houseCagr" value="12" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('house')">
+                </div>
+                <div>
+                  <!-- Empty for alignment -->
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="houseLumpsumInvest" placeholder="e.g. 500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('house')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="houseCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="houseSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="houseSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="houseLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="houseLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Child Education -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="educationCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createChildEducation" onchange="toggleGoalCard('education')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🎓</span>
+                  <div class="text-sm font-bold text-gray-900">Child's Higher Education</div>
+                </div>
+              </div>
+            </label>
+            <div id="educationInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter today's cost and target year. We'll calculate the inflated future cost automatically.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Current Cost Today (₹)</label>
+                  <input type="number" id="educationCurrentCost" placeholder="2000000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateEducationAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">What it costs today</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="educationYear" placeholder="2035" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateEducationAmount()">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="educationInflation" value="10" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateEducationAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">Education rises faster</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Amount (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="educationAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('education')">
+                  <p class="text-xs text-gray-500 mt-0.5">Inflated future cost</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="educationCagr" value="12" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('education')">
+                </div>
+                <div>
+                  <!-- Empty for alignment -->
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="educationLumpsumInvest" placeholder="e.g. 500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('education')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="educationCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="educationSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="educationSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="educationLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="educationLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Child Marriage -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="marriageCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createChildMarriage" onchange="toggleGoalCard('marriage')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">💒</span>
+                  <div class="text-sm font-bold text-gray-900">Child's Marriage</div>
+                </div>
+              </div>
+            </label>
+            <div id="marriageInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter today's cost and target year. We'll calculate the inflated future cost automatically.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Current Cost Today (₹)</label>
+                  <input type="number" id="marriageCurrentCost" placeholder="1500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateMarriageAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">What it costs today</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="marriageYear" placeholder="2040" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateMarriageAmount()">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="marriageInflation" value="6" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateMarriageAmount()">
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Amount (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="marriageAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('marriage')">
+                  <p class="text-xs text-gray-500 mt-0.5">Inflated future cost</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="marriageCagr" value="12" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('marriage')">
+                </div>
+                <div>
+                  <!-- Empty for alignment -->
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="marriageLumpsumInvest" placeholder="e.g. 500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('marriage')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="marriageCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="marriageSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="marriageSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="marriageLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="marriageLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Car Purchase -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="carCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createCarPurchase" onchange="toggleGoalCard('car')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🚗</span>
+                  <div class="text-sm font-bold text-gray-900">Car Purchase</div>
+                </div>
+              </div>
+            </label>
+            <div id="carInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter today's cost and target year. We'll calculate the inflated future cost automatically.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Current Cost Today (₹)</label>
+                  <input type="number" id="carCurrentCost" placeholder="1000000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateCarAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">What it costs today</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="carYear" placeholder="2027" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateCarAmount()">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="carInflation" value="5" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateCarAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">Automobile inflation</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Amount (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="carAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('car')">
+                  <p class="text-xs text-gray-500 mt-0.5">Inflated future cost</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="carCagr" value="10" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('car')">
+                  <p class="text-xs text-gray-500 mt-0.5">Balanced funds</p>
+                </div>
+                <div>
+                  <!-- Empty for alignment -->
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="carLumpsumInvest" placeholder="e.g. 300000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('car')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="carCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="carSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="carSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="carLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="carLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dream Vacation -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="vacationCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createVacation" onchange="toggleGoalCard('vacation')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">✈️</span>
+                  <div class="text-sm font-bold text-gray-900">Dream Vacation</div>
+                </div>
+              </div>
+            </label>
+            <div id="vacationInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2">
+                <p class="text-xs text-amber-900">
+                  <strong>💡 Auto-Calculation:</strong> Enter today's cost and target year. We'll calculate the inflated future cost automatically.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Current Cost Today (₹)</label>
+                  <input type="number" id="vacationCurrentCost" placeholder="500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateVacationAmount()">
+                  <p class="text-xs text-gray-500 mt-0.5">What it costs today</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="vacationYear" placeholder="2028" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateVacationAmount()">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="vacationInflation" value="6" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="updateVacationAmount()">
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">
+                    Target Amount (₹)
+                    <span class="text-emerald-600 font-bold">✓ Auto</span>
+                  </label>
+                  <input type="number" id="vacationAmount" placeholder="Auto-calculated" class="w-full px-2 py-1 border border-emerald-300 bg-emerald-50 rounded text-sm font-semibold text-emerald-900" onchange="calculateGoalSIP('vacation')">
+                  <p class="text-xs text-gray-500 mt-0.5">Inflated future cost</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="vacationCagr" value="10" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('vacation')">
+                  <p class="text-xs text-gray-500 mt-0.5">Balanced funds</p>
+                </div>
+                <div>
+                  <!-- Empty for alignment -->
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="vacationLumpsumInvest" placeholder="e.g. 200000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('vacation')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="vacationCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="vacationSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="vacationSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="vacationLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="vacationLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Goal -->
+        <div class="border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all" id="customCard">
+          <div class="p-2.5">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="createCustomGoal" onchange="toggleGoalCard('custom')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🎯</span>
+                  <div class="text-sm font-bold text-gray-900">Custom Goal</div>
+                </div>
+              </div>
+            </label>
+            <div id="customInputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Goal Name</label>
+                <input type="text" id="customName" placeholder="e.g., Start a Business" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Amount (₹)</label>
+                  <input type="number" id="customAmount" placeholder="1000000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('custom')">
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                  <input type="number" id="customYear" placeholder="2030" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('custom')">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                  <input type="number" id="customInflation" value="6" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('custom')">
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                  <input type="number" id="customCagr" value="12" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('custom')">
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+                <input type="number" id="customLumpsumInvest" placeholder="e.g. 500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('custom')">
+                <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+              </div>
+              <div id="customCalc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="customSIPLabel">Monthly SIP</span>
+                    <span class="font-bold text-sky-900 text-sm" id="customSIP">₹0</span>
+                  </div>
+                  <div class="text-xs">
+                    <span class="text-gray-600 block" id="customLumpsumLabel">OR Lumpsum</span>
+                    <span class="font-bold text-amber-900 text-sm" id="customLumpsum">₹0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Investment Summary -->
+      <div id="investmentSummary" class="hidden px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 border-t-2 border-emerald-400">
+        <h3 class="text-sm font-bold text-gray-900 mb-3">💰 Your Investment Plan</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-white rounded-lg p-3 border-2 border-sky-400 shadow-sm">
+            <div class="text-xs text-gray-600 mb-1 uppercase font-semibold">📅 Monthly SIP Required</div>
+            <div class="text-2xl font-bold text-sky-900 mb-1" id="totalSIPRequired">₹0</div>
+            <div class="text-xs text-gray-600">Start investing this amount every month</div>
+          </div>
+          <div class="bg-white rounded-lg p-3 border-2 border-amber-400 shadow-sm">
+            <div class="text-xs text-gray-600 mb-1 uppercase font-semibold">💵 OR Lumpsum Today</div>
+            <div class="text-2xl font-bold text-amber-900 mb-1" id="totalLumpsum">₹0</div>
+            <div class="text-xs text-gray-600">Invest this one-time amount now</div>
+          </div>
+        </div>
+        <div class="mt-3 bg-white rounded-lg p-2 border border-gray-200">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-gray-700">Total Future Value of All Goals:</span>
+            <span class="font-bold text-lg text-gray-900" id="totalFutureValue">₹0</span>
+          </div>
+        </div>
+        <div class="mt-2 text-xs text-center text-gray-700">
+          💡 Tip: You can choose monthly SIP (gradual) or lumpsum (one-time), or a mix of both based on your cash flow.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        Create Goals
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let customGoalCount = 0; // Track number of dynamic custom goals
+
+    // Auto-calculate emergency fund based on monthly expenses
+    function updateEmergencyFund() {
+      const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value);
+      const months = parseFloat(document.getElementById('emergencyMonths').value) || 6;
+
+      if (!monthlyExpenses) {
+        return; // Don't calculate if monthly expenses are missing
+      }
+
+      // Calculate emergency fund amount
+      const emergencyAmount = monthlyExpenses * months;
+
+      // Update the emergency amount field
+      const emergencyAmountField = document.getElementById('emergencyAmount');
+      emergencyAmountField.value = Math.round(emergencyAmount);
+
+      // Trigger SIP calculation if emergency goal is selected
+      const emergencyCheckbox = document.getElementById('createEmergencyFund');
+      if (emergencyCheckbox && emergencyCheckbox.checked) {
+        calculateGoalSIP('emergency');
+      }
+    }
+
+    // Auto-calculate retirement corpus based on current expenses
+    function updateRetirementCorpus() {
+      const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value);
+      const currentAge = parseFloat(document.getElementById('age').value);
+      const retirementAge = parseFloat(document.getElementById('retirementAge').value) || 60;
+      const inflationRate = parseFloat(document.getElementById('retirementInflation').value) / 100 || 0.06;
+
+      if (!monthlyExpenses || !currentAge) {
+        return; // Don't calculate if required fields are missing
+      }
+
+      const yearsToRetirement = retirementAge - currentAge;
+      if (yearsToRetirement <= 0) {
+        return;
+      }
+
+      // Calculate future monthly expenses at retirement (accounting for inflation)
+      const futureMonthlyExpenses = monthlyExpenses * Math.pow(1 + inflationRate, yearsToRetirement);
+
+      // Calculate annual expenses at retirement
+      const futureAnnualExpenses = futureMonthlyExpenses * 12;
+
+      // Apply 25x rule (assumes 4% safe withdrawal rate)
+      // This means you need 25 years worth of annual expenses
+      const retirementCorpus = futureAnnualExpenses * 25;
+
+      // Update the retirement amount field
+      const retirementAmountField = document.getElementById('retirementAmount');
+      retirementAmountField.value = Math.round(retirementCorpus);
+
+      // Trigger SIP calculation if retirement goal is selected
+      const retirementCheckbox = document.getElementById('createRetirement');
+      if (retirementCheckbox && retirementCheckbox.checked) {
+        calculateGoalSIP('retirement');
+      }
+
+      // Also update emergency fund when monthly expenses change
+      updateEmergencyFund();
+    }
+
+    // Auto-calculate house purchase target amount from current cost
+    function updateHouseAmount() {
+      const currentCost = parseFloat(document.getElementById('houseCurrentCost').value);
+      const targetYear = parseInt(document.getElementById('houseYear').value);
+      const inflationRate = parseFloat(document.getElementById('houseInflation').value) / 100 || 0.08;
+
+      if (!currentCost || !targetYear) {
+        return; // Don't calculate if required fields are missing
+      }
+
+      const currentYear = new Date().getFullYear();
+      const years = targetYear - currentYear;
+
+      if (years <= 0) {
+        return;
+      }
+
+      // Calculate future value: FV = PV × (1 + inflation)^years
+      const futureAmount = currentCost * Math.pow(1 + inflationRate, years);
+
+      // Update the target amount field
+      const amountField = document.getElementById('houseAmount');
+      amountField.value = Math.round(futureAmount);
+
+      // Trigger SIP calculation if house goal is selected
+      const checkbox = document.getElementById('createHousePurchase');
+      if (checkbox && checkbox.checked) {
+        calculateGoalSIP('house');
+      }
+    }
+
+    // Auto-calculate education target amount from current cost
+    function updateEducationAmount() {
+      const currentCost = parseFloat(document.getElementById('educationCurrentCost').value);
+      const targetYear = parseInt(document.getElementById('educationYear').value);
+      const inflationRate = parseFloat(document.getElementById('educationInflation').value) / 100 || 0.10;
+
+      if (!currentCost || !targetYear) {
+        return;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const years = targetYear - currentYear;
+
+      if (years <= 0) {
+        return;
+      }
+
+      const futureAmount = currentCost * Math.pow(1 + inflationRate, years);
+
+      const amountField = document.getElementById('educationAmount');
+      amountField.value = Math.round(futureAmount);
+
+      const checkbox = document.getElementById('createChildEducation');
+      if (checkbox && checkbox.checked) {
+        calculateGoalSIP('education');
+      }
+    }
+
+    // Auto-calculate marriage target amount from current cost
+    function updateMarriageAmount() {
+      const currentCost = parseFloat(document.getElementById('marriageCurrentCost').value);
+      const targetYear = parseInt(document.getElementById('marriageYear').value);
+      const inflationRate = parseFloat(document.getElementById('marriageInflation').value) / 100 || 0.06;
+
+      if (!currentCost || !targetYear) {
+        return;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const years = targetYear - currentYear;
+
+      if (years <= 0) {
+        return;
+      }
+
+      const futureAmount = currentCost * Math.pow(1 + inflationRate, years);
+
+      const amountField = document.getElementById('marriageAmount');
+      amountField.value = Math.round(futureAmount);
+
+      const checkbox = document.getElementById('createChildMarriage');
+      if (checkbox && checkbox.checked) {
+        calculateGoalSIP('marriage');
+      }
+    }
+
+    // Auto-calculate car purchase target amount from current cost
+    function updateCarAmount() {
+      const currentCost = parseFloat(document.getElementById('carCurrentCost').value);
+      const targetYear = parseInt(document.getElementById('carYear').value);
+      const inflationRate = parseFloat(document.getElementById('carInflation').value) / 100 || 0.05;
+
+      if (!currentCost || !targetYear) {
+        return;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const years = targetYear - currentYear;
+
+      if (years <= 0) {
+        return;
+      }
+
+      const futureAmount = currentCost * Math.pow(1 + inflationRate, years);
+
+      const amountField = document.getElementById('carAmount');
+      amountField.value = Math.round(futureAmount);
+
+      const checkbox = document.getElementById('createCarPurchase');
+      if (checkbox && checkbox.checked) {
+        calculateGoalSIP('car');
+      }
+    }
+
+    // Auto-calculate vacation target amount from current cost
+    function updateVacationAmount() {
+      const currentCost = parseFloat(document.getElementById('vacationCurrentCost').value);
+      const targetYear = parseInt(document.getElementById('vacationYear').value);
+      const inflationRate = parseFloat(document.getElementById('vacationInflation').value) / 100 || 0.06;
+
+      if (!currentCost || !targetYear) {
+        return;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const years = targetYear - currentYear;
+
+      if (years <= 0) {
+        return;
+      }
+
+      const futureAmount = currentCost * Math.pow(1 + inflationRate, years);
+
+      const amountField = document.getElementById('vacationAmount');
+      amountField.value = Math.round(futureAmount);
+
+      const checkbox = document.getElementById('createVacation');
+      if (checkbox && checkbox.checked) {
+        calculateGoalSIP('vacation');
+      }
+    }
+
+    function toggleGoalCard(goalType) {
+      const checkboxMap = {
+        emergency: 'createEmergencyFund',
+        retirement: 'createRetirement',
+        house: 'createHousePurchase',
+        education: 'createChildEducation',
+        marriage: 'createChildMarriage',
+        car: 'createCarPurchase',
+        vacation: 'createVacation',
+        custom: 'createCustomGoal'
+      };
+
+      const checkbox = document.getElementById(checkboxMap[goalType] || 'createCustomGoal' + goalType.replace('custom', ''));
+      const inputs = document.getElementById(goalType + 'Inputs');
+      const card = document.getElementById(goalType + 'Card');
+
+      if (checkbox && checkbox.checked) {
+        inputs.classList.remove('hidden');
+        card.classList.add('border-sky-400', 'bg-sky-50');
+
+        // Trigger auto-calculation when checked
+        if (goalType === 'retirement') {
+          updateRetirementCorpus();
+        } else if (goalType === 'emergency') {
+          updateEmergencyFund();
+        } else if (goalType === 'house') {
+          updateHouseAmount();
+        } else if (goalType === 'education') {
+          updateEducationAmount();
+        } else if (goalType === 'marriage') {
+          updateMarriageAmount();
+        } else if (goalType === 'car') {
+          updateCarAmount();
+        } else if (goalType === 'vacation') {
+          updateVacationAmount();
+        }
+
+        // Trigger SIP calculation for the goal
+        calculateGoalSIP(goalType);
+      } else if (checkbox) {
+        inputs.classList.add('hidden');
+        card.classList.remove('border-sky-400', 'bg-sky-50');
+
+        // Update investment summary when goal is unchecked
+        updateInvestmentSummary();
+      }
+    }
+
+    function addCustomGoal() {
+      customGoalCount++;
+      const goalId = 'custom' + customGoalCount;
+      const goalsContainer = document.querySelector('.grid.grid-cols-2');
+
+      const newCard = document.createElement('div');
+      newCard.className = 'border-2 border-gray-200 rounded-lg hover:border-sky-300 transition-all';
+      newCard.id = goalId + 'Card';
+      newCard.innerHTML = `
+        <div class="p-2.5">
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" id="createCustomGoal${customGoalCount}" onchange="toggleGoalCard('${goalId}')" class="mt-0.5 rounded w-4 h-4 cursor-pointer">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">🎯</span>
+                  <div class="text-sm font-bold text-gray-900">Custom Goal ${customGoalCount}</div>
+                </div>
+                <button type="button" onclick="removeCustomGoal('${goalId}')"
+                        class="text-red-600 hover:text-red-700 text-xs font-semibold">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </label>
+          <div id="${goalId}Inputs" class="hidden mt-2 pt-2 border-t border-gray-200 space-y-2">
+            <div>
+              <label class="text-xs font-medium text-gray-700 block mb-0.5">Goal Name</label>
+              <input type="text" id="${goalId}Name" placeholder="e.g., Start a Business" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Amount (₹)</label>
+                <input type="number" id="${goalId}Amount" placeholder="1000000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('${goalId}')">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Target Year</label>
+                <input type="number" id="${goalId}Year" placeholder="2030" min="2025" max="2050" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('${goalId}')">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Inflation (%/yr)</label>
+                <input type="number" id="${goalId}Inflation" value="6" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('${goalId}')">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-700 block mb-0.5">Returns (%/yr)</label>
+                <input type="number" id="${goalId}Cagr" value="12" step="0.5" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('${goalId}')">
+              </div>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-700 block mb-0.5">Lumpsum to invest now (₹) <span class="text-gray-400">Optional</span></label>
+              <input type="number" id="${goalId}LumpsumInvest" placeholder="e.g. 500000" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateGoalSIP('${goalId}')">
+              <p class="text-xs text-gray-500 mt-0.5">One-time amount you can invest today</p>
+            </div>
+            <div id="${goalId}Calc" class="hidden bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-300 rounded p-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div class="text-xs">
+                  <span class="text-gray-600 block" id="${goalId}SIPLabel">Monthly SIP</span>
+                  <span class="font-bold text-sky-900 text-sm" id="${goalId}SIP">₹0</span>
+                </div>
+                <div class="text-xs">
+                  <span class="text-gray-600 block" id="${goalId}LumpsumLabel">OR Lumpsum</span>
+                  <span class="font-bold text-amber-900 text-sm" id="${goalId}Lumpsum">₹0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      goalsContainer.appendChild(newCard);
+    }
+
+    function removeCustomGoal(goalId) {
+      const card = document.getElementById(goalId + 'Card');
+      if (card) {
+        card.remove();
+      }
+      updateInvestmentSummary();
+    }
+
+    // SIP and Lumpsum Calculation Function
+    function calculateSIP(targetAmount, years, returnRate, inflationRate, lumpsumInvested) {
+      // Target amount IS the future value the user wants
+      const futureValue = targetAmount;
+      lumpsumInvested = lumpsumInvested || 0;
+
+      // Future value of lumpsum invested today (it grows at returnRate)
+      const fvLumpsum = lumpsumInvested * Math.pow(1 + returnRate, years);
+
+      // Gap remaining after lumpsum grows
+      const gap = Math.max(futureValue - fvLumpsum, 0);
+
+      // Calculate monthly SIP needed for remaining gap
+      const monthlyRate = returnRate / 12;
+      const months = years * 12;
+
+      let monthlySIP;
+      if (gap <= 0) {
+        monthlySIP = 0;
+      } else if (monthlyRate === 0) {
+        monthlySIP = gap / months;
+      } else {
+        monthlySIP = gap * monthlyRate / ((Math.pow(1 + monthlyRate, months) - 1) * (1 + monthlyRate));
+      }
+
+      // Calculate full lumpsum needed today (no SIP, for reference)
+      let lumpsum;
+      if (returnRate === 0) {
+        lumpsum = futureValue;
+      } else {
+        lumpsum = futureValue / Math.pow(1 + returnRate, years);
+      }
+
+      // Calculate today's equivalent value (reverse inflation)
+      const todayValue = futureValue / Math.pow(1 + inflationRate, years);
+
+      return {
+        futureValue: Math.round(futureValue),
+        todayValue: Math.round(todayValue),
+        monthlySIP: Math.round(monthlySIP),
+        lumpsum: Math.round(lumpsum),
+        lumpsumInvested: Math.round(lumpsumInvested)
+      };
+    }
+
+    // Calculate SIP for individual goal
+    function calculateGoalSIP(goalType) {
+      const age = parseFloat(document.getElementById('age').value) || 0;
+      let amount, year, inflation, cagr;
+
+      if (goalType === 'retirement') {
+        const retirementAge = parseFloat(document.getElementById('retirementAge').value) || 60;
+        year = retirementAge - age;
+        amount = parseFloat(document.getElementById('retirementAmount').value);
+      } else {
+        const yearElement = document.getElementById(goalType + 'Year');
+        if (!yearElement) {
+          // Hide calc box if inputs don't exist
+          const calcBox = document.getElementById(goalType + 'Calc');
+          if (calcBox) calcBox.classList.add('hidden');
+          return;
+        }
+        const targetYear = parseInt(yearElement.value);
+        year = targetYear - new Date().getFullYear();
+        amount = parseFloat(document.getElementById(goalType + 'Amount').value);
+      }
+
+      const inflationElement = document.getElementById(goalType + 'Inflation');
+      const cagrElement = document.getElementById(goalType + 'Cagr');
+
+      if (!inflationElement || !cagrElement) {
+        return;
+      }
+
+      inflation = parseFloat(inflationElement.value) / 100;
+      cagr = parseFloat(cagrElement.value) / 100;
+
+      const calcBox = document.getElementById(goalType + 'Calc');
+      if (!calcBox) {
+        return;
+      }
+
+      if (!amount || !year || year <= 0) {
+        calcBox.classList.add('hidden');
+        return;
+      }
+
+      // Read optional lumpsum input
+      const lumpsumInvestElement = document.getElementById(goalType + 'LumpsumInvest');
+      const lumpsumInvested = lumpsumInvestElement ? (parseFloat(lumpsumInvestElement.value) || 0) : 0;
+
+      const result = calculateSIP(amount, year, cagr, inflation, lumpsumInvested);
+
+      const sipElement = document.getElementById(goalType + 'SIP');
+      const lumpsumElement = document.getElementById(goalType + 'Lumpsum');
+      const sipLabelEl = document.getElementById(goalType + 'SIPLabel');
+      const lumpsumLabelEl = document.getElementById(goalType + 'LumpsumLabel');
+
+      if (sipElement && lumpsumElement) {
+        if (lumpsumInvested > 0) {
+          // Combined mode: show remaining SIP + user's lumpsum
+          if (sipLabelEl) sipLabelEl.textContent = 'Remaining SIP/mo';
+          sipElement.textContent = '₹' + result.monthlySIP.toLocaleString('en-IN');
+          if (lumpsumLabelEl) lumpsumLabelEl.textContent = 'Your Lumpsum';
+          lumpsumElement.textContent = '₹' + lumpsumInvested.toLocaleString('en-IN');
+        } else {
+          // Default: SIP OR Lumpsum
+          if (sipLabelEl) sipLabelEl.textContent = 'Monthly SIP';
+          sipElement.textContent = '₹' + result.monthlySIP.toLocaleString('en-IN');
+          if (lumpsumLabelEl) lumpsumLabelEl.textContent = 'OR Lumpsum';
+          lumpsumElement.textContent = '₹' + result.lumpsum.toLocaleString('en-IN');
+        }
+
+        // Special handling for retirement goal - show expense breakdown
+        if (goalType === 'retirement') {
+          const currentExpenseElement = document.getElementById('retirementCurrentExpense');
+          const futureExpenseElement = document.getElementById('retirementFutureExpense');
+          const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value) || 0;
+
+          if (currentExpenseElement && futureExpenseElement && monthlyExpenses) {
+            const futureMonthlyExpense = monthlyExpenses * Math.pow(1 + inflation, year);
+            currentExpenseElement.textContent = '₹' + monthlyExpenses.toLocaleString('en-IN');
+            futureExpenseElement.textContent = '₹' + Math.round(futureMonthlyExpense).toLocaleString('en-IN') + '/month';
+          }
+        }
+
+        calcBox.classList.remove('hidden');
+      }
+
+      updateInvestmentSummary();
+    }
+
+    // Update overall investment summary
+    function updateInvestmentSummary() {
+      const standardGoals = ['emergency', 'retirement', 'house', 'education', 'marriage', 'car', 'vacation', 'custom'];
+      let totalSIPRequired = 0;
+      let totalLumpsumRequired = 0;
+      let totalFutureValue = 0;
+      let activeGoalsCount = 0;
+
+      function addGoalToSummary(goalId) {
+        const sipElement = document.getElementById(goalId + 'SIP');
+        const calcBox = document.getElementById(goalId + 'Calc');
+        if (!sipElement || !calcBox || calcBox.classList.contains('hidden')) return;
+
+        const sipValue = parseInt(sipElement.textContent.replace(/[₹,]/g, '')) || 0;
+
+        // Get lumpsum invested (user input) vs full lumpsum (reference)
+        const lumpsumInvestEl = document.getElementById(goalId + 'LumpsumInvest');
+        const lumpsumInvested = lumpsumInvestEl ? (parseFloat(lumpsumInvestEl.value) || 0) : 0;
+        const lumpsumElement = document.getElementById(goalId + 'Lumpsum');
+        const lumpsumDisplayed = lumpsumElement ? (parseInt(lumpsumElement.textContent.replace(/[₹,]/g, '')) || 0) : 0;
+
+        // Get target amount
+        let fvValue = 0;
+        if (goalId === 'emergency') {
+          const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value) || 0;
+          const months = parseFloat(document.getElementById('emergencyMonths').value) || 6;
+          fvValue = monthlyExpenses * months;
+        } else if (goalId === 'retirement') {
+          const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value) || 0;
+          const currentAge = parseFloat(document.getElementById('age').value) || 30;
+          const retirementAge = parseFloat(document.getElementById('retirementAge').value) || 60;
+          const yearsToRetirement = retirementAge - currentAge;
+          const inflation = parseFloat(document.getElementById('retirementInflation').value) / 100 || 0.06;
+          const futureMonthlyExpense = monthlyExpenses * Math.pow(1 + inflation, yearsToRetirement);
+          fvValue = futureMonthlyExpense * 12 * 25;
+        } else {
+          const amtEl = document.getElementById(goalId + 'Amount');
+          fvValue = amtEl ? (parseFloat(amtEl.value) || 0) : 0;
+        }
+
+        if (sipValue > 0 || lumpsumInvested > 0) {
+          totalSIPRequired += sipValue;
+          // For lumpsum total: show user's committed lumpsum if entered, otherwise full lumpsum reference
+          totalLumpsumRequired += lumpsumInvested > 0 ? lumpsumInvested : lumpsumDisplayed;
+          totalFutureValue += fvValue;
+          activeGoalsCount++;
+        }
+      }
+
+      // Check standard goals
+      standardGoals.forEach(goal => {
+        const checkboxId = goal === 'emergency' ? 'createEmergencyFund' :
+                          goal === 'retirement' ? 'createRetirement' :
+                          goal === 'house' ? 'createHousePurchase' :
+                          goal === 'education' ? 'createChildEducation' :
+                          goal === 'marriage' ? 'createChildMarriage' :
+                          goal === 'car' ? 'createCarPurchase' :
+                          goal === 'vacation' ? 'createVacation' :
+                          'createCustomGoal';
+
+        const checkbox = document.getElementById(checkboxId);
+        if (checkbox && checkbox.checked) {
+          addGoalToSummary(goal);
+        }
+      });
+
+      // Check dynamic custom goals
+      for (let i = 1; i <= customGoalCount; i++) {
+        const goalId = 'custom' + i;
+        const checkbox = document.getElementById('createCustomGoal' + i);
+        const card = document.getElementById(goalId + 'Card');
+
+        if (card && checkbox && checkbox.checked) {
+          addGoalToSummary(goalId);
+        }
+      }
+
+      if (activeGoalsCount > 0) {
+        document.getElementById('investmentSummary').classList.remove('hidden');
+        document.getElementById('totalSIPRequired').textContent = '₹' + totalSIPRequired.toLocaleString('en-IN');
+        document.getElementById('totalLumpsum').textContent = '₹' + totalLumpsumRequired.toLocaleString('en-IN');
+        document.getElementById('totalFutureValue').textContent = '₹' + totalFutureValue.toLocaleString('en-IN');
+      } else {
+        document.getElementById('investmentSummary').classList.add('hidden');
+      }
+    }
+
+    // Form submission
+    document.getElementById('goalPlannerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Collect form data
+      const formData = {
+        age: parseFloat(document.getElementById('age').value),
+        goals: {}
+      };
+
+      // Add selected standard goals
+      const standardGoals = ['emergency', 'retirement', 'house', 'education', 'marriage', 'car', 'vacation'];
+      standardGoals.forEach(goal => {
+        const checkboxId = goal === 'emergency' ? 'createEmergencyFund' :
+                          goal === 'retirement' ? 'createRetirement' :
+                          goal === 'house' ? 'createHousePurchase' :
+                          goal === 'education' ? 'createChildEducation' :
+                          goal === 'marriage' ? 'createChildMarriage' :
+                          goal === 'car' ? 'createCarPurchase' :
+                          'createVacation';
+
+        if (document.getElementById(checkboxId).checked) {
+          // Special handling for retirement goal
+          if (goal === 'retirement') {
+            const retirementAge = parseFloat(document.getElementById('retirementAge').value) || 60;
+            const currentAge = parseFloat(document.getElementById('age').value);
+            const currentYear = new Date().getFullYear();
+            const targetYear = currentYear + (retirementAge - currentAge);
+            const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value);
+
+            formData.goals[goal] = {
+              name: null,
+              currentCost: null, // Mark as already inflated
+              amount: parseFloat(document.getElementById('retirementAmount').value),
+              year: targetYear, // Use actual target year (not age)
+              inflation: parseFloat(document.getElementById('retirementInflation').value) / 100, // Pass actual inflation rate
+              cagr: parseFloat(document.getElementById('retirementCagr').value) / 100,
+              isRetirement: true, // Special flag for retirement goal
+              monthlyExpenses: monthlyExpenses, // Add monthly expenses for storage
+              lumpsumInvested: parseFloat(document.getElementById('retirementLumpsumInvest')?.value) || 0
+            };
+          }
+          // Special handling for emergency fund (no target year field)
+          else if (goal === 'emergency') {
+            const currentYear = new Date().getFullYear();
+            const targetYear = parseInt(document.getElementById('emergencyYear').value) || (currentYear + 1);
+            const monthlyExpenses = parseFloat(document.getElementById('monthlyExpenses').value);
+            const emergencyMonths = parseFloat(document.getElementById('emergencyMonths').value) || 6;
+
+            formData.goals[goal] = {
+              name: null,
+              amount: parseFloat(document.getElementById('emergencyAmount').value),
+              year: targetYear,
+              inflation: parseFloat(document.getElementById('emergencyInflation').value) / 100,
+              cagr: parseFloat(document.getElementById('emergencyCagr').value) / 100,
+              monthlyExpenses: monthlyExpenses, // Add monthly expenses for storage
+              emergencyMonths: emergencyMonths, // Add emergency months for storage
+              lumpsumInvested: parseFloat(document.getElementById('emergencyLumpsumInvest')?.value) || 0
+            };
+          }
+          // Standard handling for other goals
+          else {
+            // Check if this goal has a "Current Cost" field (house, education, marriage, car, vacation)
+            const currentCostElement = document.getElementById(goal + 'CurrentCost');
+
+            formData.goals[goal] = {
+              name: null,
+              currentCost: currentCostElement ? parseFloat(currentCostElement.value) : null,
+              amount: parseFloat(document.getElementById(goal + 'Amount').value),
+              year: parseInt(document.getElementById(goal + 'Year').value),
+              inflation: parseFloat(document.getElementById(goal + 'Inflation').value) / 100,
+              cagr: parseFloat(document.getElementById(goal + 'Cagr').value) / 100,
+              lumpsumInvested: parseFloat(document.getElementById(goal + 'LumpsumInvest')?.value) || 0
+            };
+          }
+        }
+      });
+
+      // Add selected custom goals (static + dynamic)
+      // Check static custom goal
+      if (document.getElementById('createCustomGoal') && document.getElementById('createCustomGoal').checked) {
+        formData.goals['custom'] = {
+          name: document.getElementById('customName').value,
+          amount: parseFloat(document.getElementById('customAmount').value),
+          year: parseInt(document.getElementById('customYear').value),
+          inflation: parseFloat(document.getElementById('customInflation').value) / 100,
+          cagr: parseFloat(document.getElementById('customCagr').value) / 100,
+          lumpsumInvested: parseFloat(document.getElementById('customLumpsumInvest')?.value) || 0
+        };
+      }
+
+      // Check dynamic custom goals
+      for (let i = 1; i <= customGoalCount; i++) {
+        const goalId = 'custom' + i;
+        const checkboxId = 'createCustomGoal' + i;
+        const checkbox = document.getElementById(checkboxId);
+        const card = document.getElementById(goalId + 'Card');
+
+        // Only process if card still exists (not removed) and checkbox is checked
+        if (card && checkbox && checkbox.checked) {
+          formData.goals[goalId] = {
+            name: document.getElementById(goalId + 'Name').value,
+            amount: parseFloat(document.getElementById(goalId + 'Amount').value),
+            year: parseInt(document.getElementById(goalId + 'Year').value),
+            inflation: parseFloat(document.getElementById(goalId + 'Inflation').value) / 100,
+            cagr: parseFloat(document.getElementById(goalId + 'Cagr').value) / 100,
+            lumpsumInvested: parseFloat(document.getElementById(goalId + 'LumpsumInvest')?.value) || 0
+          };
+        }
+      }
+
+      // Show progress overlay
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      // Call server function
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').textContent = '✓';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = result.message;
+            setTimeout(() => google.script.host.close(), 2000);
+          } else {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            alert('Error: ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          overlay.classList.remove('flex');
+          alert('Error: ' + (error.message || 'An error occurred'));
+        })
+        .createMultipleGoals(formData);
+    });
+  </script>
+</body>
+</html>

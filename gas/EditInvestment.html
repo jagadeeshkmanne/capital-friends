@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <!-- Investment Selection -->
+  <div id="selectionScreen" class="p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Select Investment to Edit</h2>
+    <select id="investmentSelector" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+      <option value="">Loading investments...</option>
+    </select>
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button onclick="loadInvestmentForEdit()"
+        class="px-5 py-2.5 bg-purple-600 text-white rounded-md text-sm font-semibold hover:bg-purple-700 transition-colors">
+        Edit Selected
+      </button>
+    </div>
+  </div>
+
+  <!-- Edit Form (hidden initially) -->
+  <form id="editForm" class="hidden" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-purple-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Updating investment...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait</div>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+
+      <!-- Hidden Investment ID -->
+      <input type="hidden" id="investmentId">
+
+      <!-- Row 1: Investment Type + Category -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Investment Type <span class="text-red-600">*</span></label>
+          <select id="investmentType" required onchange="updateCategory()"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+            <option value="">Select investment type</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Investment Category <span class="text-red-600">*</span></label>
+          <select id="investmentCategory" required disabled
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm bg-gray-100 cursor-not-allowed">
+            <option value="">Auto-selected based on type</option>
+            <option value="Equity">Equity</option>
+            <option value="Debt">Debt</option>
+            <option value="Gold">Gold</option>
+            <option value="Real Estate">Real Estate</option>
+            <option value="Alternative">Alternative</option>
+            <option value="Other">Other</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Category is auto-selected based on investment type</p>
+        </div>
+      </div>
+
+      <!-- Row 2: Investment Name -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Investment Name/Description <span class="text-red-600">*</span></label>
+        <input type="text" id="investmentName" required placeholder="e.g., Physical Gold Coins 24K"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+      </div>
+
+      <!-- Row 2.5: Family Member + Investment Account -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Family Member <span class="text-gray-400 text-xs">(Optional)</span></label>
+          <select id="familyMember"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+            <option value="">-- Select Family Member --</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Investment Account <span class="text-gray-400 text-xs">(Optional)</span></label>
+          <select id="investmentAccount"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+            <option value="">-- Select Investment Account --</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 3: Invested Amount + Current Value -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Invested Amount (₹) <span class="text-gray-400 text-xs">(Optional)</span></label>
+          <input type="number" id="investedAmount" step="0.01" min="0" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Current Value (₹) <span class="text-red-600">*</span></label>
+          <input type="number" id="currentValue" required step="0.01" min="0" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+        </div>
+      </div>
+
+      <!-- Row 4: Status -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Status</label>
+        <select id="status" class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+          <option value="Active">Active</option>
+          <option value="Sold">Sold</option>
+          <option value="Matured">Matured</option>
+        </select>
+      </div>
+
+      <!-- Link to Loan Section (Universal for all investment types) -->
+      <div id="loanLinkSection" class="px-4 py-3 border-b border-gray-100 bg-red-50">
+        <div class="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+          🔗 Link to Loan <span class="text-gray-400 text-xs font-normal">(Optional)</span>
+        </div>
+
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="radio" name="loanOption" value="none" checked onclick="toggleLoanFields()"
+              class="w-4 h-4 cursor-pointer">
+            <span class="text-gray-700">No loan</span>
+          </label>
+
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="radio" name="loanOption" value="existing" onclick="toggleLoanFields()"
+              class="w-4 h-4 cursor-pointer">
+            <span class="text-gray-700">Link to existing loan</span>
+          </label>
+          <div id="existingLoanField" class="hidden ml-6">
+            <select id="existingLoanId" class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100"
+              onchange="updateLoanWarning()">
+              <option value="">-- Select Loan --</option>
+            </select>
+            <div id="loanWarning" class="hidden mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Additional Details -->
+      <div class="bg-gray-50 px-4 py-2.5 border-b-2 border-gray-200 text-sm font-semibold text-gray-700 flex items-center gap-2">
+        ✨ Additional Details (Optional)
+      </div>
+
+      <div class="px-4 py-3">
+        <div id="dynamicFieldsContainer" class="space-y-2"></div>
+        <button type="button" onclick="addDynamicField()"
+          class="mt-2 bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5">
+          + Add Custom Field
+        </button>
+      </div>
+
+      <!-- Notes Section -->
+      <div class="px-4 py-3 border-t border-gray-100">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Notes <span class="text-gray-400 text-xs">(Optional)</span></label>
+        <textarea id="notes" rows="3" placeholder="Any additional information..."
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100 resize-none"></textarea>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-between gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="confirmDelete()"
+        class="px-5 py-2.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 transition-colors">
+        🗑️ Delete
+      </button>
+      <div class="flex gap-2.5">
+        <button type="button" onclick="backToSelection()"
+          class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+          ← Back
+        </button>
+        <button type="submit"
+          class="px-5 py-2.5 bg-purple-600 text-white rounded-md text-sm font-semibold hover:bg-purple-700 transition-colors shadow-sm">
+          Update Investment
+        </button>
+      </div>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let dynamicFieldCount = 0;
+    let investmentTypes = [];
+    let currentInvestment = null;
+
+    let allLiabilities = [];
+
+    // Load on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      loadInvestmentsForSelection();
+      loadInvestmentTypesForEdit();
+      loadExistingLoans();
+      loadFamilyMembers();
+      loadInvestmentAccounts();
+    });
+
+    function loadFamilyMembers() {
+      google.script.run
+        .withSuccessHandler(function(members) {
+          const select = document.getElementById('familyMember');
+          members.forEach(function(member) {
+            const option = document.createElement('option');
+            option.value = member.memberId;  // Use memberId instead of memberName
+            option.textContent = member.memberName + ' (' + member.relationship + ')';
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load family members:', error);
+        })
+        .getAllFamilyMembers();
+    }
+
+    function loadInvestmentAccounts() {
+      google.script.run
+        .withSuccessHandler(function(accounts) {
+          const select = document.getElementById('investmentAccount');
+          accounts.forEach(function(account) {
+            const option = document.createElement('option');
+            option.value = account.accountName;
+            option.textContent = account.accountName + ' - ' + (account.platformBroker || account.accountType);
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load investment accounts:', error);
+        })
+        .getAllInvestmentAccounts();
+    }
+
+    function loadInvestmentsForSelection() {
+      google.script.run
+        .withSuccessHandler(function(investments) {
+          const select = document.getElementById('investmentSelector');
+          select.innerHTML = '<option value="">-- Select Investment --</option>';
+          investments.forEach(function(inv) {
+            const option = document.createElement('option');
+            option.value = inv.investmentId;
+            option.textContent = inv.investmentType + ' - ' + inv.investmentName + ' (₹' + formatNumber(inv.currentValue) + ')';
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          alert('Failed to load investments: ' + error.message);
+        })
+        .getAllInvestments();
+    }
+
+    function loadInvestmentTypesForEdit() {
+      google.script.run
+        .withSuccessHandler(function(types) {
+          investmentTypes = types;
+          const select = document.getElementById('investmentType');
+          select.innerHTML = '<option value="">Select investment type</option>';
+          types.forEach(function(type) {
+            const option = document.createElement('option');
+            option.value = type.typeName;
+            option.dataset.category = type.defaultCategory;
+            option.textContent = (type.icon || '📦') + ' ' + type.typeName;
+            select.appendChild(option);
+          });
+        })
+        .getAllInvestmentTypes();
+    }
+
+    function loadExistingLoans() {
+      google.script.run
+        .withSuccessHandler(function(liabilities) {
+          allLiabilities = liabilities;
+          const select = document.getElementById('existingLoanId');
+          select.innerHTML = '<option value="">-- Select Loan --</option>';
+          liabilities.forEach(function(liability) {
+            const option = document.createElement('option');
+            option.value = liability.liabilityId;
+            option.textContent = liability.liabilityType + ' - ' + liability.lenderName +
+                               ' (₹' + formatNumber(liability.outstandingBalance) + ')';
+            select.appendChild(option);
+          });
+        })
+        .getAllLiabilities();
+    }
+
+    function updateLoanWarning() {
+      const loanId = document.getElementById('existingLoanId').value;
+      const warningDiv = document.getElementById('loanWarning');
+
+      if (loanId) {
+        const loan = allLiabilities.find(l => l.liabilityId === loanId);
+        if (loan && loan.linkedInvestmentId && loan.linkedInvestmentId !== currentInvestment.investmentId) {
+          warningDiv.textContent = `⚠️ This loan is already linked to another investment. Linking it here will remove the previous link.`;
+          warningDiv.classList.remove('hidden');
+        } else {
+          warningDiv.classList.add('hidden');
+        }
+      } else {
+        warningDiv.classList.add('hidden');
+      }
+    }
+
+    function loadInvestmentForEdit() {
+      const investmentId = document.getElementById('investmentSelector').value;
+      if (!investmentId) {
+        alert('Please select an investment to edit');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(investment) {
+          if (!investment) {
+            alert('Investment not found');
+            return;
+          }
+
+          currentInvestment = investment;
+          populateForm(investment);
+
+          // Show edit form, hide selection
+          document.getElementById('selectionScreen').classList.add('hidden');
+          document.getElementById('editForm').classList.remove('hidden');
+        })
+        .withFailureHandler(function(error) {
+          alert('Failed to load investment: ' + error.message);
+        })
+        .getInvestmentById(investmentId);
+    }
+
+    function populateForm(inv) {
+      document.getElementById('investmentId').value = inv.investmentId;
+      document.getElementById('investmentType').value = inv.investmentType;
+      document.getElementById('investmentCategory').value = inv.investmentCategory;
+      document.getElementById('investmentName').value = inv.investmentName;
+      document.getElementById('familyMember').value = inv.familyMemberId || '';  // Use familyMemberId
+      document.getElementById('investmentAccount').value = inv.investmentAccount || '';
+      document.getElementById('investedAmount').value = inv.investedAmount || '';
+      document.getElementById('currentValue').value = inv.currentValue;
+      document.getElementById('status').value = inv.status || 'Active';
+      document.getElementById('notes').value = inv.notes || '';
+
+      // Handle loan linking (universal for all types)
+      if (inv.linkedLiabilityId) {
+        document.querySelector('input[name="loanOption"][value="existing"]').checked = true;
+        toggleLoanFields();
+        document.getElementById('existingLoanId').value = inv.linkedLiabilityId;
+        updateLoanWarning();
+      }
+
+      // Populate dynamic fields
+      if (inv.dynamicFields && Object.keys(inv.dynamicFields).length > 0) {
+        Object.keys(inv.dynamicFields).forEach(function(key) {
+          addDynamicFieldWithValue(key, inv.dynamicFields[key]);
+        });
+      }
+    }
+
+    function addDynamicFieldWithValue(name, value) {
+      dynamicFieldCount++;
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRow = document.createElement('div');
+      fieldRow.className = 'flex gap-3 items-start';
+      fieldRow.id = `dynamicField${dynamicFieldCount}`;
+      fieldRow.innerHTML = `
+        <input type="text" id="fieldName${dynamicFieldCount}" placeholder="Field name" value="${escapeHtml(name)}"
+          class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-100">
+        <input type="text" id="fieldValue${dynamicFieldCount}" placeholder="Value" value="${escapeHtml(value)}"
+          class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-100">
+        <button type="button" onclick="removeDynamicField(${dynamicFieldCount})" title="Remove"
+          class="px-2.5 py-2 bg-red-600 text-white rounded-md text-xs hover:bg-red-700 transition-colors">
+          🗑️
+        </button>
+      `;
+      container.appendChild(fieldRow);
+    }
+
+    function addDynamicField() {
+      dynamicFieldCount++;
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRow = document.createElement('div');
+      fieldRow.className = 'flex gap-3 items-start';
+      fieldRow.id = `dynamicField${dynamicFieldCount}`;
+      fieldRow.innerHTML = `
+        <input type="text" id="fieldName${dynamicFieldCount}" placeholder="Field name"
+          class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-100">
+        <input type="text" id="fieldValue${dynamicFieldCount}" placeholder="Value"
+          class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-100">
+        <button type="button" onclick="removeDynamicField(${dynamicFieldCount})" title="Remove"
+          class="px-2.5 py-2 bg-red-600 text-white rounded-md text-xs hover:bg-red-700 transition-colors">
+          🗑️
+        </button>
+      `;
+      container.appendChild(fieldRow);
+    }
+
+    function removeDynamicField(id) {
+      const field = document.getElementById(`dynamicField${id}`);
+      if (field) field.remove();
+    }
+
+    function collectDynamicFields() {
+      const fields = {};
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRows = container.querySelectorAll('[id^="dynamicField"]');
+
+      fieldRows.forEach(row => {
+        const id = row.id.replace('dynamicField', '');
+        const nameInput = document.getElementById(`fieldName${id}`);
+        const valueInput = document.getElementById(`fieldValue${id}`);
+
+        if (nameInput && valueInput && nameInput.value.trim() && valueInput.value.trim()) {
+          fields[nameInput.value.trim()] = valueInput.value.trim();
+        }
+      });
+
+      return fields;
+    }
+
+    function updateCategory() {
+      const typeSelect = document.getElementById('investmentType');
+      const categorySelect = document.getElementById('investmentCategory');
+      const selectedOption = typeSelect.options[typeSelect.selectedIndex];
+      const defaultCategory = selectedOption.dataset.category;
+
+      if (defaultCategory) {
+        categorySelect.value = defaultCategory;
+      }
+      // Loan section is now always visible (universal for all types)
+    }
+
+    function toggleLoanFields() {
+      const selectedOption = document.querySelector('input[name="loanOption"]:checked').value;
+      const existingField = document.getElementById('existingLoanField');
+
+      existingField.classList.add('hidden');
+
+      if (selectedOption === 'existing') {
+        existingField.classList.remove('hidden');
+      }
+    }
+
+    function backToSelection() {
+      document.getElementById('editForm').classList.add('hidden');
+      document.getElementById('selectionScreen').classList.remove('hidden');
+    }
+
+    // Form submission
+    document.getElementById('editForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Enable category field before submission (disabled fields don't submit)
+      document.getElementById('investmentCategory').disabled = false;
+
+      const data = {
+        investmentId: document.getElementById('investmentId').value,
+        investmentType: document.getElementById('investmentType').value.trim(),
+        investmentCategory: document.getElementById('investmentCategory').value.trim(),
+        investmentName: document.getElementById('investmentName').value.trim(),
+        familyMember: document.getElementById('familyMember').value,
+        investmentAccount: document.getElementById('investmentAccount').value,
+        investedAmount: document.getElementById('investedAmount').value,
+        currentValue: document.getElementById('currentValue').value,
+        status: document.getElementById('status').value,
+        linkedLiabilityId: '',
+        dynamicFields: collectDynamicFields(),
+        notes: document.getElementById('notes').value.trim()
+      };
+
+      // Get loan link (universal for all investment types)
+      const loanOption = document.querySelector('input[name="loanOption"]:checked')?.value;
+      if (loanOption === 'existing') {
+        data.linkedLiabilityId = document.getElementById('existingLoanId').value;
+      }
+
+      // Show progress
+      showProgress('Updating investment...', 'Please wait');
+
+      // Submit
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            showProgress('✓ Success!', response.message, true);
+            setTimeout(function() {
+              google.script.host.close();
+            }, 1500);
+          } else {
+            hideProgress();
+            alert('Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideProgress();
+          alert('Failed to update investment: ' + error.message);
+        })
+        .processEditInvestment(data);
+    });
+
+    function confirmDelete() {
+      if (!currentInvestment) return;
+
+      const confirmMsg = `Are you sure you want to delete this investment?\n\n` +
+                        `${currentInvestment.investmentType} - ${currentInvestment.investmentName}\n` +
+                        `Current Value: ₹${formatNumber(currentInvestment.currentValue)}\n\n` +
+                        `This action cannot be undone.`;
+
+      if (confirm(confirmMsg)) {
+        showProgress('Deleting investment...', 'Please wait');
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (response.success) {
+              showProgress('✓ Deleted!', response.message, true);
+              setTimeout(function() {
+                google.script.host.close();
+              }, 1500);
+            } else {
+              hideProgress();
+              alert('Error: ' + response.error);
+            }
+          })
+          .withFailureHandler(function(error) {
+            hideProgress();
+            alert('Failed to delete investment: ' + error.message);
+          })
+          .deleteInvestment(currentInvestment.investmentId);
+      }
+    }
+
+    function showProgress(text, detail, success = false) {
+      const overlay = document.getElementById('progressOverlay');
+      const icon = document.getElementById('progressIcon');
+      const textEl = document.getElementById('progressText');
+      const detailEl = document.getElementById('progressDetail');
+
+      if (success) {
+        icon.className = 'w-12 h-12 text-green-600 mx-auto mb-4 text-4xl';
+        icon.innerHTML = '✓';
+        textEl.className = 'text-base font-semibold text-green-600 mb-2';
+      }
+
+      textEl.textContent = text;
+      detailEl.textContent = detail;
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    function hideProgress() {
+      document.getElementById('progressOverlay').classList.add('hidden');
+      document.getElementById('progressOverlay').classList.remove('flex');
+    }
+
+    function formatNumber(num) {
+      if (!num) return '0.00';
+      return parseFloat(num).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+
+</body>
+</html>

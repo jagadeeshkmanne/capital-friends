@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      font-family: 'Inter', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: white;
+    }
+
+    .question-row {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.875rem;
+      border-bottom: 1px solid #f3f4f6;
+      transition: all 0.2s;
+    }
+
+    .question-row:hover {
+      background: #fafbfc;
+    }
+
+    .question-row.error {
+      background: #fef2f2;
+      border-left: 3px solid #dc2626;
+      padding-left: calc(0.875rem - 3px);
+    }
+
+    .question-number {
+      background: #0284c7;
+      color: white;
+      min-width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .question-text {
+      flex: 1;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #1f2937;
+      line-height: 1.3;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .radio-option {
+      position: relative;
+    }
+
+    .radio-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+    }
+
+    .radio-option label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.375rem 0.875rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      background: white;
+      min-width: 65px;
+    }
+
+    .radio-option.yes input[type="radio"]:checked + label {
+      border-color: #16a34a;
+      background: #f0fdf4;
+      color: #16a34a;
+    }
+
+    .radio-option.no input[type="radio"]:checked + label {
+      border-color: #dc2626;
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .radio-option label:hover {
+      border-color: #0284c7;
+      background: #f8fafc;
+    }
+
+    .tip {
+      font-size: 0.6875rem;
+      color: #6b7280;
+      padding: 0.25rem 0.875rem 0.5rem 3.375rem;
+      line-height: 1.4;
+    }
+
+    .footer {
+      background: white;
+      border-top: 2px solid #e5e7eb;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+
+    .error-banner {
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0.875rem;
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      color: #991b1b;
+      font-weight: 500;
+      display: none;
+    }
+
+    .error-banner.show {
+      display: block;
+      animation: shake 0.3s;
+    }
+
+    .progress-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .progress-overlay.show {
+      display: flex;
+      animation: fadeIn 0.3s;
+    }
+
+    .progress-card {
+      background: white;
+      border-radius: 0.75rem;
+      padding: 2rem;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .progress-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1.25rem;
+      border: 3px solid #e5e7eb;
+      border-top-color: #0284c7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .progress-text {
+      text-align: center;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-detail {
+      text-align: center;
+      font-size: 0.875rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .success-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1.25rem;
+      border-radius: 50%;
+      background: #10b981;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: scaleIn 0.3s;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+
+    @media (max-width: 640px) {
+      .question-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .question-text {
+        font-size: 0.8125rem;
+        width: 100%;
+      }
+
+      .radio-group {
+        margin-left: auto;
+      }
+
+      .tip {
+        padding-left: 2.875rem;
+        font-size: 0.625rem;
+      }
+
+      .developer {
+        font-size: 0.75rem;
+        gap: 0.5rem;
+      }
+
+      .footer {
+        flex-direction: column;
+        gap: 0.625rem;
+      }
+
+      .progress-card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <form id="questionnaireForm" novalidate>
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="error-banner">
+      ⚠️ Please answer all questions before submitting
+    </div>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="progress-overlay">
+      <div class="progress-card">
+        <div id="progressIcon" class="progress-icon"></div>
+        <div id="progressText" class="progress-text">Updating your financial health check...</div>
+        <div id="progressDetail" class="progress-detail">Please wait while we save your responses</div>
+      </div>
+    </div>
+
+    <!-- Questions Container -->
+    <div style="max-height: calc(100vh - 170px); overflow-y: auto; background: white;">
+
+      <!-- Q1 -->
+      <div>
+        <div class="question-row" data-question="1">
+          <span class="question-number">1</span>
+          <span class="question-text">Do you have good health insurance coverage?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q1" id="q1_yes" value="Yes">
+              <label for="q1_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q1" id="q1_no" value="No">
+              <label for="q1_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 Recommended: Minimum coverage per family member for medical emergencies</div>
+      </div>
+
+      <!-- Q2 -->
+      <div>
+        <div class="question-row" data-question="2">
+          <span class="question-number">2</span>
+          <span class="question-text">Do you have term life insurance?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q2" id="q2_yes" value="Yes">
+              <label for="q2_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q2" id="q2_no" value="No">
+              <label for="q2_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 Coverage = 10-15x of your annual income to protect family's future</div>
+      </div>
+
+      <!-- Q3 -->
+      <div>
+        <div class="question-row" data-question="3">
+          <span class="question-number">3</span>
+          <span class="question-text">Do you have an emergency fund (6 months expenses)?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q3" id="q3_yes" value="Yes">
+              <label for="q3_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q3" id="q3_no" value="No">
+              <label for="q3_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 Keep liquid funds equal to 6 months of household expenses in savings or liquid fund</div>
+      </div>
+
+      <!-- Q4 -->
+      <div>
+        <div class="question-row" data-question="4">
+          <span class="question-number">4</span>
+          <span class="question-text">Does your family know where all your assets are?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q4" id="q4_yes" value="Yes">
+              <label for="q4_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q4" id="q4_no" value="No">
+              <label for="q4_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 Family should know about bank accounts, investments, insurance, and lockers</div>
+      </div>
+
+      <!-- Q5 -->
+      <div>
+        <div class="question-row" data-question="5">
+          <span class="question-number">5</span>
+          <span class="question-text">Have you created a registered Will?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q5" id="q5_yes" value="Yes">
+              <label for="q5_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q5" id="q5_no" value="No">
+              <label for="q5_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 A registered Will ensures smooth asset transfer and prevents family disputes</div>
+      </div>
+
+      <!-- Q6 -->
+      <div>
+        <div class="question-row" data-question="6">
+          <span class="question-number">6</span>
+          <span class="question-text">Are nominees updated on all financial accounts?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q6" id="q6_yes" value="Yes">
+              <label for="q6_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q6" id="q6_no" value="No">
+              <label for="q6_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 Add/update nominees on bank accounts, investments, insurance, PF, and PPF</div>
+      </div>
+
+      <!-- Q7 -->
+      <div>
+        <div class="question-row" data-question="7">
+          <span class="question-number">7</span>
+          <span class="question-text">Do you have clear financial goals with a real plan?</span>
+          <div class="radio-group">
+            <div class="radio-option yes">
+              <input type="radio" name="q7" id="q7_yes" value="Yes">
+              <label for="q7_yes">✓ Yes</label>
+            </div>
+            <div class="radio-option no">
+              <input type="radio" name="q7" id="q7_no" value="No">
+              <label for="q7_no">✗ No</label>
+            </div>
+          </div>
+        </div>
+        <div class="tip">💡 Know exactly how much SIP you need each month for house, retirement, education, etc.</div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div style="font-size: 0.8125rem; color: #64748b; font-weight: 500;">
+        📋 <span style="color: #0f172a; font-weight: 600;">7 questions</span>
+      </div>
+      <button
+        type="submit"
+        id="submitBtn"
+        style="padding: 0.625rem 1.25rem; background: #0284c7; color: white; font-weight: 600; border-radius: 0.375rem; font-size: 0.8125rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.375rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); transition: all 0.2s;"
+        onmouseover="this.style.background='#0369a1'"
+        onmouseout="this.style.background='#0284c7'"
+      >
+        <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        Complete Check
+      </button>
+    </div>
+
+    <?!= include('DeveloperCredit'); ?>
+  </form>
+
+  <script>
+    // Load existing questionnaire data on page load (using google.script.run API)
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('Loading existing questionnaire data...');
+
+      google.script.run
+        .withSuccessHandler(function(existingData) {
+          console.log('Questionnaire data received:', existingData);
+
+          if (existingData && typeof existingData === 'object') {
+            console.log('Pre-populating form with existing data');
+
+            // Map "Yes"/"No" values to radio buttons
+            if (existingData.healthInsurance) {
+              const value = existingData.healthInsurance === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q1"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (existingData.termInsurance) {
+              const value = existingData.termInsurance === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q2"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (existingData.emergencyFund) {
+              const value = existingData.emergencyFund === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q3"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (existingData.familyAwareness) {
+              const value = existingData.familyAwareness === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q4"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (existingData.will) {
+              const value = existingData.will === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q5"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (existingData.nominees) {
+              const value = existingData.nominees === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q6"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (existingData.goals) {
+              const value = existingData.goals === 'Yes' ? 'Yes' : 'No';
+              const radio = document.querySelector(`input[name="q7"][value="${value}"]`);
+              if (radio) radio.checked = true;
+            }
+          } else {
+            console.log('No existing questionnaire data found');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading questionnaire data:', error);
+          // Continue with empty form if data load fails
+        })
+        .getQuestionnaireData();
+    });
+
+    // Custom validation
+    function validateForm() {
+      const questions = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7'];
+      let allAnswered = true;
+
+      // Clear previous errors
+      document.querySelectorAll('.question-row').forEach(row => {
+        row.classList.remove('error');
+      });
+      document.getElementById('errorBanner').classList.remove('show');
+
+      // Check each question
+      questions.forEach(q => {
+        const answered = document.querySelector(`input[name="${q}"]:checked`);
+        if (!answered) {
+          allAnswered = false;
+          const row = document.querySelector(`.question-row[data-question="${q.substring(1)}"]`);
+          if (row) {
+            row.classList.add('error');
+          }
+        }
+      });
+
+      if (!allAnswered) {
+        document.getElementById('errorBanner').classList.add('show');
+        const firstError = document.querySelector('.question-row.error');
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+
+      return allAnswered;
+    }
+
+    // Form submission
+    document.getElementById('questionnaireForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Validate first
+      if (!validateForm()) {
+        return;
+      }
+
+      // Collect all answers
+      const answers = {
+        q1_healthInsurance: document.querySelector('input[name="q1"]:checked')?.value || '',
+        q2_termInsurance: document.querySelector('input[name="q2"]:checked')?.value || '',
+        q3_emergencyFund: document.querySelector('input[name="q3"]:checked')?.value || '',
+        q4_familyAwareness: document.querySelector('input[name="q4"]:checked')?.value || '',
+        q5_will: document.querySelector('input[name="q5"]:checked')?.value || '',
+        q6_nominees: document.querySelector('input[name="q6"]:checked')?.value || '',
+        q7_goals: document.querySelector('input[name="q7"]:checked')?.value || ''
+      };
+
+      // Calculate score
+      let score = 0;
+      Object.values(answers).forEach(answer => {
+        if (answer === 'Yes') score++;
+      });
+
+      answers.score = score;
+      answers.totalQuestions = 7;
+
+      // Show progress overlay
+      document.getElementById('progressOverlay').classList.add('show');
+      document.getElementById('submitBtn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            // Show success state
+            document.getElementById('progressIcon').outerHTML = '<div class="success-icon"><svg style="width: 32px; height: 32px;" fill="white" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>';
+            document.getElementById('progressText').textContent = 'Update Complete!';
+            document.getElementById('progressDetail').innerHTML = result.summary.replace(/\n/g, '<br>');
+            
+            // Close after 2 seconds
+            setTimeout(function() {
+              google.script.host.close();
+            }, 2000);
+          } else {
+            document.getElementById('progressOverlay').classList.remove('show');
+            document.getElementById('submitBtn').disabled = false;
+            alert('❌ ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('progressOverlay').classList.remove('show');
+          document.getElementById('submitBtn').disabled = false;
+          alert('❌ Error: ' + error.message);
+        })
+        .saveQuestionnaire(answers);
+    });
+
+    // Remove error styling when question is answered
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        const row = this.closest('.question-row');
+        if (row) {
+          row.classList.remove('error');
+          const allRows = document.querySelectorAll('.question-row');
+          const hasErrors = Array.from(allRows).some(r => r.classList.contains('error'));
+          if (!hasErrors) {
+            document.getElementById('errorBanner').classList.remove('show');
+          }
+        }
+      });
+    });
+
+  </script>
+
+</body>
+</html>

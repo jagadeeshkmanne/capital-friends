@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <div id="accountSelectionView">
+    <div id="loadingAccounts" class="py-12 px-6 text-center text-gray-600">
+      <div class="w-10 h-10 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-3 animate-spin"></div>
+      <p>Loading investment accounts...</p>
+    </div>
+
+    <div id="accountSelectionContent" class="hidden px-6 py-8">
+      <div class="mb-6">
+        <label class="text-sm font-semibold text-gray-700 mb-2 block">Select an investment account to edit:</label>
+        <select id="accountSelect" onchange="loadAccountForEdit()"
+          class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:border-sky-600 focus:ring-4 focus:ring-sky-100">
+          <option value="">-- Select an account --</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="button" onclick="google.script.host.close()"
+          class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <form id="accountForm" class="hidden" novalidate>
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Updating investment account...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait</div>
+      </div>
+    </div>
+
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+      <input type="hidden" id="accountId">
+
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+        <button type="button" onclick="showAccountSelection()" class="text-sky-600 hover:text-sky-700 text-sm font-semibold flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+          Back to selection
+        </button>
+      </div>
+
+      <!-- Row 1: Account Name + Family Member -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Account Name <span class="text-red-600">*</span></label>
+          <input type="text" id="accountName" required placeholder="e.g., My Zerodha Account"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="accountNameError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Family Member <span class="text-red-600">*</span></label>
+          <select id="memberId" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Loading...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="memberIdError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Linked Bank Account + Account Type -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Linked Bank Account <span class="text-red-600">*</span></label>
+          <select id="bankAccountId" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Loading...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="bankAccountIdError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Account Type <span class="text-red-600">*</span></label>
+          <select id="accountType" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Select type</option>
+            <option value="Demat Account">Demat Account (Stocks + MF)</option>
+            <option value="Mutual Fund Platform">Mutual Fund Platform</option>
+            <option value="Trading Account">Trading Account (Intraday/F&O)</option>
+            <option value="Direct AMC">Direct AMC (Fund House)</option>
+            <option value="Broker/Advisor">Broker/Advisor</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="accountTypeError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 3: Platform/Broker + Account/Client ID -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Platform/Broker Name <span class="text-red-600">*</span></label>
+          <input type="text" id="platformBroker" required placeholder="e.g., Zerodha, Groww"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="platformBrokerError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Account/Client ID <span class="text-red-600">*</span></label>
+          <input type="text" id="accountClientId" required placeholder="e.g., XYZ123"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="accountClientIdError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 4: Demat DP ID + Registered Email -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Demat DP ID <span class="text-gray-500">(Optional)</span></label>
+          <input type="text" id="dematDpId" placeholder="e.g., IN30023912345678" maxlength="16"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Registered Email <span class="text-red-600">*</span></label>
+          <input type="email" id="registeredEmail" required placeholder="e.g., john@example.com"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="registeredEmailError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 5: Registered Phone + Status -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Registered Phone <span class="text-red-600">*</span></label>
+          <input type="tel" id="registeredPhone" required placeholder="e.g., +91 98765 43210"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="registeredPhoneError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Status <span class="text-red-600">*</span></label>
+          <select id="status" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="showAccountSelection()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        Update Account
+      </button>
+    </div>
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    var allAccounts = [];
+    var allMembers = [];
+    var allBankAccounts = [];
+    var membersLoaded = false;
+    var bankAccountsLoaded = false;
+
+    window.onload = function() {
+      // Load members first
+      google.script.run
+        .withSuccessHandler(function(members) {
+          allMembers = members ? members.filter(function(m) { return m.status === 'Active'; }) : [];
+          var select = document.getElementById('memberId');
+          select.innerHTML = '<option value="">Select member</option>';
+          allMembers.forEach(function(member) {
+            var option = document.createElement('option');
+            option.value = member.memberId;
+            option.textContent = member.memberName + ' (' + member.relationship + ')';
+            select.appendChild(option);
+          });
+          membersLoaded = true;
+          checkAndLoadAccounts();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading members:', error);
+          membersLoaded = true;
+          checkAndLoadAccounts();
+        })
+        .getAllFamilyMembers();
+
+      // Load bank accounts
+      google.script.run
+        .withSuccessHandler(function(accounts) {
+          allBankAccounts = accounts ? accounts.filter(function(a) { return a.status === 'Active'; }) : [];
+          var select = document.getElementById('bankAccountId');
+          select.innerHTML = '<option value="">Select bank account</option>';
+          allBankAccounts.forEach(function(account) {
+            var option = document.createElement('option');
+            option.value = account.accountId;
+            option.textContent = account.accountName + ' - ' + account.bankName + ' (' + account.accountNumber + ')';
+            select.appendChild(option);
+          });
+          bankAccountsLoaded = true;
+          checkAndLoadAccounts();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading bank accounts:', error);
+          bankAccountsLoaded = true;
+          checkAndLoadAccounts();
+        })
+        .getAllBankAccounts();
+    };
+
+    function checkAndLoadAccounts() {
+      if (membersLoaded && bankAccountsLoaded) {
+        loadInvestmentAccounts();
+      }
+    }
+
+    function loadInvestmentAccounts() {
+      google.script.run
+        .withSuccessHandler(function(accounts) {
+          if (!accounts) {
+            document.getElementById('loadingAccounts').innerHTML = '<div class="py-12 px-6 text-center text-amber-600"><p class="font-semibold mb-2">No accounts found</p><p class="text-sm">Please add investment accounts first.</p><button onclick="google.script.host.close()" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Close</button></div>';
+            return;
+          }
+          allAccounts = accounts.filter(function(a) { return a.status === 'Active'; });
+          populateAccountDropdown();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('loadingAccounts').innerHTML = '<div class="py-12 px-6 text-center text-red-600"><p class="font-semibold mb-2">Error loading accounts</p><p class="text-sm">' + (error.message || error) + '</p><button onclick="google.script.host.close()" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Close</button></div>';
+        })
+        .getAllInvestmentAccounts();
+    }
+
+    function populateAccountDropdown() {
+      var select = document.getElementById('accountSelect');
+      if (allAccounts.length === 0) {
+        select.innerHTML = '<option value="">No active accounts found</option>';
+        document.getElementById('loadingAccounts').classList.add('hidden');
+        document.getElementById('accountSelectionContent').classList.remove('hidden');
+        return;
+      }
+      allAccounts.forEach(function(account) {
+        var option = document.createElement('option');
+        option.value = account.accountId;
+        option.textContent = account.accountName + ' - ' + account.platformBroker + ' (' + account.accountId + ')';
+        select.appendChild(option);
+      });
+      document.getElementById('loadingAccounts').classList.add('hidden');
+      document.getElementById('accountSelectionContent').classList.remove('hidden');
+    }
+
+    function loadAccountForEdit() {
+      var accountId = document.getElementById('accountSelect').value;
+      if (!accountId) return;
+      var account;
+      for (var i = 0; i < allAccounts.length; i++) {
+        if (allAccounts[i].accountId === accountId) {
+          account = allAccounts[i];
+          break;
+        }
+      }
+      if (!account) {
+        alert('Account not found');
+        return;
+      }
+
+      // Populate all fields (members and bank accounts are already loaded)
+      document.getElementById('accountId').value = account.accountId;
+      document.getElementById('accountName').value = account.accountName || '';
+      document.getElementById('memberId').value = account.memberId || '';
+      document.getElementById('bankAccountId').value = account.bankAccountId || '';
+      document.getElementById('accountType').value = account.accountType || '';
+      document.getElementById('platformBroker').value = account.platformBroker || '';
+      document.getElementById('accountClientId').value = account.accountClientId || '';
+      document.getElementById('dematDpId').value = account.dematDpId || '';
+      document.getElementById('registeredEmail').value = account.registeredEmail || '';
+      document.getElementById('registeredPhone').value = account.registeredPhone || '';
+      document.getElementById('status').value = account.status || 'Active';
+
+      // Show the edit form
+      document.getElementById('accountSelectionView').classList.add('hidden');
+      document.getElementById('accountForm').classList.remove('hidden');
+    }
+
+    function showAccountSelection() {
+      document.getElementById('accountForm').classList.add('hidden');
+      document.getElementById('accountSelectionView').classList.remove('hidden');
+      document.getElementById('accountSelect').value = '';
+    }
+
+    function showError(fieldId, message) {
+      var errorEl = document.getElementById(fieldId + 'Error');
+      var inputEl = document.getElementById(fieldId);
+      if (errorEl) { errorEl.textContent = message; errorEl.classList.remove('hidden'); }
+      if (inputEl) { inputEl.classList.remove('border-gray-300'); inputEl.classList.add('border-red-600'); }
+    }
+
+    function clearError(fieldId) {
+      var errorEl = document.getElementById(fieldId + 'Error');
+      var inputEl = document.getElementById(fieldId);
+      if (errorEl) errorEl.classList.add('hidden');
+      if (inputEl) { inputEl.classList.remove('border-red-600'); inputEl.classList.add('border-gray-300'); }
+    }
+
+    function clearAllErrors() {
+      document.querySelectorAll('[id$="Error"]').forEach(function(el) { el.classList.add('hidden'); });
+      document.querySelectorAll('input, select').forEach(function(el) {
+        el.classList.remove('border-red-600');
+        el.classList.add('border-gray-300');
+      });
+    }
+
+    document.getElementById('accountForm').onsubmit = function(e) {
+      e.preventDefault();
+      clearAllErrors();
+      var accountId = document.getElementById('accountId').value;
+      var accountName = document.getElementById('accountName').value.trim();
+      var memberId = document.getElementById('memberId').value;
+      var bankAccountId = document.getElementById('bankAccountId').value;
+      var accountType = document.getElementById('accountType').value;
+      var platformBroker = document.getElementById('platformBroker').value.trim();
+      var accountClientId = document.getElementById('accountClientId').value.trim();
+      var dematDpId = document.getElementById('dematDpId').value.trim();
+      var registeredEmail = document.getElementById('registeredEmail').value.trim();
+      var registeredPhone = document.getElementById('registeredPhone').value.trim();
+      var status = document.getElementById('status').value;
+      var isValid = true;
+      if (!accountName) { showError('accountName', 'Required'); isValid = false; }
+      if (!memberId) { showError('memberId', 'Required'); isValid = false; }
+      if (!bankAccountId) { showError('bankAccountId', 'Required'); isValid = false; }
+      if (!accountType) { showError('accountType', 'Required'); isValid = false; }
+      if (!platformBroker) { showError('platformBroker', 'Required'); isValid = false; }
+      if (!accountClientId) { showError('accountClientId', 'Required'); isValid = false; }
+      if (!registeredEmail) { showError('registeredEmail', 'Required'); isValid = false; }
+      if (!registeredPhone) { showError('registeredPhone', 'Required'); isValid = false; }
+      if (!isValid) return;
+      var data = {
+        accountId: accountId,
+        accountName: accountName,
+        memberId: memberId,
+        bankAccountId: bankAccountId,
+        accountType: accountType,
+        platformBroker: platformBroker,
+        accountClientId: accountClientId,
+        dematDpId: dematDpId,
+        registeredEmail: registeredEmail,
+        registeredPhone: registeredPhone,
+        status: status
+      };
+      var overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').textContent = '';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = response.message;
+            setTimeout(function() { google.script.host.close(); }, 2000);
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .updateInvestmentAccount(data);
+    };
+
+    document.querySelectorAll('input, select').forEach(function(el) {
+      el.oninput = function() { clearError(this.id); };
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          keyframes: {
+            bounce: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-20px)' }
+            }
+          },
+          animation: {
+            'bounce-slow': 'bounce 1s ease infinite'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <!-- Celebration Container -->
+  <div class="text-center px-4 py-8">
+
+    <!-- Celebration Icon -->
+    <div class="text-8xl mb-4 animate-bounce-slow">🎉</div>
+
+    <!-- Celebration Title -->
+    <h2 class="text-3xl font-bold text-gray-900 mb-2">Congratulations!</h2>
+    <p class="text-lg text-gray-600 mb-8">You've achieved your financial goal!</p>
+
+    <!-- Goal Summary -->
+    <div class="bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-400 rounded-xl p-6 mb-6 text-left max-w-2xl mx-auto">
+      <h3 class="text-lg font-bold text-sky-900 mb-4">🎯 <span id="goalName">Loading...</span></h3>
+      <div class="space-y-2">
+        <div class="flex justify-between text-sm border-b border-sky-200 pb-2">
+          <span class="text-gray-700">Goal Type</span>
+          <span class="font-bold text-sky-900" id="goalType">-</span>
+        </div>
+        <div class="flex justify-between text-sm border-b border-sky-200 pb-2">
+          <span class="text-gray-700">Target Amount</span>
+          <span class="font-bold text-sky-900" id="targetAmount">₹-</span>
+        </div>
+        <div class="flex justify-between text-sm border-b border-sky-200 pb-2">
+          <span class="text-gray-700">Current Value</span>
+          <span class="font-bold text-sky-900" id="currentValue">₹-</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-700">Progress</span>
+          <span class="font-bold text-emerald-700">100% ✅</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next Steps -->
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-6 mb-6 text-left max-w-2xl mx-auto">
+      <h3 class="text-lg font-bold text-amber-900 mb-4">💡 What's Next?</h3>
+      <ol class="list-decimal list-inside space-y-2 text-sm text-gray-800">
+        <li><strong class="text-gray-900">Plan Withdrawal:</strong> If you need funds now, you can start withdrawing from mapped portfolios</li>
+        <li><strong class="text-gray-900">Keep Growing:</strong> Let the funds continue growing if you don't need them immediately</li>
+        <li><strong class="text-gray-900">Rebalance Portfolios:</strong> Consider rebalancing to maintain your target asset allocation</li>
+        <li><strong class="text-gray-900">Archive Goal:</strong> Archive this goal to keep your active goals list clean</li>
+        <li><strong class="text-gray-900">Celebrate:</strong> Take a moment to appreciate your financial discipline! 🎊</li>
+      </ol>
+    </div>
+
+    <!-- Options -->
+    <div class="flex flex-col gap-4 max-w-2xl mx-auto mb-6">
+
+      <button onclick="planWithdrawal()"
+        class="p-4 border-2 border-gray-200 bg-white rounded-lg text-left hover:border-sky-400 hover:bg-sky-50 hover:-translate-y-1 transition-all shadow-sm hover:shadow-md">
+        <strong class="text-gray-900 block mb-1">💸 Plan Withdrawal</strong>
+        <span class="text-sm text-gray-600">Get suggestions on which funds to redeem from</span>
+      </button>
+
+      <button onclick="keepGrowing()"
+        class="p-4 border-2 border-gray-200 bg-white rounded-lg text-left hover:border-emerald-400 hover:bg-emerald-50 hover:-translate-y-1 transition-all shadow-sm hover:shadow-md">
+        <strong class="text-gray-900 block mb-1">📈 Keep Funds Growing</strong>
+        <span class="text-sm text-gray-600">Don't withdraw, let the money continue compounding</span>
+      </button>
+
+      <button onclick="archiveGoal()"
+        class="p-4 border-2 border-gray-200 bg-white rounded-lg text-left hover:border-purple-400 hover:bg-purple-50 hover:-translate-y-1 transition-all shadow-sm hover:shadow-md">
+        <strong class="text-gray-900 block mb-1">📦 Archive This Goal</strong>
+        <span class="text-sm text-gray-600">Move to archived goals (keeps data but hides from active list)</span>
+      </button>
+
+      <button onclick="viewDashboard()"
+        class="p-4 border-2 border-gray-200 bg-white rounded-lg text-left hover:border-amber-400 hover:bg-amber-50 hover:-translate-y-1 transition-all shadow-sm hover:shadow-md">
+        <strong class="text-gray-900 block mb-1">📊 View Goals Dashboard</strong>
+        <span class="text-sm text-gray-600">See all your goals and progress</span>
+      </button>
+
+    </div>
+
+    <!-- Close Button -->
+    <div class="mt-6">
+      <button type="button" onclick="closeDialog()"
+        class="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Close
+      </button>
+    </div>
+
+  </div>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let goalId = '';
+    let goalData = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadGoalData();
+    });
+
+    function loadGoalData() {
+      // Get goal ID from URL or storage
+      const urlParams = new URLSearchParams(window.location.search);
+      goalId = urlParams.get('goalId');
+
+      if (!goalId) {
+        // If no goal ID provided, show a generic success message
+        document.getElementById('goalName').textContent = 'Your Financial Goal';
+        return;
+      }
+
+      // Load goal details
+      google.script.run
+        .withSuccessHandler(function(goal) {
+          if (goal) {
+            goalData = goal;
+            document.getElementById('goalName').textContent = goal.goalName;
+            document.getElementById('goalType').textContent = goal.goalType;
+            document.getElementById('targetAmount').textContent = '₹' + formatCurrency(goal.targetAmount);
+            document.getElementById('currentValue').textContent = '₹' + formatCurrency(goal.currentValue);
+          }
+        })
+        .withFailureHandler(showError)
+        .getGoalById(goalId);
+    }
+
+    function planWithdrawal() {
+      if (!goalId || !goalData) {
+        alert('💡 Withdrawal planning feature:\n\n' +
+              'This feature will help you:\n' +
+              '• See which portfolios are allocated to this goal\n' +
+              '• Calculate exact funds and units to redeem\n' +
+              '• Generate a detailed redemption plan\n\n' +
+              'For now, check your portfolio mappings in Goals Dashboard.');
+        return;
+      }
+
+      if (!goalData.portfolioMappings || goalData.portfolioMappings.length === 0) {
+        alert('⚠️ No portfolios are mapped to this goal.\n\nPlease map portfolios first to plan withdrawals.');
+        return;
+      }
+
+      // Show withdrawal suggestions
+      let message = '💸 WITHDRAWAL SUGGESTIONS (Proportional Strategy)\n\n';
+      message += 'Available Amount: ₹' + formatCurrency(goalData.currentValue) + '\n\n';
+      message += 'Mapped Portfolios:\n';
+
+      goalData.portfolioMappings.forEach(mapping => {
+        const allocatedAmount = goalData.currentValue * mapping.allocationPct;
+        message += `\n• ${mapping.portfolioName}: ${(mapping.allocationPct * 100).toFixed(1)}%`;
+        message += `\n  Amount: ₹${formatCurrency(allocatedAmount)}`;
+      });
+
+      message += '\n\n📝 Note: These are suggestions only.\n';
+      message += 'You need to execute redemptions manually in your broker/AMC platform.\n\n';
+      message += 'Tip: Check the specific funds within each portfolio and redeem proportionally.';
+
+      alert(message);
+    }
+
+    function keepGrowing() {
+      const confirmed = confirm(
+        '📈 Keep Funds Growing\n\n' +
+        'Great choice! Your money will continue compounding.\n\n' +
+        'This goal will remain marked as "Achieved" but the funds will stay invested.\n\n' +
+        'You can withdraw anytime in the future.\n\n' +
+        'Continue?'
+      );
+
+      if (confirmed) {
+        alert('✅ Perfect! Your funds will continue growing.\n\nYou can check progress anytime in the Goals Dashboard.');
+        closeDialog();
+      }
+    }
+
+    function archiveGoal() {
+      const confirmed = confirm(
+        '📦 Archive Goal\n\n' +
+        'This will:\n' +
+        '• Mark goal as Inactive (hidden from active goals list)\n' +
+        '• Keep all data (you can view it anytime in the Goals sheet)\n' +
+        '• Preserve portfolio mappings\n\n' +
+        'Archive this goal?'
+      );
+
+      if (confirmed) {
+        if (!goalId) {
+          alert('❌ Cannot archive: Goal ID not found');
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert('✅ ' + result.message + '\n\nThis goal is now archived.');
+              closeDialog();
+            } else {
+              alert('❌ ' + result.error);
+            }
+          })
+          .withFailureHandler(showError)
+          .archiveGoal(goalId);
+      }
+    }
+
+    function viewDashboard() {
+      google.script.run.showGoalsDashboardDialog();
+      closeDialog();
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-IN').format(Math.round(value));
+    }
+
+    function showError(message) {
+      alert('❌ ' + (message.message || message));
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>

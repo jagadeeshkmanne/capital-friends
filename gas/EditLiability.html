@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      font-family: 'Inter', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: white;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Scrollbar styling */
+    .overflow-y-auto::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .overflow-y-auto::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .overflow-y-auto::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <!-- Liability Selection View -->
+  <div id="liabilitySelectionView">
+    <!-- Loading State -->
+    <div id="loadingLiabilities" class="py-12 px-6 text-center text-gray-600">
+      <div class="w-10 h-10 border-4 border-gray-200 border-t-red-600 rounded-full mx-auto mb-3 animate-spin"></div>
+      <p>Loading liabilities...</p>
+    </div>
+
+    <!-- Selection Dropdown -->
+    <div id="liabilitySelectionContent" class="hidden px-6 py-8">
+      <div class="mb-6">
+        <label class="text-sm font-semibold text-gray-700 mb-2 block">Select a liability to edit:</label>
+        <select id="liabilitySelect" onchange="loadLiabilityForEdit()"
+          class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-100">
+          <option value="">-- Select a liability --</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="button" onclick="google.script.host.close()"
+          class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Form View (hidden initially) -->
+  <form id="liabilityForm" class="hidden" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-red-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Updating liability...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait while we save the information</div>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+
+      <input type="hidden" id="liabilityId">
+
+      <!-- Back Button -->
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+        <button type="button" onclick="showLiabilitySelection()" class="text-red-600 hover:text-red-700 text-sm font-semibold flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+          Back to selection
+        </button>
+      </div>
+
+      <!-- Linked Investment Warning -->
+      <div id="linkedInvestmentWarning" class="hidden mx-4 mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <div class="flex items-start gap-2">
+          <span class="text-purple-600 text-lg">🔗</span>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-purple-900 mb-1">Linked to Investment</p>
+            <p class="text-xs text-purple-700" id="linkedInvestmentDetails"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 1: Liability Type + Lender Name -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Liability Type <span class="text-red-600">*</span></label>
+          <select id="liabilityType" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100">
+            <option value="">-- Select Liability Type --</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="liabilityTypeError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Lender/Bank Name <span class="text-red-600">*</span></label>
+          <input type="text" id="lenderName" required placeholder="e.g., HDFC Bank, ICICI Bank"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="lenderNameError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Family Member + Outstanding Balance -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Family Member <span class="text-gray-400 text-xs">(Optional)</span></label>
+          <select id="familyMember"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100">
+            <option value="">-- Select Family Member --</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Outstanding Balance (₹) <span class="text-red-600">*</span></label>
+          <input type="number" id="outstandingBalance" required step="0.01" min="0" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="outstandingBalanceError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 3: Link to Investment -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Link to Investment <span class="text-gray-400 text-xs">(Optional)</span></label>
+        <select id="linkedInvestmentId"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100"
+          onchange="updateLinkedInvestmentWarning()">
+          <option value="">-- No Investment Linked --</option>
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Link this loan to a related investment (e.g., Real Estate, Gold, etc.)</p>
+      </div>
+
+      <!-- Section: Additional Details -->
+      <div class="bg-gray-50 px-4 py-2.5 border-b-2 border-gray-200 text-sm font-semibold text-gray-700 flex items-center gap-2">
+        ✨ Additional Details (Optional)
+      </div>
+
+      <!-- Dynamic Fields Container -->
+      <div class="px-4 py-3">
+        <div id="dynamicFieldsContainer" class="space-y-2"></div>
+        <button type="button" onclick="addDynamicField()"
+          class="mt-2 bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5">
+          + Add Custom Field
+        </button>
+      </div>
+
+      <!-- Notes Section -->
+      <div class="px-4 py-3 border-t border-gray-100">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Notes <span class="text-gray-400 text-xs">(Optional)</span></label>
+        <textarea id="notes" rows="3" placeholder="Any additional information..."
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100 resize-none"></textarea>
+      </div>
+
+      <!-- Status Section -->
+      <div class="px-4 py-3 border-t border-gray-100">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Status <span class="text-red-600">*</span></label>
+        <select id="status" required onchange="handleStatusChange()"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100">
+          <option value="Active">🟢 Active</option>
+          <option value="Closed">✅ Closed/Settled</option>
+          <option value="Inactive">⏸️ Inactive</option>
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Note: Closing a liability will set outstanding to ₹0 and unlink from investments</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="showLiabilitySelection()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm">
+        Update Liability
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let dynamicFieldCount = 0;
+    let allLiabilities = [];
+    let currentLiability = null;
+    let allInvestments = [];
+
+    // Load all liabilities on page load
+    window.onload = function() {
+      console.log('Loading liabilities...');
+      google.script.run
+        .withSuccessHandler(function(liabilities) {
+          console.log('Liabilities received:', liabilities);
+
+          if (!liabilities || liabilities.length === 0) {
+            document.getElementById('loadingLiabilities').innerHTML = `
+              <div class="py-12 px-6 text-center text-amber-600">
+                <p class="font-semibold mb-2">No liabilities found</p>
+                <p class="text-sm">Please add liabilities first using "➕ Add Liability" menu.</p>
+                <button onclick="google.script.host.close()"
+                  class="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300">
+                  Close
+                </button>
+              </div>
+            `;
+            return;
+          }
+
+          allLiabilities = liabilities;
+          populateLiabilitySelect();
+
+          // Load other data in parallel
+          loadLiabilityTypes();
+          loadFamilyMembers();
+          loadInvestments();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load liabilities:', error);
+          document.getElementById('loadingLiabilities').innerHTML = `
+            <div class="py-12 px-6 text-center text-red-600">
+              <p class="font-semibold mb-2">Error loading liabilities</p>
+              <p class="text-sm">${error.message}</p>
+              <button onclick="google.script.host.close()"
+                class="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300">
+                Close
+              </button>
+            </div>
+          `;
+        })
+        .getAllLiabilities();
+    };
+
+    function populateLiabilitySelect() {
+      const select = document.getElementById('liabilitySelect');
+      select.innerHTML = '<option value="">-- Select a liability --</option>';
+
+      allLiabilities.forEach(function(liability) {
+        const option = document.createElement('option');
+        option.value = liability.liabilityId;
+        option.textContent = liability.liabilityType + ' - ' + liability.lenderName +
+                           ' (₹' + formatNumber(liability.outstandingBalance) + ')';
+        select.appendChild(option);
+      });
+
+      document.getElementById('loadingLiabilities').classList.add('hidden');
+      document.getElementById('liabilitySelectionContent').classList.remove('hidden');
+    }
+
+    function loadLiabilityTypes() {
+      google.script.run
+        .withSuccessHandler(function(types) {
+          const select = document.getElementById('liabilityType');
+          select.innerHTML = '<option value="">-- Select Liability Type --</option>';
+          types.forEach(function(type) {
+            const option = document.createElement('option');
+            option.value = type.typeName;
+            option.textContent = (type.icon || '📝') + ' ' + type.typeName;
+            select.appendChild(option);
+          });
+          // ✅ Re-populate liability type if editing
+          if (currentLiability && currentLiability.liabilityType) {
+            select.value = currentLiability.liabilityType;
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load liability types:', error);
+        })
+        .getAllLiabilityTypes();
+    }
+
+    function loadFamilyMembers() {
+      google.script.run
+        .withSuccessHandler(function(members) {
+          const select = document.getElementById('familyMember');
+          select.innerHTML = '<option value="">-- Select Family Member --</option>';
+          members.forEach(function(member) {
+            const option = document.createElement('option');
+            option.value = member.memberId;  // ✅ FIX: Use memberId instead of memberName
+            option.textContent = member.memberName + ' (' + member.relationship + ')';
+            select.appendChild(option);
+          });
+          // ✅ Re-populate family member if editing
+          if (currentLiability && currentLiability.familyMember) {
+            select.value = currentLiability.familyMember;
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load family members:', error);
+        })
+        .getAllFamilyMembers();
+    }
+
+    function loadInvestments() {
+      google.script.run
+        .withSuccessHandler(function(investments) {
+          allInvestments = investments;
+          const select = document.getElementById('linkedInvestmentId');
+          select.innerHTML = '<option value="">-- No Investment Linked --</option>';
+          investments.forEach(function(investment) {
+            const option = document.createElement('option');
+            option.value = investment.investmentId;
+            option.textContent = investment.investmentType + ' - ' + investment.investmentName +
+                               ' (₹' + formatNumber(investment.currentValue) + ')';
+            select.appendChild(option);
+          });
+          // ✅ Re-populate linked investment if editing
+          if (currentLiability && currentLiability.linkedInvestmentId) {
+            select.value = currentLiability.linkedInvestmentId;
+            updateLinkedInvestmentWarning(); // Update warning banner
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to load investments:', error);
+        })
+        .getAllInvestments();
+    }
+
+    function loadLiabilityForEdit() {
+      const liabilityId = document.getElementById('liabilitySelect').value;
+      if (!liabilityId) return;
+
+      const liability = allLiabilities.find(l => l.liabilityId === liabilityId);
+      if (!liability) return;
+
+      currentLiability = liability;
+
+      // Populate form fields
+      document.getElementById('liabilityId').value = liability.liabilityId;
+      document.getElementById('liabilityType').value = liability.liabilityType;
+      document.getElementById('lenderName').value = liability.lenderName;
+      document.getElementById('familyMember').value = liability.familyMember || '';
+      document.getElementById('outstandingBalance').value = liability.outstandingBalance;
+      document.getElementById('linkedInvestmentId').value = liability.linkedInvestmentId || '';
+      document.getElementById('notes').value = liability.notes || '';
+      document.getElementById('status').value = liability.status || 'Active';
+
+      // Load dynamic fields
+      loadDynamicFields(liability.dynamicFields);
+
+      // Update warning
+      updateLinkedInvestmentWarning();
+
+      // Show form view
+      document.getElementById('liabilitySelectionView').classList.add('hidden');
+      document.getElementById('liabilityForm').classList.remove('hidden');
+    }
+
+    function showLiabilitySelection() {
+      document.getElementById('liabilityForm').classList.add('hidden');
+      document.getElementById('liabilitySelectionView').classList.remove('hidden');
+      document.getElementById('liabilitySelect').value = '';
+      currentLiability = null;
+    }
+
+    function updateLinkedInvestmentWarning() {
+      const linkedId = document.getElementById('linkedInvestmentId').value;
+      const warningDiv = document.getElementById('linkedInvestmentWarning');
+      const detailsP = document.getElementById('linkedInvestmentDetails');
+
+      if (linkedId) {
+        const investment = allInvestments.find(inv => inv.investmentId === linkedId);
+        if (investment) {
+          detailsP.textContent = `This liability is linked to: ${investment.investmentType} - ${investment.investmentName} (₹${formatNumber(investment.currentValue)})`;
+          warningDiv.classList.remove('hidden');
+        } else {
+          warningDiv.classList.add('hidden');
+        }
+      } else {
+        warningDiv.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Handle status change - auto-close liability workflow
+     */
+    function handleStatusChange() {
+      const status = document.getElementById('status').value;
+      const outstandingInput = document.getElementById('outstandingBalance');
+      const linkedInvestmentSelect = document.getElementById('linkedInvestmentId');
+
+      if (status === 'Closed') {
+        // Confirm with user
+        const confirmClose = confirm(
+          '✅ Mark as Closed/Settled?\n\n' +
+          'This will:\n' +
+          '• Set Outstanding Balance to ₹0\n' +
+          '• Unlink from any investments\n' +
+          '• Mark liability as fully paid\n\n' +
+          'Continue?'
+        );
+
+        if (confirmClose) {
+          outstandingInput.value = '0';
+          linkedInvestmentSelect.value = '';
+          updateLinkedInvestmentWarning();
+        } else {
+          // Revert to previous status
+          document.getElementById('status').value = currentLiability.status || 'Active';
+        }
+      }
+    }
+
+    function loadDynamicFields(fields) {
+      const container = document.getElementById('dynamicFieldsContainer');
+      container.innerHTML = '';
+      dynamicFieldCount = 0;
+
+      if (!fields || typeof fields !== 'object') return;
+
+      Object.keys(fields).forEach(function(key) {
+        addDynamicField(key, fields[key]);
+      });
+    }
+
+    function addDynamicField(fieldName = '', fieldValue = '') {
+      dynamicFieldCount++;
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRow = document.createElement('div');
+      fieldRow.className = 'flex gap-3 items-start';
+      fieldRow.id = `dynamicField${dynamicFieldCount}`;
+      fieldRow.innerHTML = `
+        <input type="text" id="fieldName${dynamicFieldCount}" value="${fieldName}" placeholder="Field name"
+          class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-100">
+        <input type="text" id="fieldValue${dynamicFieldCount}" value="${fieldValue}" placeholder="Value"
+          class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-100">
+        <button type="button" onclick="removeDynamicField(${dynamicFieldCount})" title="Remove"
+          class="px-2.5 py-2 bg-red-600 text-white rounded-md text-xs hover:bg-red-700 transition-colors">
+          🗑️
+        </button>
+      `;
+      container.appendChild(fieldRow);
+    }
+
+    function removeDynamicField(id) {
+      const field = document.getElementById(`dynamicField${id}`);
+      if (field) field.remove();
+    }
+
+    function collectDynamicFields() {
+      const fields = {};
+      const container = document.getElementById('dynamicFieldsContainer');
+      const fieldRows = container.querySelectorAll('[id^="dynamicField"]');
+
+      fieldRows.forEach(row => {
+        const id = row.id.replace('dynamicField', '');
+        const nameInput = document.getElementById(`fieldName${id}`);
+        const valueInput = document.getElementById(`fieldValue${id}`);
+
+        if (nameInput && valueInput && nameInput.value.trim() && valueInput.value.trim()) {
+          fields[nameInput.value.trim()] = valueInput.value.trim();
+        }
+      });
+
+      return fields;
+    }
+
+    // Form submission
+    document.getElementById('liabilityForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const liabilityType = document.getElementById('liabilityType').value.trim();
+      const lenderName = document.getElementById('lenderName').value.trim();
+      const outstandingBalance = document.getElementById('outstandingBalance').value;
+
+      if (!liabilityType || !lenderName || !outstandingBalance) {
+        alert('Please fill in all required fields (marked with *)');
+        return;
+      }
+
+      const data = {
+        liabilityId: document.getElementById('liabilityId').value,
+        liabilityType: liabilityType,
+        lenderName: lenderName,
+        familyMember: document.getElementById('familyMember').value,
+        outstandingBalance: outstandingBalance,
+        linkedInvestmentId: document.getElementById('linkedInvestmentId').value,
+        dynamicFields: collectDynamicFields(),
+        notes: document.getElementById('notes').value.trim(),
+        status: document.getElementById('status').value
+      };
+
+      showProgress('Updating liability...', 'Please wait while we save the information');
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            showProgress('✓ Success!', response.message, true);
+            setTimeout(function() {
+              google.script.host.close();
+            }, 1500);
+          } else {
+            hideProgress();
+            alert('Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideProgress();
+          alert('Failed to update liability: ' + error.message);
+        })
+        .processEditLiability(data);
+    });
+
+    function showProgress(text, detail, success = false) {
+      const overlay = document.getElementById('progressOverlay');
+      const icon = document.getElementById('progressIcon');
+      const textEl = document.getElementById('progressText');
+      const detailEl = document.getElementById('progressDetail');
+
+      if (success) {
+        icon.className = 'w-12 h-12 text-green-600 mx-auto mb-4 text-4xl';
+        icon.innerHTML = '✓';
+        textEl.className = 'text-base font-semibold text-green-600 mb-2';
+      }
+
+      textEl.textContent = text;
+      detailEl.textContent = detail;
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    function hideProgress() {
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+    }
+
+    function formatNumber(num) {
+      if (!num) return '0.00';
+      return parseFloat(num).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="assetAllocationForm" class="bg-white" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Saving allocation...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait</div>
+      </div>
+    </div>
+
+    <!-- Message Box -->
+    <div id="messageBox" class="hidden mx-6 mt-6 p-3 rounded text-sm"></div>
+
+    <!-- Info Box -->
+    <div class="px-6 pt-6 pb-3">
+      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+        <p class="text-sm text-blue-800">
+          <strong>💡 Tip:</strong> Set fund composition (asset allocation & market cap breakdown) for accurate portfolio analysis. Get this data from fund fact sheets on Value Research, Morningstar, or AMC websites.
+        </p>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white px-6 pb-6">
+
+      <!-- Fund Selection -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Select Fund <span class="text-red-600">*</span></label>
+        <select id="fundCode" required
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <option value="">Loading funds...</option>
+        </select>
+        <span class="text-xs text-gray-500 mt-0.5 block" id="fundNameDisplay"></span>
+        <span class="text-red-600 text-xs hidden mt-0.5 block" id="fundCodeError">Required</span>
+      </div>
+
+      <!-- Current Allocation Status -->
+      <div id="currentAllocation" class="hidden px-4 py-2 bg-amber-50 border-b border-amber-200">
+        <div class="text-xs font-semibold text-amber-800">
+          <span id="currentAllocationText"></span>
+        </div>
+      </div>
+
+      <!-- Section: Asset Allocation -->
+      <div class="px-4 py-2 bg-purple-50 border-b border-purple-200">
+        <div class="text-xs font-bold text-purple-700">🏦 Asset Allocation (%)</div>
+        <div class="text-xs text-purple-600 mt-0.5">What % of the fund is invested in each asset class?</div>
+      </div>
+
+      <!-- Asset Allocation Grid -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Equity %</label>
+          <input type="number" id="equity" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Debt %</label>
+          <input type="number" id="debt" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Cash/Liquid %</label>
+          <input type="number" id="cash" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Real Estate %</label>
+          <input type="number" id="realEstate" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Commodities (Gold, etc.) %</label>
+          <input type="number" id="commodities" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+      </div>
+
+      <!-- Asset Allocation Total -->
+      <div id="assetAllocationTotal" class="px-4 py-3 border-b border-gray-200 bg-blue-50">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-semibold text-blue-800">Total Asset Allocation:</span>
+          <span id="assetAllocationValue" class="text-lg font-bold text-blue-900">0.00%</span>
+        </div>
+      </div>
+
+      <!-- Section: Equity Market Cap Breakdown -->
+      <div class="px-4 py-2 bg-green-50 border-b border-green-200">
+        <div class="text-xs font-bold text-green-700">📈 Equity Market Cap Breakdown (%)</div>
+        <div class="text-xs text-green-600 mt-0.5">For the equity portion only. Total should be 100%.</div>
+      </div>
+
+      <!-- Market Cap Grid -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Large Cap %</label>
+          <input type="number" id="largeCap" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Mid Cap %</label>
+          <input type="number" id="midCap" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Small Cap %</label>
+          <input type="number" id="smallCap" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Giant %</label>
+          <input type="number" id="giant" step="0.01" min="0" max="100" placeholder="0.00"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </div>
+      </div>
+
+      <!-- Market Cap Total -->
+      <div id="equityMarketCapTotal" class="px-4 py-3 border-b border-gray-200 bg-green-50">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-semibold text-green-800">Total Equity Market Cap:</span>
+          <span id="equityMarketCapValue" class="text-lg font-bold text-green-900">0.00%</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer Buttons -->
+    <div class="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex gap-3">
+      <button type="button" onclick="google.script.host.close()"
+        class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded text-sm transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="flex-1 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded text-sm transition-colors">
+        Save Allocation
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let allFunds = [];
+
+    // Show progress overlay
+    function showProgress(text, detail) {
+      document.getElementById('progressText').textContent = text;
+      document.getElementById('progressDetail').textContent = detail;
+      document.getElementById('progressOverlay').classList.remove('hidden');
+      document.getElementById('progressOverlay').classList.add('flex');
+    }
+
+    // Hide progress overlay
+    function hideProgress() {
+      document.getElementById('progressOverlay').classList.add('hidden');
+      document.getElementById('progressOverlay').classList.remove('flex');
+    }
+
+    // Show message
+    function showMessage(text, type) {
+      const messageBox = document.getElementById('messageBox');
+      messageBox.textContent = text;
+      messageBox.className = 'mx-6 mt-6 mb-3 p-3 rounded text-sm';
+
+      if (type === 'error') {
+        messageBox.classList.add('bg-red-50', 'border-l-4', 'border-red-500', 'text-red-800');
+      } else if (type === 'success') {
+        messageBox.classList.add('bg-green-50', 'border-l-4', 'border-green-500', 'text-green-800');
+      } else if (type === 'warning') {
+        messageBox.classList.add('bg-amber-50', 'border-l-4', 'border-amber-500', 'text-amber-800');
+      }
+
+      messageBox.classList.remove('hidden');
+
+      // Auto-hide after 5 seconds
+      setTimeout(function() {
+        messageBox.classList.add('hidden');
+      }, 5000);
+    }
+
+    // Hide message
+    function hideMessage() {
+      document.getElementById('messageBox').classList.add('hidden');
+    }
+
+    // Load all funds from all portfolios
+    google.script.run
+      .withSuccessHandler(function(funds) {
+        allFunds = funds;
+        const select = document.getElementById('fundCode');
+
+        // Clear loading option
+        select.innerHTML = '';
+
+        // Add placeholder option
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = '-- Select a fund --';
+        select.appendChild(placeholderOption);
+
+        // Add fund options (sorted by name)
+        funds.sort((a, b) => a.name.localeCompare(b.name)).forEach(fund => {
+          const option = document.createElement('option');
+          option.value = fund.code;
+          option.textContent = fund.name + ' (' + fund.code + ')';
+          select.appendChild(option);
+        });
+      })
+      .withFailureHandler(function(error) {
+        showMessage('Failed to load funds: ' + error.message, 'error');
+      })
+      .getAllFundsFromPortfolios();
+
+    // Fund code dropdown change handler
+    document.getElementById('fundCode').addEventListener('change', function() {
+      const code = this.value.trim();
+
+      if (!code) {
+        document.getElementById('fundNameDisplay').textContent = '';
+        document.getElementById('currentAllocation').classList.add('hidden');
+        clearAllocation();
+        return;
+      }
+
+      const fund = allFunds.find(f => f.code === code);
+
+      if (fund) {
+        document.getElementById('fundNameDisplay').textContent = 'Fund Code: ' + fund.code;
+        document.getElementById('fundNameDisplay').classList.add('text-gray-600');
+
+        // Load existing allocation
+        showProgress('Loading allocation...', 'Please wait');
+        google.script.run
+          .withSuccessHandler(function(allocation) {
+            hideProgress();
+            if (allocation) {
+              populateAllocation(allocation);
+              document.getElementById('currentAllocation').classList.remove('hidden');
+              document.getElementById('currentAllocationText').textContent = '📝 Updating existing allocation data';
+            } else {
+              document.getElementById('currentAllocation').classList.add('hidden');
+              clearAllocation();
+            }
+          })
+          .withFailureHandler(function(error) {
+            hideProgress();
+            showMessage('Error loading allocation: ' + error.message, 'error');
+          })
+          .getExistingAllocation(code);
+      }
+    });
+
+    function populateAllocation(allocation) {
+      // Backend returns flattened structure (flat object) for easy form population
+      // Even though storage uses nested JSON: { assetAllocation: {...}, equityMarketCap: {...} }
+
+      // Asset allocation
+      document.getElementById('equity').value = allocation.equity || '';
+      document.getElementById('debt').value = allocation.debt || '';
+      document.getElementById('cash').value = allocation.cash || '';
+      document.getElementById('realEstate').value = allocation.realEstate || '';
+      document.getElementById('commodities').value = allocation.commodities || allocation.gold || '';
+
+      // Equity market cap
+      document.getElementById('largeCap').value = allocation.largeCap || '';
+      document.getElementById('midCap').value = allocation.midCap || '';
+      document.getElementById('smallCap').value = allocation.smallCap || '';
+      document.getElementById('giant').value = allocation.giant || allocation.multiCap || '';
+
+      updateTotals();
+    }
+
+    function clearAllocation() {
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        input.value = '';
+      });
+      updateTotals();
+    }
+
+    // Update totals on input
+    const allocationInputs = document.querySelectorAll('input[type="number"]');
+    allocationInputs.forEach(input => {
+      input.addEventListener('input', updateTotals);
+    });
+
+    function updateTotals() {
+      // Asset allocation total
+      const assetAllocationTotal =
+        (parseFloat(document.getElementById('equity').value) || 0) +
+        (parseFloat(document.getElementById('debt').value) || 0) +
+        (parseFloat(document.getElementById('cash').value) || 0) +
+        (parseFloat(document.getElementById('realEstate').value) || 0) +
+        (parseFloat(document.getElementById('commodities').value) || 0);
+
+      const assetValue = document.getElementById('assetAllocationValue');
+      assetValue.textContent = assetAllocationTotal.toFixed(2) + '%';
+
+      // Color coding
+      if (assetAllocationTotal === 100) {
+        assetValue.classList.remove('text-blue-900', 'text-amber-900', 'text-red-900');
+        assetValue.classList.add('text-green-900');
+      } else if (assetAllocationTotal > 100) {
+        assetValue.classList.remove('text-blue-900', 'text-green-900', 'text-amber-900');
+        assetValue.classList.add('text-red-900');
+      } else if (assetAllocationTotal > 0) {
+        assetValue.classList.remove('text-blue-900', 'text-green-900', 'text-red-900');
+        assetValue.classList.add('text-amber-900');
+      } else {
+        assetValue.classList.remove('text-green-900', 'text-amber-900', 'text-red-900');
+        assetValue.classList.add('text-blue-900');
+      }
+
+      // Equity market cap total
+      const equityMarketCapTotal =
+        (parseFloat(document.getElementById('largeCap').value) || 0) +
+        (parseFloat(document.getElementById('midCap').value) || 0) +
+        (parseFloat(document.getElementById('smallCap').value) || 0) +
+        (parseFloat(document.getElementById('giant').value) || 0);
+
+      const marketCapValue = document.getElementById('equityMarketCapValue');
+      marketCapValue.textContent = equityMarketCapTotal.toFixed(2) + '%';
+
+      // Color coding
+      if (equityMarketCapTotal === 100) {
+        marketCapValue.classList.remove('text-green-900', 'text-amber-900', 'text-red-900');
+        marketCapValue.classList.add('text-green-900');
+      } else if (equityMarketCapTotal > 100) {
+        marketCapValue.classList.remove('text-green-900', 'text-amber-900', 'text-red-900');
+        marketCapValue.classList.add('text-red-900');
+      } else if (equityMarketCapTotal > 0) {
+        marketCapValue.classList.remove('text-green-900', 'text-red-900', 'text-green-900');
+        marketCapValue.classList.add('text-amber-900');
+      } else {
+        marketCapValue.classList.remove('text-green-900', 'text-amber-900', 'text-red-900');
+        marketCapValue.classList.add('text-green-900');
+      }
+    }
+
+    // Form submission
+    document.getElementById('assetAllocationForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const fundCode = document.getElementById('fundCode').value.trim();
+      if (!fundCode) {
+        showMessage('Please select a fund from the dropdown', 'error');
+        return;
+      }
+
+      const fund = allFunds.find(f => f.code === fundCode);
+      if (!fund) {
+        showMessage('Invalid fund selected. Please choose from the dropdown list.', 'error');
+        return;
+      }
+
+      const allocation = {
+        fundCode: fundCode,
+        fundName: fund.name,
+        // Asset allocation
+        equity: parseFloat(document.getElementById('equity').value) || 0,
+        debt: parseFloat(document.getElementById('debt').value) || 0,
+        cash: parseFloat(document.getElementById('cash').value) || 0,
+        realEstate: parseFloat(document.getElementById('realEstate').value) || 0,
+        commodities: parseFloat(document.getElementById('commodities').value) || 0,
+        // Equity market cap breakdown
+        largeCap: parseFloat(document.getElementById('largeCap').value) || 0,
+        midCap: parseFloat(document.getElementById('midCap').value) || 0,
+        smallCap: parseFloat(document.getElementById('smallCap').value) || 0,
+        giant: parseFloat(document.getElementById('giant').value) || 0
+      };
+
+      showProgress('Saving allocation...', 'Please wait while we save the data');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideProgress();
+          if (result.success) {
+            showMessage('✓ ' + result.message, 'success');
+            setTimeout(function() {
+              google.script.host.close();
+            }, 1500);
+          } else {
+            showMessage('✗ ' + result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideProgress();
+          showMessage('Error: ' + error.message, 'error');
+        })
+        .processAssetAllocation(allocation);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="bankAccountForm" class="bg-white" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Adding bank account...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait while we save the information</div>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+
+      <!-- Row 1: Account Name + Family Member -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Account Name <span class="text-red-600">*</span></label>
+          <input type="text" id="accountName" required placeholder="e.g., Salary Account"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="accountNameError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Family Member <span class="text-red-600">*</span></label>
+          <select id="memberId" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Loading members...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="memberIdError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Bank Name + Account Number -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Bank Name <span class="text-red-600">*</span></label>
+          <input type="text" id="bankName" required placeholder="e.g., State Bank of India"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="bankNameError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Account Number <span class="text-red-600">*</span></label>
+          <input type="text" id="accountNumber" required placeholder="e.g., 1234567890"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="accountNumberError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 3: IFSC Code + Branch Name -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">IFSC Code <span class="text-red-600">*</span></label>
+          <input type="text" id="ifscCode" required placeholder="e.g., SBIN0001234" maxlength="11"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm uppercase focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="ifscCodeError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Branch Name <span class="text-red-600">*</span></label>
+          <input type="text" id="branchName" required placeholder="e.g., Hyderabad Main Branch"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="branchNameError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 4: Account Type (full width) -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Account Type <span class="text-red-600">*</span></label>
+        <select id="accountType" required
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <option value="">Select account type</option>
+          <option value="Savings">Savings Account</option>
+          <option value="Current">Current Account</option>
+          <option value="Fixed Deposit">Fixed Deposit (FD)</option>
+          <option value="Recurring Deposit">Recurring Deposit (RD)</option>
+          <option value="NRE">NRE Account</option>
+          <option value="NRO">NRO Account</option>
+          <option value="Minor Account">Minor Account</option>
+        </select>
+        <span class="text-red-600 text-xs hidden mt-0.5 block" id="accountTypeError">Required</span>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        Add Account
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(function(members) {
+          const select = document.getElementById('memberId');
+          select.innerHTML = '<option value="">Select family member</option>';
+          if (!members || members.length === 0) {
+            select.innerHTML = '<option value="">No active members found</option>';
+            return;
+          }
+          const activeMembers = members.filter(m => m.status === 'Active');
+          activeMembers.forEach(member => {
+            const option = document.createElement('option');
+            option.value = member.memberId;
+            option.textContent = member.memberName + ' (' + member.relationship + ')';
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading members:', error);
+          document.getElementById('memberId').innerHTML = '<option value="">Error loading members</option>';
+        })
+        .getAllFamilyMembers();
+    };
+
+    function showError(fieldId, message) {
+      const errorEl = document.getElementById(fieldId + 'Error');
+      const inputEl = document.getElementById(fieldId);
+      if (errorEl) { errorEl.textContent = message; errorEl.classList.remove('hidden'); }
+      if (inputEl) { inputEl.classList.remove('border-gray-300'); inputEl.classList.add('border-red-600'); }
+    }
+
+    function clearError(fieldId) {
+      const errorEl = document.getElementById(fieldId + 'Error');
+      const inputEl = document.getElementById(fieldId);
+      if (errorEl) errorEl.classList.add('hidden');
+      if (inputEl) { inputEl.classList.remove('border-red-600'); inputEl.classList.add('border-gray-300'); }
+    }
+
+    function clearAllErrors() {
+      document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('input, select').forEach(el => {
+        el.classList.remove('border-red-600');
+        el.classList.add('border-gray-300');
+      });
+    }
+
+    document.getElementById('bankAccountForm').onsubmit = function(e) {
+      e.preventDefault();
+      clearAllErrors();
+
+      const accountName = document.getElementById('accountName').value.trim();
+      const memberId = document.getElementById('memberId').value;
+      const bankName = document.getElementById('bankName').value.trim();
+      const accountNumber = document.getElementById('accountNumber').value.trim();
+      const ifscCode = document.getElementById('ifscCode').value.trim().toUpperCase();
+      const branchName = document.getElementById('branchName').value.trim();
+      const accountType = document.getElementById('accountType').value;
+
+      let isValid = true;
+      if (!accountName) { showError('accountName', 'Account name is required'); isValid = false; }
+      if (!memberId) { showError('memberId', 'Family member is required'); isValid = false; }
+      if (!bankName) { showError('bankName', 'Bank name is required'); isValid = false; }
+      if (!accountNumber) { showError('accountNumber', 'Account number is required'); isValid = false; }
+      if (!ifscCode) { showError('ifscCode', 'IFSC code is required'); isValid = false; }
+      if (!branchName) { showError('branchName', 'Branch name is required'); isValid = false; }
+      if (!accountType) { showError('accountType', 'Account type is required'); isValid = false; }
+
+      if (!isValid) return;
+
+      const data = { accountName, memberId, bankName, accountNumber, ifscCode, branchName, accountType };
+
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').textContent = '✓';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = response.message;
+            setTimeout(function() { google.script.host.close(); }, 2000);
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .addBankAccount(data);
+    };
+
+    document.getElementById('ifscCode').oninput = function(e) {
+      e.target.value = e.target.value.toUpperCase();
+      clearError(this.id);
+    };
+
+    document.querySelectorAll('input, select').forEach(function(el) {
+      el.oninput = function() { clearError(this.id); };
+    });
+  </script>
+</body>
+</html>

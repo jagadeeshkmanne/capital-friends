@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <div class="max-h-[calc(100vh-85px)] min-h-[calc(100vh-85px)] overflow-y-auto bg-white flex flex-col">
+
+    <!-- Goal Selection Row (Initially Hidden) -->
+    <div id="goalSelectionRow" class="hidden px-4 py-2.5 border-b border-gray-100">
+      <label class="text-xs font-semibold text-gray-700 mb-1 block">Select Goal for Withdrawal <span class="text-red-600">*</span></label>
+      <select id="goalSelect" required onchange="loadGoalWithdrawalPlan()"
+        class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        <option value="">-- Select Goal --</option>
+      </select>
+    </div>
+
+    <!-- No Goals Message (Initially Hidden) -->
+    <div id="noGoalsMessage" class="hidden px-4 py-8 text-center bg-blue-50 flex-1 flex flex-col justify-center">
+      <div class="text-5xl mb-3">🎯</div>
+      <h3 class="text-base font-bold text-gray-900 mb-2">No Goals Ready for Withdrawal</h3>
+      <p class="text-sm text-gray-600 mb-4">Withdrawal planning is only available for goals that have <strong>reached their target amount</strong>.</p>
+      <div class="bg-white rounded-lg border border-blue-200 p-3 text-left max-w-md mx-auto">
+        <div class="text-xs font-semibold text-blue-900 mb-2">📊 Current Status:</div>
+        <div class="text-xs text-gray-700 space-y-2">
+          <p>None of your goals have reached their target amount yet. Keep investing!</p>
+          <p><strong>To withdraw from a goal, you need:</strong></p>
+          <ul class="ml-4 space-y-1 list-disc">
+            <li>Goal's current value ≥ Goal's target amount</li>
+            <li>Portfolios mapped to the goal</li>
+            <li>Mutual fund investments with current value</li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-4 text-xs text-gray-500">
+        💡 Tip: Check <strong>Goals Dashboard</strong> to see your progress towards each goal
+      </div>
+    </div>
+
+    <!-- Withdrawal Plan Container (Initially Hidden) -->
+    <div id="withdrawalPlanContainer" class="hidden flex-1">
+
+    <!-- Goal Info Section -->
+    <div class="px-4 py-3 bg-emerald-50 border-b border-emerald-100">
+      <div class="text-sm font-bold text-emerald-900 mb-2" id="goalTitle"></div>
+      <div class="grid grid-cols-3 gap-4 text-xs">
+        <div>
+          <span class="text-gray-600">Target:</span>
+          <span class="font-semibold text-gray-800 ml-1">₹<span id="goalTarget"></span></span>
+        </div>
+        <div>
+          <span class="text-gray-600">Current Value:</span>
+          <span class="font-semibold text-emerald-700 ml-1">₹<span id="goalCurrent"></span></span>
+        </div>
+        <div>
+          <span class="text-gray-600">Progress:</span>
+          <span class="font-semibold text-emerald-700 ml-1"><span id="goalProgress"></span>%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Withdrawal Strategy Selection -->
+    <div class="px-4 py-3 border-b border-gray-100">
+      <label class="text-xs font-semibold text-gray-700 mb-2 block">💡 Withdrawal Strategy</label>
+      <div class="space-y-2">
+        <label class="flex items-start gap-2 cursor-pointer p-2 border border-gray-200 rounded hover:bg-gray-50">
+          <input type="radio" name="strategy" value="lumpsum" checked onchange="updateWithdrawalPlan()" class="mt-0.5">
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-gray-900">Lumpsum Withdrawal</div>
+            <div class="text-xs text-gray-600">Redeem entire amount at once (for immediate use)</div>
+          </div>
+        </label>
+        <label class="flex items-start gap-2 cursor-pointer p-2 border border-gray-200 rounded hover:bg-gray-50">
+          <input type="radio" name="strategy" value="swp" onchange="updateWithdrawalPlan()" class="mt-0.5">
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-gray-900">Systematic Withdrawal Plan (SWP)</div>
+            <div class="text-xs text-gray-600">Withdraw fixed amount monthly (for regular expenses)</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- SWP Configuration (Hidden by default) -->
+    <div id="swpConfig" class="hidden px-4 py-3 bg-blue-50 border-b border-blue-100">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Monthly Withdrawal Amount (₹)</label>
+          <input type="number" id="swpAmount" placeholder="50000" min="1000" oninput="updateWithdrawalPlan()"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Duration (Months)</label>
+          <input type="number" id="swpDuration" placeholder="12" min="1" max="360" oninput="updateWithdrawalPlan()"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm">
+        </div>
+      </div>
+      <div class="mt-2 text-xs text-blue-700">
+        <strong>Note:</strong> Remaining funds will continue to grow in your portfolio
+      </div>
+    </div>
+
+    <!-- Portfolio Allocation Breakdown -->
+    <div class="px-4 py-3">
+      <div class="text-xs font-semibold text-gray-700 mb-3">💼 Withdrawal Plan by Portfolio:</div>
+      <div id="portfolioBreakdown" class="space-y-2">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 border-t border-emerald-200">
+      <div class="text-sm font-bold text-emerald-900 mb-3">📊 Withdrawal Summary</div>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-700">Total Withdrawal:</span>
+          <span class="font-bold text-emerald-700" id="totalWithdrawal">₹0</span>
+        </div>
+        <div id="swpSummary" class="hidden">
+          <div class="flex justify-between">
+            <span class="text-gray-700">Monthly SWP:</span>
+            <span class="font-semibold text-blue-700" id="monthlySWP">₹0</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-700">Duration:</span>
+            <span class="font-semibold text-blue-700" id="swpDurationDisplay">0 months</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-700">Remaining in Portfolio:</span>
+            <span class="font-semibold text-gray-700" id="remainingAmount">₹0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rebalancing Toggle -->
+    <div class="px-4 py-3 bg-purple-50 border-t border-purple-200">
+      <label class="flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" id="rebalanceToggle" onchange="updateWithdrawalPlan()" class="mt-0.5 rounded">
+        <div class="flex-1">
+          <div class="text-sm font-semibold text-purple-900">🎯 Smart Rebalancing</div>
+          <div class="text-xs text-purple-700">Adjust withdrawal to rebalance portfolio back to target allocation</div>
+        </div>
+      </label>
+      <div id="rebalanceExplanation" class="hidden mt-2 bg-white rounded p-2 border border-purple-200">
+        <div class="text-xs text-purple-900">
+          <strong>How it works:</strong>
+          <ul class="mt-1 ml-4 space-y-0.5 list-disc">
+            <li>Withdraw <strong>more</strong> from funds that are <strong>overweight</strong> (above target %)</li>
+            <li>Withdraw <strong>less</strong> from funds that are <strong>underweight</strong> (below target %)</li>
+            <li>Brings your portfolio closer to target allocation after withdrawal</li>
+          </ul>
+          <div class="mt-2 bg-purple-100 rounded p-1.5">
+            <strong>Example:</strong> Fund A is 55% (target 50%), Fund B is 45% (target 50%)<br>
+            → Withdraw more from Fund A, less from Fund B to rebalance
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="px-4 py-3 bg-amber-50 border-t border-amber-200">
+      <div class="text-xs font-semibold text-amber-900 mb-2">📝 How to Use This Plan:</div>
+      <ol class="text-xs text-amber-800 space-y-1 ml-4 list-decimal">
+        <li><strong>Review</strong> the suggested withdrawal amounts for each fund</li>
+        <li><strong>Copy</strong> or export the breakdown to a sheet</li>
+        <li><strong>Login</strong> to your broker/AMC platform</li>
+        <li><strong>Execute</strong> redemptions manually as per the breakdown</li>
+        <li>For SWP, <strong>set up</strong> monthly withdrawals in your platform</li>
+        <li><strong>Update</strong> your portfolio in Capital Friends after completion</li>
+      </ol>
+      <div class="mt-2 text-xs text-amber-700 bg-amber-100 rounded p-2">
+        <strong>⚠️ Note:</strong> This is a suggestion tool only. You must execute withdrawals in your broker platform. Capital Friends does not execute transactions.
+      </div>
+    </div>
+
+    </div>
+    <!-- End withdrawalPlanContainer -->
+
+    <!-- Spacer to push developer credit to bottom -->
+    <div class="flex-1"></div>
+
+    <!-- Developer Credit -->
+    <div class="mt-auto">
+      <?!= include('DeveloperCredit'); ?>
+    </div>
+
+  </div>
+  <!-- End scrollable container -->
+
+  <!-- Footer (Fixed at bottom) -->
+  <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+    <button type="button" onclick="google.script.host.close()"
+      class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+      Close
+    </button>
+    <button type="button" id="exportBtn" onclick="exportWithdrawalPlan()" disabled
+      class="px-5 py-2.5 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50">
+      📄 Export to Sheet
+    </button>
+  </div>
+
+  <script>
+    let allGoals = [];
+    let selectedGoal = null;
+    let portfolioMappings = [];
+    let portfolioDetails = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadGoals();
+    });
+
+    function loadGoals() {
+      console.log('GoalWithdrawalPlan: Loading goals...');
+      google.script.run
+        .withSuccessHandler(function(goals) {
+          console.log('GoalWithdrawalPlan: Goals received:', goals);
+          console.log('GoalWithdrawalPlan: Goals type:', typeof goals);
+          console.log('GoalWithdrawalPlan: Goals is array:', Array.isArray(goals));
+          console.log('GoalWithdrawalPlan: Number of goals:', goals ? goals.length : 0);
+
+          if (goals && goals.length > 0) {
+            console.log('GoalWithdrawalPlan: First goal:', JSON.stringify(goals[0]));
+          }
+
+          // Only show goals that have reached or exceeded their target (ready for withdrawal)
+          allGoals = goals.filter(g => g.currentValue >= g.targetAmount);
+          console.log('GoalWithdrawalPlan: Filtered goals ready for withdrawal (reached target):', allGoals.length);
+          populateGoalDropdown(allGoals);
+        })
+        .withFailureHandler(function(error) {
+          console.error('GoalWithdrawalPlan: Error loading goals:', error);
+          showError(error);
+        })
+        .getAllGoalsWithMappings();
+    }
+
+    function populateGoalDropdown(goals) {
+      console.log('GoalWithdrawalPlan: Populating dropdown with', goals.length, 'goals');
+      const select = document.getElementById('goalSelect');
+      const noGoalsMessage = document.getElementById('noGoalsMessage');
+      const goalSelectionRow = document.getElementById('goalSelectionRow');
+      select.innerHTML = '<option value="">-- Select Goal --</option>';
+
+      if (goals.length === 0) {
+        // Show the "No Goals" message and keep the dropdown hidden
+        noGoalsMessage.classList.remove('hidden');
+        goalSelectionRow.classList.add('hidden'); // Keep goal selection row hidden
+
+        console.log('GoalWithdrawalPlan: No goals ready for withdrawal to display');
+        return;
+      }
+
+      // Hide the "No Goals" message and show dropdown
+      noGoalsMessage.classList.add('hidden');
+      goalSelectionRow.classList.remove('hidden'); // Show the goal selection row
+      select.disabled = false;
+
+      goals.forEach(goal => {
+        const option = document.createElement('option');
+        option.value = goal.goalId;
+        option.textContent = `${goal.goalName} - ₹${formatCurrency(goal.currentValue)} allocated`;
+        select.appendChild(option);
+        console.log('GoalWithdrawalPlan: Added goal to dropdown:', goal.goalId, goal.goalName);
+      });
+    }
+
+    function loadGoalWithdrawalPlan() {
+      const goalId = document.getElementById('goalSelect').value;
+
+      if (!goalId) {
+        document.getElementById('withdrawalPlanContainer').classList.add('hidden');
+        return;
+      }
+
+      selectedGoal = allGoals.find(g => g.goalId === goalId);
+      if (!selectedGoal) return;
+
+      // Show goal info
+      document.getElementById('goalTitle').textContent = selectedGoal.goalName;
+      document.getElementById('goalTarget').textContent = formatCurrency(selectedGoal.targetAmount);
+      document.getElementById('goalCurrent').textContent = formatCurrency(selectedGoal.currentValue);
+      document.getElementById('goalProgress').textContent = (selectedGoal.progressPercent * 100).toFixed(1);
+
+      // Get portfolio mappings
+      portfolioMappings = selectedGoal.portfolioMappings || [];
+
+      if (portfolioMappings.length === 0) {
+        showError('No portfolios mapped to this goal');
+        return;
+      }
+
+      // Load portfolio details
+      loadPortfolioDetails();
+    }
+
+    function loadPortfolioDetails() {
+      const portfolioIds = portfolioMappings.map(m => m.portfolioId);
+
+      google.script.run
+        .withSuccessHandler(function(details) {
+          portfolioDetails = details;
+          document.getElementById('withdrawalPlanContainer').classList.remove('hidden');
+          document.getElementById('exportBtn').disabled = false;
+          updateWithdrawalPlan();
+        })
+        .withFailureHandler(showError)
+        .getPortfolioDetailsForWithdrawal(portfolioIds);
+    }
+
+    function updateWithdrawalPlan() {
+      const strategy = document.querySelector('input[name="strategy"]:checked').value;
+      const rebalance = document.getElementById('rebalanceToggle').checked;
+
+      // Show/hide SWP config
+      if (strategy === 'swp') {
+        document.getElementById('swpConfig').classList.remove('hidden');
+        document.getElementById('swpSummary').classList.remove('hidden');
+      } else {
+        document.getElementById('swpConfig').classList.add('hidden');
+        document.getElementById('swpSummary').classList.add('hidden');
+      }
+
+      // Show/hide rebalancing explanation
+      if (rebalance) {
+        document.getElementById('rebalanceExplanation').classList.remove('hidden');
+      } else {
+        document.getElementById('rebalanceExplanation').classList.add('hidden');
+      }
+
+      // Check if any portfolio has target allocation
+      const hasTargetAllocation = portfolioDetails.some(p => p.targetAllocation && p.targetAllocation.length > 0);
+      if (rebalance && !hasTargetAllocation) {
+        alert('⚠️ No target allocation found for portfolios.\n\nPlease set up Fund Allocation in "Manage Asset Allocation" first to use Smart Rebalancing.');
+        document.getElementById('rebalanceToggle').checked = false;
+        document.getElementById('rebalanceExplanation').classList.add('hidden');
+        return;
+      }
+
+      calculateWithdrawalBreakdown(strategy);
+    }
+
+    function calculateWithdrawalBreakdown(strategy) {
+      const container = document.getElementById('portfolioBreakdown');
+      container.innerHTML = '';
+
+      let totalWithdrawal = 0;
+
+      if (strategy === 'lumpsum') {
+        // Full withdrawal based on allocation percentages
+        portfolioMappings.forEach(mapping => {
+          const portfolio = portfolioDetails.find(p => p.portfolioId === mapping.portfolioId);
+          if (!portfolio) return;
+
+          const allocatedValue = selectedGoal.currentValue * mapping.allocationPct;
+          totalWithdrawal += allocatedValue;
+
+          const card = createPortfolioWithdrawalCard(portfolio, allocatedValue, strategy);
+          container.appendChild(card);
+        });
+
+        document.getElementById('totalWithdrawal').textContent = '₹' + formatCurrency(totalWithdrawal);
+
+      } else if (strategy === 'swp') {
+        const swpAmount = parseFloat(document.getElementById('swpAmount').value) || 0;
+        const swpDuration = parseInt(document.getElementById('swpDuration').value) || 0;
+
+        if (!swpAmount || !swpDuration) {
+          container.innerHTML = '<div class="text-xs text-gray-500 text-center py-4">Enter SWP amount and duration</div>';
+          return;
+        }
+
+        const totalSWP = swpAmount * swpDuration;
+        totalWithdrawal = totalSWP;
+
+        portfolioMappings.forEach(mapping => {
+          const portfolio = portfolioDetails.find(p => p.portfolioId === mapping.portfolioId);
+          if (!portfolio) return;
+
+          const monthlyFromPortfolio = swpAmount * mapping.allocationPct;
+          const card = createPortfolioWithdrawalCard(portfolio, monthlyFromPortfolio, strategy, swpDuration);
+          container.appendChild(card);
+        });
+
+        document.getElementById('totalWithdrawal').textContent = '₹' + formatCurrency(totalSWP);
+        document.getElementById('monthlySWP').textContent = '₹' + formatCurrency(swpAmount);
+        document.getElementById('swpDurationDisplay').textContent = swpDuration + ' months';
+        document.getElementById('remainingAmount').textContent = '₹' + formatCurrency(Math.max(0, selectedGoal.currentValue - totalSWP));
+      }
+    }
+
+    function createPortfolioWithdrawalCard(portfolio, withdrawalAmount, strategy, swpDuration = null) {
+      const card = document.createElement('div');
+      card.className = 'border border-gray-200 rounded p-3 bg-white';
+
+      if (strategy === 'lumpsum') {
+        card.innerHTML = `
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex-1">
+              <div class="text-sm font-bold text-gray-900">${portfolio.portfolioName}</div>
+              <div class="text-xs text-gray-500 mt-0.5">${portfolio.ownerName}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-gray-600">Withdraw</div>
+              <div class="text-sm font-bold text-emerald-700">₹${formatCurrency(withdrawalAmount)}</div>
+            </div>
+          </div>
+          <div class="mt-2 pt-2 border-t border-gray-100">
+            <div class="text-xs font-semibold text-gray-700 mb-1">Fund-wise Breakdown:</div>
+            <div class="space-y-1" id="fundBreakdown_${portfolio.portfolioId}">
+              ${generateFundBreakdown(portfolio, withdrawalAmount)}
+            </div>
+          </div>
+        `;
+      } else {
+        card.innerHTML = `
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex-1">
+              <div class="text-sm font-bold text-gray-900">${portfolio.portfolioName}</div>
+              <div class="text-xs text-gray-500 mt-0.5">${portfolio.ownerName}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-blue-600">Monthly SWP</div>
+              <div class="text-sm font-bold text-blue-700">₹${formatCurrency(withdrawalAmount)}</div>
+              <div class="text-xs text-gray-500">${swpDuration} months</div>
+            </div>
+          </div>
+          <div class="mt-2 pt-2 border-t border-gray-100">
+            <div class="text-xs font-semibold text-gray-700 mb-1">Fund-wise Monthly SWP:</div>
+            <div class="space-y-1" id="fundBreakdown_${portfolio.portfolioId}">
+              ${generateFundBreakdown(portfolio, withdrawalAmount)}
+            </div>
+          </div>
+        `;
+      }
+
+      return card;
+    }
+
+    function generateFundBreakdown(portfolio, totalAmount) {
+      if (!portfolio.funds || portfolio.funds.length === 0) {
+        return '<div class="text-xs text-gray-500">No fund details available</div>';
+      }
+
+      const totalValue = portfolio.funds.reduce((sum, f) => sum + f.currentValue, 0);
+      const rebalance = document.getElementById('rebalanceToggle').checked;
+
+      // Get target allocation if rebalancing is enabled
+      let fundAllocations = {};
+
+      if (rebalance && portfolio.targetAllocation) {
+        // Use target allocation from portfolio
+        portfolio.targetAllocation.forEach(target => {
+          fundAllocations[target.fundId] = target.targetPercent;
+        });
+      } else {
+        // Use current allocation (proportional withdrawal)
+        portfolio.funds.forEach(fund => {
+          fundAllocations[fund.fundId] = fund.currentValue / totalValue;
+        });
+      }
+
+      return portfolio.funds.map(fund => {
+        let fundWithdrawal;
+        let rebalanceNote = '';
+
+        if (rebalance && portfolio.targetAllocation) {
+          const currentPercent = fund.currentValue / totalValue;
+          const targetPercent = fundAllocations[fund.fundId] || currentPercent;
+
+          // Calculate how much to withdraw to rebalance
+          // If current > target: withdraw more
+          // If current < target: withdraw less
+          const valueAfterWithdrawal = totalValue - totalAmount;
+          const targetValueAfterWithdrawal = valueAfterWithdrawal * targetPercent;
+          fundWithdrawal = fund.currentValue - targetValueAfterWithdrawal;
+
+          // Ensure withdrawal is non-negative
+          fundWithdrawal = Math.max(0, fundWithdrawal);
+
+          // Add rebalancing indicator
+          const drift = ((currentPercent - targetPercent) * 100).toFixed(1);
+          if (Math.abs(drift) > 1) {
+            rebalanceNote = `<span class="text-purple-600 ml-1" title="Rebalancing: ${drift > 0 ? 'Overweight +' : 'Underweight '}${drift}%">🎯</span>`;
+          }
+        } else {
+          // Simple proportional withdrawal
+          const fundPercentage = fund.currentValue / totalValue;
+          fundWithdrawal = totalAmount * fundPercentage;
+        }
+
+        const currentAlloc = ((fund.currentValue / totalValue) * 100).toFixed(1);
+        const targetAlloc = fundAllocations[fund.fundId] ? (fundAllocations[fund.fundId] * 100).toFixed(1) : currentAlloc;
+
+        return `
+          <div class="flex justify-between text-xs">
+            <div class="flex-1">
+              <span class="text-gray-700">${fund.fundName}</span>
+              ${rebalance ? `<span class="text-gray-500 ml-1 text-[10px]">(${currentAlloc}% → ${targetAlloc}%)</span>` : `<span class="text-gray-500 ml-1 text-[10px]">(${currentAlloc}%)</span>`}
+              ${rebalanceNote}
+            </div>
+            <span class="font-semibold text-gray-800">₹${formatCurrency(fundWithdrawal)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function exportWithdrawalPlan() {
+      const strategy = document.querySelector('input[name="strategy"]:checked').value;
+      const swpAmount = strategy === 'swp' ? parseFloat(document.getElementById('swpAmount').value) || 0 : 0;
+      const swpDuration = strategy === 'swp' ? parseInt(document.getElementById('swpDuration').value) || 0 : 0;
+
+      const planData = {
+        goalId: selectedGoal.goalId,
+        goalName: selectedGoal.goalName,
+        strategy: strategy,
+        totalWithdrawal: selectedGoal.currentValue,
+        swpAmount: swpAmount,
+        swpDuration: swpDuration,
+        portfolioMappings: portfolioMappings,
+        portfolioDetails: portfolioDetails,
+        timestamp: new Date().toISOString()
+      };
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            const actionText = result.action === 'created' ? 'saved' : 'updated';
+            alert(`✅ Withdrawal plan ${actionText} in sheet: "${result.sheetName}"\n\nOnly one row per goal is maintained - subsequent exports update the existing row.`);
+          } else {
+            alert('❌ ' + result.error);
+          }
+        })
+        .withFailureHandler(showError)
+        .exportWithdrawalPlan(planData);
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-IN').format(Math.round(value));
+    }
+
+    function showError(message) {
+      alert('❌ ' + (message.message || message));
+    }
+  </script>
+</body>
+</html>

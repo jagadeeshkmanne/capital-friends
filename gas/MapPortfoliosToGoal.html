@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="mappingForm" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Saving mappings...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait while we map portfolios to goal</div>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+
+      <!-- Goal Selection Row -->
+      <div class="px-4 py-2.5 border-b border-gray-100">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Select Goal <span class="text-red-600">*</span></label>
+        <select id="goalSelect" required onchange="onGoalSelected()"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <option value="">-- Select Goal --</option>
+        </select>
+      </div>
+
+      <!-- Goal Info Section (Hidden Initially) -->
+      <div id="goalInfoSection" class="hidden">
+
+        <!-- Goal Details -->
+        <div class="px-4 py-3 bg-blue-50 border-b border-blue-100">
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span class="text-gray-600">Target:</span>
+              <span class="font-semibold text-gray-800 ml-1">₹<span id="goalTarget"></span></span>
+            </div>
+            <div>
+              <span class="text-gray-600">Target Date:</span>
+              <span class="font-semibold text-gray-800 ml-1" id="goalDate"></span>
+            </div>
+            <div>
+              <span class="text-gray-600">Progress:</span>
+              <span class="font-semibold text-gray-800 ml-1"><span id="goalProgress"></span>%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Family Member Filter Section -->
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div class="text-xs font-semibold text-gray-700 mb-2">👨‍👩‍👧‍👦 Show Portfolios From:</div>
+          <div class="text-xs text-gray-500 mb-2">Select whose portfolios you want to use for this goal</div>
+          <div id="familyMemberFilters" class="flex flex-col gap-1.5">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Portfolio List Section -->
+        <div class="px-4 py-3">
+          <div class="text-xs font-semibold text-gray-700 mb-3">💼 Available Portfolios (Mutual Funds Only):</div>
+          <div id="portfolioListContainer">
+            <div class="text-center py-8 text-gray-500 text-sm">Loading portfolios...</div>
+          </div>
+        </div>
+
+        <!-- Allocation Summary -->
+        <div class="px-4 py-3 bg-blue-50 border-t border-blue-100">
+          <div class="text-sm">
+            <span class="font-semibold text-blue-900">Total Allocation: </span>
+            <span class="text-lg font-bold text-blue-700"><span id="totalAllocation">0</span>%</span>
+          </div>
+          <div id="allocationWarning" class="hidden mt-2 text-xs text-red-600 font-semibold">
+            ⚠️ Total allocation cannot exceed 100%
+          </div>
+          <div class="mt-2 text-xs text-gray-600">
+            💡 Tip: You don't need to allocate 100%. Partial allocation is fine.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="button" id="saveBtn" onclick="saveMappings()" disabled
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+        Save Portfolio Mappings
+      </button>
+    </div>
+
+  </form>
+
+  <script>
+    let allGoals = [];
+    let allPortfolios = [];
+    let selectedGoal = null;
+    let goalOwnerMember = '';
+
+    // Load goals on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadGoals();
+    });
+
+    function loadGoals() {
+      console.log('MapPortfoliosToGoal: Loading goals...');
+      google.script.run
+        .withSuccessHandler(function(goals) {
+          console.log('MapPortfoliosToGoal: Goals received:', goals);
+          console.log('MapPortfoliosToGoal: Goals type:', typeof goals);
+          console.log('MapPortfoliosToGoal: Goals is array:', Array.isArray(goals));
+          console.log('MapPortfoliosToGoal: Number of goals:', goals ? goals.length : 0);
+
+          if (goals && goals.length > 0) {
+            console.log('MapPortfoliosToGoal: First goal:', JSON.stringify(goals[0]));
+          }
+
+          allGoals = goals;
+          populateGoalDropdown(goals);
+        })
+        .withFailureHandler(function(error) {
+          console.error('MapPortfoliosToGoal: Error loading goals:', error);
+          showError(error);
+        })
+        .getAllGoals();
+    }
+
+    function populateGoalDropdown(goals) {
+      console.log('MapPortfoliosToGoal: Populating dropdown with', goals.length, 'goals');
+      const select = document.getElementById('goalSelect');
+      select.innerHTML = '<option value="">-- Select Goal --</option>';
+
+      goals.forEach(goal => {
+        if (goal.isActive) {
+          const option = document.createElement('option');
+          option.value = goal.goalId;
+          option.textContent = `${goal.goalName} (${goal.goalType})`;
+          select.appendChild(option);
+          console.log('MapPortfoliosToGoal: Added goal to dropdown:', goal.goalId, goal.goalName);
+        } else {
+          console.log('MapPortfoliosToGoal: Skipped inactive goal:', goal.goalId, goal.goalName);
+        }
+      });
+    }
+
+    function onGoalSelected() {
+      const goalId = document.getElementById('goalSelect').value;
+
+      if (!goalId) {
+        document.getElementById('goalInfoSection').classList.add('hidden');
+        document.getElementById('saveBtn').disabled = true;
+        return;
+      }
+
+      selectedGoal = allGoals.find(g => g.goalId === goalId);
+      if (!selectedGoal) return;
+
+      goalOwnerMember = selectedGoal.familyMemberName || 'Self';
+
+      // Show goal info
+      document.getElementById('goalInfoSection').classList.remove('hidden');
+      document.getElementById('goalTarget').textContent = formatCurrency(selectedGoal.targetAmount);
+      document.getElementById('goalDate').textContent = formatDate(selectedGoal.targetDate);
+      document.getElementById('goalProgress').textContent = (selectedGoal.progressPercent * 100).toFixed(1);
+
+      // Load family members and portfolios
+      loadFamilyMembersAndPortfolios();
+    }
+
+    function loadFamilyMembersAndPortfolios() {
+      // Load family members for filter
+      google.script.run
+        .withSuccessHandler(function(members) {
+          populateFamilyMemberFilters(members);
+          loadPortfolios();
+        })
+        .withFailureHandler(showError)
+        .getAllFamilyMembers();
+    }
+
+    function populateFamilyMemberFilters(members) {
+      const container = document.getElementById('familyMemberFilters');
+      container.innerHTML = '';
+
+      // Always include "Self" - checked and disabled
+      const selfLabel = document.createElement('label');
+      selfLabel.className = 'flex items-center gap-2 text-xs cursor-pointer';
+      selfLabel.innerHTML = `
+        <input type="checkbox" value="Self" checked disabled class="rounded">
+        <strong>Self (You)</strong> - Always included
+      `;
+      container.appendChild(selfLabel);
+
+      // Add goal owner (if different from Self) - checked by default
+      if (goalOwnerMember && goalOwnerMember !== 'Self') {
+        const ownerLabel = document.createElement('label');
+        ownerLabel.className = 'flex items-center gap-2 text-xs cursor-pointer';
+        ownerLabel.innerHTML = `
+          <input type="checkbox" value="${goalOwnerMember}" checked onchange="refreshPortfolioList()" class="rounded">
+          <strong>${goalOwnerMember} (Goal Owner)</strong> - Recommended
+        `;
+        container.appendChild(ownerLabel);
+      }
+
+      // Add other family members - unchecked by default
+      members.forEach(member => {
+        const memberName = member.memberName;
+        if (memberName !== 'Self' && memberName !== goalOwnerMember) {
+          const label = document.createElement('label');
+          label.className = 'flex items-center gap-2 text-xs cursor-pointer';
+          label.innerHTML = `
+            <input type="checkbox" value="${memberName}" onchange="refreshPortfolioList()" class="rounded">
+            ${memberName}
+          `;
+          container.appendChild(label);
+        }
+      });
+    }
+
+    function loadPortfolios() {
+      const selectedMembers = getSelectedFamilyMembers();
+
+      google.script.run
+        .withSuccessHandler(function(portfolios) {
+          allPortfolios = portfolios;
+          displayPortfolios(portfolios);
+        })
+        .withFailureHandler(showError)
+        .getPortfoliosForGoalMapping(selectedMembers);
+    }
+
+    function getSelectedFamilyMembers() {
+      const checkboxes = document.querySelectorAll('#familyMemberFilters input[type="checkbox"]:checked');
+      const selected = [];
+      checkboxes.forEach(cb => selected.push(cb.value));
+      return selected;
+    }
+
+    function refreshPortfolioList() {
+      document.getElementById('portfolioListContainer').innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">Loading portfolios...</div>';
+      loadPortfolios();
+    }
+
+    function displayPortfolios(portfolios) {
+      const container = document.getElementById('portfolioListContainer');
+      container.innerHTML = '';
+
+      if (portfolios.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No mutual fund portfolios found for selected family members.<br>Try selecting more family members or create portfolios first.</div>';
+        document.getElementById('saveBtn').disabled = true;
+        return;
+      }
+
+      portfolios.forEach(portfolio => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center gap-3 p-2.5 border border-gray-200 rounded-md mb-2 hover:bg-gray-50 transition-colors';
+        item.innerHTML = `
+          <div class="flex-shrink-0">
+            <input type="checkbox"
+                   id="portfolio_${portfolio.portfolioId}"
+                   value="${portfolio.portfolioId}"
+                   onchange="onPortfolioToggle('${portfolio.portfolioId}')"
+                   class="rounded">
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-gray-800">${portfolio.portfolioName}</div>
+            <div class="text-xs text-gray-500 mt-0.5">${portfolio.ownerMemberName}</div>
+          </div>
+          <div class="text-sm font-semibold text-sky-600 whitespace-nowrap">
+            ₹${formatCurrency(portfolio.currentValue)}
+          </div>
+          <div class="flex-shrink-0 w-24">
+            <input type="number"
+                   id="allocation_${portfolio.portfolioId}"
+                   placeholder="%"
+                   min="0"
+                   max="100"
+                   step="0.1"
+                   disabled
+                   oninput="calculateTotalAllocation()"
+                   class="w-full px-2 py-1 border border-gray-300 rounded text-xs text-center focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-100 disabled:bg-gray-100 disabled:cursor-not-allowed">
+          </div>
+        `;
+        container.appendChild(item);
+      });
+
+      document.getElementById('saveBtn').disabled = false;
+    }
+
+    function onPortfolioToggle(portfolioId) {
+      const checkbox = document.getElementById(`portfolio_${portfolioId}`);
+      const allocationInput = document.getElementById(`allocation_${portfolioId}`);
+
+      allocationInput.disabled = !checkbox.checked;
+
+      if (!checkbox.checked) {
+        allocationInput.value = '';
+      }
+
+      calculateTotalAllocation();
+    }
+
+    function calculateTotalAllocation() {
+      let total = 0;
+      const allocationInputs = document.querySelectorAll('input[id^="allocation_"]:not(:disabled)');
+
+      allocationInputs.forEach(input => {
+        const value = parseFloat(input.value) || 0;
+        total += value;
+      });
+
+      document.getElementById('totalAllocation').textContent = total.toFixed(1);
+
+      const warning = document.getElementById('allocationWarning');
+      const saveBtn = document.getElementById('saveBtn');
+
+      if (total > 100) {
+        warning.classList.remove('hidden');
+        saveBtn.disabled = true;
+      } else {
+        warning.classList.add('hidden');
+        saveBtn.disabled = false;
+      }
+    }
+
+    function saveMappings() {
+      const goalId = document.getElementById('goalSelect').value;
+      if (!goalId) {
+        showError('Please select a goal');
+        return;
+      }
+
+      // Collect selected portfolios with allocations
+      const mappings = [];
+      const checkboxes = document.querySelectorAll('input[id^="portfolio_"]:checked');
+
+      checkboxes.forEach(cb => {
+        const portfolioId = cb.value;
+        const allocationInput = document.getElementById(`allocation_${portfolioId}`);
+        const allocationPercent = parseFloat(allocationInput.value) || 0;
+
+        if (allocationPercent > 0) {
+          const portfolio = allPortfolios.find(p => p.portfolioId === portfolioId);
+          if (portfolio) {
+            mappings.push({
+              portfolioId: portfolioId,
+              portfolioName: portfolio.portfolioName,
+              allocationPercent: allocationPercent
+            });
+          }
+        }
+      });
+
+      if (mappings.length === 0) {
+        showError('Please select at least one portfolio with allocation > 0%');
+        return;
+      }
+
+      // Show progress overlay
+      document.getElementById('progressOverlay').classList.remove('hidden');
+      document.getElementById('progressOverlay').classList.add('flex');
+
+      // Save mappings
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('progressOverlay').classList.add('hidden');
+          document.getElementById('progressOverlay').classList.remove('flex');
+
+          if (result.success) {
+            showSuccess(result.message);
+            setTimeout(() => google.script.host.close(), 1500);
+          } else {
+            showError(result.error || 'Failed to map portfolios');
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('progressOverlay').classList.add('hidden');
+          document.getElementById('progressOverlay').classList.remove('flex');
+          showError(error.message || 'An error occurred');
+        })
+        .mapPortfoliosToGoal(goalId, mappings);
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-IN').format(Math.round(value));
+    }
+
+    function formatDate(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      return d.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function showSuccess(message) {
+      alert('✅ ' + message);
+    }
+
+    function showError(message) {
+      alert('❌ ' + (message.message || message));
+    }
+  </script>
+</body>
+</html>

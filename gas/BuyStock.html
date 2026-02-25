@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="buyStockForm" class="bg-white" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-emerald-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Recording stock purchase...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait while we save the transaction</div>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="px-6 pt-6 pb-3">
+      <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded">
+        <p class="text-sm text-emerald-800">
+          <strong>📈 Buy Stocks</strong> - Record your stock purchases. This will add the transaction to your portfolio,
+          update your holdings, and track live prices via Google Finance.
+        </p>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white px-6 pb-6">
+
+      <!-- Row 1: Portfolio + Stock Search -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Portfolio <span class="text-red-600">*</span></label>
+          <select id="portfolioId" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+            <option value="">Loading portfolios...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="portfolioIdError">Required</span>
+        </div>
+        <div class="relative">
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Search Stock <span class="text-red-600">*</span></label>
+          <input type="text" id="stockSearch" required placeholder="Start typing stock symbol or name..."
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            autocomplete="off">
+          <input type="hidden" id="stockSymbol">
+          <div id="stockSearchResults" class="absolute left-0 right-0 z-10 bg-white border border-gray-300 rounded mt-1 max-h-60 overflow-y-auto hidden shadow-lg"></div>
+          <span class="text-xs text-gray-500 mt-0.5 block" id="stockInfo">Search from 5,292+ NSE stocks</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="stockSearchError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Purchase Date + Quantity -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Purchase Date <span class="text-red-600">*</span></label>
+          <input type="date" id="purchaseDate" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="purchaseDateError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Quantity (Shares) <span class="text-red-600">*</span></label>
+          <input type="number" id="quantity" required placeholder="e.g., 100" min="1" step="1"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="quantityError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 3: Price per Share + Total Amount -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Price per Share (₹) <span class="text-red-600">*</span></label>
+          <input type="number" id="pricePerShare" required placeholder="e.g., 2500.00" min="0.01" step="0.01"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Price at which you bought</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="pricePerShareError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Total Amount (₹)</label>
+          <input type="text" id="totalAmount" readonly
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm bg-gray-100 cursor-not-allowed">
+          <span class="text-xs text-gray-500 mt-0.5 block">Auto-calculated: Quantity × Price</span>
+        </div>
+      </div>
+
+      <!-- Row 4: Brokerage + Notes -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Brokerage & Charges (₹) <span class="text-gray-500">(Optional)</span></label>
+          <input type="number" id="brokerage" placeholder="e.g., 50.00" min="0" step="0.01" value="0"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Transaction charges (default: 0)</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Notes <span class="text-gray-500">(Optional)</span></label>
+          <input type="text" id="notes" placeholder="e.g., Dip buying opportunity"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Add notes for this transaction</span>
+        </div>
+      </div>
+
+      <!-- Row 5: Net Amount (Total + Brokerage) -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Net Amount (₹)</label>
+          <input type="text" id="netAmount" readonly
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm bg-emerald-50 cursor-not-allowed font-semibold text-emerald-700">
+          <span class="text-xs text-gray-500 mt-0.5 block">Total Amount + Brokerage (final cost)</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
+        Buy Stock
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    console.log('BuyStock.html loaded - Version 1.6 - FINAL with fixed getActiveStockPortfolios()');
+    let allStocks = [];
+    let fuse = null;
+    let searchTimeout;
+
+    window.onload = function() {
+      console.log('BuyStock.html: window.onload triggered');
+      // Set default purchase date to today
+      document.getElementById('purchaseDate').valueAsDate = new Date();
+
+      // Load stock portfolios
+      console.log('BuyStock.html: Calling getActiveStockPortfolios()...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          console.log('BuyStock.html: Received portfolios:', data);
+          const select = document.getElementById('portfolioId');
+          select.innerHTML = '<option value="">Select stock portfolio</option>';
+          if (!data || data.length === 0) {
+            console.log('No active stock portfolios found');
+            select.innerHTML = '<option value="">No stock portfolios found - create one first</option>';
+            return;
+          }
+          console.log('Loading', data.length, 'portfolios');
+          data.forEach(portfolio => {
+            console.log('Adding portfolio:', portfolio.portfolioId, portfolio.portfolioName);
+            const option = document.createElement('option');
+            option.value = portfolio.portfolioId;
+            option.textContent = portfolio.portfolioName;
+            select.appendChild(option);
+          });
+          console.log('Portfolio dropdown populated');
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading portfolios:', error);
+          document.getElementById('portfolioId').innerHTML = '<option value="">Error loading portfolios</option>';
+        })
+        .getActiveStockPortfolios();
+
+      // Load ALL stocks once for client-side searching (no more network calls!)
+      google.script.run
+        .withSuccessHandler(function(stocks) {
+          allStocks = stocks || [];
+          console.log('Loaded ' + allStocks.length + ' stocks for client-side search');
+
+          // Initialize Fuse.js for fuzzy search
+          fuse = new Fuse(allStocks, {
+            keys: ['symbol', 'companyName'],
+            threshold: 0.3,
+            distance: 100,
+            minMatchCharLength: 2,
+            includeScore: true,
+            ignoreLocation: false,
+            findAllMatches: true
+          });
+          console.log('Fuse.js initialized for stock search');
+
+          // Update info text
+          document.getElementById('stockInfo').textContent = 'Search from ' + allStocks.length + ' NSE stocks';
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading stocks:', error);
+          allStocks = [];
+        })
+        .getAllStocksForClientSearch();
+
+      // Auto-calculate total amount
+      const quantityInput = document.getElementById('quantity');
+      const priceInput = document.getElementById('pricePerShare');
+      const brokerageInput = document.getElementById('brokerage');
+      const totalAmountInput = document.getElementById('totalAmount');
+      const netAmountInput = document.getElementById('netAmount');
+
+      function calculateAmounts() {
+        const qty = parseFloat(quantityInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const brokerage = parseFloat(brokerageInput.value) || 0;
+        const total = qty * price;
+        const net = total + brokerage;
+        totalAmountInput.value = total > 0 ? '₹ ' + total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+        netAmountInput.value = net > 0 ? '₹ ' + net.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+      }
+
+      quantityInput.oninput = calculateAmounts;
+      priceInput.oninput = calculateAmounts;
+      brokerageInput.oninput = calculateAmounts;
+
+      // Stock search with Fuse.js (CLIENT-SIDE SEARCH - NO SERVER CALLS!)
+      console.log('Setting up stock search event handler');
+      const stockSearchInput = document.getElementById('stockSearch');
+      const stockSearchResults = document.getElementById('stockSearchResults');
+      const stockSymbolInput = document.getElementById('stockSymbol');
+      const stockInfoSpan = document.getElementById('stockInfo');
+
+      console.log('Stock search input element:', stockSearchInput);
+
+      stockSearchInput.oninput = function() {
+      console.log('Stock search input triggered! Value:', this.value);
+      clearTimeout(searchTimeout);
+      const query = this.value.trim();
+      console.log('Query:', query, 'Length:', query.length);
+
+      if (query.length < 2) {
+        console.log('Query too short, hiding results');
+        stockSearchResults.classList.add('hidden');
+        stockSymbolInput.value = '';
+        return;
+      }
+
+      searchTimeout = setTimeout(function() {
+        console.log('Search timeout fired for query:', query);
+        // Check if stocks are loaded
+        if (!fuse || !allStocks || allStocks.length === 0) {
+          console.log('Fuse or stocks not loaded yet', 'Fuse:', !!fuse, 'Stocks count:', allStocks ? allStocks.length : 0);
+          stockSearchResults.innerHTML = '<div class="px-3 py-2 text-sm text-gray-500">Loading stocks...</div>';
+          stockSearchResults.classList.remove('hidden');
+          return;
+        }
+
+        console.log('Searching with Fuse.js for:', query);
+        // FUZZY SEARCH with Fuse.js (handles typos, partial matches!)
+        const fuseResults = fuse.search(query);
+        console.log('Fuse results:', fuseResults.length, 'matches found');
+        const results = fuseResults.slice(0, 50).map(result => result.item); // Top 50 results
+
+        stockSearchResults.innerHTML = '';
+        if (results.length === 0) {
+          console.log('No results found');
+          stockSearchResults.innerHTML = '<div class="px-3 py-2 text-sm text-gray-500">No stocks found</div>';
+          stockSearchResults.classList.remove('hidden');
+          return;
+        }
+
+        console.log('Displaying', results.length, 'results');
+
+        results.forEach(function(stock) {
+          const div = document.createElement('div');
+          div.className = 'px-3 py-2 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 last:border-0';
+          div.innerHTML = `
+            <div class="font-semibold text-sm text-gray-800">${stock.symbol}</div>
+            <div class="text-xs text-gray-600">${stock.companyName}</div>
+            <div class="text-xs text-gray-500 mt-0.5">${stock.sector || 'N/A'} | ${stock.exchange}</div>
+          `;
+          div.onclick = function() {
+            stockSearchInput.value = stock.symbol + ' - ' + stock.companyName;
+            stockSymbolInput.value = stock.symbol;
+            stockSearchResults.classList.add('hidden');
+            stockInfoSpan.textContent = `${stock.companyName} | ${stock.exchange} | ${stock.sector || 'N/A'}`;
+            stockInfoSpan.className = 'text-xs text-emerald-600 font-medium mt-0.5 block';
+          };
+          stockSearchResults.appendChild(div);
+        });
+
+        stockSearchResults.classList.remove('hidden');
+      }, 300);
+      };
+
+      // Close search results when clicking outside
+      document.addEventListener('click', function(e) {
+        if (!stockSearchInput.contains(e.target) && !stockSearchResults.contains(e.target)) {
+          stockSearchResults.classList.add('hidden');
+        }
+      });
+    };
+
+    function showError(fieldId, message) {
+      const errorEl = document.getElementById(fieldId + 'Error');
+      const inputEl = document.getElementById(fieldId);
+      if (errorEl) { errorEl.textContent = message; errorEl.classList.remove('hidden'); }
+      if (inputEl) { inputEl.classList.remove('border-gray-300'); inputEl.classList.add('border-red-600'); }
+    }
+
+    function clearError(fieldId) {
+      const errorEl = document.getElementById(fieldId + 'Error');
+      const inputEl = document.getElementById(fieldId);
+      if (errorEl) errorEl.classList.add('hidden');
+      if (inputEl) { inputEl.classList.remove('border-red-600'); inputEl.classList.add('border-gray-300'); }
+    }
+
+    function clearAllErrors() {
+      document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('input, select').forEach(el => {
+        el.classList.remove('border-red-600');
+        el.classList.add('border-gray-300');
+      });
+    }
+
+    document.getElementById('buyStockForm').onsubmit = function(e) {
+      e.preventDefault();
+      clearAllErrors();
+
+      const portfolioId = document.getElementById('portfolioId').value;
+      const stockSymbol = document.getElementById('stockSymbol').value;
+      const purchaseDate = document.getElementById('purchaseDate').value;
+      const quantity = document.getElementById('quantity').value;
+      const pricePerShare = document.getElementById('pricePerShare').value;
+      const brokerage = document.getElementById('brokerage').value || '0';
+      const notes = document.getElementById('notes').value;
+
+      let isValid = true;
+      if (!portfolioId) { showError('portfolioId', 'Portfolio is required'); isValid = false; }
+      if (!stockSymbol) { showError('stockSearch', 'Stock selection is required'); isValid = false; }
+      if (!purchaseDate) { showError('purchaseDate', 'Purchase date is required'); isValid = false; }
+      if (!quantity || parseFloat(quantity) <= 0) { showError('quantity', 'Valid quantity is required'); isValid = false; }
+      if (!pricePerShare || parseFloat(pricePerShare) <= 0) { showError('pricePerShare', 'Valid price is required'); isValid = false; }
+
+      if (!isValid) return;
+
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').innerHTML = '✓';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = response.message;
+            setTimeout(function() { google.script.host.close(); }, 2000);
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .buyStock(
+          portfolioId,
+          stockSymbol,
+          parseFloat(quantity),
+          parseFloat(pricePerShare),
+          purchaseDate,
+          parseFloat(brokerage),
+          notes
+        );
+    };
+
+    document.querySelectorAll('input, select').forEach(function(el) {
+      el.oninput = function() { clearError(this.id); };
+    });
+  </script>
+</body>
+</html>

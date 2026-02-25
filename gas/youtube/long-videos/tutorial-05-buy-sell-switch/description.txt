@@ -1,0 +1,58 @@
+FREE Portfolio Tracker for Mutual Funds, Stocks, Gold, Insurance & Family Wealth Management on Google Sheets
+
+Does your family know about ALL your investments? Bank accounts? Insurance policies? Loans? What happens if something happens to you tomorrow?
+
+Capital Friends is a 100% FREE Google Sheets portfolio tracker that solves this problem. Track your entire family's wealth in one place and send automated email reports to your family daily, weekly, or monthly.
+
+✅ What You Can Track:
+→ Mutual Funds with Live NAV updates from AMFI database
+→ Stocks with Live Google Finance prices (5000+ NSE stocks)
+→ Gold (Physical + Digital), PPF, EPF, NPS, Real Estate, Fixed Deposits
+→ Health Insurance, Term Life Insurance, Motor Insurance policies
+→ Home Loan, Car Loan, Personal Loan, Credit Card debt tracking
+→ Family Members, Bank Accounts, Investment Accounts, Demat accounts
+→ Financial Goals with SIP Calculator and Goal Planner
+
+🎯 Key Features:
+✓ ONE-CLICK SETUP: Creates everything in 30 seconds
+✓ LIVE NAV UPDATES: Mutual fund prices update automatically every day
+✓ ATH TRACKING: See how much below All-Time High each fund is
+✓ AUTO REBALANCING: Get exact amounts to invest in each fund to maintain target allocation
+✓ REALIZED vs UNREALIZED P&L: Know your real profit vs paper profit
+✓ SIP CALCULATOR: Calculate exact monthly SIP needed for your goals
+✓ GOAL TRACKING: Map portfolios to goals, track progress automatically
+✓ EMAIL REPORTS: Automated daily/weekly/monthly wealth reports to entire family
+✓ REMINDERS: SIP payments, EMI due dates, insurance renewals, tax deadlines
+✓ WEALTH DASHBOARD: Complete family net worth with asset allocation breakdown
+
+💯 Why 100% FREE Forever?
+→ Runs entirely on YOUR Google account
+→ No company servers storing your data
+→ Maximum privacy - only you and your family can see
+→ No subscription ever - free for every Indian family
+
+In this video:
+• Record monthly SIP — and how average NAV updates
+• Record lumpsum investment — for bonus or dip buying
+• Sell/Redeem — see your profit before selling!
+• Switch between funds — why total investment stays the same
+• Transaction History — all 4 types recorded
+
+Get started FREE: https://www.capitalfriends.in
+Full playlist: [YouTube playlist link]
+
+Timestamps:
+0:00 - Four transaction types explained
+0:30 - Record monthly SIP (Parag Parikh)
+2:00 - How average NAV updates (rupee cost averaging)
+3:00 - Record Lumpsum (Nippon)
+4:30 - SIP vs Lumpsum — what's the difference?
+5:00 - Sell/Redeem — see profit before selling!
+6:30 - Transaction Preview (Capital Gain/Loss)
+7:30 - How Total Investment changes on sell
+8:00 - Switch between funds
+9:30 - Switch does NOT change Total Investment
+10:30 - When to use Sell vs Switch
+11:00 - Transaction History summary
+
+#MutualFundTracker #SIPTracker #PortfolioTracker #GoogleSheets #MutualFunds #PersonalFinance #SIPInvestment #LumpsumInvestment #TransactionTracking

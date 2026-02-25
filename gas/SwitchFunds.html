@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="switchForm" class="bg-white" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Switching funds...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait while we save the information</div>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="px-6 pt-6 pb-3">
+      <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+        <p class="text-sm text-purple-800">
+          <strong>🔄 Switch Funds</strong> - Move money between funds within your portfolio (rebalancing).
+          This will NOT change your portfolio's Total Investment - it's just moving money internally.
+          Sells units from one fund and uses proceeds to buy another.
+        </p>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white px-6 pb-6">
+
+      <!-- Row 1: Portfolio + Switch Date -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Portfolio <span class="text-red-600">*</span></label>
+          <select id="portfolioId" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Loading portfolios...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="portfolioIdError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Switch Date <span class="text-red-600">*</span></label>
+          <input type="date" id="switchDate" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="switchDateError">Required</span>
+        </div>
+      </div>
+
+      <!-- Section: From Fund -->
+      <div class="px-4 py-2 bg-red-50 border-b border-red-200">
+        <div class="text-xs font-bold text-red-700">📤 FROM FUND (Selling)</div>
+      </div>
+
+      <!-- Row 2: From Fund + Units -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">From Fund <span class="text-red-600">*</span></label>
+          <select id="fromFundCode" required disabled
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Select portfolio first</option>
+          </select>
+          <span class="text-xs text-gray-500 mt-0.5 block" id="fromFundInfo"></span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="fromFundCodeError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Units to Switch <span class="text-red-600">*</span></label>
+          <input type="number" id="units" required placeholder="e.g., 25.123" min="0.001" step="0.001"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-xs text-gray-500 mt-0.5 block" id="maxUnits"></span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="unitsError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 3: From Fund Price -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">From Fund Sale NAV (₹) <span class="text-red-600">*</span></label>
+        <input type="number" id="fromFundPrice" required placeholder="e.g., 165.50" min="0.01" step="0.01"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        <span class="text-xs text-gray-500 mt-0.5 block">NAV at which you're selling from fund</span>
+        <span class="text-red-600 text-xs hidden mt-0.5 block" id="fromFundPriceError">Required</span>
+      </div>
+
+      <!-- Section: To Fund -->
+      <div class="px-4 py-2 bg-emerald-50 border-b border-emerald-200">
+        <div class="text-xs font-bold text-emerald-700">📥 TO FUND (Buying)</div>
+      </div>
+
+      <!-- Row 4: To Fund + Search -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div class="relative">
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">To Fund <span class="text-red-600">*</span></label>
+          <input type="text" id="toFundSearch" required placeholder="Start typing fund name..."
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <input type="hidden" id="toFundCode">
+          <div id="toFundSearchResults" class="absolute z-10 bg-white border border-gray-300 rounded mt-1 max-h-60 overflow-y-auto hidden shadow-lg w-full"></div>
+          <span class="text-xs text-gray-500 mt-0.5 block">Can be existing or new fund</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="toFundSearchError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">To Fund Buy NAV (₹) <span class="text-red-600">*</span></label>
+          <input type="number" id="toFundPrice" required placeholder="e.g., 145.50" min="0.01" step="0.01"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">NAV at which you're buying to fund</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="toFundPriceError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 5: Target Allocation (for new fund) -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Target Allocation (%) <span class="text-gray-500">(Optional - only for new funds)</span></label>
+        <input type="number" id="targetAllocation" placeholder="e.g., 25" min="0" max="100" step="0.01"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        <span class="text-xs text-gray-500 mt-0.5 block">For rebalancing purposes (0-100). Only needed if To Fund is not in portfolio yet</span>
+      </div>
+
+      <!-- Calculation Preview -->
+      <div id="calculationPreview" class="hidden mx-4 my-3 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+        <div class="text-xs font-semibold text-gray-700 mb-2">📊 Switch Preview</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="text-gray-600">Selling:</div>
+          <div class="text-gray-800 font-semibold text-right" id="previewSellUnits">-</div>
+          <div class="text-gray-600">Sale Proceeds:</div>
+          <div class="text-gray-800 font-semibold text-right" id="previewSaleAmount">-</div>
+          <div class="text-gray-600 border-t border-gray-300 pt-2">Buying:</div>
+          <div class="text-gray-800 font-semibold text-right border-t border-gray-300 pt-2" id="previewBuyUnits">-</div>
+          <div class="text-gray-600">At Price:</div>
+          <div class="text-gray-800 font-semibold text-right" id="previewBuyPrice">-</div>
+        </div>
+      </div>
+
+      <!-- Row 6: Notes -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Notes <span class="text-gray-500">(Optional)</span></label>
+        <input type="text" id="notes" placeholder="e.g., Portfolio rebalancing, Switching to better performer"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        Execute Switch
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let portfolios = [];
+    let portfolioFunds = {};
+    let searchTimeout;
+    let allFunds = []; // Client-side fund cache for instant search
+    let fuse = null; // Fuse.js instance for fuzzy search
+
+    window.onload = function() {
+      // Load portfolios
+      google.script.run
+        .withSuccessHandler(function(data) {
+          const select = document.getElementById('portfolioId');
+          select.innerHTML = '<option value="">Select portfolio</option>';
+          if (!data || data.length === 0) {
+            select.innerHTML = '<option value="">No active portfolios found</option>';
+            return;
+          }
+          portfolios = data;
+          data.forEach(portfolio => {
+            const option = document.createElement('option');
+            option.value = portfolio.portfolioId;
+            option.textContent = portfolio.portfolioName;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading portfolios:', error);
+          document.getElementById('portfolioId').innerHTML = '<option value="">Error loading portfolios</option>';
+        })
+        .getActivePortfolios();
+
+      // Load ALL funds once for client-side searching (no more network calls!)
+      google.script.run
+        .withSuccessHandler(function(funds) {
+          allFunds = funds || [];
+          console.log('Loaded ' + allFunds.length + ' funds for client-side search');
+
+          // Initialize Fuse.js for fuzzy search
+          fuse = new Fuse(allFunds, {
+            keys: ['fundName'],
+            threshold: 0.3,
+            distance: 50,
+            minMatchCharLength: 2,
+            includeScore: true,
+            ignoreLocation: false,
+            findAllMatches: true,
+            useExtendedSearch: false
+          });
+          console.log('Fuse.js initialized for fuzzy search');
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading funds:', error);
+          allFunds = [];
+        })
+        .getAllFundsForClientSearch();
+
+      // Set today's date as default
+      document.getElementById('switchDate').valueAsDate = new Date();
+
+      // Portfolio change handler - load funds
+      document.getElementById('portfolioId').onchange = function() {
+        const portfolioId = this.value;
+        const fromFundSelect = document.getElementById('fromFundCode');
+
+        if (!portfolioId) {
+          fromFundSelect.disabled = true;
+          fromFundSelect.innerHTML = '<option value="">Select portfolio first</option>';
+          document.getElementById('fromFundInfo').textContent = '';
+          document.getElementById('maxUnits').textContent = '';
+          return;
+        }
+
+        fromFundSelect.disabled = true;
+        fromFundSelect.innerHTML = '<option value="">Loading funds...</option>';
+
+        google.script.run
+          .withSuccessHandler(function(funds) {
+            fromFundSelect.innerHTML = '<option value="">Select fund</option>';
+            if (!funds || funds.length === 0) {
+              fromFundSelect.innerHTML = '<option value="">No funds in portfolio</option>';
+              alert('This portfolio has no funds.');
+              return;
+            }
+
+            portfolioFunds = {};
+            funds.forEach(fund => {
+              const option = document.createElement('option');
+              option.value = fund.fundCode;
+              option.textContent = fund.fundName;
+              fromFundSelect.appendChild(option);
+              portfolioFunds[fund.fundCode] = fund;
+            });
+
+            fromFundSelect.disabled = false;
+          })
+          .withFailureHandler(function(error) {
+            console.error('Error loading funds:', error);
+            fromFundSelect.innerHTML = '<option value="">Error loading funds</option>';
+          })
+          .getPortfolioFunds(portfolioId);
+      };
+
+      // From Fund change handler
+      document.getElementById('fromFundCode').onchange = function() {
+        const fundCode = this.value;
+        const fundInfo = document.getElementById('fromFundInfo');
+        const maxUnits = document.getElementById('maxUnits');
+
+        if (!fundCode || !portfolioFunds[fundCode]) {
+          fundInfo.textContent = '';
+          maxUnits.textContent = '';
+          return;
+        }
+
+        const fund = portfolioFunds[fundCode];
+        fundInfo.textContent = `Current: ${fund.units || 0} units @ ₹${(fund.avgPrice || 0).toFixed(2)} avg`;
+        maxUnits.textContent = `Max you can switch: ${fund.units || 0} units`;
+
+        updateCalculationPreview();
+      };
+
+      // Setup To Fund search event handler INSIDE window.onload
+      const toFundSearchInput = document.getElementById('toFundSearch');
+
+      toFundSearchInput.oninput = function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        if (query.length < 2) {
+          document.getElementById('toFundSearchResults').classList.add('hidden');
+          return;
+        }
+
+        searchTimeout = setTimeout(function() {
+          const resultsDiv = document.getElementById('toFundSearchResults');
+
+          // Check if funds are loaded
+          if (!fuse || !allFunds || allFunds.length === 0) {
+            resultsDiv.innerHTML = '<div class="p-2 text-sm text-gray-500">Loading funds...</div>';
+            resultsDiv.classList.remove('hidden');
+            return;
+          }
+
+          // FUZZY SEARCH with Fuse.js (handles typos, partial matches, smart ranking!)
+          const fuseResults = fuse.search(query);
+          const results = fuseResults.slice(0, 50).map(result => result.item);
+
+          // Display results
+          resultsDiv.innerHTML = '';
+
+          if (results.length === 0) {
+            resultsDiv.innerHTML = '<div class="p-2 text-sm text-gray-500">No funds found</div>';
+            resultsDiv.classList.remove('hidden');
+            return;
+          }
+
+          results.forEach(function(fund) {
+            const div = document.createElement('div');
+            div.className = 'p-2 hover:bg-sky-50 cursor-pointer text-sm border-b border-gray-100';
+            div.innerHTML = '<div class="font-semibold text-gray-800">' + fund.fundName + '</div><div class="text-xs text-gray-600">' + fund.fundCode + '</div>';
+            div.onclick = function() {
+              document.getElementById('toFundSearch').value = fund.fundName;
+              document.getElementById('toFundCode').value = fund.fundCode;
+              resultsDiv.classList.add('hidden');
+              clearError('toFundSearch');
+              updateCalculationPreview();
+            };
+            resultsDiv.appendChild(div);
+          });
+
+          resultsDiv.classList.remove('hidden');
+        }, 150);
+      };
+
+      // Close search results when clicking outside
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('#toFundSearch') && !e.target.closest('#toFundSearchResults')) {
+          document.getElementById('toFundSearchResults').classList.add('hidden');
+        }
+      });
+
+      // Calculate preview
+      function updateCalculationPreview() {
+        const fromFundCode = document.getElementById('fromFundCode').value;
+        const units = parseFloat(document.getElementById('units').value) || 0;
+        const fromFundPrice = parseFloat(document.getElementById('fromFundPrice').value) || 0;
+        const toFundPrice = parseFloat(document.getElementById('toFundPrice').value) || 0;
+
+        if (!fromFundCode || !portfolioFunds[fromFundCode] || units <= 0 || fromFundPrice <= 0 || toFundPrice <= 0) {
+          document.getElementById('calculationPreview').classList.add('hidden');
+          return;
+        }
+
+        const fund = portfolioFunds[fromFundCode];
+
+        if (units > fund.units) {
+          alert(`Cannot switch ${units} units. You only have ${fund.units} units.`);
+          document.getElementById('calculationPreview').classList.add('hidden');
+          return;
+        }
+
+        const saleProceeds = units * fromFundPrice;
+        const buyUnits = saleProceeds / toFundPrice;
+
+        document.getElementById('previewSellUnits').textContent = `${units} units @ ₹${fromFundPrice.toFixed(2)}`;
+        document.getElementById('previewSaleAmount').textContent = `₹${saleProceeds.toFixed(2)}`;
+        document.getElementById('previewBuyUnits').textContent = `${buyUnits.toFixed(3)} units`;
+        document.getElementById('previewBuyPrice').textContent = `₹${toFundPrice.toFixed(2)}`;
+
+        document.getElementById('calculationPreview').classList.remove('hidden');
+      }
+
+      document.getElementById('units').oninput = updateCalculationPreview;
+      document.getElementById('fromFundPrice').oninput = updateCalculationPreview;
+      document.getElementById('toFundPrice').oninput = updateCalculationPreview;
+
+      function showError(fieldId, message) {
+        const errorEl = document.getElementById(fieldId + 'Error');
+        const inputEl = document.getElementById(fieldId);
+        if (errorEl) { errorEl.textContent = message; errorEl.classList.remove('hidden'); }
+        if (inputEl) { inputEl.classList.remove('border-gray-300'); inputEl.classList.add('border-red-600'); }
+      }
+
+      function clearError(fieldId) {
+        const errorEl = document.getElementById(fieldId + 'Error');
+        const inputEl = document.getElementById(fieldId);
+        if (errorEl) errorEl.classList.add('hidden');
+        if (inputEl) { inputEl.classList.remove('border-red-600'); inputEl.classList.add('border-gray-300'); }
+      }
+
+      function clearAllErrors() {
+        document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('input, select').forEach(el => {
+          el.classList.remove('border-red-600');
+          el.classList.add('border-gray-300');
+        });
+      }
+
+      document.getElementById('switchForm').onsubmit = function(e) {
+      e.preventDefault();
+      clearAllErrors();
+
+      const portfolioId = document.getElementById('portfolioId').value;
+      const fromFundCode = document.getElementById('fromFundCode').value;
+      const toFundCode = document.getElementById('toFundCode').value;
+      const switchDate = document.getElementById('switchDate').value;
+      const units = document.getElementById('units').value.trim();
+      const fromFundPrice = document.getElementById('fromFundPrice').value.trim();
+      const toFundPrice = document.getElementById('toFundPrice').value.trim();
+      const targetAllocation = document.getElementById('targetAllocation').value.trim();
+      const notes = document.getElementById('notes').value.trim();
+
+      let isValid = true;
+      if (!portfolioId) { showError('portfolioId', 'Portfolio is required'); isValid = false; }
+      if (!fromFundCode) { showError('fromFundCode', 'From fund is required'); isValid = false; }
+      if (!toFundCode) { showError('toFundSearch', 'To fund is required'); isValid = false; }
+      if (!switchDate) { showError('switchDate', 'Switch date is required'); isValid = false; }
+      if (!units || parseFloat(units) <= 0) { showError('units', 'Valid units required'); isValid = false; }
+      if (!fromFundPrice || parseFloat(fromFundPrice) <= 0) { showError('fromFundPrice', 'Valid from fund NAV required'); isValid = false; }
+      if (!toFundPrice || parseFloat(toFundPrice) <= 0) { showError('toFundPrice', 'Valid to fund NAV required'); isValid = false; }
+
+      // Validate same fund
+      if (fromFundCode === toFundCode) {
+        alert('Cannot switch to the same fund. Please select different funds.');
+        isValid = false;
+      }
+
+      // Validate units against holdings
+      const fund = portfolioFunds[fromFundCode];
+      if (fund && parseFloat(units) > fund.units) {
+        showError('units', `Cannot switch ${units} units. You only have ${fund.units} units.`);
+        isValid = false;
+      }
+
+      if (!isValid) return;
+
+      const data = {
+        portfolioId,
+        fromFundCode,
+        toFundCode,
+        switchDate,
+        units: parseFloat(units),
+        fromFundPrice: parseFloat(fromFundPrice),
+        toFundPrice: parseFloat(toFundPrice),
+        targetAllocation: targetAllocation ? parseFloat(targetAllocation) : 0,
+        notes
+      };
+
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').textContent = '✓';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = response.message;
+            setTimeout(function() { google.script.host.close(); }, 2000);
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .processSwitchFunds(data);
+    };
+
+      // Clear errors on input for all fields EXCEPT the search field (which has its own handler)
+      document.querySelectorAll('input:not(#toFundSearch), select').forEach(function(el) {
+        el.oninput = function() { clearError(this.id); };
+      });
+    }; // End of window.onload
+  </script>
+</body>
+</html>

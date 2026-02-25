@@ -1,0 +1,64 @@
+FREE Portfolio Tracker for Mutual Funds, Stocks, Gold, Insurance & Family Wealth Management on Google Sheets
+
+Does your family know about ALL your investments? Bank accounts? Insurance policies? Loans? What happens if something happens to you tomorrow?
+
+Capital Friends is a 100% FREE Google Sheets portfolio tracker that solves this problem. Track your entire family's wealth in one place and send automated email reports to your family daily, weekly, or monthly.
+
+✅ What You Can Track:
+→ Mutual Funds with Live NAV updates from AMFI database
+→ Stocks with Live Google Finance prices (5000+ NSE stocks)
+→ Gold (Physical + Digital), PPF, EPF, NPS, Real Estate, Fixed Deposits
+→ Health Insurance, Term Life Insurance, Motor Insurance policies
+→ Home Loan, Car Loan, Personal Loan, Credit Card debt tracking
+→ Family Members, Bank Accounts, Investment Accounts, Demat accounts
+→ Financial Goals with SIP Calculator and Goal Planner
+
+🎯 Key Features:
+✓ ONE-CLICK SETUP: Creates everything in 30 seconds
+✓ LIVE NAV UPDATES: Mutual fund prices update automatically every day
+✓ ATH TRACKING: See how much below All-Time High each fund is
+✓ AUTO REBALANCING: Get exact amounts to invest in each fund to maintain target allocation
+✓ REALIZED vs UNREALIZED P&L: Know your real profit vs paper profit
+✓ SIP CALCULATOR: Calculate exact monthly SIP needed for your goals
+✓ GOAL TRACKING: Map portfolios to goals, track progress automatically
+✓ EMAIL REPORTS: Automated daily/weekly/monthly wealth reports to entire family
+✓ REMINDERS: SIP payments, EMI due dates, insurance renewals, tax deadlines
+✓ WEALTH DASHBOARD: Complete family net worth with asset allocation breakdown
+
+💯 Why 100% FREE Forever?
+→ Runs entirely on YOUR Google account
+→ No company servers storing your data
+→ Maximum privacy - only you and your family can see
+→ No subscription ever - free for every Indian family
+
+In this video:
+• Reminders — never miss insurance renewal or EMI
+• Email Reports — automated family wealth report
+• Dashboard — complete financial picture in one view
+• Series recap — all 13 videos covered
+
+Get started FREE: https://www.capitalfriends.in
+Full playlist: [YouTube playlist link]
+
+Timestamps:
+0:00 - Why reminders matter
+0:30 - Add Insurance Renewal reminder
+1:30 - Add Monthly EMI reminder
+2:00 - Add Tax Filing reminder
+2:30 - Setup Daily Check (auto trigger)
+3:00 - Test Reminder Email
+3:30 - Edit & View All Reminders
+4:00 - Family Wealth Email Reports
+4:30 - Email Settings (frequency, time)
+5:30 - Who receives the email
+6:00 - Send report now (demo)
+6:30 - What the email contains
+8:00 - ATH color coding in email
+8:30 - Realized vs Unrealized P&L in email
+9:00 - Open Dashboard
+10:00 - Net Worth & Asset Allocation
+11:00 - About & Support Developer
+11:30 - Series recap — all 13 videos
+12:30 - What's next
+
+#PortfolioTracker #MutualFundTracker #FamilyFinance #GoogleSheets #PersonalFinance #WealthManagement #EmailReports #AutomatedReminders #Dashboard #NetWorth #CompleteSeries

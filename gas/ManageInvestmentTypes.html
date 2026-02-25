@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <div class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+      <h2 class="text-xl font-bold mb-1">⚙️ Manage Investment Types</h2>
+      <p class="text-sm opacity-90">Customize your investment categories</p>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-auto p-6">
+
+      <!-- Info Alert -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-800">
+        <strong>💡 Tip:</strong> Add custom investment types to track investments not covered by default categories.
+      </div>
+
+      <!-- Success Message -->
+      <div id="successAlert" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-sm text-green-800"></div>
+
+      <!-- Add New Type Section -->
+      <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">➕ Add New Investment Type</h3>
+
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Type Name <span class="text-red-600">*</span></label>
+            <input type="text" id="newTypeName" placeholder="e.g., Startup Equity"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Default Category</label>
+            <select id="newCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+              <option value="Equity">Equity</option>
+              <option value="Debt">Debt</option>
+              <option value="Gold">Gold</option>
+              <option value="Real Estate">Real Estate</option>
+              <option value="Alternative">Alternative</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Icon (Emoji)</label>
+            <input type="text" id="newIcon" placeholder="📦" maxlength="2"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-100">
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button onclick="addNewType()"
+            class="px-5 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">
+            ➕ Add Type
+          </button>
+        </div>
+      </div>
+
+      <!-- Existing Types Section -->
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Existing Investment Types</h3>
+
+        <div id="typesGrid" class="grid grid-cols-2 gap-4">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="border-t border-gray-200 px-4 py-3 bg-gray-50 flex justify-end">
+      <button onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Close
+      </button>
+    </div>
+
+  </div>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    let allTypes = [];
+
+    // Load types on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      loadInvestmentTypes();
+    });
+
+    function loadInvestmentTypes() {
+      google.script.run
+        .withSuccessHandler(function(types) {
+          allTypes = types;
+          renderTypes(types);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading types:', error);
+        })
+        .getAllInvestmentTypes();
+    }
+
+    function renderTypes(types) {
+      const grid = document.getElementById('typesGrid');
+
+      if (!types || types.length === 0) {
+        grid.innerHTML = '<p class="col-span-2 text-center text-gray-600">No investment types found.</p>';
+        return;
+      }
+
+      let html = '';
+      types.forEach(function(type) {
+        const categoryColors = {
+          'Equity': 'bg-blue-100 text-blue-800',
+          'Debt': 'bg-green-100 text-green-800',
+          'Gold': 'bg-yellow-100 text-yellow-800',
+          'Real Estate': 'bg-purple-100 text-purple-800',
+          'Alternative': 'bg-orange-100 text-orange-800',
+          'Other': 'bg-gray-100 text-gray-800'
+        };
+
+        const categoryClass = categoryColors[type.defaultCategory] || 'bg-gray-100 text-gray-800';
+
+        html += `
+          <div class="border border-gray-200 rounded-lg p-4 hover:border-purple-400 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="text-3xl">${type.icon || '📦'}</div>
+              <div class="flex-1">
+                <h4 class="font-semibold text-gray-800">${escapeHtml(type.typeName)}</h4>
+                <span class="inline-block px-2 py-1 rounded-full text-xs font-medium ${categoryClass} mt-1">
+                  ${type.defaultCategory || 'Other'}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      grid.innerHTML = html;
+    }
+
+    function addNewType() {
+      const typeName = document.getElementById('newTypeName').value.trim();
+      const category = document.getElementById('newCategory').value;
+      const icon = document.getElementById('newIcon').value.trim() || '📦';
+
+      // Validate
+      if (!typeName) {
+        alert('Please enter a Type Name.');
+        return;
+      }
+
+      // Check for duplicates
+      const exists = allTypes.some(function(type) {
+        return type.typeName.toLowerCase() === typeName.toLowerCase();
+      });
+
+      if (exists) {
+        alert('This investment type already exists.');
+        return;
+      }
+
+      // Prepare data
+      const data = {
+        typeName: typeName,
+        defaultCategory: category,
+        icon: icon
+      };
+
+      // Submit to backend
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            showSuccess(response.message);
+            // Clear form
+            document.getElementById('newTypeName').value = '';
+            document.getElementById('newCategory').value = 'Equity';
+            document.getElementById('newIcon').value = '';
+            // Reload types
+            loadInvestmentTypes();
+          } else {
+            alert('Error: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('Failed to add investment type: ' + error.message);
+        })
+        .addInvestmentType(data);
+    }
+
+    function showSuccess(message) {
+      const alert = document.getElementById('successAlert');
+      alert.textContent = message;
+      alert.classList.remove('hidden');
+      // Hide after 3 seconds
+      setTimeout(function() {
+        alert.classList.add('hidden');
+      }, 3000);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+
+</body>
+</html>

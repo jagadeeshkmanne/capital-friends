@@ -1,0 +1,4 @@
+master-mf-db/**
+youtube/**
+node_modules/**
+.git/**

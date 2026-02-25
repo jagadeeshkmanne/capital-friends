@@ -1,0 +1,475 @@
+<!-- Common Styles for Capital Friends V2 -->
+<!-- Include this in all HTML forms using: <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?> -->
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  /* ===== BASE STYLES ===== */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ===== CUSTOM SCROLLBAR ===== */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* ===== SMOOTH TRANSITIONS ===== */
+  * {
+    transition: all 0.2s ease;
+  }
+
+  input, select, textarea, button {
+    transition: all 0.2s ease;
+  }
+
+  /* ===== FOCUS STYLES ===== */
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  /* ===== BUTTON HOVER EFFECTS ===== */
+  button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(0);
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* ===== LOADING SPINNER ===== */
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  /* ===== FADE IN ANIMATION ===== */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* ===== TOOLTIPS ===== */
+  .tooltip {
+    position: relative;
+    display: inline-block;
+  }
+
+  .tooltip .tooltiptext {
+    visibility: hidden;
+    width: 220px;
+    background-color: #1e293b;
+    color: #fff;
+    text-align: left;
+    border-radius: 8px;
+    padding: 10px 12px;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -110px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  }
+
+  .tooltip .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1e293b transparent transparent transparent;
+  }
+
+  .tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* ===== BADGE STYLES ===== */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 9999px;
+  }
+
+  .badge-primary {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+
+  .badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+
+  .badge-warning {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+
+  .badge-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .badge-gray {
+    background-color: #f3f4f6;
+    color: #374151;
+  }
+
+  /* ===== CARD STYLES ===== */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+  }
+
+  .card-hover:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-color: #6366f1;
+  }
+
+  /* ===== GRADIENT BACKGROUNDS ===== */
+  .gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+
+  .gradient-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  }
+
+  .gradient-indigo {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  }
+
+  /* ===== INFO BOX STYLES ===== */
+  .info-box {
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .info-box-blue {
+    background-color: #dbeafe;
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+  }
+
+  .info-box-green {
+    background-color: #d1fae5;
+    border: 1px solid #6ee7b7;
+    color: #065f46;
+  }
+
+  .info-box-yellow {
+    background-color: #fef3c7;
+    border: 1px solid #fde047;
+    color: #92400e;
+  }
+
+  .info-box-red {
+    background-color: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+  }
+
+  /* ===== DYNAMIC FIELD STYLES ===== */
+  .dynamic-field-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.75rem;
+    background-color: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+  }
+
+  .dynamic-field-row:hover {
+    border-color: #6366f1;
+    background-color: #f5f3ff;
+  }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: #9ca3af;
+  }
+
+  .empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  /* ===== DIVIDER ===== */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #e5e7eb, transparent);
+    margin: 1.5rem 0;
+  }
+
+  /* ===== FORM SECTION HEADER ===== */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  /* ===== DEVELOPER CREDIT FOOTER ===== */
+  .developer-credit {
+    background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+    color: white;
+    text-align: center;
+    padding: 1rem 1.5rem;
+    border-radius: 0 0 12px 12px;
+    margin-top: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .developer-credit p {
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .developer-credit strong {
+    font-weight: 700;
+    font-size: 0.8125rem;
+  }
+
+  /* ===== STATUS INDICATORS ===== */
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+
+  .status-active {
+    background-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  }
+
+  .status-inactive {
+    background-color: #6b7280;
+    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2);
+  }
+
+  /* ===== RESPONSIVE UTILITIES ===== */
+  @media (max-width: 640px) {
+    .card {
+      padding: 1rem;
+    }
+
+    .section-header {
+      font-size: 0.8125rem;
+    }
+  }
+
+  /* ===== PRINT STYLES ===== */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+</style>
+
+<!-- Common Scripts -->
+<script>
+  // ===== UTILITY FUNCTIONS =====
+
+  /**
+   * Show loading state on button
+   */
+  function showButtonLoading(buttonId, loadingText = 'Saving...') {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.dataset.originalContent = btn.innerHTML;
+    btn.innerHTML = `
+      <svg class="animate-spin h-4 w-4 inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      ${loadingText}
+    `;
+  }
+
+  /**
+   * Reset button to original state
+   */
+  function resetButton(buttonId) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+
+    btn.disabled = false;
+    if (btn.dataset.originalContent) {
+      btn.innerHTML = btn.dataset.originalContent;
+    }
+  }
+
+  /**
+   * Show success message
+   */
+  function showSuccess(message) {
+    alert(' ' + message);
+  }
+
+  /**
+   * Show error message
+   */
+  function showError(message) {
+    alert('L ' + message);
+  }
+
+  /**
+   * Close dialog
+   */
+  function closeDialog() {
+    google.script.host.close();
+  }
+
+  /**
+   * Format date to YYYY-MM-DD
+   */
+  function formatDate(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Format currency
+   */
+  function formatCurrency(amount, currency = '�') {
+    if (amount === null || amount === undefined || amount === '') return '';
+    const num = parseFloat(amount);
+    if (isNaN(num)) return '';
+
+    return currency + ' ' + num.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  /**
+   * Validate email
+   */
+  function validateEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+
+  /**
+   * Validate phone number (10 digits)
+   */
+  function validatePhone(phone) {
+    const re = /^\d{10}$/;
+    return re.test(phone);
+  }
+
+  /**
+   * Validate PAN number
+   */
+  function validatePAN(pan) {
+    const re = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    return re.test(pan);
+  }
+
+  /**
+   * Validate Aadhar number (12 digits)
+   */
+  function validateAadhar(aadhar) {
+    const re = /^\d{12}$/;
+    return re.test(aadhar);
+  }
+
+  /**
+   * Add fade-in animation to element
+   */
+  function fadeIn(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.classList.add('fade-in');
+    }
+  }
+</script>

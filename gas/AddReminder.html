@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <form id="reminderForm" novalidate>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Adding reminder...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait while we save the reminder</div>
+      </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+
+      <!-- Row 1: Reminder Type + Family Member -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Reminder Type <span class="text-red-600">*</span></label>
+          <select id="reminderType" required onchange="updateReminderTypeHint()"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Select type</option>
+            <option value="FD Maturity">FD Maturity</option>
+            <option value="Insurance Renewal">Insurance Renewal</option>
+            <option value="Insurance Expiry">Insurance Expiry</option>
+            <option value="PPF Contribution">PPF Contribution</option>
+            <option value="NPS Contribution">NPS Contribution</option>
+            <option value="SIP Payment">SIP Payment</option>
+            <option value="Loan EMI">Loan EMI</option>
+            <option value="Tax Filing Deadline">Tax Filing Deadline</option>
+            <option value="Portfolio Review">Portfolio Review</option>
+            <option value="Rebalance Portfolio">Rebalance Portfolio</option>
+            <option value="Update NAV/Prices">Update NAV/Prices</option>
+            <option value="Custom">Custom</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="reminderTypeError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Family Member <span class="text-gray-400 text-xs">(Optional)</span></label>
+          <select id="familyMember"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">All Members</option>
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 2: Title -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Reminder Title <span class="text-red-600">*</span></label>
+        <input type="text" id="title" required placeholder="e.g., HDFC FD Maturity - Rs 5 Lakhs"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        <span class="text-red-600 text-xs hidden mt-0.5 block" id="titleError">Required</span>
+      </div>
+
+      <!-- Row 3: Description -->
+      <div class="px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Description <span class="text-gray-400 text-xs">(Optional)</span></label>
+        <textarea id="description" rows="2" placeholder="Add any additional details..."
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 resize-none"></textarea>
+      </div>
+
+      <!-- Row 4: Due Date + Advance Notice -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Due Date <span class="text-red-600">*</span></label>
+          <input type="date" id="dueDate" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="dueDateError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Advance Notice <span class="text-gray-400 text-xs cursor-help" title="Days before due date to send reminder">ℹ️</span></label>
+          <select id="advanceNoticeDays"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="0">On due date</option>
+            <option value="1">1 day before</option>
+            <option value="3">3 days before</option>
+            <option value="7" selected>7 days before</option>
+            <option value="15">15 days before</option>
+            <option value="30">30 days before</option>
+            <option value="60">60 days before</option>
+            <option value="90">90 days before</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 5: Frequency + Email Recipients -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Frequency <span class="text-red-600">*</span></label>
+          <select id="frequency" required onchange="toggleRecurrenceFields()"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="Once" selected>Once</option>
+            <option value="Daily">Daily</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Monthly">Monthly</option>
+            <option value="Quarterly">Quarterly</option>
+            <option value="Yearly">Yearly</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="frequencyError">Required</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Send Email To <span class="text-red-600">*</span></label>
+          <textarea id="recipientEmail" required placeholder="email1@example.com, email2@example.com" rows="2"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 resize-none"></textarea>
+          <span class="text-xs text-gray-500 mt-0.5 block">Separate multiple emails with commas</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="recipientEmailError">Invalid email</span>
+        </div>
+      </div>
+
+      <!-- Row 6: Recurrence End Date (conditional) -->
+      <div id="recurrenceFields" class="hidden px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <label class="text-xs font-semibold text-gray-700 mb-1 block">Recurrence End Date <span class="text-gray-400 text-xs">(Optional)</span> <span class="text-gray-400 text-xs cursor-help" title="Leave blank for no end date">ℹ️</span></label>
+        <input type="date" id="recurrenceEndDate"
+          class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        <p class="text-xs text-gray-500 mt-1">Leave blank if reminder should repeat indefinitely</p>
+      </div>
+
+      <!-- Row 7: Priority + Active Status -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Priority</label>
+          <select id="priority"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="Low">🟢 Low</option>
+            <option value="Medium" selected>🟡 Medium</option>
+            <option value="High">🔴 High</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <label class="flex items-center gap-2 cursor-pointer text-sm pb-2">
+            <input type="checkbox" id="isActive" checked class="w-4 h-4 cursor-pointer">
+            <span class="font-medium text-gray-700">Active Reminder</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Row 8: Additional Notes Section -->
+      <div class="px-4 py-2.5 border-b border-gray-100 bg-sky-50">
+        <div class="flex items-start gap-2">
+          <span class="text-lg">💡</span>
+          <div class="text-xs text-gray-700">
+            <p class="font-semibold mb-1">Reminder Tips:</p>
+            <ul class="list-disc list-inside space-y-0.5 text-gray-600">
+              <li><strong>FD Maturity:</strong> Set 30 days before to plan reinvestment</li>
+              <li><strong>Insurance:</strong> Set 60-90 days before expiry for renewal</li>
+              <li><strong>Tax Deadlines:</strong> Set 15 days before for preparation time</li>
+              <li><strong>Portfolio Review:</strong> Set quarterly for regular checkups</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="google.script.host.close()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        Add Reminder
+      </button>
+    </div>
+
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    // Load family members on init
+    window.addEventListener('DOMContentLoaded', function() {
+      google.script.run.withSuccessHandler(populateFamilyMembers).getAllFamilyMembers();
+
+      // Set default email to current user
+      google.script.run.withSuccessHandler(function(email) {
+        document.getElementById('recipientEmail').value = email;
+      }).getCurrentUserEmail();
+
+      // Set min date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('dueDate').setAttribute('min', today);
+    });
+
+    function populateFamilyMembers(members) {
+      const select = document.getElementById('familyMember');
+      if (!members || members.length === 0) {
+        return;
+      }
+      // Filter for active members only
+      const activeMembers = members.filter(m => m.status === 'Active');
+      activeMembers.forEach(member => {
+        const option = document.createElement('option');
+        option.value = member.memberName;
+        option.textContent = member.memberName + ' (' + member.relationship + ')';
+        select.appendChild(option);
+      });
+    }
+
+    function toggleRecurrenceFields() {
+      const frequency = document.getElementById('frequency').value;
+      const recurrenceFields = document.getElementById('recurrenceFields');
+      if (frequency !== 'Once') {
+        recurrenceFields.classList.remove('hidden');
+      } else {
+        recurrenceFields.classList.add('hidden');
+      }
+    }
+
+    function updateReminderTypeHint() {
+      const type = document.getElementById('reminderType').value;
+      const titleField = document.getElementById('title');
+      const advanceNotice = document.getElementById('advanceNoticeDays');
+
+      // Set suggested advance notice based on type
+      const advanceNoticeMap = {
+        'FD Maturity': '30',
+        'Insurance Renewal': '60',
+        'Insurance Expiry': '60',
+        'PPF Contribution': '7',
+        'NPS Contribution': '7',
+        'SIP Payment': '3',
+        'Loan EMI': '3',
+        'Tax Filing Deadline': '15',
+        'Portfolio Review': '7',
+        'Rebalance Portfolio': '0',
+        'Update NAV/Prices': '0'
+      };
+
+      if (advanceNoticeMap[type]) {
+        advanceNotice.value = advanceNoticeMap[type];
+      }
+
+      // Update placeholder based on type
+      const placeholders = {
+        'FD Maturity': 'e.g., HDFC FD Maturity - ₹5 Lakhs',
+        'Insurance Renewal': 'e.g., Health Insurance Renewal - Star Health',
+        'Insurance Expiry': 'e.g., Car Insurance Expiry - Honda City',
+        'PPF Contribution': 'e.g., PPF Yearly Contribution Deadline',
+        'NPS Contribution': 'e.g., NPS Monthly Contribution',
+        'SIP Payment': 'e.g., SIP Payment - HDFC Equity Fund',
+        'Loan EMI': 'e.g., Home Loan EMI - HDFC',
+        'Tax Filing Deadline': 'e.g., ITR Filing Deadline - FY 2025-26',
+        'Portfolio Review': 'e.g., Quarterly Portfolio Review',
+        'Rebalance Portfolio': 'e.g., Rebalance to 70-30 Equity-Debt',
+        'Update NAV/Prices': 'e.g., Update All NAVs and Prices'
+      };
+
+      if (placeholders[type]) {
+        titleField.placeholder = placeholders[type];
+      }
+    }
+
+    function showError(fieldId, message) {
+      const field = document.getElementById(fieldId);
+      const error = document.getElementById(fieldId + 'Error');
+      field.classList.add('border-red-500');
+      if (error) {
+        error.textContent = message;
+        error.classList.remove('hidden');
+      }
+    }
+
+    function clearError(fieldId) {
+      const field = document.getElementById(fieldId);
+      const error = document.getElementById(fieldId + 'Error');
+      field.classList.remove('border-red-500');
+      if (error) error.classList.add('hidden');
+    }
+
+    function validateEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function validateEmails(emailString) {
+      const emails = emailString.split(',').map(e => e.trim()).filter(e => e);
+      if (emails.length === 0) return false;
+      return emails.every(email => validateEmail(email));
+    }
+
+    document.getElementById('reminderForm').onsubmit = function(e) {
+      e.preventDefault();
+
+      // Clear all errors
+      document.querySelectorAll('input, select, textarea').forEach(el => clearError(el.id));
+
+      // Get form values
+      const reminderType = document.getElementById('reminderType').value.trim();
+      const familyMember = document.getElementById('familyMember').value.trim();
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const dueDate = document.getElementById('dueDate').value;
+      const advanceNoticeDays = document.getElementById('advanceNoticeDays').value;
+      const frequency = document.getElementById('frequency').value;
+      const recipientEmail = document.getElementById('recipientEmail').value.trim();
+      const recurrenceEndDate = document.getElementById('recurrenceEndDate').value;
+      const priority = document.getElementById('priority').value;
+      const isActive = document.getElementById('isActive').checked;
+
+      // Validate
+      let isValid = true;
+
+      if (!reminderType) { showError('reminderType', 'Required'); isValid = false; }
+      if (!title) { showError('title', 'Required'); isValid = false; }
+      if (!dueDate) { showError('dueDate', 'Required'); isValid = false; }
+      if (!frequency) { showError('frequency', 'Required'); isValid = false; }
+      if (!recipientEmail) { showError('recipientEmail', 'Required'); isValid = false; }
+      if (recipientEmail && !validateEmails(recipientEmail)) { showError('recipientEmail', 'Invalid email(s)'); isValid = false; }
+
+      // Validate due date is in future
+      const dueDateObj = new Date(dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (dueDateObj < today) {
+        showError('dueDate', 'Due date must be today or in the future');
+        isValid = false;
+      }
+
+      // Validate recurrence end date if set
+      if (recurrenceEndDate) {
+        const endDateObj = new Date(recurrenceEndDate);
+        if (endDateObj < dueDateObj) {
+          showError('recurrenceEndDate', 'End date must be after due date');
+          isValid = false;
+        }
+      }
+
+      if (!isValid) return;
+
+      const data = {
+        reminderType,
+        familyMember: familyMember || 'All Members',
+        title,
+        description,
+        dueDate,
+        advanceNoticeDays: parseInt(advanceNoticeDays),
+        frequency,
+        recipientEmail,
+        recurrenceEndDate: recurrenceEndDate || '',
+        priority,
+        isActive
+      };
+
+      const overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').textContent = '✓';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = response.message;
+            setTimeout(() => google.script.host.close(), 2000);
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .addReminder(data);
+    };
+
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+      el.oninput = function() { clearError(this.id); };
+    });
+  </script>
+</body>
+</html>

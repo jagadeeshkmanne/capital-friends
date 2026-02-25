@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Capital Friends — YouTube Video Slides</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+  .slide-wrapper {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    z-index: 100;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  .slide-wrapper.active {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ===== SLIDE CANVAS — 1920x1080 (YouTube 1080p) ===== */
+  .slide {
+    width: 1920px;
+    height: 1080px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    border-radius: 0;
+    border: none;
+    background: linear-gradient(165deg, #101828 0%, #15202e 50%, #111a27 100%);
+    transform-origin: top left;
+  }
+
+  /* ===== HEADER BAR ===== */
+  .slide-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 64px;
+    z-index: 10;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .slide-bar .brand img { height: 70px; width: auto; }
+  .slide-bar .right-info { display: flex; align-items: center; gap: 18px; }
+  .slide-bar .website { color: rgba(255,255,255,0.35); font-size: 17px; font-weight: 500; letter-spacing: 0.2px; }
+  .slide-bar .free-pill {
+    background: rgba(125,211,192,0.12); color: #7dd3c0;
+    font-size: 13px; font-weight: 700;
+    padding: 6px 16px; border-radius: 20px;
+    letter-spacing: 0.8px;
+    border: 1px solid rgba(125,211,192,0.2);
+  }
+
+  /* ===== FOOTER ===== */
+  .slide-footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 64px;
+    z-index: 10;
+    background: rgba(0,0,0,0.25);
+    border-top: 1px solid rgba(255,255,255,0.03);
+  }
+  .slide-footer .gs-tag {
+    display: flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.25); font-size: 14px; font-weight: 500;
+  }
+  .slide-footer .gs-tag .gs-box {
+    width: 17px; height: 17px; background: #5eae9a;
+    border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  }
+  .slide-footer .gs-box span { color: #fff; font-size: 10px; font-weight: 900; }
+  .slide-footer .slide-num { color: rgba(255,255,255,0.15); font-size: 14px; font-weight: 500; }
+
+  /* ===== DECORATIVE ===== */
+  .glow { position: absolute; border-radius: 50%; z-index: 1; }
+  .glow-tl { width: 700px; height: 700px; background: radial-gradient(circle, rgba(125,211,192,0.04) 0%, transparent 70%); top: -250px; left: -200px; }
+  .glow-br { width: 600px; height: 600px; background: radial-gradient(circle, rgba(212,168,83,0.025) 0%, transparent 70%); bottom: -200px; right: -150px; }
+
+  /* ===== CONTENT AREA ===== */
+  .content {
+    position: relative; z-index: 5;
+    padding: 100px 80px 64px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .content.center { align-items: center; justify-content: center; text-align: center; }
+
+  /* ===== TYPOGRAPHY — softer, muted palette ===== */
+  .title {
+    font-size: 58px; font-weight: 700; line-height: 1.15;
+    color: rgba(255,255,255,0.93);
+    letter-spacing: -0.5px;
+  }
+  /* Muted accent colors — gentle, professional */
+  .hl-green { color: #7dd3c0; }
+  .hl-yellow { color: #d4a853; }
+  .hl-red { color: #e07070; }
+  .hl-blue { color: #7db8e0; }
+  .hl-orange { color: #d4915a; }
+
+  .subtitle {
+    font-size: 26px; color: rgba(255,255,255,0.5);
+    margin-top: 18px; font-weight: 400; line-height: 1.55;
+  }
+
+  /* ===== BULLET POINTS ===== */
+  .bullets {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+    justify-content: space-evenly;
+  }
+  .bullet-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    font-size: 26px;
+    line-height: 1.45;
+    color: rgba(255,255,255,0.65);
+  }
+  .bullet-item .icon {
+    font-size: 26px;
+    min-width: 38px;
+    text-align: center;
+    margin-top: 3px;
+  }
+  .bullet-item .lead { color: rgba(255,255,255,0.88); font-weight: 500; }
+  .bullet-item strong { color: rgba(255,255,255,0.88); font-weight: 500; }
+
+  /* ===== TWO COLUMN ===== */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 28px;
+    flex: 1;
+    align-content: stretch;
+  }
+  .col-section {
+    padding: 28px 30px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .col-section h3 {
+    font-size: 30px; font-weight: 600; margin-bottom: 18px; line-height: 1.3;
+  }
+  .col-section .col-bullets {
+    display: flex; flex-direction: column; gap: 0; flex: 1; justify-content: space-evenly;
+  }
+  .col-section .col-bullet {
+    display: flex; align-items: flex-start; gap: 14px;
+    font-size: 26px; line-height: 1.45; color: rgba(255,255,255,0.65);
+  }
+  .col-section .col-bullet .dot {
+    min-width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 12px; flex-shrink: 0;
+  }
+  .col-section .col-bullet strong { color: rgba(255,255,255,0.85); font-weight: 500; }
+
+  /* ===== FEATURE LIST ===== */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 48px;
+    margin-top: 24px;
+    flex: 1;
+    align-content: space-evenly;
+  }
+  .feature-row {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .feature-row .f-icon { font-size: 24px; min-width: 32px; text-align: center; margin-top: 2px; }
+  .feature-row .f-name { font-size: 22px; font-weight: 500; color: rgba(255,255,255,0.88); }
+  .feature-row .f-desc { font-size: 17px; color: rgba(255,255,255,0.4); margin-top: 2px; line-height: 1.4; }
+
+  /* ===== QUESTION ROWS ===== */
+  .q-list { margin-top: 20px; display: flex; flex-direction: column; gap: 0; flex: 1; justify-content: space-evenly; }
+  .q-row {
+    display: flex; align-items: flex-start; gap: 20px;
+    padding: 14px 28px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid;
+  }
+  .q-row .q-num { font-size: 22px; font-weight: 700; min-width: 34px; text-align: center; margin-top: 2px; }
+  .q-row .q-text { font-size: 25px; font-weight: 500; color: rgba(255,255,255,0.88); flex: 1; line-height: 1.3; }
+  .q-row .q-sub { font-size: 18px; color: rgba(255,255,255,0.38); margin-top: 4px; line-height: 1.4; font-weight: 400; }
+  .q-row .q-right { display: flex; flex-direction: column; flex: 1; }
+
+  /* ===== STEPS ROW ===== */
+  .steps { display: flex; gap: 24px; margin-top: 36px; }
+  .step {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 28px 22px;
+    text-align: center;
+  }
+  .step .s-num {
+    background: rgba(125,211,192,0.12); color: #7dd3c0;
+    border: 1px solid rgba(125,211,192,0.2);
+    font-size: 20px; font-weight: 700;
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .step .s-title { font-size: 23px; font-weight: 600; color: rgba(255,255,255,0.88); margin-bottom: 8px; }
+  .step .s-desc { font-size: 18px; color: rgba(255,255,255,0.42); line-height: 1.5; font-weight: 400; }
+
+  /* ===== HIGHLIGHT BOX ===== */
+  .highlight-box {
+    margin-top: 28px;
+    padding: 16px 30px;
+    background: rgba(125,211,192,0.04);
+    border: 1px solid rgba(125,211,192,0.1);
+    border-radius: 10px;
+    font-size: 24px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.5;
+    text-align: center;
+    font-weight: 400;
+  }
+
+  /* ===== BOTTOM LINE ===== */
+  .bottom-line {
+    margin-top: auto;
+    padding-top: 16px;
+    font-size: 22px;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    font-weight: 400;
+  }
+
+  /* ===== CONTENT ANIMATIONS ===== */
+  .slide-wrapper .anim {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  .slide-wrapper.active .anim {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .slide-wrapper.active .content > .anim:nth-child(1) { transition-delay: 0.15s; }
+  .slide-wrapper.active .content > .anim:nth-child(2) { transition-delay: 0.35s; }
+  .slide-wrapper.active .content > .anim:nth-child(3) { transition-delay: 0.55s; }
+  .slide-wrapper.active .content > .anim:nth-child(4) { transition-delay: 0.75s; }
+  .slide-wrapper.active .content > .anim:nth-child(5) { transition-delay: 0.95s; }
+
+  .slide-wrapper.resetting .anim {
+    transition: none !important;
+    opacity: 0 !important;
+    transform: translateY(24px) !important;
+  }
+
+  /* ===== PROGRESS BAR ===== */
+  #presProgress {
+    position: fixed;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: #7dd3c0;
+    z-index: 9999;
+    transition: width 0.4s ease;
+  }
+  #presCounter {
+    position: fixed;
+    bottom: 12px; right: 24px;
+    color: rgba(255,255,255,0.15);
+    font-size: 13px; font-weight: 500;
+    z-index: 9999;
+    font-family: 'Inter', sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!-- SLIDE 1 — INTRO + HOOK -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info">
+        <span class="website">www.capitalfriends.in</span>
+        <span class="free-pill">100% FREE</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">1 / 8</div>
+    </div>
+
+    <div class="content center">
+      <div class="anim title" style="font-size:68px;">
+        Your Entire Family Should Know<br>About <span class="hl-yellow">Your Investments</span>
+      </div>
+      <div class="anim subtitle" style="font-size:28px;margin-top:24px;max-width:1300px;">
+        A <span class="hl-green" style="font-weight:500;">free</span> Google Sheets tool that tracks your family's complete wealth &mdash;
+        mutual funds, stocks, insurance, loans, goals &mdash; and sends
+        <span class="hl-green" style="font-weight:500;">automated email reports</span> to keep everyone informed.
+      </div>
+      <div class="anim steps" style="gap:40px;">
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;">
+          <div style="font-size:52px;margin-bottom:14px;">&#x1f4b0;</div>
+          <div class="s-title" style="font-size:26px;color:#e07070;">Free Forever</div>
+          <div class="s-desc" style="font-size:21px;line-height:1.6;flex:1;display:flex;align-items:center;">
+            <span>No subscription fees. No hidden charges. Ever.</span>
+          </div>
+        </div>
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;">
+          <div style="font-size:52px;margin-bottom:14px;">&#x1f468;&#x200d;&#x1f469;&#x200d;&#x1f467;&#x200d;&#x1f466;</div>
+          <div class="s-title" style="font-size:26px;color:#7dd3c0;">Family Informed</div>
+          <div class="s-desc" style="font-size:21px;line-height:1.6;flex:1;display:flex;align-items:center;">
+            <span>Automated email reports sent directly to your family members</span>
+          </div>
+        </div>
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;">
+          <div style="font-size:52px;margin-bottom:14px;">&#x1f512;</div>
+          <div class="s-title" style="font-size:26px;color:#d4a853;">Complete Privacy</div>
+          <div class="s-desc" style="font-size:21px;line-height:1.6;flex:1;display:flex;align-items:center;">
+            <span>Your Google Sheet, your data. Nobody else has access</span>
+          </div>
+        </div>
+      </div>
+      <div class="anim bottom-line" style="margin-top:40px;font-size:24px;">
+        Works on any device &nbsp;&bull;&nbsp; No app to install &nbsp;&bull;&nbsp; No server needed &nbsp;&bull;&nbsp; Built on Google Sheets
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 2 — THE HIDDEN DANGER -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">2 / 8</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title">
+        The <span class="hl-red">Hidden Danger</span> Nobody Talks About
+      </div>
+      <div class="anim subtitle">
+        Everything about your money is locked inside <span class="hl-yellow" style="font-weight:600;">your head</span>. What happens if something unexpected occurs?
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:28px;flex:1;align-content:center;">
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f3e6;</div>
+          <h3 style="color:#e07070;font-size:26px;margin-bottom:10px;">Bank Accounts</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            Multiple banks, scattered accounts — your family may not know which banks or what's in them
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f4ca;</div>
+          <h3 style="color:#e07070;font-size:26px;margin-bottom:10px;">Scattered Investments</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            MFs, stocks, PPF, NPS, FDs, gold — no single view of everything
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f6e1;&#xfe0f;</div>
+          <h3 style="color:#e07070;font-size:26px;margin-bottom:10px;">Insurance Policies</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            Critical details unknown — if they don't know the details, they can't claim
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f3e0;</div>
+          <h3 style="color:#e07070;font-size:26px;margin-bottom:10px;">Loans & EMIs</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            Your family needs to know what's pending and where documents are
+          </div>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="background:rgba(224,112,112,0.06);border-color:rgba(224,112,112,0.15);margin-top:24px;">
+        <span style="color:#e07070;font-weight:600;">Fact:</span> Every year, thousands of crores in insurance claims go unclaimed because families didn't know the policy existed.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 3 — EXISTING SOLUTIONS FAIL -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">3 / 8</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title">
+        Why <span class="hl-red">Existing Apps</span> Don't Solve This
+      </div>
+      <div class="anim subtitle">
+        You might think &mdash; "I already use a finance app." Here's why most apps fall short:
+      </div>
+
+      <div class="anim two-col" style="margin-top:32px;">
+        <div class="col-section">
+          <h3 style="color:#e07070;">&#x274c; &nbsp;The Problems</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><span class="lead" style="color:#e07070;">Paid subscriptions</span> &mdash; Pay monthly just to view your own data. Stop paying, lose access.</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><span class="lead" style="color:#e07070;">Too many apps</span> &mdash; One for mutual funds, another for stocks, another for insurance. No complete picture.</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><span class="lead" style="color:#e07070;">No family visibility</span> &mdash; If something happens to you, your family starts from scratch.</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><span class="lead" style="color:#e07070;">Privacy concerns</span> &mdash; Your complete financial life on someone else's server.</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-section">
+          <h3 style="color:#7dd3c0;">&#x2705; &nbsp;What You Actually Need</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><span class="lead" style="color:#7dd3c0;">Completely free</span> &mdash; No subscription, no trial, no premium tier. Free forever.</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><span class="lead" style="color:#7dd3c0;">Everything in one place</span> &mdash; Banks, MFs, stocks, insurance, loans, goals. One sheet.</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><span class="lead" style="color:#7dd3c0;">Family gets notified</span> &mdash; Automated email reports to every family member you choose.</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><span class="lead" style="color:#7dd3c0;">100% private</span> &mdash; Data in YOUR Google account. No server, no company involved.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim bottom-line">
+        That's exactly what <span class="hl-green" style="font-weight:600;">Capital Friends</span> was built to do.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 4 — THE SOLUTION -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info">
+        <span class="website">www.capitalfriends.in</span>
+        <span class="free-pill">100% FREE</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">4 / 8</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:54px;">
+        How <span class="hl-green">Capital Friends</span> Works
+      </div>
+      <div class="anim subtitle">
+        A simple, powerful Google Sheet that brings your entire financial life into one place.
+      </div>
+
+      <div class="anim two-col" style="margin-top:28px;">
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f4dd;</div>
+          <h3 style="color:#e07070;">Step 1: Add Your Data</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span>Bank accounts, mutual funds, stocks</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span>Insurance, loans, goals</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span>Simple menus, no tech knowledge needed</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f4ca;</div>
+          <h3 style="color:#7db8e0;">Step 2: Live Tracking</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#7db8e0;"></span>
+              <span>Mutual fund NAVs update daily</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7db8e0;"></span>
+              <span>Stock prices from Google Finance</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7db8e0;"></span>
+              <span>Dashboard shows wealth, allocation, P&L</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f468;&#x200d;&#x1f469;&#x200d;&#x1f467;&#x200d;&#x1f466;</div>
+          <h3 style="color:#7dd3c0;">Step 3: Family Reports</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span>Add spouse, parents, children</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span>Automated email reports</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span>Daily, weekly, or monthly schedule</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:42px;margin-bottom:12px;">&#x1f512;</div>
+          <h3 style="color:#d4a853;">100% Private</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#d4a853;"></span>
+              <span>Everything in YOUR Google Sheet</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#d4a853;"></span>
+              <span>No server, no database</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#d4a853;"></span>
+              <span>No company storing your data</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim bottom-line">
+        <span class="hl-green" style="font-weight:600;">One Google Sheet</span> for complete financial transparency
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 5 — ALL FEATURES -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info">
+        <span class="website">www.capitalfriends.in</span>
+        <span class="free-pill">100% FREE</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">5 / 8</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:54px;">
+        Everything <span class="hl-green">Capital Friends</span> Can Do
+      </div>
+      <div class="anim subtitle">
+        One sheet manages your family's complete financial life. Here's what's included:
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:28px;flex:1;align-content:center;">
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f680;</div>
+          <div class="s-title" style="color:#7dd3c0;font-size:24px;margin-bottom:10px;font-weight:600;">Quick Setup</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            ONE-CLICK SETUP<br>
+            Financial Health Check (8 questions)<br>
+            Ready in 2 minutes
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f4ca;</div>
+          <div class="s-title" style="color:#7db8e0;font-size:24px;margin-bottom:10px;font-weight:600;">Dashboard & Reports</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            Wealth Dashboard<br>
+            Email Reports<br>
+            Daily/Weekly/Monthly
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f4b9;</div>
+          <div class="s-title" style="color:#7dd3c0;font-size:24px;margin-bottom:10px;font-weight:600;">Mutual Funds</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            Live NAV tracking<br>
+            SIP & Lumpsum<br>
+            ATH & Rebalancing
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f4c8;</div>
+          <div class="s-title" style="color:#d4915a;font-size:24px;margin-bottom:10px;font-weight:600;">Stocks</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            5000+ NSE stocks<br>
+            Buy/Sell tracking<br>
+            Google Finance data
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f3af;</div>
+          <div class="s-title" style="color:#d4a853;font-size:24px;margin-bottom:10px;font-weight:600;">Goals & Planning</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            8 goal categories<br>
+            SIP calculator<br>
+            Goal Dashboard
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f4b0;</div>
+          <div class="s-title" style="color:#7db8e0;font-size:24px;margin-bottom:10px;font-weight:600;">Other Investments</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            Gold, PPF, EPF, NPS<br>
+            Fixed Deposits<br>
+            Real Estate
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f468;&#x200d;&#x1f469;&#x200d;&#x1f467;&#x200d;&#x1f466;</div>
+          <div class="s-title" style="color:#e07070;font-size:24px;margin-bottom:10px;font-weight:600;">Family & Accounts</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            Family members<br>
+            Bank accounts<br>
+            Investment accounts
+          </div>
+        </div>
+        <div class="step" style="text-align:left;padding:28px 24px;display:flex;flex-direction:column;">
+          <div style="font-size:44px;margin-bottom:12px;">&#x1f6e1;&#xfe0f;</div>
+          <div class="s-title" style="color:#7dd3c0;font-size:24px;margin-bottom:10px;font-weight:600;">Insurance & More</div>
+          <div class="s-desc" style="text-align:left;line-height:1.7;font-size:19px;">
+            Insurance policies<br>
+            Liabilities & loans<br>
+            Smart reminders
+          </div>
+        </div>
+      </div>
+
+      <div class="anim bottom-line" style="color:#7dd3c0;">
+        Let me show you a live demo &rarr;
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 6 — WHY IS THIS FREE -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info">
+        <span class="website">www.capitalfriends.in</span>
+        <span class="free-pill">100% FREE</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">6 / 8</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:54px;">
+        "Why Is This <span class="hl-yellow">Free</span>?"
+      </div>
+      <div class="anim subtitle">
+        The #1 question everyone asks. Here's my honest answer:
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:28px;flex:1;align-content:center;">
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;color:#7dd3c0;font-weight:700;">01</div>
+          <h3 style="color:#7dd3c0;">Built for Family First</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            I couldn't find a tool that combined financial tracking, family transparency, and total privacy. So I built one.
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;color:#7dd3c0;font-weight:700;">02</div>
+          <h3 style="color:#7dd3c0;">Every Family Needs This</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            Whether you have ₹1 lakh or ₹1 crore, your family should know where everything is. Financial awareness shouldn't be a luxury.
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;color:#7dd3c0;font-weight:700;">03</div>
+          <h3 style="color:#7dd3c0;">Nothing to Charge For</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            The tool runs on YOUR Google account — your Sheet, your Drive, your email. No server on my side. Zero costs.
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;color:#7dd3c0;font-weight:700;">04</div>
+          <h3 style="color:#7dd3c0;">100% Private Forever</h3>
+          <div style="font-size:22px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            I can never see your data. Your financial information stays between you and your family — exactly as it should be.
+          </div>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="margin-top:24px;">
+        <span style="font-weight:600;color:#7dd3c0;">The mission is simple:</span> &nbsp; Help every Indian family have complete financial transparency.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 7 — 7 QUESTIONS -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">7 / 8</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:54px;">
+        <span class="hl-yellow">7 Questions</span> Every Family Must Answer
+      </div>
+      <div class="anim subtitle">
+        Can your family answer "Yes" to all of these today?
+      </div>
+
+      <div class="anim q-list">
+        <div class="q-row" style="border-color:#e07070;align-items:center;">
+          <span class="q-num" style="color:#e07070;">01</span>
+          <span class="q-text">Do you have adequate health insurance?</span>
+        </div>
+        <div class="q-row" style="border-color:#e07070;align-items:center;">
+          <span class="q-num" style="color:#e07070;">02</span>
+          <span class="q-text">Do you have term life insurance?</span>
+        </div>
+        <div class="q-row" style="border-color:#d4915a;align-items:center;">
+          <span class="q-num" style="color:#d4915a;">03</span>
+          <span class="q-text">Do you have 6+ months of emergency fund?</span>
+        </div>
+        <div class="q-row" style="border-color:#d4915a;align-items:center;">
+          <span class="q-num" style="color:#d4915a;">04</span>
+          <span class="q-text">Does your family know where all your assets are?</span>
+        </div>
+        <div class="q-row" style="border-color:#d4a853;align-items:center;">
+          <span class="q-num" style="color:#d4a853;">05</span>
+          <span class="q-text">Do you have a registered will?</span>
+        </div>
+        <div class="q-row" style="border-color:#d4a853;align-items:center;">
+          <span class="q-num" style="color:#d4a853;">06</span>
+          <span class="q-text">Are your nominees updated on every account?</span>
+        </div>
+        <div class="q-row" style="border-color:#7dd3c0;align-items:center;">
+          <span class="q-num" style="color:#7dd3c0;">07</span>
+          <span class="q-text">Have you set clear financial goals with a plan?</span>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="margin-top:auto;">
+        <span style="font-weight:600;color:#7dd3c0;">Capital Friends</span> helps you track, plan, and answer all seven. Start today.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 8 — HEALTH INSURANCE -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">8 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-red">Q1:</span> Health Insurance — <span class="hl-green">The Math</span>
+      </div>
+      <div class="anim subtitle">
+        ₹8.4L paid over 20 years = ₹1 Crore coverage EVERY YEAR
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px;flex:1;align-content:center;">
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">💰</div>
+          <h3 style="color:#e07070;">What You Pay</h3>
+          <div style="font-size:46px;color:#e07070;font-weight:700;margin:20px 0;">₹8.4 Lakhs</div>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            ₹3,500/month × 20 years<br>
+            <span style="font-size:17px;color:rgba(255,255,255,0.4);">Family of 4, Age 30</span>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">🏥</div>
+          <h3 style="color:#7dd3c0;">What You Get</h3>
+          <div style="font-size:46px;color:#7dd3c0;font-weight:700;margin:20px 0;">₹1 Crore</div>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            Every single year<br>
+            <span style="font-size:17px;color:rgba(255,255,255,0.4);">For all 20 years</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="background:rgba(224,112,112,0.06);border-color:rgba(224,112,112,0.15);margin-top:24px;">
+        <span style="color:#e07070;font-weight:600;">Without insurance:</span> One medical emergency (₹15-20L) wipes out 10 years of savings
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 9 — TERM INSURANCE -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">9 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-red">Q2:</span> Term Insurance — <span class="hl-green">Family's Safety Net</span>
+      </div>
+      <div class="anim subtitle">
+        ₹1,000/month = ₹1 Crore security for your family
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px;flex:1;align-content:center;">
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">💸</div>
+          <h3 style="color:#d4915a;">Monthly Cost</h3>
+          <div style="font-size:50px;color:#d4915a;font-weight:700;margin:20px 0;">₹1,000</div>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            Less than eating out<br>
+            <span style="font-size:17px;color:rgba(255,255,255,0.4);">Age 35, 25-year cover</span>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">👨‍👩‍👧‍👦</div>
+          <h3 style="color:#7dd3c0;">Family Gets</h3>
+          <div style="font-size:50px;color:#7dd3c0;font-weight:700;margin:20px 0;">₹1 Crore</div>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.5;">
+            ₹55,000/month interest<br>
+            <span style="font-size:17px;color:rgba(255,255,255,0.4);">@ 8% returns, forever</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="margin-top:24px;">
+        <span style="font-weight:600;color:#7dd3c0;">Your family can maintain their lifestyle with dignity and financial security</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 10 — EMERGENCY FUND -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">10 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-orange">Q3:</span> Emergency Fund — <span class="hl-red">COVID 2020 Lesson</span>
+      </div>
+      <div class="anim subtitle">
+        Same job loss. Same expenses. Different outcomes.
+      </div>
+
+      <div class="anim two-col" style="margin-top:28px;">
+        <div class="col-section" style="border-color:rgba(224,112,112,0.2);">
+          <h3 style="color:#e07070;">❌ Without Emergency Fund</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Forced to sell</strong> mutual funds when market down 30%</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Lost ₹90,000</strong> in forced selling</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Missed recovery</strong> — nothing left invested in Dec 2020</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Total loss:</strong> Over ₹1 lakh</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-section" style="border-color:rgba(125,211,192,0.2);">
+          <h3 style="color:#7dd3c0;">✓ With 6-Month Emergency Fund</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>Used emergency fund</strong> for EMIs Apr-Sep</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>Didn't touch</strong> investments at all</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>Portfolio recovered</strong> by Dec 2020</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>Total loss:</strong> ₹0 (actually made profit)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim bottom-line">
+        Same situation. Only difference: <span class="hl-green" style="font-weight:600;">6-month emergency fund</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 11 — FAMILY AWARENESS -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">11 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-orange">Q4:</span> Family Awareness — <span class="hl-red">The Search Nightmare</span>
+      </div>
+      <div class="anim subtitle">
+        When assets are scattered and family doesn't know where anything is
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:28px;flex:1;align-content:center;">
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">🏦</div>
+          <h3 style="color:#e07070;">Bank Accounts</h3>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.6;">
+            Found 2 accounts.<br>
+            <strong style="color:#e07070;">3-4 more still missing.</strong>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">📊</div>
+          <h3 style="color:#e07070;">Mutual Funds</h3>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.6;">
+            Knew about Groww.<br>
+            <strong style="color:#e07070;">Found 2 more platforms after 2 years.</strong>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">🛡️</div>
+          <h3 style="color:#e07070;">Insurance</h3>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.6;">
+            ₹1 Cr term policy found<br>
+            <strong style="color:#e07070;">after 3 years. Legal battles.</strong>
+          </div>
+        </div>
+        <div class="col-section">
+          <div style="font-size:38px;margin-bottom:12px;">🏠</div>
+          <h3 style="color:#e07070;">Property Docs</h3>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.6;">
+            Bank locker somewhere.<br>
+            <strong style="color:#e07070;">8 months to find which bank.</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="margin-top:24px;">
+        <span style="font-weight:600;color:#7dd3c0;">Capital Friends:</span> One complete list. Automated email reports. Family always informed.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 12 — WILL -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">12 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-yellow">Q5:</span> Registered Will — <span class="hl-red">The Legal Nightmare</span>
+      </div>
+      <div class="anim subtitle">
+        Without a will: 1-3 years of frozen assets and legal battles
+      </div>
+
+      <div class="anim two-col" style="margin-top:28px;">
+        <div class="col-section" style="border-color:rgba(224,112,112,0.2);">
+          <h3 style="color:#e07070;">❌ Without Will</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Legal Heir Certificate</strong> needed from court</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>ALL family members</strong> must be physically present</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Bank accounts frozen</strong> — can't access a single rupee</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>1-3 years minimum</strong> (up to 5 years if complications)</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#e07070;"></span>
+              <span><strong>Family borrows money</strong> for daily expenses</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-section" style="border-color:rgba(125,211,192,0.2);">
+          <h3 style="color:#7dd3c0;">✓ With Registered Will</h3>
+          <div class="col-bullets">
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>Assets transfer</strong> in 1-2 months</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>No court battles</strong> — clean and simple</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>No frozen accounts</strong> — family has access</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>One-time cost:</strong> ₹5,000 - ₹10,000</span>
+            </div>
+            <div class="col-bullet">
+              <span class="dot" style="background:#7dd3c0;"></span>
+              <span><strong>Peace of mind</strong> — priceless</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim bottom-line">
+        Get it done today. <span class="hl-green" style="font-weight:600;">Don't postpone this.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 13 — NOMINEES -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">13 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-yellow">Q6:</span> Updated Nominees — <span class="hl-green">5 Minutes to Fix</span>
+      </div>
+      <div class="anim subtitle">
+        Your life changed. Did your nominees?
+      </div>
+
+      <div class="anim bullets" style="margin-top:32px;">
+        <div class="bullet-item">
+          <span class="icon">💍</span>
+          <span><span class="lead">Recently married?</span> Add your spouse as nominee along with parents</span>
+        </div>
+        <div class="bullet-item">
+          <span class="icon">👶</span>
+          <span><span class="lead">First child born?</span> Add your child as nominee too</span>
+        </div>
+        <div class="bullet-item">
+          <span class="icon">👨‍👩‍👧‍👦</span>
+          <span><span class="lead">Life changed?</span> But nominees still outdated from 10 years ago?</span>
+        </div>
+        <div class="bullet-item">
+          <span class="icon">💰</span>
+          <span><span class="lead">Distribute smartly</span> — 50% spouse, 30% kids, 20% parents</span>
+        </div>
+        <div class="bullet-item">
+          <span class="icon">📱</span>
+          <span><span class="lead">Update online</span> — Most banks/apps let you do it in 5 minutes</span>
+        </div>
+      </div>
+
+      <div class="anim highlight-box" style="margin-top:auto;">
+        <span style="font-weight:600;">One hour this weekend:</span> List all accounts → Check nominees → Update wherever needed
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 14 — GOALS -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info"><span class="website">www.capitalfriends.in</span></div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">14 / 15</div>
+    </div>
+
+    <div class="content">
+      <div class="anim title" style="font-size:50px;">
+        <span class="hl-green">Q7:</span> Financial Goals — <span class="hl-yellow">Know Your Target</span>
+      </div>
+      <div class="anim subtitle">
+        Investing ₹10K/month blindly vs. investing with purpose
+      </div>
+
+      <div class="anim" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px;flex:1;align-content:center;">
+        <div class="col-section" style="border-color:rgba(224,112,112,0.2);">
+          <div style="font-size:38px;margin-bottom:12px;">❓</div>
+          <h3 style="color:#e07070;">Random Investing</h3>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.7;">
+            <strong>"Everyone says invest, so I'm investing."</strong><br><br>
+            No target amount.<br>
+            No timeline.<br>
+            No clear purpose.<br><br>
+            Like driving without a destination.
+          </div>
+        </div>
+        <div class="col-section" style="border-color:rgba(125,211,192,0.2);">
+          <div style="font-size:38px;margin-bottom:12px;">🎯</div>
+          <h3 style="color:#7dd3c0;">Goal-Based Planning</h3>
+          <div style="font-size:20px;color:rgba(255,255,255,0.65);line-height:1.7;">
+            <strong>Child education:</strong> ₹30L in 10 yrs → ₹15K/month<br>
+            <strong>Retirement:</strong> ₹5Cr in 25 yrs → ₹25K/month<br>
+            <strong>Emergency:</strong> ₹5L in 4 yrs → ₹10K/month<br><br>
+            <strong style="color:#7dd3c0;">Total: ₹50K/month with clear purpose</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim bottom-line">
+        Capital Friends <span class="hl-green" style="font-weight:600;">Goal Planner</span> calculates everything automatically
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- SLIDE 15 — GET STARTED + CTA -->
+<!-- ================================================================ -->
+<div class="slide-wrapper">
+  <div class="slide">
+    <div class="glow glow-tl"></div>
+    <div class="glow glow-br"></div>
+    <div class="slide-bar">
+      <div class="brand"><img src="https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-main.png" alt="CF"></div>
+      <div class="right-info">
+        <span class="website">www.capitalfriends.in</span>
+        <span class="free-pill">100% FREE</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <div class="gs-tag"><div class="gs-box"><span>S</span></div> Google Sheets</div>
+      <div class="slide-num">15 / 15</div>
+    </div>
+
+    <div class="content center">
+      <div class="anim title" style="font-size:62px;">
+        Get Started in <span class="hl-yellow">2 Minutes</span>
+      </div>
+      <div class="anim subtitle" style="margin-top:20px;">
+        It takes less time than ordering food online. Here's how:
+      </div>
+
+      <div class="anim steps" style="margin-top:48px;display:grid;grid-template-columns:repeat(5,1fr);gap:20px;">
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;padding:28px 20px;">
+          <div class="s-num">1</div>
+          <div class="s-title" style="font-size:23px;margin-bottom:10px;">Visit the Website</div>
+          <div class="s-desc" style="font-size:18px;line-height:1.5;flex:1;display:flex;align-items:center;">
+            <span>Go to <span style="color:#7dd3c0;font-weight:600;">capitalfriends.in</span> and click "Get Your Free Copy"</span>
+          </div>
+        </div>
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;padding:28px 20px;">
+          <div class="s-num">2</div>
+          <div class="s-title" style="font-size:23px;margin-bottom:10px;">Sheet Copies to Drive</div>
+          <div class="s-desc" style="font-size:18px;line-height:1.5;flex:1;display:flex;align-items:center;">
+            <span>Google Sheet appears in your Drive instantly</span>
+          </div>
+        </div>
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;padding:28px 20px;">
+          <div class="s-num">3</div>
+          <div class="s-title" style="font-size:23px;margin-bottom:10px;">One-Click Setup</div>
+          <div class="s-desc" style="font-size:18px;line-height:1.5;flex:1;display:flex;align-items:center;">
+            <span>Open menu → One-Click Setup. Creates all sheets</span>
+          </div>
+        </div>
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;padding:28px 20px;">
+          <div class="s-num">4</div>
+          <div class="s-title" style="font-size:23px;margin-bottom:10px;">Answer 8 Questions</div>
+          <div class="s-desc" style="font-size:18px;line-height:1.5;flex:1;display:flex;align-items:center;">
+            <span><span style="color:#7dd3c0;font-weight:600;">Financial Health Check</span> — 8 simple yes/no questions</span>
+          </div>
+        </div>
+        <div class="step" style="min-height:200px;display:flex;flex-direction:column;padding:28px 20px;">
+          <div class="s-num">5</div>
+          <div class="s-title" style="font-size:23px;margin-bottom:10px;">Start Tracking</div>
+          <div class="s-desc" style="font-size:18px;line-height:1.5;flex:1;display:flex;align-items:center;">
+            <span>Add your data. Email reports start automatically</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="anim" style="margin-top:50px;">
+        <span style="font-size:44px;font-weight:700;color:rgba(255,255,255,0.93);">
+          <span class="hl-green">Free Forever.</span> For Every Family.
+        </span>
+      </div>
+
+      <div class="anim" style="margin-top:28px;">
+        <span style="font-size:24px;color:rgba(255,255,255,0.65);">
+          Watch the complete tutorial playlist to learn how to use the sheet &rarr;
+        </span>
+      </div>
+
+      <div class="anim" style="margin-top:32px;display:flex;gap:20px;justify-content:center;">
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px 32px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:26px;">&#x1f44d;</span>
+          <span style="font-size:20px;font-weight:600;color:rgba(255,255,255,0.7);">Like this video</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px 32px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:26px;">&#x1f4ac;</span>
+          <span style="font-size:20px;font-weight:600;color:rgba(255,255,255,0.7);">Comment below</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px 32px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:26px;">&#x1f501;</span>
+          <span style="font-size:20px;font-weight:600;color:rgba(255,255,255,0.7);">Share with family</span>
+        </div>
+        <div style="background:rgba(224,112,112,0.08);border:1px solid rgba(224,112,112,0.25);border-radius:12px;padding:16px 32px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:26px;">&#x1f514;</span>
+          <span style="font-size:20px;font-weight:700;color:#e07070;">Subscribe</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- PRESENTATION ENGINE                                               -->
+<!-- ================================================================ -->
+<div id="presProgress"></div>
+<div id="presCounter"></div>
+
+<script>
+(function() {
+  var currentSlide = 0;
+  var slides = document.querySelectorAll('.slide-wrapper');
+  var totalSlides = slides.length;
+  var progressBar = document.getElementById('presProgress');
+  var counter = document.getElementById('presCounter');
+
+  function updateProgress() {
+    progressBar.style.width = ((currentSlide + 1) / totalSlides * 100) + '%';
+    counter.textContent = (currentSlide + 1) + ' / ' + totalSlides;
+  }
+
+  function fitSlide() {
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var scale = vw / 1920;
+    var scaledHeight = 1080 * scale;
+    var offsetY = Math.max(0, (vh - scaledHeight) / 2);
+    slides.forEach(function(wrapper) {
+      var slide = wrapper.querySelector('.slide');
+      slide.style.transform = 'scale(' + scale + ')';
+      slide.style.top = offsetY + 'px';
+    });
+  }
+
+  function goToSlide(index) {
+    if (index < 0 || index >= totalSlides) return;
+    slides[currentSlide].classList.remove('active');
+    currentSlide = index;
+    var target = slides[currentSlide];
+    target.classList.add('resetting');
+    target.classList.remove('active');
+    void target.offsetHeight;
+    target.classList.remove('resetting');
+    void target.offsetHeight;
+    target.classList.add('active');
+    updateProgress();
+  }
+
+  // Auto-start presentation on load
+  fitSlide();
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      slides[0].classList.add('active');
+      updateProgress();
+    });
+  });
+
+  document.addEventListener('keydown', function(e) {
+    switch(e.key) {
+      case 'ArrowRight': case ' ': case 'PageDown':
+        e.preventDefault();
+        if (currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
+        break;
+      case 'ArrowLeft': case 'PageUp':
+        e.preventDefault();
+        if (currentSlide > 0) goToSlide(currentSlide - 1);
+        break;
+      case 'Home': e.preventDefault(); goToSlide(0); break;
+      case 'End': e.preventDefault(); goToSlide(totalSlides - 1); break;
+      case 'f': case 'F':
+        e.preventDefault();
+        document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+        break;
+      case '1': case '2': case '3': case '4':
+      case '5': case '6': case '7': case '8':
+        e.preventDefault();
+        goToSlide(parseInt(e.key) - 1);
+        break;
+    }
+  });
+
+  window.addEventListener('resize', fitSlide);
+  document.addEventListener('fullscreenchange', function() { setTimeout(fitSlide, 100); });
+})();
+</script>
+
+</body>
+</html>

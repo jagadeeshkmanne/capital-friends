@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <div id="portfolioSelectionView">
+    <div id="loadingPortfolios" class="py-12 px-6 text-center text-gray-600">
+      <div class="w-10 h-10 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-3 animate-spin"></div>
+      <p>Loading portfolios...</p>
+    </div>
+
+    <div id="portfolioSelectionContent" class="hidden px-6 py-8">
+      <div class="mb-6">
+        <label class="text-sm font-semibold text-gray-700 mb-2 block">Select a portfolio to edit:</label>
+        <select id="portfolioSelect" onchange="loadPortfolioForEdit()"
+          class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:border-sky-600 focus:ring-4 focus:ring-sky-100">
+          <option value="">-- Select a portfolio --</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="button" onclick="google.script.host.close()"
+          class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <form id="portfolioForm" class="hidden" novalidate>
+    <div id="progressOverlay" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center min-w-[300px]">
+        <div id="progressIcon" class="w-12 h-12 border-4 border-gray-200 border-t-sky-600 rounded-full mx-auto mb-4 animate-spin"></div>
+        <div id="progressText" class="text-base font-semibold text-gray-800 mb-2">Updating portfolio...</div>
+        <div id="progressDetail" class="text-sm text-gray-600">Please wait</div>
+      </div>
+    </div>
+
+    <div class="max-h-[calc(100vh-85px)] overflow-y-auto bg-white">
+      <input type="hidden" id="portfolioId">
+
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+        <button type="button" onclick="showPortfolioSelection()" class="text-sky-600 hover:text-sky-700 text-sm font-semibold flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+          Back to selection
+        </button>
+      </div>
+
+      <!-- Row 1: Portfolio Name + Investment Account -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Portfolio Name <span class="text-red-600">*</span></label>
+          <input type="text" id="portfolioName" required placeholder="e.g., PFL-Retirement" readonly
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm bg-gray-100 cursor-not-allowed">
+          <span class="text-xs text-gray-500 mt-0.5 block">Portfolio name cannot be changed</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Investment Account <span class="text-red-600">*</span></label>
+          <select id="investmentAccount" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="">Loading...</option>
+          </select>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="investmentAccountError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Original Investment + SIP Target -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Original Investment (₹) <span class="text-gray-500">(Optional)</span></label>
+          <input type="number" id="initialInvestment" placeholder="e.g., 100000" min="0" step="0.01"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">If you know your original investment: Enter it. Don't know: Leave as 0 (auto-calculated)</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Monthly SIP Target (₹) <span class="text-gray-500">(Optional)</span></label>
+          <input type="number" id="sipTarget" placeholder="e.g., 10000" min="0" step="0.01"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Leave blank if only tracking lumpsum investments</span>
+        </div>
+      </div>
+
+      <!-- Row 3: Lumpsum Target + Rebalance Threshold -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Lumpsum Target (₹) <span class="text-gray-500">(Optional)</span></label>
+          <input type="number" id="lumpsumTarget" placeholder="e.g., 50000" min="0" step="0.01"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Planned lumpsum investment amount</span>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Rebalance Threshold (%) <span class="text-red-600">*</span></label>
+          <input type="number" id="rebalanceThreshold" required placeholder="5" min="1" max="100" step="0.1"
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+          <span class="text-xs text-gray-500 mt-0.5 block">Trigger rebalancing when deviation exceeds this %</span>
+          <span class="text-red-600 text-xs hidden mt-0.5 block" id="rebalanceThresholdError">Required</span>
+        </div>
+      </div>
+
+      <!-- Row 4: Status -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div>
+          <label class="text-xs font-semibold text-gray-700 mb-1 block">Status <span class="text-red-600">*</span></label>
+          <select id="status" required
+            class="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+        <div></div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2.5 px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <button type="button" onclick="showPortfolioSelection()"
+        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button type="submit"
+        class="px-5 py-2.5 bg-sky-600 text-white rounded-md text-sm font-semibold hover:bg-sky-700 transition-colors shadow-sm">
+        Update Portfolio
+      </button>
+    </div>
+  </form>
+
+  <?!= include('DeveloperCredit'); ?>
+
+  <script>
+    var allPortfolios = [];
+    var allInvestmentAccounts = [];
+    var investmentAccountsLoaded = false;
+
+    window.onload = function() {
+      // Load investment accounts first
+      google.script.run
+        .withSuccessHandler(function(accounts) {
+          allInvestmentAccounts = accounts ? accounts.filter(function(a) { return a.status === 'Active'; }) : [];
+          var select = document.getElementById('investmentAccount');
+          select.innerHTML = '<option value="">Select investment account</option>';
+          allInvestmentAccounts.forEach(function(account) {
+            var option = document.createElement('option');
+            option.value = account.accountId;
+            option.textContent = account.accountName + ' - ' + account.platformBroker;
+            select.appendChild(option);
+          });
+          investmentAccountsLoaded = true;
+          loadPortfolios();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading investment accounts:', error);
+          investmentAccountsLoaded = true;
+          loadPortfolios();
+        })
+        .getAllInvestmentAccounts();
+    };
+
+    function loadPortfolios() {
+      google.script.run
+        .withSuccessHandler(function(portfolios) {
+          if (!portfolios || portfolios.length === 0) {
+            document.getElementById('loadingPortfolios').innerHTML = '<div class="py-12 px-6 text-center text-amber-600"><p class="font-semibold mb-2">No portfolios found</p><p class="text-sm">Please create portfolios first.</p><button onclick="google.script.host.close()" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Close</button></div>';
+            return;
+          }
+          allPortfolios = portfolios;
+          populatePortfolioDropdown();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('loadingPortfolios').innerHTML = '<div class="py-12 px-6 text-center text-red-600"><p class="font-semibold mb-2">Error loading portfolios</p><p class="text-sm">' + (error.message || error) + '</p><button onclick="google.script.host.close()" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Close</button></div>';
+        })
+        .getAllPortfolios();
+    }
+
+    function populatePortfolioDropdown() {
+      var select = document.getElementById('portfolioSelect');
+      if (allPortfolios.length === 0) {
+        document.getElementById('loadingPortfolios').innerHTML = '<div class="py-12 px-6 text-center text-amber-600"><p class="font-semibold mb-2">No portfolios found</p><p class="text-sm">Please create portfolios first.</p><button onclick="google.script.host.close()" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Close</button></div>';
+        return;
+      }
+
+      select.innerHTML = '<option value="">-- Select a portfolio --</option>';
+      allPortfolios.forEach(function(portfolio) {
+        var option = document.createElement('option');
+        option.value = portfolio.portfolioId;
+        option.textContent = portfolio.portfolioName + ' - ' + portfolio.investmentAccount + ' [' + portfolio.status + ']';
+        select.appendChild(option);
+      });
+
+      document.getElementById('loadingPortfolios').classList.add('hidden');
+      document.getElementById('portfolioSelectionContent').classList.remove('hidden');
+    }
+
+    function loadPortfolioForEdit() {
+      var portfolioId = document.getElementById('portfolioSelect').value;
+      if (!portfolioId) return;
+
+      var portfolio = allPortfolios.find(function(p) { return p.portfolioId === portfolioId; });
+      if (!portfolio) return;
+
+      // Populate form
+      document.getElementById('portfolioId').value = portfolio.portfolioId;
+      document.getElementById('portfolioName').value = portfolio.portfolioName;
+      document.getElementById('investmentAccount').value = portfolio.investmentAccount;
+      document.getElementById('initialInvestment').value = portfolio.initialInvestment;
+      document.getElementById('sipTarget').value = portfolio.sipTarget;
+      document.getElementById('lumpsumTarget').value = portfolio.lumpsumTarget || 0;
+
+      // Convert rebalance threshold from decimal to percentage
+      var thresholdPercent = (portfolio.rebalanceThreshold * 100).toFixed(1);
+      document.getElementById('rebalanceThreshold').value = thresholdPercent;
+
+      document.getElementById('status').value = portfolio.status;
+
+      // Show form
+      document.getElementById('portfolioSelectionView').classList.add('hidden');
+      document.getElementById('portfolioForm').classList.remove('hidden');
+    }
+
+    function showPortfolioSelection() {
+      document.getElementById('portfolioForm').classList.add('hidden');
+      document.getElementById('portfolioSelectionView').classList.remove('hidden');
+      document.getElementById('portfolioSelect').value = '';
+      clearAllErrors();
+    }
+
+    function showError(fieldId, message) {
+      var errorEl = document.getElementById(fieldId + 'Error');
+      var inputEl = document.getElementById(fieldId);
+      if (errorEl) { errorEl.textContent = message; errorEl.classList.remove('hidden'); }
+      if (inputEl) { inputEl.classList.remove('border-gray-300'); inputEl.classList.add('border-red-600'); }
+    }
+
+    function clearError(fieldId) {
+      var errorEl = document.getElementById(fieldId + 'Error');
+      var inputEl = document.getElementById(fieldId);
+      if (errorEl) errorEl.classList.add('hidden');
+      if (inputEl) { inputEl.classList.remove('border-red-600'); inputEl.classList.add('border-gray-300'); }
+    }
+
+    function clearAllErrors() {
+      document.querySelectorAll('[id$="Error"]').forEach(function(el) { el.classList.add('hidden'); });
+      document.querySelectorAll('input, select').forEach(function(el) {
+        el.classList.remove('border-red-600');
+        el.classList.add('border-gray-300');
+      });
+    }
+
+    document.getElementById('portfolioForm').onsubmit = function(e) {
+      e.preventDefault();
+      clearAllErrors();
+
+      var portfolioId = document.getElementById('portfolioId').value;
+      var portfolioName = document.getElementById('portfolioName').value.trim();
+      var investmentAccount = document.getElementById('investmentAccount').value;
+      var initialInvestment = document.getElementById('initialInvestment').value || '0';  // Default to 0 if empty
+      var sipTarget = document.getElementById('sipTarget').value || '0';  // Default to 0 if empty
+      var lumpsumTarget = document.getElementById('lumpsumTarget').value || '0';
+      var rebalanceThreshold = document.getElementById('rebalanceThreshold').value;
+      var status = document.getElementById('status').value;
+
+      var isValid = true;
+      if (!portfolioName) { showError('portfolioName', 'Portfolio name is required'); isValid = false; }
+      if (!investmentAccount) { showError('investmentAccount', 'Investment account is required'); isValid = false; }
+      // Original investment is optional - only validate if provided
+      if (initialInvestment && parseFloat(initialInvestment) < 0) {
+        showError('initialInvestment', 'Original investment must be positive');
+        isValid = false;
+      }
+      // SIP is optional - only validate if provided
+      if (sipTarget && parseFloat(sipTarget) < 0) {
+        showError('sipTarget', 'SIP target must be positive');
+        isValid = false;
+      }
+      if (!rebalanceThreshold || parseFloat(rebalanceThreshold) < 1 || parseFloat(rebalanceThreshold) > 100) {
+        showError('rebalanceThreshold', 'Valid threshold (1-100%) is required');
+        isValid = false;
+      }
+
+      if (!isValid) return;
+
+      var data = {
+        portfolioId: portfolioId,
+        portfolioName: portfolioName,
+        investmentAccount: investmentAccount,
+        initialInvestment: initialInvestment,
+        sipTarget: sipTarget,
+        lumpsumTarget: lumpsumTarget,
+        rebalanceThreshold: rebalanceThreshold,
+        status: status
+      };
+
+      var overlay = document.getElementById('progressOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            document.getElementById('progressIcon').className = 'w-12 h-12 rounded-full bg-emerald-600 text-white text-2xl flex items-center justify-center mx-auto mb-4';
+            document.getElementById('progressIcon').textContent = '✓';
+            document.getElementById('progressText').textContent = 'Success!';
+            document.getElementById('progressDetail').textContent = response.message;
+            setTimeout(function() { google.script.host.close(); }, 2000);
+          } else {
+            overlay.classList.add('hidden');
+            alert('Error: ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          overlay.classList.add('hidden');
+          alert('Error: ' + error.message);
+        })
+        .updatePortfolio(data);
+    };
+
+    document.querySelectorAll('input, select').forEach(function(el) {
+      el.oninput = function() { clearError(this.id); };
+    });
+  </script>
+</body>
+</html>

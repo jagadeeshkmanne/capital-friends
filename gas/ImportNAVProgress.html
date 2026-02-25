@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      font-family: 'Inter', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .progress-card {
+      background: white;
+      border-radius: 0.75rem;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      animation: fadeIn 0.3s;
+    }
+
+    .progress-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1.25rem;
+      border: 3px solid #e5e7eb;
+      border-top-color: #0284c7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .success-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1.25rem;
+      background: #10b981;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: successPop 0.5s;
+    }
+
+    .error-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1.25rem;
+      background: #ef4444;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: errorShake 0.5s;
+    }
+
+    .progress-text {
+      text-align: center;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-detail {
+      text-align: center;
+      font-size: 0.875rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .timer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 1rem;
+      font-weight: 500;
+    }
+
+    .close-button {
+      display: none;
+      margin: 1.5rem auto 0;
+      padding: 0.5rem 1.5rem;
+      background: #0284c7;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .close-button:hover {
+      background: #0369a1;
+    }
+
+    .close-button.show {
+      display: block;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes successPop {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes errorShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-card">
+    <div id="progressIcon" class="progress-icon"></div>
+    <div id="progressText" class="progress-text">Importing NAV Data...</div>
+    <div id="progressDetail" class="progress-detail">Fetching 40,000+ mutual fund records from AMFI<br>This may take 30-60 seconds</div>
+    <div id="timer" class="timer">Elapsed: <span id="elapsedTime">0</span>s</div>
+    <button id="closeButton" class="close-button" onclick="google.script.host.close()">Close</button>
+  </div>
+
+  <script>
+    // Start timer
+    let startTime = Date.now();
+    let initialRowCount = 0;
+    let previousRowCount = 0;
+    let pollCount = 0;
+    let importStarted = false;
+    let stableCount = 0; // Count how many times row count hasn't changed
+
+    // Timer to show elapsed time
+    let timerInterval = setInterval(function() {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('elapsedTime').textContent = elapsed;
+    }, 1000);
+
+    // Function to show success
+    function showSuccess(text, detail) {
+      clearInterval(timerInterval);
+      clearInterval(pollInterval);
+      document.getElementById('timer').style.display = 'none';
+      document.getElementById('progressIcon').outerHTML =
+        '<div class="success-icon"><svg style="width: 32px; height: 32px;" fill="white" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>';
+      document.getElementById('progressText').textContent = text;
+      document.getElementById('progressDetail').innerHTML = detail;
+    }
+
+    // Function to show error
+    function showError(text, detail) {
+      clearInterval(timerInterval);
+      clearInterval(pollInterval);
+      document.getElementById('timer').style.display = 'none';
+      document.getElementById('progressIcon').outerHTML =
+        '<div class="error-icon"><svg style="width: 32px; height: 32px;" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></div>';
+      document.getElementById('progressText').textContent = text;
+      document.getElementById('progressDetail').innerHTML = detail;
+      document.getElementById('closeButton').classList.add('show');
+    }
+
+    // Poll every 2 seconds to check if import is complete
+    let pollInterval = setInterval(function() {
+      pollCount++;
+      console.log('Polling... attempt', pollCount);
+
+      google.script.run
+        .withSuccessHandler(function(statusInfo) {
+          console.log('Import status:', statusInfo);
+
+          if (statusInfo.status === 'COMPLETE') {
+            // Import completed successfully
+            showSuccess(
+              'Import Complete! ✅',
+              `Successfully imported ${statusInfo.count.toLocaleString()} mutual fund NAV records from AMFI.<br><br>The dialog will close automatically.`
+            );
+            setTimeout(function() {
+              google.script.host.close();
+            }, 2000);
+          } else if (statusInfo.status === 'ERROR') {
+            // Import failed
+            showError(
+              'Import Failed ❌',
+              `Error: ${statusInfo.error}<br><br>Please check your internet connection and try again.`
+            );
+          } else if (pollCount >= 60) {
+            // After 2 minutes of polling (60 * 2 seconds = 120s), give up
+            showError(
+              'Import Taking Too Long ⚠️',
+              `Import has not completed after 2 minutes.<br>Status: ${statusInfo.status}<br><br>Please close this dialog and check the MutualFundData sheet manually.`
+            );
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Polling error:', error);
+          // Don't stop - keep trying
+        })
+        .checkNAVImportStatus();
+    }, 2000);
+
+    // Start the import process (fire and forget - we'll poll for completion)
+    google.script.run
+      .withSuccessHandler(function(result) {
+        console.log('Import completed via callback:', result);
+        if (result && result.success) {
+          importStarted = true;
+          const count = result.count || 0;
+          showSuccess(
+            'Import Complete! ✅',
+            `Successfully imported ${count.toLocaleString()} mutual fund NAV records from AMFI.<br><br>The dialog will close automatically.`
+          );
+          setTimeout(function() {
+            google.script.host.close();
+          }, 3000);
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.log('Import callback failed (expected if timeout):', error);
+        importStarted = true;
+        // Don't show error - let polling handle it
+      })
+      .importNAVDataWithProgress();
+  </script>
+</body>
+</html>

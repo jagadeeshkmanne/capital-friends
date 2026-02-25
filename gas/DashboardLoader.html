@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="m-0 p-0 bg-white font-sans">
+
+  <!-- Loading State -->
+  <div id="loadingState" class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div class="bg-white p-8 rounded-lg shadow-xl text-center min-w-[400px]">
+      <div class="w-16 h-16 border-4 border-gray-200 border-t-indigo-600 rounded-full mx-auto mb-4 animate-spin"></div>
+      <div class="text-xl font-bold text-gray-800 mb-2">Loading Dashboard</div>
+      <div class="text-sm text-gray-600 mb-4">Generating your family wealth report...</div>
+      <div class="text-xs text-gray-500">This may take 10-30 seconds</div>
+    </div>
+  </div>
+
+  <!-- Dashboard Content Container -->
+  <div id="dashboardContent" class="hidden"></div>
+
+  <script>
+    // Load dashboard content on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      loadDashboard();
+    });
+
+    function loadDashboard() {
+      google.script.run
+        .withSuccessHandler(function(htmlContent) {
+          // Hide loading state
+          document.getElementById('loadingState').classList.add('hidden');
+
+          // Show dashboard content
+          const contentDiv = document.getElementById('dashboardContent');
+          contentDiv.innerHTML = htmlContent;
+          contentDiv.classList.remove('hidden');
+        })
+        .withFailureHandler(function(error) {
+          // Hide loading state
+          document.getElementById('loadingState').classList.add('hidden');
+
+          // Show error message
+          const contentDiv = document.getElementById('dashboardContent');
+          contentDiv.innerHTML = `
+            <div class="flex items-center justify-center min-h-screen bg-gray-50 p-8">
+              <div class="bg-white p-8 rounded-lg shadow-lg text-center max-w-md border-l-4 border-red-500">
+                <div class="text-5xl mb-4">❌</div>
+                <div class="text-xl font-bold text-gray-900 mb-2">Error Loading Dashboard</div>
+                <div class="text-sm text-gray-700 mb-4">${error.message}</div>
+                <button onclick="google.script.host.close()"
+                  class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+                  Close
+                </button>
+              </div>
+            </div>
+          `;
+          contentDiv.classList.remove('hidden');
+        })
+        .getCompleteWealthReportHTML();
+    }
+  </script>
+
+</body>
+</html>
