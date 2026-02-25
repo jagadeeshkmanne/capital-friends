@@ -1,20 +1,14 @@
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
-import GlobalHighlights from './GlobalHighlights'
 import BottomNav from './BottomNav'
 import BrandedLoading from './BrandedLoading'
 import { useData } from '../context/DataContext'
 
-// Pages that manage their own portfolio-level highlights
-const HIDE_GLOBAL_HIGHLIGHTS = ['/investments']
-
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const { pathname } = useLocation()
-  const showHighlights = !HIDE_GLOBAL_HIGHLIGHTS.some((p) => pathname.startsWith(p))
   const { loading, error } = useData()
 
   if (loading) {
@@ -54,7 +48,6 @@ export default function Layout() {
 
         <main className="flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
           <div className="px-3 sm:px-4 py-3 sm:py-4 w-full">
-            {showHighlights && <GlobalHighlights />}
             <Outlet />
           </div>
         </main>

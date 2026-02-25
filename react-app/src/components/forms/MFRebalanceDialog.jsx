@@ -4,6 +4,35 @@ import { formatINR } from '../../data/familyData'
 import { Repeat, IndianRupee, ArrowUpDown } from 'lucide-react'
 import { FormField, FormInput } from '../Modal'
 
+// ── Toggle this to false when real data is available ──
+const USE_DUMMY = true
+
+const DUMMY_REBALANCE = [
+  {
+    portfolioId: 'dr1', portfolioName: 'Jags Growth Portfolio', ownerName: 'Jags',
+    rebalanceThreshold: 0.05, sipTarget: 25000, lumpsumTarget: 100000,
+    totalValue: 1500000, driftedCount: 3,
+    holdings: [
+      { holdingId: 'rh1', fundName: 'Parag Parikh Flexi Cap Fund', currentValue: 427500, currentNav: 62.80, units: 6808, targetAllocationPct: 30 },
+      { holdingId: 'rh2', fundName: 'Mirae Asset Large Cap Fund', currentValue: 331500, currentNav: 91.60, units: 3619, targetAllocationPct: 25 },
+      { holdingId: 'rh3', fundName: 'Axis Small Cap Fund', currentValue: 270000, currentNav: 36.38, units: 7422, targetAllocationPct: 20 },
+      { holdingId: 'rh4', fundName: 'SBI Blue Chip Fund', currentValue: 285000, currentNav: 55.20, units: 5163, targetAllocationPct: 15 },
+      { holdingId: 'rh5', fundName: 'ICICI Pru Value Discovery', currentValue: 186000, currentNav: 48.90, units: 3804, targetAllocationPct: 10 },
+    ],
+  },
+  {
+    portfolioId: 'dr2', portfolioName: 'Priya Conservative MF', ownerName: 'Priya',
+    rebalanceThreshold: 0.05, sipTarget: 15000, lumpsumTarget: 50000,
+    totalValue: 1350000, driftedCount: 2,
+    holdings: [
+      { holdingId: 'rh6', fundName: 'HDFC Mid-Cap Opportunities', currentValue: 407700, currentNav: 82.89, units: 4919, targetAllocationPct: 35 },
+      { holdingId: 'rh7', fundName: 'Kotak Emerging Equity Fund', currentValue: 213300, currentNav: 61.56, units: 3465, targetAllocationPct: 20 },
+      { holdingId: 'rh8', fundName: 'UTI Nifty Index Fund', currentValue: 472500, currentNav: 130.20, units: 3630, targetAllocationPct: 30 },
+      { holdingId: 'rh9', fundName: 'Axis Liquid Fund', currentValue: 256500, currentNav: 2650.80, units: 96.78, targetAllocationPct: 15 },
+    ],
+  },
+]
+
 const modes = [
   { key: 'sip', label: 'Adjust SIP', icon: Repeat, color: 'text-blue-400', dimColor: 'text-blue-400/60 hover:text-blue-400', activeBg: 'bg-blue-500/20 border border-blue-500/40' },
   { key: 'lumpsum', label: 'Lumpsum', icon: IndianRupee, color: 'text-emerald-400', dimColor: 'text-emerald-400/60 hover:text-emerald-400', activeBg: 'bg-emerald-500/20 border border-emerald-500/40' },
@@ -216,6 +245,8 @@ export default function MFRebalanceDialog() {
 
   // All portfolios needing rebalance
   const portfolioGroups = useMemo(() => {
+    if (USE_DUMMY) return DUMMY_REBALANCE
+
     return mfPortfolios
       .filter((p) => p.status !== 'Inactive')
       .map((p) => {

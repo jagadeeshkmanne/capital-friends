@@ -319,6 +319,19 @@ function routeAction(action, params, userRecord) {
     case 'market:data':
       return getMarketData();
 
+    // ── Bulk Data (for targeted refresh) ──
+    case 'mf-holdings:list':
+      return getAllMFHoldings();
+
+    case 'mf-transactions:list':
+      return getAllMFTransactions();
+
+    case 'stock-holdings:list-all':
+      return getAllStockHoldingsData();
+
+    case 'stock-transactions:list-all':
+      return getAllStockTransactionsData();
+
     // ── Diagnostics (for testing) ──
     case 'test:diagnose':
       return runDiagnostics();

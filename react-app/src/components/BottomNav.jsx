@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Wallet, CreditCard, Target, MoreHorizontal } from 'lucide-react'
+import { Wallet, CreditCard, Target, Bell, MoreHorizontal } from 'lucide-react'
 
 const tabs = [
-  { label: 'Home',       icon: LayoutDashboard, path: '/dashboard' },
-  { label: 'Accounts',   icon: CreditCard,      path: '/accounts/bank' },
   { label: 'Invest',     icon: Wallet,           path: '/investments/mutual-funds' },
+  { label: 'Accounts',   icon: CreditCard,      path: '/accounts/bank' },
   { label: 'Goals',      icon: Target,           path: '/goals' },
+  { label: 'Reminders',  icon: Bell,             path: '/reminders' },
   { label: 'More',       icon: MoreHorizontal,   path: '/more' },
 ]
 
@@ -14,7 +14,7 @@ export default function BottomNav() {
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-sidebar)] border-t border-[var(--border)] safe-bottom">
       <div className="flex items-center justify-around h-[56px]">
         {tabs.map(({ label, icon: Icon, path }) => (
-          <NavLink key={path} to={path} end={path === '/dashboard'}
+          <NavLink key={path} to={path}
             className={({ isActive }) =>
               `relative flex flex-col items-center justify-center gap-0.5 w-full h-full text-xs font-medium transition-colors ${
                 isActive ? 'text-[var(--sidebar-active-text)]' : 'text-[var(--text-dim)]'

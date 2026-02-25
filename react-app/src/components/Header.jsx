@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, RefreshCw } from 'lucide-react'
+import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { useTheme } from '../context/ThemeContext'
 import { useFamily } from '../context/FamilyContext'
@@ -7,8 +8,51 @@ import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { formatINR } from '../data/familyData'
 import MarketTicker from './MarketTicker'
+import ActionStrip from './ActionStrip'
+import useAlerts from '../hooks/useAlerts'
 
 const LOGO = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png'
+
+// ── Toggle this to false when real data is available ──
+const USE_DUMMY = true
+// Section metadata: order, label, color, route
+const SECTION_META = {
+  mf: { label: 'Mutual Funds', color: 'bg-violet-500', order: 1, route: '/investments/mutual-funds' },
+  stocks: { label: 'Stocks', color: 'bg-blue-500', order: 2, route: '/investments/stocks' },
+  Debt: { label: 'Debt', color: 'bg-cyan-500', order: 3, route: '/accounts/other-investments' },
+  Gold: { label: 'Gold', color: 'bg-amber-500', order: 4, route: '/accounts/other-investments' },
+  Silver: { label: 'Silver', color: 'bg-slate-400', order: 5, route: '/accounts/other-investments' },
+  Property: { label: 'Real Estate', color: 'bg-orange-500', order: 6, route: '/accounts/other-investments' },
+  Alternative: { label: 'Alternative', color: 'bg-violet-400', order: 7, route: '/accounts/other-investments' },
+  Equity: { label: 'Equity', color: 'bg-emerald-500', order: 8, route: '/accounts/other-investments' },
+  Other: { label: 'Other', color: 'bg-gray-500', order: 9, route: '/accounts/other-investments' },
+}
+
+const DUMMY_NW = {
+  netWorth: 4235000, totalInv: 4735000, totalInvested: 3850000,
+  totalLiab: 500000,
+  sections: [
+    { key: 'mf', label: 'Mutual Funds', color: 'bg-violet-500', route: '/investments/mutual-funds', total: 2850000, items: [
+      { label: 'Jags Growth Portfolio', value: 1500000 },
+      { label: 'Priya Conservative MF', value: 1350000 },
+    ]},
+    { key: 'stocks', label: 'Stocks', color: 'bg-blue-500', route: '/investments/stocks', total: 1250000, items: [
+      { label: 'Zerodha Stocks', value: 1250000 },
+    ]},
+    { key: 'Debt', label: 'Debt', color: 'bg-cyan-500', route: '/accounts/other-investments', total: 450000, items: [
+      { label: 'HDFC PPF', value: 250000 },
+      { label: 'SBI FD - 7.5%', value: 200000 },
+    ]},
+    { key: 'Gold', label: 'Gold', color: 'bg-amber-500', route: '/accounts/other-investments', total: 185000, items: [
+      { label: 'SBI Gold Bond 2029', value: 120000 },
+      { label: 'Digital Gold', value: 65000 },
+    ]},
+  ],
+  liabilities: [
+    { label: 'HDFC Home Loan', value: 350000 },
+    { label: 'Car Loan - SBI', value: 150000 },
+  ],
+}
 
 export const avatarColors = [
   'from-violet-500 to-indigo-500',
@@ -26,64 +70,98 @@ const avatarSolids = [
   'bg-emerald-500',
 ]
 
-
-
 export default function Header({ onMenuClick }) {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
-  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, isRefreshing } = useData()
+  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList } = useData()
   const { user, signOut } = useAuth()
 
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef(null)
+  const navigate = useNavigate()
+  const { criticalAlerts, upcomingReminders } = useAlerts()
 
-  // Close dropdown on outside click
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const dropdownRef = useRef(null)
+  const notifRef = useRef(null)
+
+  const notifCount = criticalAlerts.length + upcomingReminders.length
+
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false)
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false)
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false)
     }
-    if (dropdownOpen) document.addEventListener('mousedown', handleClick)
+    if (dropdownOpen || notifOpen) document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [dropdownOpen])
+  }, [dropdownOpen, notifOpen])
 
   // Find the selected member object & its avatar index
   const selectedIdx = familyMembers.findIndex((m) => m.memberId === selectedMember)
   const selectedObj = selectedIdx >= 0 ? familyMembers[selectedIdx] : null
 
-  const w = useMemo(() => {
+  // Compute net worth breakdown
+  const nw = useMemo(() => {
+    if (USE_DUMMY) return DUMMY_NW
+
     const filterOwner = (items, key) =>
       selectedMember === 'all' ? items : items.filter((i) => i[key] === selectedMember)
 
+    // Build sectioned breakdown
+    const sectionMap = {} // key → { items: [], invested: 0 }
+    const addToSection = (key, label, value, invested) => {
+      if (!sectionMap[key]) sectionMap[key] = { items: [], invested: 0 }
+      sectionMap[key].items.push({ label, value })
+      sectionMap[key].invested += invested
+    }
+
+    // MF portfolios
     const activeMF = filterOwner(mfPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
-    const mfIds = new Set(activeMF.map((p) => p.portfolioId))
-    const mfH = mfHoldings.filter((h) => mfIds.has(h.portfolioId) && h.units > 0)
-    const mfInvested = mfH.reduce((s, h) => s + h.investment, 0)
-    const mfValue = mfH.reduce((s, h) => s + h.currentValue, 0)
+    activeMF.forEach((p) => {
+      const pH = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
+      const value = pH.reduce((s, h) => s + h.currentValue, 0)
+      const inv = pH.reduce((s, h) => s + h.investment, 0)
+      if (value > 0) addToSection('mf', p.portfolioName, value, inv)
+    })
 
+    // Stock portfolios
     const activeStk = filterOwner(stockPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
-    const stkIds = new Set(activeStk.map((p) => p.portfolioId))
-    const stkH = stockHoldings.filter((h) => stkIds.has(h.portfolioId))
-    const stkInvested = stkH.reduce((s, h) => s + h.totalInvestment, 0)
-    const stkValue = stkH.reduce((s, h) => s + h.currentValue, 0)
+    activeStk.forEach((p) => {
+      const pH = stockHoldings.filter((h) => h.portfolioId === p.portfolioId)
+      const value = pH.reduce((s, h) => s + h.currentValue, 0)
+      const inv = pH.reduce((s, h) => s + h.totalInvestment, 0)
+      if (value > 0) addToSection('stocks', p.portfolioName, value, inv)
+    })
 
+    // Other investments — all individual by investmentName, grouped into sections by category
     const activeOther = filterOwner(otherInvList.filter((i) => i.status === 'Active'), 'familyMemberId')
-    const otherInvested = activeOther.reduce((s, i) => s + i.investedAmount, 0)
-    const otherValue = activeOther.reduce((s, i) => s + i.currentValue, 0)
+    activeOther.forEach((i) => {
+      const cat = i.investmentCategory || 'Other'
+      addToSection(cat, i.investmentName || i.investmentType || 'Other', i.currentValue, i.investedAmount || 0)
+    })
 
+    // Build sections array sorted by SECTION_META order
+    const sections = Object.entries(sectionMap)
+      .map(([key, { items: sItems, invested }]) => {
+        const meta = SECTION_META[key] || SECTION_META.Other
+        const total = sItems.reduce((s, i) => s + i.value, 0)
+        return { key, label: meta.label, color: meta.color, order: meta.order, route: meta.route, total, invested, items: sItems.sort((a, b) => b.value - a.value) }
+      })
+      .filter((s) => s.total > 0)
+      .sort((a, b) => a.order - b.order)
+
+    // Liabilities with names
     const activeLiab = filterOwner(liabilityList.filter((l) => l.status === 'Active'), 'familyMemberId')
+    const liabilities = activeLiab.map((l) => ({ label: l.liabilityName || l.liabilityType || 'Loan', value: l.outstandingBalance }))
     const totalLiab = activeLiab.reduce((s, l) => s + l.outstandingBalance, 0)
-
-    const totalAssets = mfValue + stkValue + otherValue
-    const netWorth = totalAssets - totalLiab
-
-    return { netWorth, totalAssets, totalLiab }
+    const totalInv = sections.reduce((s, sec) => s + sec.total, 0)
+    const totalInvested = sections.reduce((s, sec) => s + sec.invested, 0)
+    return { netWorth: totalInv - totalLiab, totalInv, totalInvested, sections, totalLiab, liabilities }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList])
 
   return (
     <header className="sticky top-0 z-30 shrink-0">
-      {/* Top bar — matches pre-login header style */}
+      {/* Top bar */}
       <div className="bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
           {/* Left: hamburger + logo */}
@@ -94,11 +172,74 @@ export default function Header({ onMenuClick }) {
             <img src={LOGO} alt="Capital Friends" className="h-10" />
           </div>
 
-          {/* Right: theme toggle + member avatar */}
+          {/* Right: theme toggle + notification bell + member avatar */}
           <div className="flex items-center gap-1.5">
             <button onClick={toggle} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
+
+            {/* Notification bell */}
+            {notifCount > 0 && (
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  className="relative p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <Bell size={18} />
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold text-white bg-rose-500 rounded-full px-1">{notifCount}</span>
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl shadow-black/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                    <div className="px-3 py-2 border-b border-[var(--border-light)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Notifications</p>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto py-1">
+                      {criticalAlerts.map((a, i) => {
+                        const dot = { critical: 'bg-rose-500', warning: 'bg-amber-500', info: 'bg-blue-500' }[a.type]
+                        const badgeCls = { critical: 'bg-rose-500/15 text-rose-400', warning: 'bg-amber-500/15 text-amber-400', info: 'bg-blue-500/15 text-blue-400' }[a.type]
+                        return (
+                          <button
+                            key={`c-${i}`}
+                            onClick={() => { setNotifOpen(false); navigate(a.navigateTo) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-hover)] transition-colors"
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                            <span className="text-xs text-[var(--text-secondary)] flex-1 text-left truncate">{a.title}</span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${badgeCls}`}>{a.badge}</span>
+                          </button>
+                        )
+                      })}
+
+                      {criticalAlerts.length > 0 && upcomingReminders.length > 0 && (
+                        <div className="mx-3 my-1 border-t border-[var(--border-light)]" />
+                      )}
+
+                      {upcomingReminders.map((r) => {
+                        const badgeCls = r.days <= 7
+                          ? 'bg-rose-500/15 text-rose-400'
+                          : r.days <= 15
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-slate-500/15 text-[var(--text-muted)]'
+                        return (
+                          <button
+                            key={`r-${r.reminderId}`}
+                            onClick={() => { setNotifOpen(false); navigate('/reminders') }}
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-hover)] transition-colors text-left"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0 bg-amber-500" />
+                            <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{r.title}</span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${badgeCls}`}>
+                              {r.days === 0 ? 'Today' : r.days <= 30 ? `${r.days}d` : r.dateStr}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Member avatar + dropdown */}
             <div className="relative" ref={dropdownRef}>
@@ -203,33 +344,79 @@ export default function Header({ onMenuClick }) {
         </div>
       </div>
 
-      {/* Wealth strip — reactive to selected member */}
-      <div className="bg-[var(--bg-strip)]/95 backdrop-blur-sm border-b border-[var(--border)]">
-        <div className="flex items-stretch overflow-x-auto no-scrollbar">
-          <WealthItem label="Net Worth" value={formatINR(w.netWorth)} primary />
-          <WealthItem label="Assets" value={formatINR(w.totalAssets)} />
-          <WealthItem label="Liabilities" value={formatINR(w.totalLiab)} liability />
-          {isRefreshing && (
-            <div className="flex items-center px-3 text-[var(--text-muted)]">
-              <RefreshCw size={12} className="animate-spin" />
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Market Ticker */}
       <MarketTicker />
-    </header>
-  )
-}
 
-function WealthItem({ label, value, primary, liability }) {
-  return (
-    <div className={`flex-1 px-4 sm:px-5 py-2 border-r border-[var(--border-light)] last:border-0 text-center ${primary ? 'bg-violet-500/[0.03]' : ''}`}>
-      <p className={`font-semibold uppercase tracking-wider whitespace-nowrap ${primary ? 'text-xs text-violet-400' : 'text-xs text-[var(--text-muted)]'}`}>{label}</p>
-      <div className="flex items-center justify-center gap-1 mt-0.5">
-        <p className={`font-bold whitespace-nowrap tabular-nums ${primary ? 'text-[var(--text-primary)] text-base' : liability ? 'text-rose-400 text-sm' : 'text-[var(--text-secondary)] text-sm'}`}>{value}</p>
+      {/* Action Strip — pills that open dialogs */}
+      <ActionStrip />
+
+      {/* Net Worth Breakdown — always visible */}
+      <div className="bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
+        <div className="px-3 sm:px-4 py-2.5">
+          {/* Section cards grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+            {nw.sections?.map((sec) => (
+              <Link
+                key={sec.key}
+                to={sec.route}
+                className="group rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+              >
+                {/* Section header */}
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    <span className={`w-1.5 h-1.5 rounded-full ${sec.color}`} />{sec.label}
+                  </span>
+                  <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mb-0.5">{formatINR(sec.total)}</p>
+                {/* Items */}
+                {sec.items.length > 0 && (
+                  <div className="space-y-0">
+                    {sec.items.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between">
+                        <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
+                        <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{formatINR(item.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Link>
+            ))}
+
+            {/* Liabilities card with individual names */}
+            {nw.totalLiab > 0 && (
+              <Link
+                to="/accounts/liabilities"
+                className="group rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Liabilities
+                  </span>
+                  <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <p className="text-sm font-bold text-[var(--accent-rose)] tabular-nums mb-0.5">&minus;{formatINR(nw.totalLiab)}</p>
+                {nw.liabilities?.length > 0 && (
+                  <div className="space-y-0">
+                    {nw.liabilities.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between">
+                        <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
+                        <span className="text-[11px] text-[var(--accent-rose)]/70 tabular-nums shrink-0">{formatINR(item.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Link>
+            )}
+
+            {/* Net Worth — highlighted card */}
+            <div className="rounded-lg p-2.5 bg-gradient-to-br from-emerald-500/15 to-teal-500/10 border border-emerald-500/30 flex flex-col justify-center">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">Net Worth</span>
+              <p className="text-xl font-extrabold text-emerald-400 tabular-nums mt-1">{formatINR(nw.netWorth)}</p>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </header>
   )
 }

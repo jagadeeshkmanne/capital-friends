@@ -1,9 +1,8 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import HomePage from './components/HomePage'
 import LandingPage from './pages/LandingPage'
-import Dashboard from './pages/dashboard/Dashboard'
 import Placeholder from './pages/Placeholder'
 import BankAccountsPage from './pages/accounts/BankAccountsPage'
 import InvestmentAccountsPage from './pages/accounts/InvestmentAccountsPage'
@@ -32,8 +31,8 @@ export default function App() {
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          {/* Dashboard (direct access) */}
-          <Route path="dashboard" element={<Dashboard />} />
+          {/* Dashboard redirects to Mutual Funds */}
+          <Route path="dashboard" element={<Navigate to="/investments/mutual-funds" replace />} />
 
           {/* Family */}
           <Route path="family" element={<Family />} />

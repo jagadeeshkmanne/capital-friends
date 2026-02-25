@@ -1,23 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import * as api from '../services/api'
+import * as idb from '../services/idb'
 import { useAuth } from './AuthContext'
 
 const DataContext = createContext()
 
-const DATA_CACHE_KEY = 'cf_data_cache'
 const HEALTH_CACHE_KEY = 'cf_health_check'
-const SETTINGS_CACHE_KEY = 'cf_settings'
-
-function getDataCache() {
-  try {
-    const cached = sessionStorage.getItem(DATA_CACHE_KEY)
-    return cached ? JSON.parse(cached) : null
-  } catch { return null }
-}
-
-function setDataCache(data) {
-  try { sessionStorage.setItem(DATA_CACHE_KEY, JSON.stringify(data)) } catch {}
-}
 
 function getHealthCache() {
   try {
@@ -26,139 +14,189 @@ function getHealthCache() {
   } catch { return null }
 }
 
+function setHealthCache(val) {
+  try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(val)) } catch {}
+}
+
 export function DataProvider({ children }) {
   const { isAuthenticated } = useAuth()
-
-  // ── Restore from cache instantly ──
-  const cached = isAuthenticated ? getDataCache() : null
   const cachedHealth = isAuthenticated ? getHealthCache() : null
 
   // ── Loading & Error State ──
-  const [loading, setLoading] = useState(!cached) // false if cache hit
+  const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
 
-  // ── All Data State — initialize from cache if available ──
-  const [members, setMembers] = useState(cached?.members || [])
-  const [banks, setBanks] = useState(cached?.bankAccounts || [])
-  const [investments, setInvestments] = useState(cached?.investments || [])
-  const [insurancePolicies, setInsurance] = useState(cached?.insurancePolicies || [])
-  const [liabilityList, setLiabilities] = useState(cached?.liabilities || [])
-  const [otherInvList, setOtherInvestments] = useState(cached?.otherInvestments || [])
-  const [stockPortfolios, setStockPortfolios] = useState(cached?.stockPortfolios || [])
-  const [stockHoldings, setStockHoldings] = useState(cached?.stockHoldings || [])
-  const [stockTransactions, setStockTransactions] = useState(cached?.stockTransactions || [])
-  const [mfPortfolios, setMFPortfolios] = useState(cached?.mfPortfolios || [])
-  const [mfHoldings, setMFHoldings] = useState(cached?.mfHoldings || [])
-  const [mfTransactions, setMFTransactions] = useState(cached?.mfTransactions || [])
-  const [goalList, setGoals] = useState(cached?.goals || [])
-  const [reminderList, setReminders] = useState(cached?.reminders || [])
-  const [goalPortfolioMappings, setGoalPortfolioMappings] = useState(cached?.goalPortfolioMappings || [])
-  const [settings, setSettings] = useState(() => {
-    try { const s = sessionStorage.getItem(SETTINGS_CACHE_KEY); return s ? JSON.parse(s) : {} } catch { return {} }
-  })
-  // Health check: trust session cache ONLY if it says true (was confirmed by API in this session)
-  // If cache says false or doesn't exist, always re-verify from backend
+  // ── All Data State — starts empty, hydrated from IDB then API ──
+  const [members, setMembers] = useState([])
+  const [banks, setBanks] = useState([])
+  const [investments, setInvestments] = useState([])
+  const [insurancePolicies, setInsurance] = useState([])
+  const [liabilityList, setLiabilities] = useState([])
+  const [otherInvList, setOtherInvestments] = useState([])
+  const [stockPortfolios, setStockPortfolios] = useState([])
+  const [stockHoldings, setStockHoldings] = useState([])
+  const [stockTransactions, setStockTransactions] = useState([])
+  const [mfPortfolios, setMFPortfolios] = useState([])
+  const [mfHoldings, setMFHoldings] = useState([])
+  const [mfTransactions, setMFTransactions] = useState([])
+  const [goalList, setGoals] = useState([])
+  const [reminderList, setReminders] = useState([])
+  const [goalPortfolioMappings, setGoalPortfolioMappings] = useState([])
+  const [settings, setSettings] = useState({})
+  // Health check: trust session cache first, IDB hydrated in init
   const [healthCheckCompleted, setHealthCheckCompleted] = useState(
-    cachedHealth === true ? true : null
+    cachedHealth !== null ? cachedHealth : null
   )
 
-  // Track if first load (with cache) already ran
   const didInitRef = useRef(false)
 
-  // ── Load All Data on Auth ──
+  // ── Hydrate state from a data object (IDB or API response) ──
+  const hydrateState = useCallback((data) => {
+    if (!data) return
+    if (data.members) setMembers(data.members)
+    if (data.bankAccounts) setBanks(data.bankAccounts)
+    if (data.investments) setInvestments(data.investments)
+    if (data.insurancePolicies) setInsurance(data.insurancePolicies)
+    if (data.liabilities) setLiabilities(data.liabilities)
+    if (data.otherInvestments) setOtherInvestments(data.otherInvestments)
+    if (data.stockPortfolios) setStockPortfolios(data.stockPortfolios)
+    if (data.stockHoldings) setStockHoldings(data.stockHoldings)
+    if (data.stockTransactions) setStockTransactions(data.stockTransactions)
+    if (data.mfPortfolios) setMFPortfolios(data.mfPortfolios)
+    if (data.mfHoldings) setMFHoldings(data.mfHoldings)
+    if (data.mfTransactions) setMFTransactions(data.mfTransactions)
+    if (data.goals) setGoals(data.goals)
+    if (data.reminders) setReminders(data.reminders)
+    if (data.goalPortfolioMappings) setGoalPortfolioMappings(data.goalPortfolioMappings)
+    if (data.settings) setSettings(data.settings)
+  }, [])
+
+  // ── Save all data to IDB (after API load) ──
+  const persistToIDB = useCallback((data) => {
+    idb.putMany({
+      members: data.members || [],
+      bankAccounts: data.bankAccounts || [],
+      investments: data.investments || [],
+      insurancePolicies: data.insurancePolicies || [],
+      liabilities: data.liabilities || [],
+      otherInvestments: data.otherInvestments || [],
+      stockPortfolios: data.stockPortfolios || [],
+      stockHoldings: data.stockHoldings || [],
+      stockTransactions: data.stockTransactions || [],
+      mfPortfolios: data.mfPortfolios || [],
+      mfHoldings: data.mfHoldings || [],
+      mfTransactions: data.mfTransactions || [],
+      goals: data.goals || [],
+      reminders: data.reminders || [],
+      goalPortfolioMappings: data.goalPortfolioMappings || [],
+    })
+  }, [])
+
+  // ── Load All Data from API ──
   const refreshData = useCallback(async (background = false) => {
     try {
       if (background) setIsRefreshing(true)
       else setLoading(true)
       setError(null)
       const data = await api.loadAllData()
-      setMembers(data.members || [])
-      setBanks(data.bankAccounts || [])
-      setInvestments(data.investments || [])
-      setInsurance(data.insurancePolicies || [])
-      setLiabilities(data.liabilities || [])
-      setOtherInvestments(data.otherInvestments || [])
-      setStockPortfolios(data.stockPortfolios || [])
-      setStockHoldings(data.stockHoldings || [])
-      setStockTransactions(data.stockTransactions || [])
-      setMFPortfolios(data.mfPortfolios || [])
-      setMFHoldings(data.mfHoldings || [])
-      setMFTransactions(data.mfTransactions || [])
-      setGoals(data.goals || [])
-      setReminders(data.reminders || [])
-      setGoalPortfolioMappings(data.goalPortfolioMappings || [])
-      // Cache for next refresh
-      setDataCache(data)
+      hydrateState(data)
+      persistToIDB(data)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
     }
-  }, [])
+  }, [hydrateState, persistToIDB])
 
-  // Refresh individual sections (lighter than full reload)
+  // ── Section refresh functions (each writes to IDB) ──
   const refreshMembers = useCallback(async () => {
     const data = await api.getMembers()
     setMembers(data || [])
+    idb.put('members', data || [])
   }, [])
 
   const refreshBanks = useCallback(async () => {
     const data = await api.getBanks()
     setBanks(data || [])
+    idb.put('bankAccounts', data || [])
   }, [])
 
   const refreshInvestmentAccounts = useCallback(async () => {
     const data = await api.getInvestmentAccounts()
     setInvestments(data || [])
+    idb.put('investments', data || [])
   }, [])
 
   const refreshInsurance = useCallback(async () => {
     const data = await api.getInsurance()
     setInsurance(data || [])
+    idb.put('insurancePolicies', data || [])
   }, [])
 
   const refreshLiabilities = useCallback(async () => {
     const data = await api.getLiabilities()
     setLiabilities(data || [])
+    idb.put('liabilities', data || [])
   }, [])
 
   const refreshOtherInvestments = useCallback(async () => {
     const data = await api.getOtherInvestments()
     setOtherInvestments(data || [])
+    idb.put('otherInvestments', data || [])
   }, [])
 
   const refreshGoals = useCallback(async () => {
     const [goals, mappings] = await Promise.all([api.getGoals(), api.getGoalMappings()])
     setGoals(goals || [])
     setGoalPortfolioMappings(mappings || [])
+    idb.put('goals', goals || [])
+    idb.put('goalPortfolioMappings', mappings || [])
   }, [])
 
   const refreshReminders = useCallback(async () => {
     const data = await api.getReminders()
     setReminders(data || [])
+    idb.put('reminders', data || [])
   }, [])
 
   const refreshMF = useCallback(async () => {
-    // Reload portfolios, holdings, and transactions together
-    const data = await api.loadAllData()
-    setMFPortfolios(data.mfPortfolios || [])
-    setMFHoldings(data.mfHoldings || [])
-    setMFTransactions(data.mfTransactions || [])
+    const [portfolios, holdings, transactions] = await Promise.all([
+      api.getMFPortfolios(),
+      api.getAllMFHoldings(),
+      api.getAllMFTransactions(),
+    ])
+    setMFPortfolios(portfolios || [])
+    setMFHoldings(holdings || [])
+    setMFTransactions(transactions || [])
+    idb.putMany({
+      mfPortfolios: portfolios || [],
+      mfHoldings: holdings || [],
+      mfTransactions: transactions || [],
+    })
   }, [])
 
   const refreshStocks = useCallback(async () => {
-    const data = await api.loadAllData()
-    setStockPortfolios(data.stockPortfolios || [])
-    setStockHoldings(data.stockHoldings || [])
-    setStockTransactions(data.stockTransactions || [])
+    const [portfolios, holdings, transactions] = await Promise.all([
+      api.getStockPortfolios(),
+      api.getAllStockHoldings(),
+      api.getAllStockTransactions(),
+    ])
+    setStockPortfolios(portfolios || [])
+    setStockHoldings(holdings || [])
+    setStockTransactions(transactions || [])
+    idb.putMany({
+      stockPortfolios: portfolios || [],
+      stockHoldings: holdings || [],
+      stockTransactions: transactions || [],
+    })
   }, [])
 
   const refreshSettings = useCallback(async () => {
     const data = await api.getSettings()
     setSettings(data || {})
-    try { sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(data || {})) } catch {}
+    idb.put('settings', data || {})
   }, [])
 
   const updateSettings = useCallback(async (data) => {
@@ -171,10 +209,12 @@ export function DataProvider({ children }) {
       const status = await api.getHealthCheckStatus()
       const completed = status?.completed ?? false
       setHealthCheckCompleted(completed)
-      try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(completed)) } catch {}
+      setHealthCache(completed)
+      idb.put('healthCheck', completed)
     } catch {
       setHealthCheckCompleted(false)
-      try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(false)) } catch {}
+      setHealthCache(false)
+      idb.put('healthCheck', false)
     }
   }, [])
 
@@ -182,30 +222,63 @@ export function DataProvider({ children }) {
     const result = await api.saveHealthCheck(answers)
     if (result?.success) {
       setHealthCheckCompleted(true)
-      try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(true)) } catch {}
+      setHealthCache(true)
+      idb.put('healthCheck', true)
     }
     return result
   }, [])
 
+  // ── Init: IDB hydration → then background API refresh ──
   useEffect(() => {
-    if (isAuthenticated) {
-      // If we restored from cache, do background refresh (no loading screen)
-      const hasCache = !!getDataCache()
-      if (hasCache && !didInitRef.current) {
-        didInitRef.current = true
-        refreshData(true) // background
-      } else {
-        refreshData(false) // foreground with loading
-      }
-      refreshSettings().catch(() => {}) // non-blocking
-      // Only call API if health check status not already confirmed in this session
-      if (cachedHealth !== true) {
-        checkHealthCheck().catch(() => {})
-      }
-    } else {
+    if (!isAuthenticated) {
       setLoading(false)
+      return
     }
-  }, [isAuthenticated, refreshData, refreshSettings, checkHealthCheck])
+    if (didInitRef.current) return
+    didInitRef.current = true
+
+    async function init() {
+      // Step 1: Hydrate from IndexedDB (~5-20ms)
+      const cached = await idb.getAll()
+      const hasCache = Object.keys(cached).length > 0
+      if (hasCache) {
+        hydrateState(cached)
+        // Restore health check from IDB if not already in sessionStorage
+        if (cached.healthCheck !== undefined && cachedHealth === null) {
+          setHealthCheckCompleted(cached.healthCheck)
+          setHealthCache(cached.healthCheck)
+        }
+        setLoading(false) // UI renders instantly with cached data
+      }
+
+      // Step 2: Fresh data from API (background if we had cache)
+      try {
+        if (hasCache) setIsRefreshing(true)
+        const data = await api.loadAllData()
+        hydrateState(data)
+        persistToIDB(data)
+      } catch (err) {
+        if (!hasCache) setError(err.message)
+      } finally {
+        setLoading(false)
+        setIsRefreshing(false)
+      }
+    }
+
+    init()
+    refreshSettings().catch(() => {})
+    // Only call health check API if no cache at all — IDB hydration in init handles the rest
+    if (cachedHealth === null) {
+      checkHealthCheck().catch(() => {})
+    }
+  }, [isAuthenticated, hydrateState, persistToIDB, refreshSettings, checkHealthCheck])
+
+  // Reset init ref when user logs out so re-login triggers fresh init
+  useEffect(() => {
+    if (!isAuthenticated) {
+      didInitRef.current = false
+    }
+  }, [isAuthenticated])
 
   // ── Family Members CRUD ──
   const addMember = useCallback(async (data) => {
@@ -296,7 +369,6 @@ export function DataProvider({ children }) {
   const addOtherInvestment = useCallback(async (data) => {
     const result = await api.createOtherInvestment(data)
     await refreshOtherInvestments()
-    // Also refresh liabilities in case a quick loan was created
     if (data.quickLoan) await refreshLiabilities()
     return result
   }, [refreshOtherInvestments, refreshLiabilities])
@@ -422,7 +494,7 @@ export function DataProvider({ children }) {
     await refreshMF()
   }, [refreshMF])
 
-  // ── Filtered helpers (same as before) ──
+  // ── Filtered helpers ──
   const activeMembers = members.filter((m) => m.status === 'Active')
   const activeBanks = banks.filter((b) => b.status === 'Active')
   const activeInvestmentAccounts = investments.filter((a) => a.status === 'Active')

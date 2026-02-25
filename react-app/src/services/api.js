@@ -200,6 +200,12 @@ export const sellStock = (data) => callAPI('stock:sell', data)
 export const getStockHoldings = (portfolioId) => callAPI('stock:holdings', { portfolioId })
 export const getStockTransactions = (portfolioId) => callAPI('stock:transactions', { portfolioId })
 
+// Bulk Data (for cache refresh)
+export const getAllMFHoldings = () => callAPI('mf-holdings:list')
+export const getAllMFTransactions = () => callAPI('mf-transactions:list')
+export const getAllStockHoldings = () => callAPI('stock-holdings:list-all')
+export const getAllStockTransactions = () => callAPI('stock-transactions:list-all')
+
 // Reminders
 export const getReminders = () => callAPI('reminders:list')
 export const createReminder = (data) => callAPI('reminder:create', data)

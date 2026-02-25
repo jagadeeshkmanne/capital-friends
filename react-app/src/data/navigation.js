@@ -1,5 +1,4 @@
 import {
-  LayoutDashboard,
   Users,
   Landmark,
   Briefcase,
@@ -9,12 +8,10 @@ import {
   Package,
   CreditCard,
   Target,
-  FileText,
   Settings,
 } from 'lucide-react'
 
 const navigation = [
-  { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Family', icon: Users, path: '/family' },
   {
     label: 'Accounts',
@@ -36,7 +33,6 @@ const navigation = [
   },
   { label: 'Liabilities', icon: CreditCard, path: '/liabilities' },
   { label: 'Goals',       icon: Target,     path: '/goals' },
-  { label: 'Reports',     icon: FileText,   path: '/reports' },
   { label: 'Settings',    icon: Settings,   path: '/settings' },
 ]
 

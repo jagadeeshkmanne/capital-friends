@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../services/api'
+import * as idb from '../services/idb'
 
 const AuthContext = createContext(null)
 
@@ -202,9 +203,8 @@ export function AuthProvider({ children }) {
     }
     api.clearToken()
     clearCachedUser()
-    sessionStorage.removeItem('cf_data_cache')
+    idb.clearAll()
     sessionStorage.removeItem('cf_health_check')
-    sessionStorage.removeItem('cf_settings')
     setUser(null)
   }, [])
 

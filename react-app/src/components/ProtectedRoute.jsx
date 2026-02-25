@@ -23,11 +23,8 @@ export default function ProtectedRoute() {
     return <BrandedLoading phase="data" />
   }
 
-  if (healthCheckCompleted === null) {
-    return <BrandedLoading phase="health" />
-  }
-
-  // Redirect to health check if not completed (except when already on that page)
+  // Health check: only block if explicitly false (not completed)
+  // null = still loading from API → let user through, check resolves in background
   if (healthCheckCompleted === false && location.pathname !== '/health-check') {
     return <Navigate to="/health-check" replace />
   }

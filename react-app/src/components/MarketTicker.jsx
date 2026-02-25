@@ -25,7 +25,9 @@ function setCachedMarketData(data) {
 export default function MarketTicker() {
   const [data, setData] = useState(() => getCachedMarketData())
   const [btc, setBtc] = useState(null)
-  const scrollRef = useRef(null)
+  const trackRef = useRef(null)
+  const [shouldAnimate, setShouldAnimate] = useState(false)
+  const [paused, setPaused] = useState(false)
 
   // Fetch market data from GAS backend
   useEffect(() => {
@@ -44,13 +46,10 @@ export default function MarketTicker() {
       }
     }
 
-    // Fetch immediately if no cache
-    if (!data) fetchMarket()
-    else fetchMarket() // Background refresh anyway
-
+    fetchMarket()
     const interval = setInterval(fetchMarket, REFRESH_INTERVAL)
     return () => { cancelled = true; clearInterval(interval) }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch BTC from CoinGecko (CORS-friendly, no key needed)
   useEffect(() => {
@@ -84,18 +83,51 @@ export default function MarketTicker() {
   if (data?.metals) items.push(...data.metals)
   if (btc) items.push(btc)
 
+  // Check if content overflows and needs scrolling
+  useEffect(() => {
+    if (!trackRef.current) return
+    const track = trackRef.current
+    const container = track.parentElement
+    setShouldAnimate(track.scrollWidth > container.clientWidth)
+  }, [items.length])
+
   if (items.length === 0) return null
 
+  // Duration proportional to number of items (slower = more readable)
+  const duration = items.length * 3
+
   return (
-    <div className="bg-[var(--bg-card)]/80 backdrop-blur-sm border-b border-[var(--border-light)] overflow-hidden">
-      <div
-        ref={scrollRef}
-        className="flex items-stretch overflow-x-auto no-scrollbar sm:justify-center"
-      >
-        {items.map((item, i) => (
-          <TickerItem key={item.name + i} item={item} />
-        ))}
+    <div
+      className="bg-[var(--bg-card)]/80 backdrop-blur-sm border-b border-[var(--border-light)] overflow-hidden"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={() => setPaused(true)}
+      onTouchEnd={() => setPaused(false)}
+    >
+      <div className="overflow-hidden">
+        <div
+          ref={trackRef}
+          className="flex items-stretch w-max"
+          style={shouldAnimate ? {
+            animation: `ticker-scroll ${duration}s linear infinite`,
+            animationPlayState: paused ? 'paused' : 'running',
+          } : { margin: '0 auto' }}
+        >
+          {items.map((item, i) => (
+            <TickerItem key={item.name + i} item={item} />
+          ))}
+          {/* Duplicate for seamless loop */}
+          {shouldAnimate && items.map((item, i) => (
+            <TickerItem key={'dup-' + item.name + i} item={item} />
+          ))}
+        </div>
       </div>
+      <style>{`
+        @keyframes ticker-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
     </div>
   )
 }

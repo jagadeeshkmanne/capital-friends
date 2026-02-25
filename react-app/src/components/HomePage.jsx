@@ -11,7 +11,7 @@ export default function HomePage() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/investments/mutual-funds" replace />
   }
 
   return <LandingPage />

@@ -4,24 +4,22 @@
  * ============================================================================
  *
  * Fetches market indices, gold, and silver prices.
- * Caches in Script Properties for 5 minutes to avoid rate limits.
+ * Caches in CacheService for 5 minutes to avoid rate limits.
  *
  * Data sources:
- *   - Indices: Google Finance (via UrlFetchApp scraping)
- *   - Gold/Silver: metals-api alternatives / RBI reference rates
+ *   - Indices: NSE India API (primary), GOOGLEFINANCE (fallback)
+ *   - Gold/Silver: GOOGLEFINANCE for USD/INR + metalpriceapi
+ *   - Crypto: Fetched client-side from CoinGecko (CORS-friendly)
  *
  * ============================================================================
  */
 
 var MARKET_CACHE_KEY = 'market_data_cache';
-var MARKET_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Get cached market data or fetch fresh data.
- * Called via apiRouter → routeAction → getMarketData
  */
 function getMarketData() {
-  // Check cache first
   var cache = CacheService.getScriptCache();
   var cached = cache.get(MARKET_CACHE_KEY);
   if (cached) {
@@ -55,39 +53,134 @@ function fetchMarketData() {
     lastUpdated: new Date().toISOString()
   };
 
-  // Fetch indices
   try {
     result.indices = fetchIndianIndices();
   } catch (e) {
     log('Indices fetch failed: ' + e.message);
   }
 
-  // Fetch metals (gold/silver)
   try {
     result.metals = fetchMetalPrices();
   } catch (e) {
     log('Metals fetch failed: ' + e.message);
   }
 
-  // Note: Crypto (BTC) is fetched directly from frontend via CoinGecko (CORS-friendly)
-  // We don't need to proxy it through GAS
-
   return result;
 }
 
+// ── Index name mapping for NSE API ──
+var NSE_INDEX_NAMES = {
+  'NIFTY 50': 'Nifty 50',
+  'NIFTY NEXT 50': 'Nifty Next 50',
+  'NIFTY 100': 'Nifty 100',
+  'NIFTY MIDCAP 150': 'Midcap 150',
+  'NIFTY SMLCAP 250': 'Smallcap 250',
+  'NIFTY BANK': 'Bank Nifty',
+  'NIFTY IT': 'Nifty IT',
+  'NIFTY PHARMA': 'Nifty Pharma',
+  'NIFTY AUTO': 'Nifty Auto',
+  'NIFTY FINANCIAL SERVICES': 'Fin Services',
+  'NIFTY FMCG': 'Nifty FMCG',
+  'NIFTY METAL': 'Nifty Metal',
+  'NIFTY REALTY': 'Nifty Realty',
+  'NIFTY ENERGY': 'Nifty Energy'
+};
+
+// Desired display order
+var INDEX_ORDER = [
+  'NIFTY 50', 'NIFTY NEXT 50', 'NIFTY 100', 'NIFTY MIDCAP 150', 'NIFTY SMLCAP 250',
+  'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY AUTO', 'NIFTY FINANCIAL SERVICES',
+  'NIFTY FMCG', 'NIFTY METAL', 'NIFTY REALTY', 'NIFTY ENERGY'
+];
+
 /**
- * Fetch Indian market indices using Google Finance
- * Uses a temporary sheet with GOOGLEFINANCE formulas
+ * Fetch Indian market indices — NSE API (primary), GOOGLEFINANCE (fallback)
  */
 function fetchIndianIndices() {
-  var indices = [
-    // Broad market
+  // Try NSE India API first
+  try {
+    var results = fetchIndicesFromNSE();
+    if (results.length > 0) return results;
+  } catch (e) {
+    log('NSE API failed: ' + e.message);
+  }
+
+  // Fallback: GOOGLEFINANCE via user's spreadsheet
+  try {
+    var results2 = fetchIndicesViaGoogleFinance();
+    if (results2.length > 0) return results2;
+  } catch (e) {
+    log('GOOGLEFINANCE fallback failed: ' + e.message);
+  }
+
+  // Last resort: Yahoo Finance for key indices
+  return fetchIndicesViaYahoo();
+}
+
+/**
+ * Primary: Fetch indices from NSE India API
+ */
+function fetchIndicesFromNSE() {
+  var url = 'https://www.nseindia.com/api/allIndices';
+  var response = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
+  });
+
+  if (response.getResponseCode() !== 200) {
+    throw new Error('NSE API returned ' + response.getResponseCode());
+  }
+
+  var json = JSON.parse(response.getContentText());
+  var data = json.data || [];
+
+  // Build a map of NSE index name → data
+  var indexMap = {};
+  for (var i = 0; i < data.length; i++) {
+    var item = data[i];
+    var key = (item.index || item.indexSymbol || '').toUpperCase();
+    if (NSE_INDEX_NAMES[key]) {
+      indexMap[key] = item;
+    }
+  }
+
+  // Return in desired order
+  var results = [];
+  for (var j = 0; j < INDEX_ORDER.length; j++) {
+    var name = INDEX_ORDER[j];
+    var item2 = indexMap[name];
+    if (item2) {
+      var price = parseFloat(item2.last || item2.closePrice) || 0;
+      var changePct = parseFloat(item2.percentChange) || 0;
+      if (price > 0) {
+        results.push({
+          name: NSE_INDEX_NAMES[name],
+          symbol: name,
+          price: price,
+          changePct: changePct,
+          type: 'index'
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Fallback: Fetch indices via GOOGLEFINANCE (uses user's spreadsheet)
+ */
+function fetchIndicesViaGoogleFinance() {
+  var gfIndices = [
     { symbol: 'INDEXNSE:NIFTY_50', name: 'Nifty 50' },
     { symbol: 'INDEXNSE:NIFTY_NEXT_50', name: 'Nifty Next 50' },
     { symbol: 'INDEXNSE:NIFTY_100', name: 'Nifty 100' },
     { symbol: 'INDEXNSE:NIFTY_MIDCAP_150', name: 'Midcap 150' },
     { symbol: 'INDEXNSE:NIFTY_SMLCAP_250', name: 'Smallcap 250' },
-    // Sector indices
     { symbol: 'INDEXNSE:NIFTY_BANK', name: 'Bank Nifty' },
     { symbol: 'INDEXNSE:NIFTY_IT', name: 'Nifty IT' },
     { symbol: 'INDEXNSE:NIFTY_PHARMA', name: 'Nifty Pharma' },
@@ -99,13 +192,7 @@ function fetchIndianIndices() {
     { symbol: 'INDEXNSE:NIFTY_ENERGY', name: 'Nifty Energy' }
   ];
 
-  // Use a temporary sheet with GOOGLEFINANCE formulas
-  var ss = SpreadsheetApp.getActive();
-  if (!ss) {
-    // Fallback: use deployer's spreadsheet or any accessible one
-    return fetchIndicesViaUrl();
-  }
-
+  var ss = getSpreadsheet(); // Uses openById (works via Execution API)
   var tempSheetName = '_MarketTemp';
   var tempSheet = ss.getSheetByName(tempSheetName);
   if (!tempSheet) {
@@ -113,29 +200,27 @@ function fetchIndianIndices() {
     tempSheet.hideSheet();
   }
 
-  // Set up GOOGLEFINANCE formulas for price and change
   var formulas = [];
-  for (var i = 0; i < indices.length; i++) {
+  for (var i = 0; i < gfIndices.length; i++) {
     formulas.push([
-      '=IFERROR(GOOGLEFINANCE("' + indices[i].symbol + '", "price"), 0)',
-      '=IFERROR(GOOGLEFINANCE("' + indices[i].symbol + '", "changepct"), 0)'
+      '=IFERROR(GOOGLEFINANCE("' + gfIndices[i].symbol + '", "price"), 0)',
+      '=IFERROR(GOOGLEFINANCE("' + gfIndices[i].symbol + '", "changepct"), 0)'
     ]);
   }
 
   tempSheet.getRange(1, 1, formulas.length, 2).setFormulas(formulas);
-  SpreadsheetApp.flush(); // Force calculation
+  SpreadsheetApp.flush();
 
-  // Read values
-  var values = tempSheet.getRange(1, 1, indices.length, 2).getValues();
+  var values = tempSheet.getRange(1, 1, gfIndices.length, 2).getValues();
 
   var results = [];
-  for (var j = 0; j < indices.length; j++) {
+  for (var j = 0; j < gfIndices.length; j++) {
     var price = parseFloat(values[j][0]) || 0;
     var changePct = parseFloat(values[j][1]) || 0;
     if (price > 0) {
       results.push({
-        name: indices[j].name,
-        symbol: indices[j].symbol,
+        name: gfIndices[j].name,
+        symbol: gfIndices[j].symbol,
         price: price,
         changePct: changePct,
         type: 'index'
@@ -143,11 +228,9 @@ function fetchIndianIndices() {
     }
   }
 
-  // Clean up temp sheet
   try {
     ss.deleteSheet(tempSheet);
   } catch (e) {
-    // If can't delete, just clear it
     tempSheet.clear();
   }
 
@@ -155,16 +238,18 @@ function fetchIndianIndices() {
 }
 
 /**
- * Fallback: Fetch indices via URL (less reliable)
+ * Last resort: Yahoo Finance for key indices only
  */
-function fetchIndicesViaUrl() {
-  // Yahoo Finance API endpoint for Indian indices
-  var symbols = ['^NSEI', '^NSEBANK'];
+function fetchIndicesViaYahoo() {
+  var symbols = [
+    { yahoo: '^NSEI', name: 'Nifty 50' },
+    { yahoo: '^NSEBANK', name: 'Bank Nifty' }
+  ];
   var results = [];
 
   for (var i = 0; i < symbols.length; i++) {
     try {
-      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbols[i]) + '?range=1d&interval=1d';
+      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbols[i].yahoo) + '?range=1d&interval=1d';
       var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
       if (response.getResponseCode() === 200) {
         var json = JSON.parse(response.getContentText());
@@ -173,21 +258,16 @@ function fetchIndicesViaUrl() {
         var prevClose = meta.chartPreviousClose || meta.previousClose || price;
         var changePct = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
 
-        var nameMap = {
-          '^NSEI': 'Nifty 50',
-          '^NSEBANK': 'Bank Nifty'
-        };
-
         results.push({
-          name: nameMap[symbols[i]] || symbols[i],
-          symbol: symbols[i],
+          name: symbols[i].name,
+          symbol: symbols[i].yahoo,
           price: price,
           changePct: changePct,
           type: 'index'
         });
       }
     } catch (e) {
-      log('Yahoo Finance fetch failed for ' + symbols[i] + ': ' + e.message);
+      log('Yahoo Finance fetch failed for ' + symbols[i].yahoo + ': ' + e.message);
     }
   }
 
@@ -196,78 +276,71 @@ function fetchIndicesViaUrl() {
 
 /**
  * Fetch gold and silver prices in INR
- * Uses a combination of sources
  */
 function fetchMetalPrices() {
   var results = [];
 
-  // Try fetching from a public gold price API
+  // Get USD/INR rate via GOOGLEFINANCE
+  var usdInr = 83; // default fallback
   try {
-    // Use Google Finance for gold via GAS
-    var ss = SpreadsheetApp.getActive();
-    if (ss) {
-      var tempSheetName = '_MetalTemp';
-      var tempSheet = ss.getSheetByName(tempSheetName);
-      if (!tempSheet) {
-        tempSheet = ss.insertSheet(tempSheetName);
-        tempSheet.hideSheet();
-      }
+    var ss = getSpreadsheet();
+    var tempSheetName = '_MetalTemp';
+    var tempSheet = ss.getSheetByName(tempSheetName);
+    if (!tempSheet) {
+      tempSheet = ss.insertSheet(tempSheetName);
+      tempSheet.hideSheet();
+    }
 
-      // Gold price in USD per troy ounce, then convert
-      // GOOGLEFINANCE for commodities may not work, so use currency approach
-      // Gold: 1 troy ounce = 31.1035 grams
-      // We'll get XAU/INR directly or USD gold + USD/INR
-      tempSheet.getRange(1, 1).setFormula('=IFERROR(GOOGLEFINANCE("CURRENCY:USDINR"), 0)');
-      SpreadsheetApp.flush();
+    tempSheet.getRange(1, 1).setFormula('=IFERROR(GOOGLEFINANCE("CURRENCY:USDINR"), 0)');
+    SpreadsheetApp.flush();
 
-      var usdInr = parseFloat(tempSheet.getRange(1, 1).getValue()) || 83;
+    var rate = parseFloat(tempSheet.getRange(1, 1).getValue());
+    if (rate > 0) usdInr = rate;
 
-      try {
-        ss.deleteSheet(tempSheet);
-      } catch (e) {
-        tempSheet.clear();
-      }
+    try {
+      ss.deleteSheet(tempSheet);
+    } catch (e) {
+      tempSheet.clear();
+    }
+  } catch (e) {
+    log('USD/INR fetch failed: ' + e.message);
+  }
 
-      // Fetch gold price in USD from a free API
-      try {
-        var goldUrl = 'https://api.metalpriceapi.com/v1/latest?api_key=demo&base=USD&currencies=XAU,XAG';
-        var goldResp = UrlFetchApp.fetch(goldUrl, { muteHttpExceptions: true });
-        if (goldResp.getResponseCode() === 200) {
-          var goldJson = JSON.parse(goldResp.getContentText());
-          if (goldJson.rates) {
-            // XAU rate is USD per troy ounce (inverted)
-            var goldOzUsd = goldJson.rates.USDXAU ? (1 / goldJson.rates.USDXAU) : 0;
-            var silverOzUsd = goldJson.rates.USDXAG ? (1 / goldJson.rates.USDXAG) : 0;
+  // Fetch gold/silver prices in USD
+  try {
+    var goldUrl = 'https://api.metalpriceapi.com/v1/latest?api_key=demo&base=USD&currencies=XAU,XAG';
+    var goldResp = UrlFetchApp.fetch(goldUrl, { muteHttpExceptions: true });
+    if (goldResp.getResponseCode() === 200) {
+      var goldJson = JSON.parse(goldResp.getContentText());
+      if (goldJson.rates) {
+        var goldOzUsd = goldJson.rates.USDXAU ? (1 / goldJson.rates.USDXAU) : 0;
+        var silverOzUsd = goldJson.rates.USDXAG ? (1 / goldJson.rates.USDXAG) : 0;
 
-            if (goldOzUsd > 0) {
-              var goldGramInr = (goldOzUsd * usdInr) / 31.1035;
-              results.push({
-                name: 'Gold (24K)',
-                symbol: 'XAU',
-                price: Math.round(goldGramInr),
-                unit: '₹/gram',
-                type: 'metal'
-              });
-            }
-
-            if (silverOzUsd > 0) {
-              var silverGramInr = (silverOzUsd * usdInr) / 31.1035;
-              results.push({
-                name: 'Silver',
-                symbol: 'XAG',
-                price: Math.round(silverGramInr),
-                unit: '₹/gram',
-                type: 'metal'
-              });
-            }
-          }
+        if (goldOzUsd > 0) {
+          var goldGramInr = (goldOzUsd * usdInr) / 31.1035;
+          results.push({
+            name: 'Gold (24K)',
+            symbol: 'XAU',
+            price: Math.round(goldGramInr),
+            unit: '₹/gram',
+            type: 'metal'
+          });
         }
-      } catch (e) {
-        log('Metal price API failed: ' + e.message);
+
+        if (silverOzUsd > 0) {
+          var silverGramInr = (silverOzUsd * usdInr) / 31.1035;
+          results.push({
+            name: 'Silver',
+            symbol: 'XAG',
+            price: Math.round(silverGramInr),
+            unit: '₹/gram',
+            type: 'metal'
+          });
+        }
       }
     }
   } catch (e) {
-    log('Metal prices fetch failed: ' + e.message);
+    log('Metal price API failed: ' + e.message);
   }
 
   return results;

@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Wallet, TrendingUp, TrendingDown, BarChart3, Building2, Landmark, AlertCircle, RefreshCw } from 'lucide-react'
+import { ChevronRight, ChevronDown, Wallet, TrendingUp, TrendingDown, BarChart3, Building2, Landmark, AlertCircle, RefreshCw } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import PageLoading from '../../components/PageLoading'
 import { useFamily } from '../../context/FamilyContext'
@@ -36,6 +36,12 @@ export default function Dashboard() {
     const mfCurrentValue = activeMFHoldings.reduce((s, h) => s + h.currentValue, 0)
     const mfPL = mfCurrentValue - mfInvested
 
+    // MF per-portfolio breakdown
+    const mfPortfolioDetails = activeMFPortfolios.map((p) => {
+      const ph = activeMFHoldings.filter((h) => h.portfolioId === p.portfolioId)
+      return { name: p.portfolioName, value: ph.reduce((s, h) => s + h.currentValue, 0) }
+    }).filter((p) => p.value > 0)
+
     // Stocks
     const activeStockPortfolios = filterOwner(stockPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
     const stkPortfolioIds = new Set(activeStockPortfolios.map((p) => p.portfolioId))
@@ -44,16 +50,32 @@ export default function Dashboard() {
     const stkCurrentValue = activeStockHoldings.reduce((s, h) => s + h.currentValue, 0)
     const stkPL = stkCurrentValue - stkInvested
 
+    // Stocks per-portfolio breakdown
+    const stkPortfolioDetails = activeStockPortfolios.map((p) => {
+      const ph = activeStockHoldings.filter((h) => h.portfolioId === p.portfolioId)
+      return { name: p.portfolioName, value: ph.reduce((s, h) => s + h.currentValue, 0) }
+    }).filter((p) => p.value > 0)
+
     // Other Investments
     const activeOther = filterOwner(otherInvList.filter((i) => i.status === 'Active'), 'familyMemberId')
     const otherInvested = activeOther.reduce((s, i) => s + i.investedAmount, 0)
     const otherCurrentValue = activeOther.reduce((s, i) => s + i.currentValue, 0)
     const otherPL = otherCurrentValue - otherInvested
 
+    // Other individual items
+    const otherDetails = activeOther.map((i) => ({
+      name: i.investmentName, type: i.investmentType, value: i.currentValue,
+    }))
+
     // Liabilities
     const activeLiabilities = filterOwner(liabilityList.filter((l) => l.status === 'Active'), 'familyMemberId')
     const totalLiabilities = activeLiabilities.reduce((s, l) => s + l.outstandingBalance, 0)
     const totalEMI = activeLiabilities.reduce((s, l) => s + l.emiAmount, 0)
+
+    // Liability individual items
+    const liabilityDetails = activeLiabilities.map((l) => ({
+      name: l.lenderName || l.liabilityType, type: l.liabilityType, balance: l.outstandingBalance, emi: l.emiAmount,
+    }))
 
     // Insurance
     const activeInsurance = filterOwner(insurancePolicies.filter((p) => p.status === 'Active'), 'memberId')
@@ -85,10 +107,10 @@ export default function Dashboard() {
     })
 
     return {
-      mfCurrentValue, mfInvested, mfPL, mfCount: activeMFPortfolios.length,
-      stkCurrentValue, stkInvested, stkPL, stkCount: activeStockPortfolios.length,
-      otherCurrentValue, otherInvested, otherPL, otherCount: activeOther.length,
-      totalLiabilities, totalEMI, liabilityCount: activeLiabilities.length,
+      mfCurrentValue, mfInvested, mfPL, mfCount: activeMFPortfolios.length, mfPortfolioDetails,
+      stkCurrentValue, stkInvested, stkPL, stkCount: activeStockPortfolios.length, stkPortfolioDetails,
+      otherCurrentValue, otherInvested, otherPL, otherCount: activeOther.length, otherDetails,
+      totalLiabilities, totalEMI, liabilityCount: activeLiabilities.length, liabilityDetails,
       totalCover, insuranceCount: activeInsurance.length,
       bankCount: activeBankAccounts.length,
       totalAssets, totalInvested, totalPL, netWorth,
@@ -158,20 +180,119 @@ export default function Dashboard() {
     <div className="space-y-4">
       {/* Net Worth Hero */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Net Worth</p>
-          <span className={`text-xs font-semibold ${plColor(data.totalPL)}`}>
-            {plPrefix(data.totalPL)}{formatINR(Math.abs(data.totalPL))} P&L
-          </span>
-        </div>
+        <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Net Worth</p>
         <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</p>
-        <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-dim)]">
-          <span>Assets: <span className="font-semibold text-[var(--text-secondary)]">{formatINR(data.totalAssets)}</span></span>
-          <span className="w-px h-3 bg-[var(--border)]" />
-          <span>Liabilities: <span className="font-semibold text-[var(--accent-rose)]">{formatINR(data.totalLiabilities)}</span></span>
+
+        {/* Full breakdown */}
+        <div className="mt-3 space-y-0.5">
+          {/* Investments */}
+          <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Investments</p>
+
+          {data.mfCurrentValue > 0 && (
+            <ExpandableRow
+              dot="bg-violet-500"
+              label="Mutual Funds"
+              value={formatINR(data.mfCurrentValue)}
+              items={data.mfPortfolioDetails}
+              renderItem={(p) => (
+                <div key={p.name} className="flex items-center justify-between">
+                  <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{p.name}</span>
+                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(p.value)}</span>
+                </div>
+              )}
+            />
+          )}
+
+          {data.stkCurrentValue > 0 && (
+            <ExpandableRow
+              dot="bg-blue-500"
+              label="Stocks"
+              value={formatINR(data.stkCurrentValue)}
+              items={data.stkPortfolioDetails}
+              renderItem={(p) => (
+                <div key={p.name} className="flex items-center justify-between">
+                  <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{p.name}</span>
+                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(p.value)}</span>
+                </div>
+              )}
+            />
+          )}
+
+          {data.otherCurrentValue > 0 && (
+            <ExpandableRow
+              dot="bg-emerald-500"
+              label="Other Investments"
+              value={formatINR(data.otherCurrentValue)}
+              items={data.otherDetails}
+              renderItem={(item) => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <div className="min-w-0 mr-2">
+                    <span className="text-[11px] text-[var(--text-dim)] truncate block">{item.name}</span>
+                    <span className="text-[10px] text-[var(--text-dim)]/60">{item.type}</span>
+                  </div>
+                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(item.value)}</span>
+                </div>
+              )}
+            />
+          )}
+
+          {data.totalAssets > 0 && (data.mfCurrentValue > 0) + (data.stkCurrentValue > 0) + (data.otherCurrentValue > 0) > 1 && (
+            <div className="flex items-center justify-between pl-2 pt-0.5">
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Total</span>
+              <span className="text-xs font-bold text-[var(--text-secondary)] tabular-nums">{formatINR(data.totalAssets)}</span>
+            </div>
+          )}
+
+          {/* Liabilities */}
+          {data.totalLiabilities > 0 && (
+            <>
+              <div className="pt-1.5">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Liabilities</p>
+              </div>
+              <ExpandableRow
+                dot="bg-rose-500"
+                label={data.liabilityCount === 1 ? (data.liabilityDetails[0]?.type || 'Loan') : `${data.liabilityCount} Loans`}
+                value={<span className="text-[var(--accent-rose)]">&minus;{formatINR(data.totalLiabilities)}</span>}
+                valueClass="text-[var(--accent-rose)]"
+                items={data.liabilityDetails}
+                renderItem={(l) => (
+                  <div key={l.name + l.type} className="flex items-center justify-between">
+                    <div className="min-w-0 mr-2">
+                      <span className="text-[11px] text-[var(--text-dim)] truncate block">{l.name}</span>
+                      {l.emi > 0 && <span className="text-[10px] text-[var(--text-dim)]/60">EMI {formatINR(l.emi)}/mo</span>}
+                    </div>
+                    <span className="text-[11px] text-[var(--accent-rose)] tabular-nums shrink-0">{formatINR(l.balance)}</span>
+                  </div>
+                )}
+              />
+              {data.totalEMI > 0 && (
+                <div className="flex items-center justify-between pl-2">
+                  <span className="text-[11px] text-[var(--text-dim)]">Total EMI</span>
+                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{formatINR(data.totalEMI)}/mo</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Net Worth line */}
+          <div className="border-t border-dashed border-[var(--border-light)] pt-1.5 mt-1 flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--text-primary)]">= Net Worth</span>
+            <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</span>
+          </div>
         </div>
 
-        {/* Asset/Liability bar */}
+        {/* P&L */}
+        {data.totalInvested > 0 && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <span className="text-[var(--text-dim)]">Invested {formatINR(data.totalInvested)}</span>
+            <span className="text-[var(--text-dim)]">&rarr;</span>
+            <span className={`font-semibold ${plColor(data.totalPL)}`}>
+              P&L {plPrefix(data.totalPL)}{formatINR(Math.abs(data.totalPL))} ({plPrefix(data.totalPL)}{((data.totalPL / data.totalInvested) * 100).toFixed(1)}%)
+            </span>
+          </div>
+        )}
+
+        {/* Asset allocation bar */}
         {data.totalAssets > 0 && (
           <div className="mt-3 h-2 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
             {data.mfCurrentValue > 0 && (
@@ -185,11 +306,13 @@ export default function Dashboard() {
             )}
           </div>
         )}
-        <div className="flex items-center gap-3 mt-1.5 text-xs text-[var(--text-dim)]">
-          {data.mfCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500" />MF {((data.mfCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
-          {data.stkCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Stocks {((data.stkCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
-          {data.otherCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Other {((data.otherCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
-        </div>
+        {data.totalAssets > 0 && (
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-[var(--text-dim)]">
+            {data.mfCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500" />MF {((data.mfCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
+            {data.stkCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Stocks {((data.stkCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
+            {data.otherCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Other {((data.otherCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
+          </div>
+        )}
       </div>
 
       {/* Investment Alerts */}
@@ -341,6 +464,40 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── Expandable row — tap to slide open details ── */
+function ExpandableRow({ dot, label, value, items, renderItem }) {
+  const [open, setOpen] = useState(false)
+  const hasDetails = items && items.length > 1
+
+  return (
+    <div className="pl-2">
+      <button
+        onClick={hasDetails ? () => setOpen(!open) : undefined}
+        className={`w-full flex items-center justify-between py-0.5 ${hasDetails ? 'cursor-pointer' : ''}`}
+      >
+        <span className="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
+          <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+          {label}
+          {hasDetails && (
+            <ChevronDown size={10} className={`text-[var(--text-dim)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+          )}
+        </span>
+        <span className="text-xs font-semibold text-[var(--text-secondary)] tabular-nums">{value}</span>
+      </button>
+
+      {/* Slide-open detail items */}
+      <div
+        className="overflow-hidden transition-all duration-200 ease-in-out"
+        style={{ maxHeight: open ? `${items.length * 40}px` : '0px', opacity: open ? 1 : 0 }}
+      >
+        <div className="pl-4 py-1 space-y-1 border-l border-[var(--border-light)] ml-0.5">
+          {items.map(renderItem)}
+        </div>
+      </div>
     </div>
   )
 }
