@@ -1,39 +1,72 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import * as api from '../services/api'
 import { useAuth } from './AuthContext'
 
 const DataContext = createContext()
 
+const DATA_CACHE_KEY = 'cf_data_cache'
+const HEALTH_CACHE_KEY = 'cf_health_check'
+const SETTINGS_CACHE_KEY = 'cf_settings'
+
+function getDataCache() {
+  try {
+    const cached = sessionStorage.getItem(DATA_CACHE_KEY)
+    return cached ? JSON.parse(cached) : null
+  } catch { return null }
+}
+
+function setDataCache(data) {
+  try { sessionStorage.setItem(DATA_CACHE_KEY, JSON.stringify(data)) } catch {}
+}
+
+function getHealthCache() {
+  try {
+    const val = sessionStorage.getItem(HEALTH_CACHE_KEY)
+    return val !== null ? JSON.parse(val) : null
+  } catch { return null }
+}
+
 export function DataProvider({ children }) {
   const { isAuthenticated } = useAuth()
 
+  // ── Restore from cache instantly ──
+  const cached = isAuthenticated ? getDataCache() : null
+  const cachedHealth = isAuthenticated ? getHealthCache() : null
+
   // ── Loading & Error State ──
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!cached) // false if cache hit
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
 
-  // ── All Data State (same shape as before) ──
-  const [members, setMembers] = useState([])
-  const [banks, setBanks] = useState([])
-  const [investments, setInvestments] = useState([])
-  const [insurancePolicies, setInsurance] = useState([])
-  const [liabilityList, setLiabilities] = useState([])
-  const [otherInvList, setOtherInvestments] = useState([])
-  const [stockPortfolios, setStockPortfolios] = useState([])
-  const [stockHoldings, setStockHoldings] = useState([])
-  const [stockTransactions, setStockTransactions] = useState([])
-  const [mfPortfolios, setMFPortfolios] = useState([])
-  const [mfHoldings, setMFHoldings] = useState([])
-  const [mfTransactions, setMFTransactions] = useState([])
-  const [goalList, setGoals] = useState([])
-  const [reminderList, setReminders] = useState([])
-  const [goalPortfolioMappings, setGoalPortfolioMappings] = useState([])
-  const [settings, setSettings] = useState({})
-  const [healthCheckCompleted, setHealthCheckCompleted] = useState(null) // null=loading, true/false
+  // ── All Data State — initialize from cache if available ──
+  const [members, setMembers] = useState(cached?.members || [])
+  const [banks, setBanks] = useState(cached?.bankAccounts || [])
+  const [investments, setInvestments] = useState(cached?.investments || [])
+  const [insurancePolicies, setInsurance] = useState(cached?.insurancePolicies || [])
+  const [liabilityList, setLiabilities] = useState(cached?.liabilities || [])
+  const [otherInvList, setOtherInvestments] = useState(cached?.otherInvestments || [])
+  const [stockPortfolios, setStockPortfolios] = useState(cached?.stockPortfolios || [])
+  const [stockHoldings, setStockHoldings] = useState(cached?.stockHoldings || [])
+  const [stockTransactions, setStockTransactions] = useState(cached?.stockTransactions || [])
+  const [mfPortfolios, setMFPortfolios] = useState(cached?.mfPortfolios || [])
+  const [mfHoldings, setMFHoldings] = useState(cached?.mfHoldings || [])
+  const [mfTransactions, setMFTransactions] = useState(cached?.mfTransactions || [])
+  const [goalList, setGoals] = useState(cached?.goals || [])
+  const [reminderList, setReminders] = useState(cached?.reminders || [])
+  const [goalPortfolioMappings, setGoalPortfolioMappings] = useState(cached?.goalPortfolioMappings || [])
+  const [settings, setSettings] = useState(() => {
+    try { const s = sessionStorage.getItem(SETTINGS_CACHE_KEY); return s ? JSON.parse(s) : {} } catch { return {} }
+  })
+  const [healthCheckCompleted, setHealthCheckCompleted] = useState(cachedHealth) // null=loading, true/false
+
+  // Track if first load (with cache) already ran
+  const didInitRef = useRef(false)
 
   // ── Load All Data on Auth ──
-  const refreshData = useCallback(async () => {
+  const refreshData = useCallback(async (background = false) => {
     try {
-      setLoading(true)
+      if (background) setIsRefreshing(true)
+      else setLoading(true)
       setError(null)
       const data = await api.loadAllData()
       setMembers(data.members || [])
@@ -51,10 +84,13 @@ export function DataProvider({ children }) {
       setGoals(data.goals || [])
       setReminders(data.reminders || [])
       setGoalPortfolioMappings(data.goalPortfolioMappings || [])
+      // Cache for next refresh
+      setDataCache(data)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+      setIsRefreshing(false)
     }
   }, [])
 
@@ -118,6 +154,7 @@ export function DataProvider({ children }) {
   const refreshSettings = useCallback(async () => {
     const data = await api.getSettings()
     setSettings(data || {})
+    try { sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(data || {})) } catch {}
   }, [])
 
   const updateSettings = useCallback(async (data) => {
@@ -128,9 +165,12 @@ export function DataProvider({ children }) {
   const checkHealthCheck = useCallback(async () => {
     try {
       const status = await api.getHealthCheckStatus()
-      setHealthCheckCompleted(status?.completed ?? false)
+      const completed = status?.completed ?? false
+      setHealthCheckCompleted(completed)
+      try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(completed)) } catch {}
     } catch {
       setHealthCheckCompleted(false)
+      try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(false)) } catch {}
     }
   }, [])
 
@@ -144,7 +184,14 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     if (isAuthenticated) {
-      refreshData()
+      // If we restored from cache, do background refresh (no loading screen)
+      const hasCache = !!getDataCache()
+      if (hasCache && !didInitRef.current) {
+        didInitRef.current = true
+        refreshData(true) // background
+      } else {
+        refreshData(false) // foreground with loading
+      }
       refreshSettings().catch(() => {}) // non-blocking
       checkHealthCheck().catch(() => {}) // non-blocking
     } else {
@@ -375,7 +422,7 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider value={{
       // Loading state
-      loading, error, refreshData,
+      loading, isRefreshing, error, refreshData,
       // Data
       members, banks, investments, insurancePolicies, liabilityList, otherInvList,
       // Filtered

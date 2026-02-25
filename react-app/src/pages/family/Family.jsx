@@ -3,6 +3,7 @@ import { Plus, Pencil, Users, Mail, Landmark, Briefcase, Shield } from 'lucide-r
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
 import MemberForm from '../../components/forms/MemberForm'
+import PageLoading from '../../components/PageLoading'
 
 const avatarColors = [
   'from-violet-500 to-indigo-500',
@@ -22,7 +23,9 @@ const relationBadge = {
 }
 
 export default function Family() {
-  const { members, banks, investments, insurancePolicies, addMember, updateMember, deleteMember } = useData()
+  const { loading, members, banks, investments, insurancePolicies, addMember, updateMember, deleteMember } = useData()
+
+  if (loading) return <PageLoading title="Loading family" cards={3} />
   const [modal, setModal] = useState(null)
 
   const activeMembers = members.filter((m) => m.status !== 'Inactive')

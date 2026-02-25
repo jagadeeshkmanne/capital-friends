@@ -11,6 +11,7 @@ import MFSwitchForm from '../../components/forms/MFSwitchForm'
 import MFAllocationManager from '../../components/forms/MFAllocationManager'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
+import PageLoading from '../../components/PageLoading'
 
 // ATH color coding (matching email report)
 function athColor(pct) {
@@ -24,11 +25,14 @@ function athColor(pct) {
 export default function MutualFundsPage() {
   const { selectedMember } = useFamily()
   const {
+    loading,
     mfPortfolios, mfHoldings, mfTransactions,
     activeInvestmentAccounts,
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
     investMF, redeemMF, switchMF, updateHoldingAllocations,
   } = useData()
+
+  if (loading) return <PageLoading title="Loading mutual funds" cards={5} />
 
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')

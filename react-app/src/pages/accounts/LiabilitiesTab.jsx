@@ -5,6 +5,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
 import LiabilityForm from '../../components/forms/LiabilityForm'
+import PageLoading from '../../components/PageLoading'
 
 const typeBadge = {
   'Home Loan': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -17,7 +18,9 @@ const typeBadge = {
 
 export default function LiabilitiesTab() {
   const { selectedMember, member } = useFamily()
-  const { liabilityList, addLiability, updateLiability, deleteLiability } = useData()
+  const { loading, liabilityList, addLiability, updateLiability, deleteLiability } = useData()
+
+  if (loading) return <PageLoading title="Loading liabilities" cards={4} />
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {

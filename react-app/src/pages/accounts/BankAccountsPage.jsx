@@ -4,6 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
 import BankAccountForm from '../../components/forms/BankAccountForm'
+import PageLoading from '../../components/PageLoading'
 
 const typeBadge = {
   'Savings Account': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -16,7 +17,9 @@ const typeBadge = {
 
 export default function BankAccountsPage() {
   const { selectedMember, member } = useFamily()
-  const { banks, addBankAccount, updateBankAccount, deleteBankAccount } = useData()
+  const { loading, banks, addBankAccount, updateBankAccount, deleteBankAccount } = useData()
+
+  if (loading) return <PageLoading title="Loading bank accounts" cards={3} />
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {

@@ -7,6 +7,7 @@ import Modal from '../../components/Modal'
 import GoalForm from '../../components/forms/GoalForm'
 import GoalPortfolioMapping from '../../components/forms/GoalPortfolioMapping'
 import GoalWithdrawalPlan from '../../components/forms/GoalWithdrawalPlan'
+import PageLoading from '../../components/PageLoading'
 
 const statusBadge = {
   'On Track': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -30,7 +31,9 @@ const barColor = {
 
 export default function GoalsPage() {
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings } = useData()
+  const { loading, goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings } = useData()
+
+  if (loading) return <PageLoading title="Loading goals" cards={5} />
   const [modal, setModal] = useState(null)
   const [mappingGoal, setMappingGoal] = useState(null)
   const [withdrawalGoal, setWithdrawalGoal] = useState(null)

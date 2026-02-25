@@ -22,11 +22,37 @@ const SCOPES = [
   'profile',
 ].join(' ')
 
+const USER_PROFILE_KEY = 'cf_user_profile'
+
+function getCachedUser() {
+  try {
+    const cached = localStorage.getItem(USER_PROFILE_KEY)
+    return cached ? JSON.parse(cached) : null
+  } catch { return null }
+}
+
+function setCachedUser(user) {
+  try { localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user)) } catch {}
+}
+
+function clearCachedUser() {
+  localStorage.removeItem(USER_PROFILE_KEY)
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null) // { email, name, role, picture }
-  const [loading, setLoading] = useState(true)
+  // Instantly restore from cache if token is valid — no loading flash on refresh
+  const cachedUser = api.isTokenValid() ? getCachedUser() : null
+  const [user, setUser] = useState(cachedUser)
+  const [loading, setLoading] = useState(!cachedUser) // false if cache hit
   const [error, setError] = useState(null)
   const tokenClientRef = useRef(null)
+
+  // Wrap setUser to also persist to cache
+  function setUserAndCache(u) {
+    setUser(u)
+    if (u) setCachedUser(u)
+    else clearCachedUser()
+  }
 
   // Initialize Google Identity Services (OAuth2 Token Client)
   useEffect(() => {
@@ -84,7 +110,7 @@ export function AuthProvider({ children }) {
 
       // Call our backend to register/login
       const me = await api.getMe()
-      setUser({
+      setUserAndCache({
         email: me.email || profile.email,
         name: me.name || profile.name,
         role: me.role,
@@ -93,7 +119,7 @@ export function AuthProvider({ children }) {
     } catch (err) {
       setError(err.message)
       api.clearToken()
-      setUser(null)
+      setUserAndCache(null)
     } finally {
       setLoading(false)
     }
@@ -110,13 +136,16 @@ export function AuthProvider({ children }) {
 
   // Restore session from stored access token
   async function restoreSession() {
+    // If we already restored from cache, validate in background (no loading)
+    const hadCachedUser = !!getCachedUser()
+
     try {
       const token = api.getStoredToken()
       const profile = await fetchUserProfile(token)
       api.setStoredUserName(profile.name || '')
 
       const me = await api.getMe()
-      setUser({
+      setUserAndCache({
         email: me.email || profile.email,
         name: me.name || profile.name,
         role: me.role,
@@ -125,9 +154,10 @@ export function AuthProvider({ children }) {
     } catch {
       // Token expired or invalid — clear and show login
       api.clearToken()
-      setUser(null)
+      setUserAndCache(null)
     } finally {
-      setLoading(false)
+      if (!hadCachedUser) setLoading(false)
+      // If had cache, loading was already false from init
     }
   }
 
@@ -171,6 +201,10 @@ export function AuthProvider({ children }) {
       window.google.accounts.oauth2.revoke(token)
     }
     api.clearToken()
+    clearCachedUser()
+    sessionStorage.removeItem('cf_data_cache')
+    sessionStorage.removeItem('cf_health_check')
+    sessionStorage.removeItem('cf_settings')
     setUser(null)
   }, [])
 

@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Wallet, TrendingUp, BarChart3, Building2, Landmark, AlertCircle } from 'lucide-react'
+import { ChevronRight, Wallet, TrendingUp, TrendingDown, BarChart3, Building2, Landmark, AlertCircle, RefreshCw } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import PageLoading from '../../components/PageLoading'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 
@@ -12,12 +13,15 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { selectedMember } = useFamily()
   const {
+    loading,
     mfPortfolios, mfHoldings,
     stockPortfolios, stockHoldings,
     otherInvList, liabilityList,
     banks, insurancePolicies,
     reminderList, goalList,
   } = useData()
+
+  if (loading) return <PageLoading title="Loading dashboard" cards={4} />
 
   // Filter by selected member
   const data = useMemo(() => {
@@ -64,6 +68,22 @@ export default function Dashboard() {
     const totalInvested = mfInvested + stkInvested + otherInvested
     const totalPL = totalAssets - totalInvested
 
+    // Investment Alerts — buy opportunities (ATH-based) & rebalance
+    let buyOppCount = 0
+    let rebalanceCount = 0
+    activeMFPortfolios.forEach((p) => {
+      const pHoldings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
+      const pValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
+      const threshold = p.rebalanceThreshold || 0.05
+      pHoldings.forEach((h) => {
+        if (h.athNav > 0 && h.belowATHPct >= 5) buyOppCount++
+        if (h.targetAllocationPct > 0 && pValue > 0) {
+          const currentPct = (h.currentValue / pValue) * 100
+          if (Math.abs(currentPct - h.targetAllocationPct) > threshold * 100) rebalanceCount++
+        }
+      })
+    })
+
     return {
       mfCurrentValue, mfInvested, mfPL, mfCount: activeMFPortfolios.length,
       stkCurrentValue, stkInvested, stkPL, stkCount: activeStockPortfolios.length,
@@ -72,6 +92,7 @@ export default function Dashboard() {
       totalCover, insuranceCount: activeInsurance.length,
       bankCount: activeBankAccounts.length,
       totalAssets, totalInvested, totalPL, netWorth,
+      buyOppCount, rebalanceCount,
     }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, insurancePolicies])
 
@@ -165,11 +186,47 @@ export default function Dashboard() {
           </div>
         )}
         <div className="flex items-center gap-3 mt-1.5 text-xs text-[var(--text-dim)]">
-          {data.mfCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500" />MF</span>}
-          {data.stkCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Stocks</span>}
-          {data.otherCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Other</span>}
+          {data.mfCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500" />MF {((data.mfCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
+          {data.stkCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Stocks {((data.stkCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
+          {data.otherCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Other {((data.otherCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
         </div>
       </div>
+
+      {/* Investment Alerts */}
+      {(data.buyOppCount > 0 || data.rebalanceCount > 0) && (
+        <div className="flex gap-3">
+          {data.buyOppCount > 0 && (
+            <button
+              onClick={() => navigate('/investments/mutual-funds')}
+              className="flex-1 flex items-center gap-2.5 bg-[var(--bg-card)] rounded-xl border border-emerald-500/30 p-3 hover:bg-emerald-500/5 transition-colors"
+            >
+              <span className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-400 shrink-0">
+                <TrendingDown size={16} />
+              </span>
+              <div className="min-w-0 text-left">
+                <p className="text-sm font-semibold text-emerald-400">{data.buyOppCount} Buy {data.buyOppCount === 1 ? 'Opportunity' : 'Opportunities'}</p>
+                <p className="text-xs text-[var(--text-dim)]">Funds 5%+ below ATH</p>
+              </div>
+              <ChevronRight size={14} className="text-[var(--text-dim)] ml-auto shrink-0" />
+            </button>
+          )}
+          {data.rebalanceCount > 0 && (
+            <button
+              onClick={() => navigate('/investments/mutual-funds')}
+              className="flex-1 flex items-center gap-2.5 bg-[var(--bg-card)] rounded-xl border border-violet-500/30 p-3 hover:bg-violet-500/5 transition-colors"
+            >
+              <span className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center text-violet-400 shrink-0">
+                <RefreshCw size={16} />
+              </span>
+              <div className="min-w-0 text-left">
+                <p className="text-sm font-semibold text-violet-400">{data.rebalanceCount} Rebalance {data.rebalanceCount === 1 ? 'Alert' : 'Alerts'}</p>
+                <p className="text-xs text-[var(--text-dim)]">Portfolios drifted from targets</p>
+              </div>
+              <ChevronRight size={14} className="text-[var(--text-dim)] ml-auto shrink-0" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Asset Cards Grid */}
       <div className="grid grid-cols-2 gap-3">

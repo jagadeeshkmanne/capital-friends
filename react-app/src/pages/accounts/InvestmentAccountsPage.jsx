@@ -4,6 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
 import InvestmentAccountForm from '../../components/forms/InvestmentAccountForm'
+import PageLoading from '../../components/PageLoading'
 
 const typeBadge = {
   'Demat + Trading': 'bg-violet-500/15 text-[var(--accent-violet)]',
@@ -16,7 +17,9 @@ const typeBadge = {
 
 export default function InvestmentAccountsPage() {
   const { selectedMember, member } = useFamily()
-  const { investments, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
+  const { loading, investments, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
+
+  if (loading) return <PageLoading title="Loading investment accounts" cards={4} />
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {

@@ -5,6 +5,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
 import OtherInvestmentForm from '../../components/forms/OtherInvestmentForm'
+import PageLoading from '../../components/PageLoading'
 
 const catBadge = {
   Debt: 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -16,7 +17,9 @@ const catBadge = {
 
 export default function OtherInvestmentsTab() {
   const { selectedMember, member } = useFamily()
-  const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
+  const { loading, otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
+
+  if (loading) return <PageLoading title="Loading investments" cards={5} />
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {

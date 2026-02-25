@@ -7,15 +7,19 @@ import Modal from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
 import BuyStockForm from '../../components/forms/BuyStockForm'
 import SellStockForm from '../../components/forms/SellStockForm'
+import PageLoading from '../../components/PageLoading'
 
 export default function StocksPage() {
   const { selectedMember } = useFamily()
   const {
+    loading,
     stockPortfolios, stockHoldings, stockTransactions,
     activeInvestmentAccounts,
     addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
     buyStock, sellStock,
   } = useData()
+
+  if (loading) return <PageLoading title="Loading stocks" cards={5} />
 
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')

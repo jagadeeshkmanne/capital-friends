@@ -8,21 +8,23 @@ export default function ProtectedRoute() {
   const { healthCheckCompleted, loading: dataLoading } = useData()
   const location = useLocation()
 
-  // Determine loading phase for progress display
-  if (authLoading) {
+  // Only show full-screen loading on first login (no cached data)
+  // On refresh with cache, auth + data restore instantly — no loading screen
+  if (authLoading && !isAuthenticated) {
     return <BrandedLoading phase="auth" />
   }
 
-  if (isAuthenticated && dataLoading) {
+  if (!isAuthenticated && !authLoading) {
+    return <Navigate to="/" replace />
+  }
+
+  // First-time load (no cache) — show loading phases
+  if (dataLoading) {
     return <BrandedLoading phase="data" />
   }
 
-  if (isAuthenticated && healthCheckCompleted === null) {
+  if (healthCheckCompleted === null) {
     return <BrandedLoading phase="health" />
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />
   }
 
   // Redirect to health check if not completed (except when already on that page)

@@ -5,6 +5,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
 import InsuranceForm from '../../components/forms/InsuranceForm'
+import PageLoading from '../../components/PageLoading'
 
 const typeBadge = {
   'Term Life': 'bg-rose-500/15 text-[var(--accent-rose)]',
@@ -18,7 +19,9 @@ const typeBadge = {
 
 export default function InsurancePage() {
   const { selectedMember, member } = useFamily()
-  const { insurancePolicies, addInsurance, updateInsurance, deleteInsurance } = useData()
+  const { loading, insurancePolicies, addInsurance, updateInsurance, deleteInsurance } = useData()
+
+  if (loading) return <PageLoading title="Loading insurance" cards={5} />
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {

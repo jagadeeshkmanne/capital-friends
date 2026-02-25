@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Menu, Sun, Moon, ArrowUpRight, ArrowDownRight, Users, ChevronDown, Check, LogOut } from 'lucide-react'
+import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, RefreshCw } from 'lucide-react'
 
 import { useTheme } from '../context/ThemeContext'
 import { useFamily } from '../context/FamilyContext'
@@ -25,16 +25,12 @@ const avatarSolids = [
   'bg-emerald-500',
 ]
 
-function plSign(num) { return num >= 0 ? '+' : '' }
-function plPct(pl, invested) {
-  if (!invested) return '0%'
-  return `${pl >= 0 ? '+' : ''}${((pl / invested) * 100).toFixed(1)}%`
-}
+
 
 export default function Header({ onMenuClick }) {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
-  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList } = useData()
+  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, isRefreshing } = useData()
   const { user, signOut } = useAuth()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -78,12 +74,10 @@ export default function Header({ onMenuClick }) {
     const activeLiab = filterOwner(liabilityList.filter((l) => l.status === 'Active'), 'familyMemberId')
     const totalLiab = activeLiab.reduce((s, l) => s + l.outstandingBalance, 0)
 
-    const invested = mfInvested + stkInvested + otherInvested
     const totalAssets = mfValue + stkValue + otherValue
-    const unrealizedPL = totalAssets - invested
     const netWorth = totalAssets - totalLiab
 
-    return { netWorth, invested, totalPL: unrealizedPL, unrealizedPL }
+    return { netWorth, totalAssets, totalLiab }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList])
 
   return (
@@ -212,25 +206,25 @@ export default function Header({ onMenuClick }) {
       <div className="bg-[var(--bg-strip)]/95 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-stretch overflow-x-auto no-scrollbar">
           <WealthItem label="Net Worth" value={formatINR(w.netWorth)} primary />
-          <WealthItem label="Invested" value={formatINR(w.invested)} />
-          <WealthItem label="P&L" value={`${plSign(w.totalPL)}${formatINR(Math.abs(w.totalPL))}`} change={plPct(w.totalPL, w.invested)} up={w.totalPL >= 0} />
+          <WealthItem label="Assets" value={formatINR(w.totalAssets)} />
+          <WealthItem label="Liabilities" value={formatINR(w.totalLiab)} liability />
+          {isRefreshing && (
+            <div className="flex items-center px-3 text-[var(--text-muted)]">
+              <RefreshCw size={12} className="animate-spin" />
+            </div>
+          )}
         </div>
       </div>
     </header>
   )
 }
 
-function WealthItem({ label, value, change, up, primary }) {
+function WealthItem({ label, value, primary, liability }) {
   return (
     <div className={`flex-1 px-4 sm:px-5 py-2 border-r border-[var(--border-light)] last:border-0 text-center ${primary ? 'bg-violet-500/[0.03]' : ''}`}>
       <p className={`font-semibold uppercase tracking-wider whitespace-nowrap ${primary ? 'text-xs text-violet-400' : 'text-xs text-[var(--text-muted)]'}`}>{label}</p>
       <div className="flex items-center justify-center gap-1 mt-0.5">
-        <p className={`font-bold whitespace-nowrap tabular-nums ${primary ? 'text-[var(--text-primary)] text-base' : 'text-[var(--text-secondary)] text-sm'}`}>{value}</p>
-        {change && (
-          <span className={`flex items-center text-xs font-semibold ${up ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}{change}
-          </span>
-        )}
+        <p className={`font-bold whitespace-nowrap tabular-nums ${primary ? 'text-[var(--text-primary)] text-base' : liability ? 'text-rose-400 text-sm' : 'text-[var(--text-secondary)] text-sm'}`}>{value}</p>
       </div>
     </div>
   )
