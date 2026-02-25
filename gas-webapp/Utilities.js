@@ -409,6 +409,173 @@ function getBaseFundName(fullName) {
 }
 
 // ============================================================================
+// HEALTH CHECK API FUNCTIONS (for React App)
+// ============================================================================
+
+/**
+ * Get health check completion status
+ * Returns whether the user has completed the Financial Health Check
+ */
+function getHealthCheckStatus() {
+  try {
+    const questionnaireSheet = getSheet(CONFIG.questionnaireSheet);
+
+    if (!questionnaireSheet) {
+      return { completed: false, score: 0, total: 10 };
+    }
+
+    const lastRow = questionnaireSheet.getLastRow();
+    if (lastRow <= 2) {
+      return { completed: false, score: 0, total: 10 };
+    }
+
+    // Get score from the last data row
+    const data = questionnaireSheet.getRange(lastRow, 1, 1, 13).getValues()[0];
+    return {
+      completed: true,
+      score: data[11] || 0,  // Column L: Score
+      total: data[12] || 10  // Column M: Total
+    };
+  } catch (error) {
+    log('Error getting health check status: ' + error.toString());
+    return { completed: false, score: 0, total: 10 };
+  }
+}
+
+/**
+ * Save health check answers (10 questions from React app)
+ * Creates/updates the Questionnaire sheet with expanded 10-question format
+ */
+function saveHealthCheck(params) {
+  try {
+    const spreadsheet = getSpreadsheet();
+    let questionnaireSheet = getSheet(CONFIG.questionnaireSheet);
+
+    const HEADERS = [
+      'Date',
+      'Term Life',
+      'Health Insurance',
+      'Emergency Fund',
+      'Family Aware',
+      'Will',
+      'Nominees',
+      'Goals',
+      'Retirement',
+      'Tax Planning',
+      'Debt Free',
+      'Score',
+      'Total'
+    ];
+
+    // Create Questionnaire sheet if it doesn't exist
+    if (!questionnaireSheet) {
+      questionnaireSheet = spreadsheet.insertSheet(CONFIG.questionnaireSheet);
+      addDeveloperCredit(questionnaireSheet, HEADERS.length);
+      questionnaireSheet.appendRow(HEADERS);
+      formatHeaderRow(questionnaireSheet, questionnaireSheet.getRange('A2:M2'), 40);
+      applyStandardFormatting(questionnaireSheet);
+      questionnaireSheet.setTabColor('#10b981');
+    }
+
+    const row = [
+      new Date(),
+      params.termLife || 'No',
+      params.healthIns || 'No',
+      params.emergencyFund || 'No',
+      params.familyAware || 'No',
+      params.hasWill || 'No',
+      params.nominees || 'No',
+      params.goals || 'No',
+      params.retirement || 'No',
+      params.taxPlanning || 'No',
+      params.debtFree || 'No',
+      params.score || 0,
+      params.total || 10
+    ];
+
+    const lastRow = questionnaireSheet.getLastRow();
+
+    if (lastRow <= 2) {
+      questionnaireSheet.appendRow(row);
+    } else {
+      // Update existing row
+      questionnaireSheet.getRange(lastRow, 1, 1, 13).setValues([row]);
+    }
+
+    log('Health check saved: ' + params.score + '/' + params.total);
+
+    return {
+      success: true,
+      completed: true,
+      score: params.score,
+      total: params.total
+    };
+  } catch (error) {
+    log('Error saving health check: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Get latest health check responses for pre-populating the form
+ * Returns all 10 answers from the Questionnaire sheet
+ */
+function getLatestHealthCheckResponses() {
+  try {
+    const questionnaireSheet = getSheet(CONFIG.questionnaireSheet);
+
+    if (!questionnaireSheet) {
+      return null;
+    }
+
+    const lastRow = questionnaireSheet.getLastRow();
+    if (lastRow <= 2) {
+      return null;
+    }
+
+    const data = questionnaireSheet.getRange(lastRow, 1, 1, 13).getValues()[0];
+    const colCount = data.length;
+
+    // Support both old 7-question format (10 columns) and new 10-question format (13 columns)
+    if (colCount >= 13 || questionnaireSheet.getLastColumn() >= 13) {
+      return {
+        termLife: data[1] || 'No',
+        healthIns: data[2] || 'No',
+        emergencyFund: data[3] || 'No',
+        familyAware: data[4] || 'No',
+        hasWill: data[5] || 'No',
+        nominees: data[6] || 'No',
+        goals: data[7] || 'No',
+        retirement: data[8] || 'No',
+        taxPlanning: data[9] || 'No',
+        debtFree: data[10] || 'No',
+        score: data[11] || 0,
+        total: data[12] || 10
+      };
+    } else {
+      // Old 7-question format — map to new format, leave new questions unanswered
+      return {
+        termLife: data[2] || 'No',      // Old col C: Term Insurance
+        healthIns: data[1] || 'No',     // Old col B: Health Insurance
+        emergencyFund: data[3] || 'No', // Old col D: Emergency Fund
+        familyAware: data[4] || 'No',   // Old col E: Family Awareness
+        hasWill: data[5] || 'No',       // Old col F: Will
+        nominees: data[6] || 'No',      // Old col G: Nominees
+        goals: data[7] || 'No',        // Old col H: Goals
+        retirement: '',                  // New — not in old format
+        taxPlanning: '',                 // New — not in old format
+        debtFree: '',                    // New — not in old format
+        score: data[8] || 0,
+        total: data[9] || 7
+      };
+    }
+  } catch (error) {
+    log('Error getting health check responses: ' + error.toString());
+    return null;
+  }
+}
+
+// ============================================================================
 // BIDIRECTIONAL LINKING - Investment & Liability Sync Functions
 // ============================================================================
 

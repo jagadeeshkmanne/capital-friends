@@ -206,6 +206,11 @@ export const createReminder = (data) => callAPI('reminder:create', data)
 export const updateReminder = (data) => callAPI('reminder:update', data)
 export const deleteReminder = (reminderId) => callAPI('reminder:delete', { reminderId })
 
+// Health Check
+export const getHealthCheckStatus = () => callAPI('healthcheck:status')
+export const saveHealthCheck = (answers) => callAPI('healthcheck:save', answers)
+export const getHealthCheckAnswers = () => callAPI('healthcheck:get')
+
 // Settings
 export const getSettings = () => callAPI('settings:list')
 export const saveSettings = (data) => callAPI('settings:update', data)

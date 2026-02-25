@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
-import { ClipboardCheck, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ClipboardCheck, CheckCircle, AlertTriangle, XCircle, ArrowRight, Save, Loader2 } from 'lucide-react'
 import { useData } from '../context/DataContext'
-import { formatINR } from '../data/familyData'
+import * as api from '../services/api'
 
 const QUESTIONS = [
   { id: 'termLife', question: 'Do you have adequate Term Life Insurance?', tip: 'Recommended: 10-15x annual income', category: 'Insurance' },
@@ -17,8 +18,13 @@ const QUESTIONS = [
 ]
 
 export default function HealthCheckPage() {
-  const { members, insurancePolicies, goalList, liabilityList, otherInvList } = useData()
+  const navigate = useNavigate()
+  const { members, insurancePolicies, goalList, liabilityList, otherInvList, healthCheckCompleted, completeHealthCheck } = useData()
   const activeMembers = members.filter((m) => m.status === 'Active')
+  const isFirstTime = healthCheckCompleted === false
+  const [saving, setSaving] = useState(false)
+  const [loadingPrevious, setLoadingPrevious] = useState(true)
+  const [previousAnswers, setPreviousAnswers] = useState(null)
 
   // Auto-detect answers from existing data
   const autoDetected = useMemo(() => {
@@ -38,6 +44,16 @@ export default function HealthCheckPage() {
     return hints
   }, [insurancePolicies, goalList, liabilityList, otherInvList])
 
+  // Load previous answers if they exist
+  useEffect(() => {
+    api.getHealthCheckAnswers()
+      .then((data) => {
+        if (data) setPreviousAnswers(data)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPrevious(false))
+  }, [])
+
   const [answers, setAnswers] = useState(() => {
     const initial = {}
     QUESTIONS.forEach((q) => {
@@ -45,8 +61,25 @@ export default function HealthCheckPage() {
     })
     return initial
   })
+
+  // Once previous answers load, merge them in (overrides auto-detected)
+  useEffect(() => {
+    if (previousAnswers) {
+      setAnswers((prev) => {
+        const merged = { ...prev }
+        QUESTIONS.forEach((q) => {
+          const saved = previousAnswers[q.id]
+          if (saved === 'Yes') merged[q.id] = 'yes'
+          else if (saved === 'No') merged[q.id] = 'no'
+        })
+        return merged
+      })
+    }
+  }, [previousAnswers])
+
   const answeredCount = Object.values(answers).filter((v) => v).length
   const yesCount = Object.values(answers).filter((v) => v === 'yes').length
+  const allAnswered = answeredCount === QUESTIONS.length
   const score = answeredCount > 0 ? Math.round((yesCount / QUESTIONS.length) * 100) : 0
 
   function getScoreColor() {
@@ -77,8 +110,37 @@ export default function HealthCheckPage() {
     return recs
   }, [answers])
 
+  const handleSave = useCallback(async () => {
+    if (!allAnswered) return
+    setSaving(true)
+    try {
+      const payload = {}
+      QUESTIONS.forEach((q) => {
+        payload[q.id] = answers[q.id] === 'yes' ? 'Yes' : 'No'
+      })
+      payload.score = yesCount
+      payload.total = QUESTIONS.length
+      await completeHealthCheck(payload)
+      navigate('/dashboard')
+    } catch (err) {
+      console.error('Failed to save health check:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [allAnswered, answers, yesCount, completeHealthCheck, navigate])
+
   return (
     <div className="space-y-4 max-w-2xl">
+      {/* First-time banner */}
+      {isFirstTime && (
+        <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
+          <h2 className="text-base font-bold text-violet-400 mb-1">Welcome to Capital Friends!</h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Before you start, please complete this quick Financial Health Check. It takes less than a minute and helps you understand where your family stands financially.
+          </p>
+        </div>
+      )}
+
       {/* Score Card */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
         <div className="flex items-center justify-between mb-3">
@@ -110,12 +172,15 @@ export default function HealthCheckPage() {
           <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Health Check Questions</h3>
         </div>
         <div className="divide-y divide-[var(--border-light)]">
-          {QUESTIONS.map((q) => (
+          {QUESTIONS.map((q, idx) => (
             <div key={q.id} className="px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm text-[var(--text-primary)]">{q.question}</p>
-                  <p className="text-xs text-[var(--text-dim)] mt-0.5">{q.tip}</p>
+                  <p className="text-sm text-[var(--text-primary)]">
+                    <span className="text-[var(--text-dim)] mr-2">{idx + 1}.</span>
+                    {q.question}
+                  </p>
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5 ml-5">{q.tip}</p>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button
@@ -141,7 +206,7 @@ export default function HealthCheckPage() {
                 </div>
               </div>
               {autoDetected[q.id] !== undefined && (
-                <p className="text-xs text-violet-400 mt-1">
+                <p className="text-xs text-violet-400 mt-1 ml-5">
                   Auto-detected: {autoDetected[q.id] ? 'Found in your data' : 'Not found'}
                 </p>
               )}
@@ -151,7 +216,7 @@ export default function HealthCheckPage() {
       </div>
 
       {/* Recommendations */}
-      {recommendations.length > 0 && (
+      {recommendations.length > 0 && allAnswered && (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
             <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Recommendations</h3>
@@ -174,6 +239,41 @@ export default function HealthCheckPage() {
           </div>
         </div>
       )}
+
+      {/* Save Button */}
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+        {!allAnswered && (
+          <p className="text-xs text-[var(--accent-amber)] mb-3">
+            Please answer all {QUESTIONS.length} questions before saving.
+          </p>
+        )}
+        <button
+          onClick={handleSave}
+          disabled={!allAnswered || saving}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-bold transition-colors ${
+            allAnswered && !saving
+              ? 'bg-violet-600 hover:bg-violet-500 text-white'
+              : 'bg-[var(--bg-inset)] text-[var(--text-dim)] cursor-not-allowed'
+          }`}
+        >
+          {saving ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Saving...
+            </>
+          ) : isFirstTime ? (
+            <>
+              Save & Continue to Dashboard
+              <ArrowRight size={16} />
+            </>
+          ) : (
+            <>
+              <Save size={16} />
+              Update Health Check
+            </>
+          )}
+        </button>
+      </div>
     </div>
   )
 }

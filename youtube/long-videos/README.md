@@ -55,7 +55,7 @@ long-videos/
 ## Tutorial Topics
 
 1. **Intro** - The ULTIMATE All-in-One Portfolio Tracker
-2. **Setup** - Setup in 2 Minutes (ONE-CLICK SETUP, Financial Health Check)
+2. **Setup** - Setup in 2 Minutes (Automatic Setup, Financial Health Check)
 3. **Family & Accounts** - Add Family Members, Bank Accounts, Investment Accounts
 4. **Portfolio & Migrate** - Create Mutual Fund Portfolio, Migrate Existing Holdings
 5. **Buy/Sell/Switch** - Record SIP, Lumpsum, Sell, and Switch Transactions

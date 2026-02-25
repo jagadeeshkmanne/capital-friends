@@ -28,6 +28,7 @@ export function DataProvider({ children }) {
   const [reminderList, setReminders] = useState([])
   const [goalPortfolioMappings, setGoalPortfolioMappings] = useState([])
   const [settings, setSettings] = useState({})
+  const [healthCheckCompleted, setHealthCheckCompleted] = useState(null) // null=loading, true/false
 
   // ── Load All Data on Auth ──
   const refreshData = useCallback(async () => {
@@ -124,14 +125,32 @@ export function DataProvider({ children }) {
     await refreshSettings()
   }, [refreshSettings])
 
+  const checkHealthCheck = useCallback(async () => {
+    try {
+      const status = await api.getHealthCheckStatus()
+      setHealthCheckCompleted(status?.completed ?? false)
+    } catch {
+      setHealthCheckCompleted(false)
+    }
+  }, [])
+
+  const completeHealthCheck = useCallback(async (answers) => {
+    const result = await api.saveHealthCheck(answers)
+    if (result?.success) {
+      setHealthCheckCompleted(true)
+    }
+    return result
+  }, [])
+
   useEffect(() => {
     if (isAuthenticated) {
       refreshData()
       refreshSettings().catch(() => {}) // non-blocking
+      checkHealthCheck().catch(() => {}) // non-blocking
     } else {
       setLoading(false)
     }
-  }, [isAuthenticated, refreshData, refreshSettings])
+  }, [isAuthenticated, refreshData, refreshSettings, checkHealthCheck])
 
   // ── Family Members CRUD ──
   const addMember = useCallback(async (data) => {
@@ -391,6 +410,8 @@ export function DataProvider({ children }) {
       investMF, redeemMF, switchMF, updateHoldingAllocations,
       // Settings
       settings, updateSettings, refreshSettings,
+      // Health Check
+      healthCheckCompleted, completeHealthCheck,
     }}>
       {children}
     </DataContext.Provider>

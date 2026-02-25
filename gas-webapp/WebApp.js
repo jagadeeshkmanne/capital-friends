@@ -291,6 +291,16 @@ function routeAction(action, params, userRecord) {
     case 'reminder:delete':
       return deleteReminder(params.reminderId);
 
+    // ── Health Check ──
+    case 'healthcheck:status':
+      return getHealthCheckStatus();
+
+    case 'healthcheck:save':
+      return saveHealthCheck(params);
+
+    case 'healthcheck:get':
+      return getLatestHealthCheckResponses();
+
     // ── Settings ──
     case 'settings:list':
       return getAllSettings();

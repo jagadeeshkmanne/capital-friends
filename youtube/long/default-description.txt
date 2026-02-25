@@ -10,7 +10,7 @@ Capital Friends is a 100% FREE web app for portfolio tracking with LIVE NAV upda
 ✓ REALIZED vs UNREALIZED P&L: Track actual profit withdrawn vs paper profit still in market
 ✓ LIVE NAV UPDATES: Mutual fund prices update daily from AMFI database
 ✓ LIVE STOCK PRICES: 5000+ NSE stocks with real-time Google Finance data
-✓ ONE-CLICK SETUP: Creates entire tracking system automatically when you sign in
+✓ AUTOMATIC SETUP: Sign in and the app sets up everything automatically
 ✓ SIP CALCULATOR: Calculate exact monthly SIP needed for your goals with inflation adjustment
 ✓ GOAL PLANNER: Plan retirement, emergency fund, child education with automatic progress tracking
 ✓ EMAIL AUTOMATION: Daily/weekly/monthly wealth reports sent to entire family automatically

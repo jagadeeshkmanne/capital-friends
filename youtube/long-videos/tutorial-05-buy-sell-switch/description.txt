@@ -14,7 +14,7 @@ Capital Friends is a 100% FREE web app portfolio tracker that solves this proble
 → Financial Goals with SIP Calculator and Goal Planner
 
 🎯 Key Features:
-✓ ONE-CLICK SETUP: Creates everything in 30 seconds
+✓ AUTOMATIC SETUP: Sign in and the app sets up everything automatically
 ✓ LIVE NAV UPDATES: Mutual fund prices update automatically every day
 ✓ ATH TRACKING: See how much below All-Time High each fund is
 ✓ AUTO REBALANCING: Get exact amounts to invest in each fund to maintain target allocation
@@ -26,7 +26,7 @@ Capital Friends is a 100% FREE web app portfolio tracker that solves this proble
 ✓ WEALTH DASHBOARD: Complete family net worth with asset allocation breakdown
 
 💯 Why 100% FREE Forever?
-→ Runs entirely on YOUR Google account
+→ Data stays in YOUR Google Drive
 → No company servers storing your data
 → Maximum privacy - only you and your family can see
 → No subscription ever - free for every Indian family
