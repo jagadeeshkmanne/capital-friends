@@ -5,7 +5,7 @@ import {
   Shield, Users, TrendingUp, Target, BarChart3,
   CreditCard, Bell, Lock, RefreshCw, Link2,
   Heart, PiggyBank, ArrowDown, CheckCircle2, AlertTriangle,
-  Eye,
+  Eye, LogIn, FileSpreadsheet, ClipboardCheck,
 } from 'lucide-react'
 
 const LOGO = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png'
@@ -161,6 +161,26 @@ export default function LandingPage() {
           <p className="text-center mt-8 text-base text-slate-500">
             Built for <strong className="text-white">you</strong> to manage your wealth — and for your <strong className="text-white">family</strong> to access it when they need to.
           </p>
+      </section>
+
+      {/* ── How it Works ── */}
+      <section className="bg-[#0a0e1c] border-y border-white/[0.06] px-5 sm:px-8 lg:px-16 py-14 sm:py-20">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-2">How it Works</h2>
+          <p className="text-base text-slate-500">Set up in 2 minutes — no bank credentials, no downloads</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
+          <HowStep num={1} icon={<LogIn size={24} />} color="violet" title="Sign In with Google" desc="Go to capitalfriends.in and sign in with your Google account. That's all — no registration form, no passwords." />
+          <HowStep num={2} icon={<FileSpreadsheet size={24} />} color="emerald" title="App Creates Your Sheet" desc="The app creates a private Google Sheet in your own Google Drive. This sheet stores all your financial data. Only you can see it — not even the developer." />
+          <HowStep num={3} icon={<ClipboardCheck size={24} />} color="cyan" title="Financial Health Check" desc="Answer 7 simple yes/no questions about your financial health. Get your score and personalized recommendations instantly." />
+          <HowStep num={4} icon={<TrendingUp size={24} />} color="amber" title="Start Tracking" desc="Add family members, portfolios, goals, insurance, and loans. The app connects to AMFI for live mutual fund prices automatically." />
+        </div>
+
+        <p className="text-center mt-10 text-sm text-slate-600">
+          Your sheet is named <strong className="text-slate-400">&ldquo;Capital Friends - Your Name&rdquo;</strong> and lives in your Google Drive.
+          The web app is just a beautiful dashboard to view and manage it.
+        </p>
       </section>
 
       {/* ── Features Showcase ── */}
@@ -558,6 +578,24 @@ function Bullet({ c, t }) {
     <div className="flex items-center gap-2.5">
       <CheckCircle2 size={16} className={`${colors[c]} shrink-0`} />
       <span className="text-sm text-slate-300">{t}</span>
+    </div>
+  )
+}
+
+function HowStep({ num, icon, color, title, desc }) {
+  const colors = {
+    violet: ['text-violet-400', 'bg-violet-500/10', 'border-violet-500/20', 'from-violet-500/20 to-violet-500/5'],
+    emerald: ['text-emerald-400', 'bg-emerald-500/10', 'border-emerald-500/20', 'from-emerald-500/20 to-emerald-500/5'],
+    cyan: ['text-cyan-400', 'bg-cyan-500/10', 'border-cyan-500/20', 'from-cyan-500/20 to-cyan-500/5'],
+    amber: ['text-amber-400', 'bg-amber-500/10', 'border-amber-500/20', 'from-amber-500/20 to-amber-500/5'],
+  }
+  const [tc, ibg, bdr, grad] = colors[color] || colors.violet
+  return (
+    <div className={`relative rounded-2xl border ${bdr} bg-gradient-to-b ${grad} p-6 text-center`}>
+      <span className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${ibg} ${tc} mb-4`}>{icon}</span>
+      <span className={`absolute top-4 right-4 text-xs font-bold ${tc} opacity-40`}>0{num}</span>
+      <h3 className="text-base font-bold text-white mb-2">{title}</h3>
+      <p className="text-sm text-slate-400 leading-relaxed">{desc}</p>
     </div>
   )
 }

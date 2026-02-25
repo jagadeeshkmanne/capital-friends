@@ -421,30 +421,30 @@ function getHealthCheckStatus() {
     const questionnaireSheet = getSheet(CONFIG.questionnaireSheet);
 
     if (!questionnaireSheet) {
-      return { completed: false, score: 0, total: 10 };
+      return { completed: false, score: 0, total: 7 };
     }
 
     const lastRow = questionnaireSheet.getLastRow();
     if (lastRow <= 2) {
-      return { completed: false, score: 0, total: 10 };
+      return { completed: false, score: 0, total: 7 };
     }
 
-    // Get score from the last data row
-    const data = questionnaireSheet.getRange(lastRow, 1, 1, 13).getValues()[0];
+    // Get score from the last data row (10 columns: Date + 7 answers + Score + Total)
+    const data = questionnaireSheet.getRange(lastRow, 1, 1, 10).getValues()[0];
     return {
       completed: true,
-      score: data[11] || 0,  // Column L: Score
-      total: data[12] || 10  // Column M: Total
+      score: data[8] || 0,  // Column I: Score
+      total: data[9] || 7   // Column J: Total
     };
   } catch (error) {
     log('Error getting health check status: ' + error.toString());
-    return { completed: false, score: 0, total: 10 };
+    return { completed: false, score: 0, total: 7 };
   }
 }
 
 /**
- * Save health check answers (10 questions from React app)
- * Creates/updates the Questionnaire sheet with expanded 10-question format
+ * Save health check answers (7 questions from React app)
+ * Creates/updates the Questionnaire sheet with standard 7-question format
  */
 function saveHealthCheck(params) {
   try {
@@ -453,16 +453,13 @@ function saveHealthCheck(params) {
 
     const HEADERS = [
       'Date',
-      'Term Life',
       'Health Insurance',
+      'Term Insurance',
       'Emergency Fund',
-      'Family Aware',
+      'Family Awareness',
       'Will',
       'Nominees',
       'Goals',
-      'Retirement',
-      'Tax Planning',
-      'Debt Free',
       'Score',
       'Total'
     ];
@@ -472,25 +469,22 @@ function saveHealthCheck(params) {
       questionnaireSheet = spreadsheet.insertSheet(CONFIG.questionnaireSheet);
       addDeveloperCredit(questionnaireSheet, HEADERS.length);
       questionnaireSheet.appendRow(HEADERS);
-      formatHeaderRow(questionnaireSheet, questionnaireSheet.getRange('A2:M2'), 40);
+      formatHeaderRow(questionnaireSheet, questionnaireSheet.getRange('A2:J2'), 40);
       applyStandardFormatting(questionnaireSheet);
       questionnaireSheet.setTabColor('#10b981');
     }
 
     const row = [
       new Date(),
-      params.termLife || 'No',
       params.healthIns || 'No',
+      params.termLife || 'No',
       params.emergencyFund || 'No',
       params.familyAware || 'No',
       params.hasWill || 'No',
       params.nominees || 'No',
       params.goals || 'No',
-      params.retirement || 'No',
-      params.taxPlanning || 'No',
-      params.debtFree || 'No',
       params.score || 0,
-      params.total || 10
+      params.total || 7
     ];
 
     const lastRow = questionnaireSheet.getLastRow();
@@ -499,7 +493,7 @@ function saveHealthCheck(params) {
       questionnaireSheet.appendRow(row);
     } else {
       // Update existing row
-      questionnaireSheet.getRange(lastRow, 1, 1, 13).setValues([row]);
+      questionnaireSheet.getRange(lastRow, 1, 1, 10).setValues([row]);
     }
 
     log('Health check saved: ' + params.score + '/' + params.total);
@@ -518,7 +512,7 @@ function saveHealthCheck(params) {
 
 /**
  * Get latest health check responses for pre-populating the form
- * Returns all 10 answers from the Questionnaire sheet
+ * Returns 7 answers from the Questionnaire sheet
  */
 function getLatestHealthCheckResponses() {
   try {
@@ -533,42 +527,20 @@ function getLatestHealthCheckResponses() {
       return null;
     }
 
-    const data = questionnaireSheet.getRange(lastRow, 1, 1, 13).getValues()[0];
-    const colCount = data.length;
+    // 10 columns: Date, Health Insurance, Term Insurance, Emergency Fund, Family Awareness, Will, Nominees, Goals, Score, Total
+    const data = questionnaireSheet.getRange(lastRow, 1, 1, 10).getValues()[0];
 
-    // Support both old 7-question format (10 columns) and new 10-question format (13 columns)
-    if (colCount >= 13 || questionnaireSheet.getLastColumn() >= 13) {
-      return {
-        termLife: data[1] || 'No',
-        healthIns: data[2] || 'No',
-        emergencyFund: data[3] || 'No',
-        familyAware: data[4] || 'No',
-        hasWill: data[5] || 'No',
-        nominees: data[6] || 'No',
-        goals: data[7] || 'No',
-        retirement: data[8] || 'No',
-        taxPlanning: data[9] || 'No',
-        debtFree: data[10] || 'No',
-        score: data[11] || 0,
-        total: data[12] || 10
-      };
-    } else {
-      // Old 7-question format — map to new format, leave new questions unanswered
-      return {
-        termLife: data[2] || 'No',      // Old col C: Term Insurance
-        healthIns: data[1] || 'No',     // Old col B: Health Insurance
-        emergencyFund: data[3] || 'No', // Old col D: Emergency Fund
-        familyAware: data[4] || 'No',   // Old col E: Family Awareness
-        hasWill: data[5] || 'No',       // Old col F: Will
-        nominees: data[6] || 'No',      // Old col G: Nominees
-        goals: data[7] || 'No',        // Old col H: Goals
-        retirement: '',                  // New — not in old format
-        taxPlanning: '',                 // New — not in old format
-        debtFree: '',                    // New — not in old format
-        score: data[8] || 0,
-        total: data[9] || 7
-      };
-    }
+    return {
+      healthIns: data[1] || 'No',
+      termLife: data[2] || 'No',
+      emergencyFund: data[3] || 'No',
+      familyAware: data[4] || 'No',
+      hasWill: data[5] || 'No',
+      nominees: data[6] || 'No',
+      goals: data[7] || 'No',
+      score: data[8] || 0,
+      total: data[9] || 7
+    };
   } catch (error) {
     log('Error getting health check responses: ' + error.toString());
     return null;

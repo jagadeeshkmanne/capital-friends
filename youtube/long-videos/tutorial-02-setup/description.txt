@@ -34,7 +34,7 @@ Capital Friends is a 100% FREE web app portfolio tracker that solves this proble
 In this video:
 • Sign in with Google at capitalfriends.in
 • App sets up everything automatically
-• Financial Health Check — 10 simple questions
+• Financial Health Check — 7 simple questions
 • Explore the app — Dashboard, Portfolios, Goals
 
 Get started FREE: https://www.capitalfriends.in
@@ -42,7 +42,7 @@ Full playlist: [YouTube playlist link]
 
 Timestamps:
 0:00 - Sign in at capitalfriends.in
-1:00 - Financial Health Check (10 questions)
+1:00 - Financial Health Check (7 questions)
 3:00 - Your score and recommendations
 4:00 - Explore the app
 

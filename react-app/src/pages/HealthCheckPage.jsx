@@ -5,21 +5,18 @@ import { useData } from '../context/DataContext'
 import * as api from '../services/api'
 
 const QUESTIONS = [
-  { id: 'termLife', question: 'Do you have adequate Term Life Insurance?', tip: 'Recommended: 10-15x annual income', category: 'Insurance' },
   { id: 'healthIns', question: 'Does your family have Health Insurance?', tip: 'Minimum ₹5L cover per member or family floater', category: 'Insurance' },
+  { id: 'termLife', question: 'Do you have adequate Term Life Insurance?', tip: 'Recommended: 10-15x annual income', category: 'Insurance' },
   { id: 'emergencyFund', question: 'Do you have an Emergency Fund?', tip: '6-12 months of monthly expenses in liquid assets', category: 'Savings' },
   { id: 'familyAware', question: 'Is your family aware of all investments?', tip: 'Ensure nominees and family know about all assets', category: 'Planning' },
   { id: 'hasWill', question: 'Do you have a Will?', tip: 'Legal document for asset distribution', category: 'Planning' },
   { id: 'nominees', question: 'Have you updated Nominees on all accounts?', tip: 'Bank, demat, insurance, MF — all should have nominees', category: 'Planning' },
   { id: 'goals', question: 'Do you have clearly defined Financial Goals?', tip: 'Retirement, education, home — with target amounts and dates', category: 'Goals' },
-  { id: 'retirement', question: 'Are you investing regularly for Retirement?', tip: 'Start early, invest consistently via SIP', category: 'Goals' },
-  { id: 'taxPlanning', question: 'Have you done Tax Planning (80C, 80D, etc.)?', tip: 'Maximize deductions under relevant sections', category: 'Tax' },
-  { id: 'debtFree', question: 'Are you on track to become debt-free?', tip: 'Plan EMI repayments strategically', category: 'Debt' },
 ]
 
 export default function HealthCheckPage() {
   const navigate = useNavigate()
-  const { members, insurancePolicies, goalList, liabilityList, otherInvList, healthCheckCompleted, completeHealthCheck } = useData()
+  const { members, insurancePolicies, goalList, otherInvList, healthCheckCompleted, completeHealthCheck } = useData()
   const activeMembers = members.filter((m) => m.status === 'Active')
   const isFirstTime = healthCheckCompleted === false
   const [saving, setSaving] = useState(false)
@@ -29,20 +26,16 @@ export default function HealthCheckPage() {
   // Auto-detect answers from existing data
   const autoDetected = useMemo(() => {
     const hints = {}
-    const termPolicies = insurancePolicies.filter((p) => p.policyType === 'Term Life' && p.status === 'Active')
-    hints.termLife = termPolicies.length > 0
     const healthPolicies = insurancePolicies.filter((p) => p.policyType === 'Health' && p.status === 'Active')
     hints.healthIns = healthPolicies.length > 0
+    const termPolicies = insurancePolicies.filter((p) => p.policyType === 'Term Life' && p.status === 'Active')
+    hints.termLife = termPolicies.length > 0
     const emergencyGoals = goalList.filter((g) => g.goalType === 'Emergency Fund' && g.isActive)
     const emergencyInv = otherInvList.filter((i) => i.investmentType === 'FD' || i.investmentType === 'PPF')
     hints.emergencyFund = emergencyGoals.length > 0 || emergencyInv.length > 0
     hints.goals = goalList.filter((g) => g.isActive).length >= 2
-    const retirementGoals = goalList.filter((g) => g.goalType === 'Retirement' && g.isActive)
-    hints.retirement = retirementGoals.length > 0
-    const activeLiabilities = liabilityList.filter((l) => l.status === 'Active')
-    hints.debtFree = activeLiabilities.length === 0
     return hints
-  }, [insurancePolicies, goalList, liabilityList, otherInvList])
+  }, [insurancePolicies, goalList, otherInvList])
 
   // Load previous answers if they exist
   useEffect(() => {
@@ -97,16 +90,13 @@ export default function HealthCheckPage() {
 
   const recommendations = useMemo(() => {
     const recs = []
-    if (answers.termLife !== 'yes') recs.push({ severity: 'critical', text: 'Get Term Life Insurance (10-15x annual income)', action: 'Compare plans online' })
     if (answers.healthIns !== 'yes') recs.push({ severity: 'critical', text: 'Get Health Insurance for your family', action: 'Minimum ₹5L cover recommended' })
+    if (answers.termLife !== 'yes') recs.push({ severity: 'critical', text: 'Get Term Life Insurance (10-15x annual income)', action: 'Compare plans online' })
     if (answers.emergencyFund !== 'yes') recs.push({ severity: 'warning', text: 'Build an Emergency Fund', action: 'Save 6-12 months expenses in liquid fund/FD' })
     if (answers.familyAware !== 'yes') recs.push({ severity: 'warning', text: 'Share investment details with family', action: 'Create a document with all account info' })
     if (answers.hasWill !== 'yes') recs.push({ severity: 'warning', text: 'Create a legal Will', action: 'Consult a lawyer for Will registration' })
     if (answers.nominees !== 'yes') recs.push({ severity: 'warning', text: 'Update nominees on all accounts', action: 'Check bank, demat, insurance, MF accounts' })
     if (answers.goals !== 'yes') recs.push({ severity: 'info', text: 'Define clear financial goals', action: 'Use the Goal Planner to set targets' })
-    if (answers.retirement !== 'yes') recs.push({ severity: 'info', text: 'Start investing for retirement', action: 'Begin with equity SIPs for long term' })
-    if (answers.taxPlanning !== 'yes') recs.push({ severity: 'info', text: 'Optimize tax planning', action: 'Utilize 80C, 80D, NPS deductions' })
-    if (answers.debtFree !== 'yes') recs.push({ severity: 'info', text: 'Plan debt repayment strategy', action: 'Prioritize high-interest loans first' })
     return recs
   }, [answers])
 
