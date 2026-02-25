@@ -57,7 +57,11 @@ export function DataProvider({ children }) {
   const [settings, setSettings] = useState(() => {
     try { const s = sessionStorage.getItem(SETTINGS_CACHE_KEY); return s ? JSON.parse(s) : {} } catch { return {} }
   })
-  const [healthCheckCompleted, setHealthCheckCompleted] = useState(null) // always null until API confirms
+  // Health check: trust session cache ONLY if it says true (was confirmed by API in this session)
+  // If cache says false or doesn't exist, always re-verify from backend
+  const [healthCheckCompleted, setHealthCheckCompleted] = useState(
+    cachedHealth === true ? true : null
+  )
 
   // Track if first load (with cache) already ran
   const didInitRef = useRef(false)
@@ -178,6 +182,7 @@ export function DataProvider({ children }) {
     const result = await api.saveHealthCheck(answers)
     if (result?.success) {
       setHealthCheckCompleted(true)
+      try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(true)) } catch {}
     }
     return result
   }, [])
@@ -193,7 +198,10 @@ export function DataProvider({ children }) {
         refreshData(false) // foreground with loading
       }
       refreshSettings().catch(() => {}) // non-blocking
-      checkHealthCheck().catch(() => {}) // non-blocking
+      // Only call API if health check status not already confirmed in this session
+      if (cachedHealth !== true) {
+        checkHealthCheck().catch(() => {})
+      }
     } else {
       setLoading(false)
     }

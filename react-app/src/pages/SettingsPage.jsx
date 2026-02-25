@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Moon, Sun, Mail, Globe, ChevronDown, RefreshCw, Database, User, LogOut } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Moon, Sun, Mail, Globe, ChevronDown, RefreshCw, Database, User, LogOut, Zap } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -8,8 +9,9 @@ import * as api from '../services/api'
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export default function SettingsPage() {
+  const navigate = useNavigate()
   const { theme, toggle } = useTheme()
-  const { members, settings, updateSettings, updateMember } = useData()
+  const { members, settings, updateSettings, updateMember, healthCheckCompleted } = useData()
   const { user, signOut } = useAuth()
   const activeMembers = members.filter((m) => m.status === 'Active')
 
@@ -103,6 +105,27 @@ export default function SettingsPage() {
             >
               <LogOut size={12} />
               Sign Out
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Financial Health Check */}
+      <Card>
+        <CardHeader icon={<Zap size={14} />} title="Financial Health Check" />
+        <div className="px-4 py-4 space-y-3">
+          <Row label="Status">
+            <span className={`text-xs font-semibold ${healthCheckCompleted ? 'text-emerald-400' : 'text-[var(--accent-amber)]'}`}>
+              {healthCheckCompleted ? 'Completed' : 'Not completed'}
+            </span>
+          </Row>
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={() => navigate('/health-check')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Zap size={12} />
+              {healthCheckCompleted ? 'Update Answers' : 'Take Health Check'}
             </button>
           </div>
         </div>
