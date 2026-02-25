@@ -29,8 +29,8 @@ const SECTION_META = {
 }
 
 const DUMMY_NW = {
-  netWorth: 4235000, totalInv: 4735000, totalInvested: 3850000,
-  totalLiab: 500000,
+  netWorth: 7585000, totalInv: 8585000,
+  totalLiab: 1000000,
   sections: [
     { key: 'mf', label: 'Mutual Funds', color: 'bg-violet-500', route: '/investments/mutual-funds', total: 2850000, items: [
       { label: 'Jags Growth Portfolio', value: 1500000 },
@@ -39,18 +39,29 @@ const DUMMY_NW = {
     { key: 'stocks', label: 'Stocks', color: 'bg-blue-500', route: '/investments/stocks', total: 1250000, items: [
       { label: 'Zerodha Stocks', value: 1250000 },
     ]},
-    { key: 'Debt', label: 'Debt', color: 'bg-cyan-500', route: '/accounts/other-investments', total: 450000, items: [
-      { label: 'HDFC PPF', value: 250000 },
-      { label: 'SBI FD - 7.5%', value: 200000 },
+    { key: 'Property', label: 'Real Estate', color: 'bg-orange-500', route: '/accounts/other-investments', total: 2500000, items: [
+      { label: '2BHK Flat - Hyderabad', value: 2500000 },
     ]},
-    { key: 'Gold', label: 'Gold', color: 'bg-amber-500', route: '/accounts/other-investments', total: 185000, items: [
+    { key: 'Debt', label: 'Debt', color: 'bg-cyan-500', route: '/accounts/other-investments', total: 950000, items: [
+      { label: 'HDFC PPF', value: 350000 },
+      { label: 'SBI FD - 7.5%', value: 200000 },
+      { label: 'EPF', value: 400000 },
+    ]},
+    { key: 'Gold', label: 'Gold', color: 'bg-amber-500', route: '/accounts/other-investments', total: 285000, items: [
       { label: 'SBI Gold Bond 2029', value: 120000 },
       { label: 'Digital Gold', value: 65000 },
+      { label: 'Physical Gold', value: 100000 },
+    ]},
+    { key: 'Equity', label: 'Equity', color: 'bg-emerald-500', route: '/accounts/other-investments', total: 500000, items: [
+      { label: 'NPS - Tier 1', value: 500000 },
+    ]},
+    { key: 'Alternative', label: 'Alternative', color: 'bg-violet-400', route: '/accounts/other-investments', total: 250000, items: [
+      { label: 'Smallcase - Momentum', value: 250000 },
     ]},
   ],
   liabilities: [
-    { label: 'HDFC Home Loan', value: 350000 },
-    { label: 'Car Loan - SBI', value: 150000 },
+    { label: 'HDFC Home Loan', value: 750000 },
+    { label: 'Car Loan - SBI', value: 250000 },
   ],
 }
 
@@ -353,8 +364,8 @@ export default function Header({ onMenuClick }) {
       {/* Net Worth Breakdown — always visible */}
       <div className="bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
         <div className="px-3 sm:px-4 py-2.5">
-          {/* Section cards grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+          {/* Section cards grid — auto-fill adapts to any number of cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2">
             {nw.sections?.map((sec) => (
               <Link
                 key={sec.key}
