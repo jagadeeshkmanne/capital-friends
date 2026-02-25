@@ -57,7 +57,7 @@ export function DataProvider({ children }) {
   const [settings, setSettings] = useState(() => {
     try { const s = sessionStorage.getItem(SETTINGS_CACHE_KEY); return s ? JSON.parse(s) : {} } catch { return {} }
   })
-  const [healthCheckCompleted, setHealthCheckCompleted] = useState(cachedHealth) // null=loading, true/false
+  const [healthCheckCompleted, setHealthCheckCompleted] = useState(null) // always null until API confirms
 
   // Track if first load (with cache) already ran
   const didInitRef = useRef(false)
