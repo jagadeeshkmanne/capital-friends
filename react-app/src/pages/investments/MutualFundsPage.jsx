@@ -43,10 +43,9 @@ export default function MutualFundsPage() {
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading mutual funds" cards={5} />
-
   // Enrich portfolios: resolve investmentAccountId, ownerId & ownerName from investment accounts
   const enrichedPortfolios = useMemo(() => {
+    if (!mfPortfolios) return []
     return mfPortfolios.filter((p) => p.status !== 'Inactive').map((p) => {
       // GAS may store name label instead of ID in investmentAccountId
       let account = activeInvestmentAccounts.find((a) => a.accountId === p.investmentAccountId)
@@ -70,14 +69,16 @@ export default function MutualFundsPage() {
 
   // Filter portfolios by member
   const portfolios = useMemo(() => {
+    if (!enrichedPortfolios.length) return []
     return selectedMember === 'all' ? enrichedPortfolios : enrichedPortfolios.filter((p) => p.ownerId === selectedMember)
   }, [enrichedPortfolios, selectedMember])
 
   // Per-portfolio computed data
   const portfolioData = useMemo(() => {
+    if (!mfHoldings) return []
     return portfolios.map((p) => {
       const holdings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId)
-      const txns = mfTransactions.filter((t) => t.portfolioId === p.portfolioId)
+      const txns = (mfTransactions || []).filter((t) => t.portfolioId === p.portfolioId)
       return {
         ...p, holdings, txns,
         fundCount: holdings.length,
@@ -107,11 +108,13 @@ export default function MutualFundsPage() {
 
   // Holdings & transactions for selected view
   const holdings = useMemo(() => {
+    if (!mfHoldings) return []
     if (selectedPortfolioId === 'all') return mfHoldings.filter((h) => portfolios.some((p) => p.portfolioId === h.portfolioId))
     return mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
   }, [mfHoldings, portfolios, selectedPortfolioId])
 
   const transactions = useMemo(() => {
+    if (!mfTransactions) return []
     const txns = selectedPortfolioId === 'all'
       ? mfTransactions.filter((t) => portfolios.some((p) => p.portfolioId === t.portfolioId))
       : mfTransactions.filter((t) => t.portfolioId === selectedPortfolioId)
@@ -134,6 +137,7 @@ export default function MutualFundsPage() {
 
   // Per-portfolio indicator counts (buy opp + rebalance)
   const portfolioIndicators = useMemo(() => {
+    if (!mfHoldings) return {}
     const indicators = {}
     portfolioData.forEach((p) => {
       const pHoldings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
@@ -159,6 +163,9 @@ export default function MutualFundsPage() {
     Object.values(portfolioIndicators).forEach((ind) => { buyOpp += ind.buyOpp; rebalance += ind.rebalance })
     return { buyOpp, rebalance }
   }, [selectedPortfolioId, portfolioIndicators])
+
+  // Loading state — after all hooks
+  if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading mutual funds" cards={5} />
 
   const selectedPortfolio = portfolioData.find((p) => p.portfolioId === selectedPortfolioId)
 

@@ -27,19 +27,19 @@ export default function StocksPage() {
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  if (stockPortfolios === null || stockHoldings === null) return <PageLoading title="Loading stocks" cards={5} />
-
   // Filter portfolios by member
   const portfolios = useMemo(() => {
+    if (!stockPortfolios) return []
     const active = stockPortfolios.filter((p) => p.status !== 'Inactive')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [stockPortfolios, selectedMember])
 
   // Per-portfolio computed data
   const portfolioData = useMemo(() => {
+    if (!stockHoldings) return []
     return portfolios.map((p) => {
       const holdings = stockHoldings.filter((h) => h.portfolioId === p.portfolioId)
-      const txns = stockTransactions.filter((t) => t.portfolioId === p.portfolioId)
+      const txns = (stockTransactions || []).filter((t) => t.portfolioId === p.portfolioId)
       const invested = holdings.reduce((s, h) => s + h.totalInvestment, 0)
       const current = holdings.reduce((s, h) => s + h.currentValue, 0)
       const unrealizedPL = current - invested
@@ -72,16 +72,21 @@ export default function StocksPage() {
 
   // Holdings & transactions for selected view
   const holdings = useMemo(() => {
+    if (!stockHoldings) return []
     if (selectedPortfolioId === 'all') return stockHoldings.filter((h) => portfolios.some((p) => p.portfolioId === h.portfolioId))
     return stockHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
   }, [stockHoldings, portfolios, selectedPortfolioId])
 
   const transactions = useMemo(() => {
+    if (!stockTransactions) return []
     const txns = selectedPortfolioId === 'all'
       ? stockTransactions.filter((t) => portfolios.some((p) => p.portfolioId === t.portfolioId))
       : stockTransactions.filter((t) => t.portfolioId === selectedPortfolioId)
     return txns.sort((a, b) => new Date(b.date) - new Date(a.date))
   }, [stockTransactions, portfolios, selectedPortfolioId])
+
+  // Loading state — after all hooks
+  if (stockPortfolios === null || stockHoldings === null) return <PageLoading title="Loading stocks" cards={5} />
 
   // Currently selected portfolio object (for edit)
   const selectedPortfolio = portfolioData.find((p) => p.portfolioId === selectedPortfolioId)

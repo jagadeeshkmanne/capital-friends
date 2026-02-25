@@ -41,9 +41,8 @@ export default function GoalsPage() {
   const [showCelebration, setShowCelebration] = useState(null)
   const prevAchievedRef = useRef(new Set())
 
-  if (goalList === null) return <PageLoading title="Loading goals" cards={5} />
-
   const filtered = useMemo(() => {
+    if (!goalList) return []
     const active = goalList.filter((g) => g.isActive !== false)
     return selectedMember === 'all' ? active : active.filter((g) => g.familyMemberId === selectedMember)
   }, [goalList, selectedMember])
@@ -70,6 +69,9 @@ export default function GoalsPage() {
     }
     prevAchievedRef.current = currentAchieved
   }, [filtered])
+
+  // Loading state — after all hooks
+  if (goalList === null) return <PageLoading title="Loading goals" cards={5} />
 
   async function handleSave(data) {
     showBlockUI('Saving...')
