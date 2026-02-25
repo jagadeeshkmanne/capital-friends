@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon } from 'lucide-react'
+import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronLeft, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 import { useTheme } from '../context/ThemeContext'
@@ -83,8 +83,9 @@ const avatarSolids = [
 ]
 
 const NAV_ITEMS = [
-  { label: 'Family', path: '/family', match: '/family' },
-  { label: 'Accounts', path: '/accounts/bank', match: '/accounts' },
+  { label: 'Family Members', path: '/family', match: '/family' },
+  { label: 'Bank Accounts', path: '/accounts/bank', match: '/accounts/bank' },
+  { label: 'Investment Accounts', path: '/accounts/investment', match: '/accounts/investment' },
   { label: 'Insurance', path: '/insurance', match: '/insurance' },
   { label: 'Mutual Funds', path: '/investments/mutual-funds', match: '/investments/mutual-funds' },
   { label: 'Stocks', path: '/investments/stocks', match: '/investments/stocks' },
@@ -92,7 +93,7 @@ const NAV_ITEMS = [
   { label: 'Goals', path: '/goals', match: '/goals' },
 ]
 
-const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance' }
+const DIALOG_TITLES = { buyopp: 'Buying Opportunities', rebalance: 'Rebalance Alerts' }
 
 export default function Header({ onMenuClick }) {
   const { theme, toggle } = useTheme()
@@ -107,8 +108,11 @@ export default function Header({ onMenuClick }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [dialogKey, setDialogKey] = useState(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(true)
   const dropdownRef = useRef(null)
   const notifRef = useRef(null)
+  const cardsRef = useRef(null)
 
   const notifCount = criticalAlerts.length + upcomingReminders.length
   const { buyOppCount, rebalanceCount } = investmentSignals
@@ -185,6 +189,24 @@ export default function Header({ onMenuClick }) {
     setNotifOpen(false)
   }
 
+  // Carousel scroll for NW cards
+  function handleCardsScroll() {
+    if (!cardsRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = cardsRef.current
+    setCanScrollLeft(scrollLeft > 5)
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 5)
+  }
+
+  function scrollCards(dir) {
+    if (!cardsRef.current) return
+    const card = cardsRef.current.querySelector('a')
+    const cardWidth = (card?.offsetWidth || 240) + 12 // card width + gap
+    cardsRef.current.scrollBy({ left: dir * cardWidth, behavior: 'smooth' })
+  }
+
+  // Check scroll arrows on mount and data change
+  useEffect(() => { handleCardsScroll() }, [nw])
+
   return (
     <header className="sticky top-0 z-30 shrink-0">
       {/* Glow animation styles */}
@@ -214,7 +236,7 @@ export default function Header({ onMenuClick }) {
 
           {/* Right: action pills + NW + theme + bell + avatar */}
           <div className="flex items-center gap-2">
-            {/* Buy Opps pill — glowing */}
+            {/* Buying Opportunities pill — glowing */}
             {buyOppCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
@@ -225,12 +247,12 @@ export default function Header({ onMenuClick }) {
                 }`}
               >
                 <TrendingDown size={13} strokeWidth={2.5} />
-                <span className="hidden sm:inline">Buy Opps</span>
+                <span className="hidden sm:inline">Buying Opportunities</span>
                 <span className="text-[11px] bg-emerald-500/30 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
               </button>
             )}
 
-            {/* Rebalance pill — glowing */}
+            {/* Rebalance Alerts pill — glowing */}
             {rebalanceCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
@@ -241,16 +263,10 @@ export default function Header({ onMenuClick }) {
                 }`}
               >
                 <RefreshCw size={13} strokeWidth={2.5} />
-                <span className="hidden sm:inline">Rebalance</span>
+                <span className="hidden sm:inline">Rebalance Alerts</span>
                 <span className="text-[11px] bg-violet-500/30 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
               </button>
             )}
-
-            {/* Net Worth — highlighted */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">NW</span>
-              <span className="text-sm font-extrabold text-emerald-400 tabular-nums">{formatINR(nw.netWorth)}</span>
-            </div>
 
             {/* Theme toggle */}
             <button onClick={toggle} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
@@ -421,47 +437,71 @@ export default function Header({ onMenuClick }) {
 
       {/* ── Navigation Strip ── */}
       <nav className="bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)]">
-        <div className="flex items-center gap-1 px-3 sm:px-4 py-1.5 overflow-x-auto no-scrollbar">
-          {NAV_ITEMS.map((item) => {
-            const isActive = location.pathname.startsWith(item.match)
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                  isActive
-                    ? 'bg-violet-500/15 text-violet-400'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-                }`}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
+        <div className="flex items-center px-3 sm:px-4 py-1.5">
+          {/* Nav links — scrollable */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0">
+            {NAV_ITEMS.map((item) => {
+              const isActive = location.pathname.startsWith(item.match)
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                    isActive
+                      ? 'bg-violet-500/15 text-violet-400'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
+          </div>
+
+          {/* Net Worth — right side */}
+          <div className="shrink-0 ml-3 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">Net Worth</span>
+            <span className="text-sm font-extrabold text-emerald-400 tabular-nums">{formatINR(nw.netWorth)}</span>
+          </div>
         </div>
       </nav>
 
-      {/* ── Net Worth Breakdown — horizontal scroll single row ── */}
-      <div className="bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
-        <div className="flex gap-2 px-3 sm:px-4 py-2.5 overflow-x-auto no-scrollbar">
+      {/* ── Net Worth Breakdown — Carousel ── */}
+      <div className="relative bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
+        {/* Left arrow */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scrollCards(-1)}
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
+
+        {/* Cards container — responsive: 2 mobile, 3 tablet, 4 desktop */}
+        <div
+          ref={cardsRef}
+          onScroll={handleCardsScroll}
+          className="flex gap-3 px-3 sm:px-4 py-2.5 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar"
+        >
           {nw.sections?.map((sec) => (
             <Link
               key={sec.key}
               to={sec.route}
-              className="group shrink-0 w-[170px] sm:w-[190px] rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+              className="group snap-start shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] rounded-lg p-3 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   <span className={`w-1.5 h-1.5 rounded-full ${sec.color}`} />{sec.label}
                 </span>
                 <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mb-0.5">{formatINR(sec.total)}</p>
+              <p className="text-base font-bold text-[var(--text-primary)] tabular-nums mb-1">{formatINR(sec.total)}</p>
               {sec.items.length > 0 && (
-                <div className="space-y-0">
+                <div className="space-y-0.5">
                   {sec.items.map((item) => (
                     <div key={item.label} className="flex items-center justify-between">
-                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
+                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{item.label}</span>
                       <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{formatINR(item.value)}</span>
                     </div>
                   ))}
@@ -474,20 +514,20 @@ export default function Header({ onMenuClick }) {
           {nw.totalLiab > 0 && (
             <Link
               to="/liabilities"
-              className="group shrink-0 w-[170px] sm:w-[190px] rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+              className="group snap-start shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] rounded-lg p-3 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Liabilities
                 </span>
                 <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-sm font-bold text-[var(--accent-rose)] tabular-nums mb-0.5">&minus;{formatINR(nw.totalLiab)}</p>
+              <p className="text-base font-bold text-[var(--accent-rose)] tabular-nums mb-1">&minus;{formatINR(nw.totalLiab)}</p>
               {nw.liabilities?.length > 0 && (
-                <div className="space-y-0">
+                <div className="space-y-0.5">
                   {nw.liabilities.map((item) => (
                     <div key={item.label} className="flex items-center justify-between">
-                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
+                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{item.label}</span>
                       <span className="text-[11px] text-[var(--accent-rose)]/70 tabular-nums shrink-0">{formatINR(item.value)}</span>
                     </div>
                   ))}
@@ -496,6 +536,16 @@ export default function Header({ onMenuClick }) {
             </Link>
           )}
         </div>
+
+        {/* Right arrow */}
+        {canScrollRight && (
+          <button
+            onClick={() => scrollCards(1)}
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+        )}
       </div>
 
       {/* ── Dialog Overlay (Buy Opps / Rebalance) ── */}
