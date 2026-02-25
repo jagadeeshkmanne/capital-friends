@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { useMask } from '../context/MaskContext'
 
 export default function Modal({ open, onClose, title, children, wide }) {
   const overlayRef = useRef(null)
@@ -51,14 +52,15 @@ export function FormField({ label, required, error, children }) {
   )
 }
 
-export function FormInput({ value, onChange, placeholder, type = 'text', ...props }) {
+export function FormInput({ value, onChange, placeholder, type = 'text', sensitive, ...props }) {
+  const { masked } = useMask()
   return (
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
+      className={`w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors ${sensitive && masked ? 'sensitive-blur' : ''}`}
       {...props}
     />
   )
@@ -108,10 +110,11 @@ export function FormCheckbox({ checked, onChange, label }) {
 export function FormActions({ onCancel, onSubmit, submitLabel = 'Save', loading }) {
   return (
     <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-[var(--border-light)]">
-      <button onClick={onCancel} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
+      <button onClick={onCancel} disabled={loading} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40">
         Cancel
       </button>
-      <button onClick={onSubmit} disabled={loading} className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50">
+      <button onClick={onSubmit} disabled={loading} className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
+        {loading && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
         {loading ? 'Saving...' : submitLabel}
       </button>
     </div>

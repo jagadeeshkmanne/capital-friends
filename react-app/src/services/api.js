@@ -6,8 +6,9 @@
  * Uses OAuth access tokens (not ID tokens).
  */
 
-// GAS Script ID (Execution API uses the script project directly, not a deployment URL)
+// GAS IDs — Script ID for devMode, Deployment ID for production
 const SCRIPT_ID = import.meta.env.VITE_GAS_SCRIPT_ID || ''
+const DEPLOYMENT_ID = import.meta.env.VITE_GAS_DEPLOYMENT_ID || ''
 
 const TOKEN_KEY = 'cf_access_token'
 const TOKEN_EXPIRY_KEY = 'cf_token_expiry'
@@ -63,8 +64,12 @@ export async function callAPI(action, params = {}, retry = true) {
     throw new Error('Not authenticated. Please sign in.')
   }
 
+  // devMode: true uses Script ID (latest saved, owner only)
+  // devMode: false uses Deployment ID (published, all users)
+  const devMode = import.meta.env.DEV
+  const apiId = devMode ? SCRIPT_ID : (DEPLOYMENT_ID || SCRIPT_ID)
   const response = await fetch(
-    `https://script.googleapis.com/v1/scripts/${SCRIPT_ID}:run`,
+    `https://script.googleapis.com/v1/scripts/${apiId}:run`,
     {
       method: 'POST',
       headers: {
@@ -73,7 +78,7 @@ export async function callAPI(action, params = {}, retry = true) {
       },
       body: JSON.stringify({
         function: 'apiRouter',
-        devMode: true,
+        devMode,
         parameters: [{ action, params, userName: getStoredUserName() }],
       }),
     }

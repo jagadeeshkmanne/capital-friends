@@ -122,6 +122,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   }, [form.investmentType, weightGrams, purity])
 
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -150,7 +151,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
     const data = {
       ...form,
@@ -173,7 +174,8 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
         interestRate: Number(quickLoan.interestRate) || 0,
       }
     }
-    onSave(data)
+    setSaving(true)
+    try { await onSave(data) } finally { setSaving(false) }
   }
 
   // Liability options for linking
@@ -309,7 +311,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Investment'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Investment'} loading={saving} />
       </div>
     </div>
   )

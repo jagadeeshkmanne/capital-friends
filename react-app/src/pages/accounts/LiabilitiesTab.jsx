@@ -3,6 +3,7 @@ import { Plus, Pencil, CreditCard } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/Modal'
 import LiabilityForm from '../../components/forms/LiabilityForm'
 import PageLoading from '../../components/PageLoading'
@@ -18,10 +19,12 @@ const typeBadge = {
 
 export default function LiabilitiesTab() {
   const { selectedMember, member } = useFamily()
-  const { loading, liabilityList, addLiability, updateLiability, deleteLiability } = useData()
+  const { liabilityList, addLiability, updateLiability, deleteLiability } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
 
-  if (loading) return <PageLoading title="Loading liabilities" cards={4} />
   const [modal, setModal] = useState(null)
+
+  if (liabilityList === null) return <PageLoading title="Loading liabilities" cards={4} />
 
   const filtered = useMemo(() => {
     const active = liabilityList.filter((l) => l.status !== 'Inactive')
@@ -32,16 +35,32 @@ export default function LiabilitiesTab() {
   const totalEMI = filtered.reduce((s, l) => s + (l.emiAmount || 0), 0)
   const activeCount = filtered.filter((l) => l.status === 'Active').length
 
-  function handleSave(data) {
-    if (modal?.edit) updateLiability(modal.edit.liabilityId, data)
-    else addLiability(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateLiability(modal.edit.liabilityId, data)
+      else await addLiability(data)
+      showToast(modal?.edit ? 'Liability updated' : 'Liability added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save liability', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Deactivate this liability?')) {
-      deleteLiability(modal.edit.liabilityId)
-      setModal(null)
+      showBlockUI('Deactivating...')
+      try {
+        await deleteLiability(modal.edit.liabilityId)
+        showToast('Liability deactivated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate liability', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 

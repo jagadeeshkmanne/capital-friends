@@ -32,6 +32,7 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
     notes: initial?.notes || '',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -56,9 +57,10 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave({ ...form, sumAssured: Number(form.sumAssured), premium: Number(form.premium) || 0 })
+    setSaving(true)
+    try { await onSave({ ...form, sumAssured: Number(form.sumAssured), premium: Number(form.premium) || 0 }) } finally { setSaving(false) }
   }
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
@@ -76,7 +78,7 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Policy Number" required error={errors.policyNumber}>
-          <FormInput value={form.policyNumber} onChange={(v) => set('policyNumber', v)} placeholder="e.g., HL-2024-78901" />
+          <FormInput sensitive value={form.policyNumber} onChange={(v) => set('policyNumber', v)} placeholder="e.g., HL-2024-78901" />
         </FormField>
         <FormField label="Policy Name" required error={errors.policyName}>
           <FormInput value={form.policyName} onChange={(v) => set('policyName', v)} placeholder="e.g., Click 2 Protect Life" />
@@ -116,7 +118,7 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Policy'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Policy'} loading={saving} />
       </div>
     </div>
   )

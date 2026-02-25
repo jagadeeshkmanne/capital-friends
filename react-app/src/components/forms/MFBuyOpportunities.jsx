@@ -2,27 +2,6 @@ import { useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 
-// ── Toggle this to false when real data is available ──
-const USE_DUMMY = true
-
-const DUMMY_PORTFOLIOS = [
-  {
-    portfolioId: 'dp1', portfolioName: 'Jags Growth Portfolio', ownerName: 'Jags', totalValue: 1500000,
-    opportunities: [
-      { holdingId: 'dh1', fundName: 'Parag Parikh Flexi Cap Fund', athNav: 78.50, currentNav: 62.80, belowATHPct: 20.0, currentPct: 28.5, targetAllocationPct: 30, currentValue: 427500 },
-      { holdingId: 'dh2', fundName: 'Mirae Asset Large Cap Fund', athNav: 105.30, currentNav: 91.60, belowATHPct: 13.0, currentPct: 22.1, targetAllocationPct: 25, currentValue: 331500 },
-      { holdingId: 'dh3', fundName: 'Axis Small Cap Fund', athNav: 42.80, currentNav: 36.38, belowATHPct: 15.0, currentPct: 18.0, targetAllocationPct: 20, currentValue: 270000 },
-    ],
-  },
-  {
-    portfolioId: 'dp2', portfolioName: 'Priya Conservative MF', ownerName: 'Priya', totalValue: 1350000,
-    opportunities: [
-      { holdingId: 'dh4', fundName: 'HDFC Mid-Cap Opportunities', athNav: 92.10, currentNav: 82.89, belowATHPct: 10.0, currentPct: 30.2, targetAllocationPct: 35, currentValue: 407700 },
-      { holdingId: 'dh5', fundName: 'Kotak Emerging Equity Fund', athNav: 68.40, currentNav: 61.56, belowATHPct: 10.0, currentPct: 15.8, targetAllocationPct: 20, currentValue: 213300 },
-    ],
-  },
-]
-
 function belowColor(pct) {
   if (pct >= 20) return 'bg-rose-500/20 text-[var(--accent-rose)]'
   if (pct >= 10) return 'bg-orange-500/20 text-[var(--accent-orange)]'
@@ -35,8 +14,6 @@ export default function MFBuyOpportunities() {
 
   // Group opportunities by portfolio
   const portfolioGroups = useMemo(() => {
-    if (USE_DUMMY) return DUMMY_PORTFOLIOS
-
     return mfPortfolios
       .filter((p) => p.status !== 'Inactive')
       .map((p) => {

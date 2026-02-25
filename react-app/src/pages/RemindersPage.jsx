@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Plus, Pencil, Bell, BellOff } from 'lucide-react'
 import { useFamily } from '../context/FamilyContext'
 import { useData } from '../context/DataContext'
+import { useToast } from '../context/ToastContext'
 import Modal from '../components/Modal'
 import ReminderForm from '../components/forms/ReminderForm'
 
@@ -29,6 +30,7 @@ function daysUntil(dateStr) {
 export default function RemindersPage() {
   const { selectedMember, member } = useFamily()
   const { reminderList, addReminder, updateReminder, deleteReminder } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {
@@ -47,16 +49,32 @@ export default function RemindersPage() {
     return da - db
   })
 
-  function handleSave(data) {
-    if (modal?.edit) updateReminder(modal.edit.reminderId, data)
-    else addReminder(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateReminder(modal.edit.reminderId, data)
+      else await addReminder(data)
+      showToast(modal?.edit ? 'Reminder updated' : 'Reminder added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save reminder', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Delete this reminder?')) {
-      deleteReminder(modal.edit.reminderId)
-      setModal(null)
+      showBlockUI('Deleting...')
+      try {
+        await deleteReminder(modal.edit.reminderId)
+        showToast('Reminder deleted')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to delete reminder', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 

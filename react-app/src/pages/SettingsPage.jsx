@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun, Mail, Globe, ChevronDown, RefreshCw, Database, User, LogOut, Zap } from 'lucide-react'
+import { Moon, Sun, Mail, Globe, ChevronDown, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { useMask } from '../context/MaskContext'
 import * as api from '../services/api'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -13,6 +14,7 @@ export default function SettingsPage() {
   const { theme, toggle } = useTheme()
   const { members, settings, updateSettings, updateMember, healthCheckCompleted } = useData()
   const { user, signOut } = useAuth()
+  const { masked, toggleMask, mv } = useMask()
   const activeMembers = members.filter((m) => m.status === 'Active')
 
   // Local form state (synced from backend settings)
@@ -93,7 +95,7 @@ export default function SettingsPage() {
         <CardHeader icon={<User size={14} />} title="Account" />
         <div className="px-4 py-4 space-y-3">
           <Row label="Signed in as">
-            <p className="text-xs font-semibold text-[var(--text-primary)] truncate max-w-[200px]">{user?.email || '—'}</p>
+            <p className="text-xs font-semibold text-[var(--text-primary)] truncate max-w-[200px]">{mv(user?.email, 'email') || '—'}</p>
           </Row>
           <Row label="Name">
             <p className="text-xs font-semibold text-[var(--text-primary)]">{user?.name || '—'}</p>
@@ -240,6 +242,30 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Privacy */}
+      <Card>
+        <CardHeader icon={<EyeOff size={14} />} title="Privacy" />
+        <div className="px-4 py-4 space-y-3">
+          <Row label="Mask sensitive data">
+            <button
+              onClick={toggleMask}
+              className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${masked ? 'bg-amber-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${masked ? 'left-[18px] bg-white' : 'left-0.5 bg-[var(--text-dim)]'}`} />
+            </button>
+          </Row>
+          <p className="text-xs text-[var(--text-dim)]">
+            {masked ? 'Sensitive data is hidden. ' : ''}Masks PAN, Aadhaar, mobile, email, account numbers, client IDs, and policy numbers across the app. Use the {masked ? <EyeOff size={11} className="inline text-amber-400" /> : <Eye size={11} className="inline" />} icon in the header to quickly toggle.
+          </p>
+          {masked && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <EyeOff size={14} className="text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-400 font-medium">Data masking is active — safe for screen sharing</p>
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* Display Preferences */}
       <Card>
         <CardHeader icon={<Globe size={14} />} title="Display" />
@@ -304,6 +330,7 @@ function Select({ value, onChange, options, suffix }) {
 }
 
 function MemberEmailToggle({ member, onToggle }) {
+  const { mv } = useMask()
   const isOn = member.includeInEmailReports === 'Yes' || member.includeInEmailReports === true
   const [toggling, setToggling] = useState(false)
 
@@ -326,7 +353,7 @@ function MemberEmailToggle({ member, onToggle }) {
         </div>
         <div className="min-w-0">
           <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{member.memberName}</p>
-          {member.email && <p className="text-[10px] text-[var(--text-dim)] truncate">{member.email}</p>}
+          {member.email && <p className="text-[10px] text-[var(--text-dim)] truncate">{mv(member.email, 'email')}</p>}
         </div>
       </div>
       <button

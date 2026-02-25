@@ -5,71 +5,70 @@ import { useAuth } from './AuthContext'
 
 const DataContext = createContext()
 
-const HEALTH_CACHE_KEY = 'cf_health_check'
+const HC_SESSION_KEY = 'cf_hc_done'
 
-function getHealthCache() {
-  try {
-    const val = sessionStorage.getItem(HEALTH_CACHE_KEY)
-    return val !== null ? JSON.parse(val) : null
-  } catch { return null }
+function getHCSession() {
+  try { return sessionStorage.getItem(HC_SESSION_KEY) === '1' ? true : null } catch { return null }
 }
 
-function setHealthCache(val) {
-  try { sessionStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(val)) } catch {}
+function setHCSession(val) {
+  try { sessionStorage.setItem(HC_SESSION_KEY, val ? '1' : '0') } catch {}
 }
 
 export function DataProvider({ children }) {
   const { isAuthenticated } = useAuth()
-  const cachedHealth = isAuthenticated ? getHealthCache() : null
+  const cachedHC = isAuthenticated ? getHCSession() : null
 
   // ── Loading & Error State ──
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
 
-  // ── All Data State — starts empty, hydrated from IDB then API ──
-  const [members, setMembers] = useState([])
-  const [banks, setBanks] = useState([])
-  const [investments, setInvestments] = useState([])
-  const [insurancePolicies, setInsurance] = useState([])
-  const [liabilityList, setLiabilities] = useState([])
-  const [otherInvList, setOtherInvestments] = useState([])
-  const [stockPortfolios, setStockPortfolios] = useState([])
-  const [stockHoldings, setStockHoldings] = useState([])
-  const [stockTransactions, setStockTransactions] = useState([])
-  const [mfPortfolios, setMFPortfolios] = useState([])
-  const [mfHoldings, setMFHoldings] = useState([])
-  const [mfTransactions, setMFTransactions] = useState([])
-  const [goalList, setGoals] = useState([])
-  const [reminderList, setReminders] = useState([])
-  const [goalPortfolioMappings, setGoalPortfolioMappings] = useState([])
-  const [settings, setSettings] = useState({})
-  // Health check: trust session cache first, IDB hydrated in init
+  // ── All Data State — starts null (not loaded), hydrated from IDB then API ──
+  // null = not loaded yet, [] = loaded but empty, [...] = loaded with data
+  const [members, setMembers] = useState(null)
+  const [banks, setBanks] = useState(null)
+  const [investments, setInvestments] = useState(null)
+  const [insurancePolicies, setInsurance] = useState(null)
+  const [liabilityList, setLiabilities] = useState(null)
+  const [otherInvList, setOtherInvestments] = useState(null)
+  const [stockPortfolios, setStockPortfolios] = useState(null)
+  const [stockHoldings, setStockHoldings] = useState(null)
+  const [stockTransactions, setStockTransactions] = useState(null)
+  const [mfPortfolios, setMFPortfolios] = useState(null)
+  const [mfHoldings, setMFHoldings] = useState(null)
+  const [mfTransactions, setMFTransactions] = useState(null)
+  const [goalList, setGoals] = useState(null)
+  const [reminderList, setReminders] = useState(null)
+  const [goalPortfolioMappings, setGoalPortfolioMappings] = useState(null)
+  const [settings, setSettings] = useState(null)
+  // Health check: session cache for instant same-tab checks, IDB for persistence
   const [healthCheckCompleted, setHealthCheckCompleted] = useState(
-    cachedHealth !== null ? cachedHealth : null
+    cachedHC !== null ? cachedHC : null
   )
 
   const didInitRef = useRef(false)
 
   // ── Hydrate state from a data object (IDB or API response) ──
+  // Uses 'key' in data to set even empty arrays (transitions null → [])
   const hydrateState = useCallback((data) => {
     if (!data) return
-    if (data.members) setMembers(data.members)
-    if (data.bankAccounts) setBanks(data.bankAccounts)
-    if (data.investments) setInvestments(data.investments)
-    if (data.insurancePolicies) setInsurance(data.insurancePolicies)
-    if (data.liabilities) setLiabilities(data.liabilities)
-    if (data.otherInvestments) setOtherInvestments(data.otherInvestments)
-    if (data.stockPortfolios) setStockPortfolios(data.stockPortfolios)
-    if (data.stockHoldings) setStockHoldings(data.stockHoldings)
-    if (data.stockTransactions) setStockTransactions(data.stockTransactions)
-    if (data.mfPortfolios) setMFPortfolios(data.mfPortfolios)
-    if (data.mfHoldings) setMFHoldings(data.mfHoldings)
-    if (data.mfTransactions) setMFTransactions(data.mfTransactions)
-    if (data.goals) setGoals(data.goals)
-    if (data.reminders) setReminders(data.reminders)
-    if (data.goalPortfolioMappings) setGoalPortfolioMappings(data.goalPortfolioMappings)
-    if (data.settings) setSettings(data.settings)
+    if ('members' in data) setMembers(data.members || [])
+    if ('bankAccounts' in data) setBanks(data.bankAccounts || [])
+    if ('investments' in data) setInvestments(data.investments || [])
+    if ('insurancePolicies' in data) setInsurance(data.insurancePolicies || [])
+    if ('liabilities' in data) setLiabilities(data.liabilities || [])
+    if ('otherInvestments' in data) setOtherInvestments(data.otherInvestments || [])
+    if ('stockPortfolios' in data) setStockPortfolios(data.stockPortfolios || [])
+    if ('stockHoldings' in data) setStockHoldings(data.stockHoldings || [])
+    if ('stockTransactions' in data) setStockTransactions(data.stockTransactions || [])
+    if ('mfPortfolios' in data) setMFPortfolios(data.mfPortfolios || [])
+    if ('mfHoldings' in data) setMFHoldings(data.mfHoldings || [])
+    if ('mfTransactions' in data) setMFTransactions(data.mfTransactions || [])
+    if ('goals' in data) setGoals(data.goals || [])
+    if ('reminders' in data) setReminders(data.reminders || [])
+    if ('goalPortfolioMappings' in data) setGoalPortfolioMappings(data.goalPortfolioMappings || [])
+    if ('settings' in data) setSettings(data.settings || {})
   }, [])
 
   // ── Save all data to IDB (after API load) ──
@@ -204,17 +203,31 @@ export function DataProvider({ children }) {
     await refreshSettings()
   }, [refreshSettings])
 
-  const checkHealthCheck = useCallback(async () => {
+  // Resolve health check by looking for answers: IDB first, then API
+  const resolveHealthCheck = useCallback(async () => {
     try {
-      const status = await api.getHealthCheckStatus()
-      const completed = status?.completed ?? false
-      setHealthCheckCompleted(completed)
-      setHealthCache(completed)
-      idb.put('healthCheck', completed)
+      // Step 1: Check IDB for cached answers
+      const cached = await idb.get('healthCheckAnswers')
+      if (cached && Object.keys(cached).length > 0) {
+        setHealthCheckCompleted(true)
+        setHCSession(true)
+        return
+      }
+
+      // Step 2: Fetch answers from API (new browser / cleared cache)
+      const answers = await api.getHealthCheckAnswers()
+      if (answers && Object.keys(answers).length > 0) {
+        setHealthCheckCompleted(true)
+        setHCSession(true)
+        idb.put('healthCheckAnswers', answers)
+      } else {
+        // No answers anywhere — user hasn't completed health check
+        setHealthCheckCompleted(false)
+        setHCSession(false)
+      }
     } catch {
       setHealthCheckCompleted(false)
-      setHealthCache(false)
-      idb.put('healthCheck', false)
+      setHCSession(false)
     }
   }, [])
 
@@ -222,8 +235,8 @@ export function DataProvider({ children }) {
     const result = await api.saveHealthCheck(answers)
     if (result?.success) {
       setHealthCheckCompleted(true)
-      setHealthCache(true)
-      idb.put('healthCheck', true)
+      setHCSession(true)
+      idb.put('healthCheckAnswers', answers)
     }
     return result
   }, [])
@@ -243,10 +256,10 @@ export function DataProvider({ children }) {
       const hasCache = Object.keys(cached).length > 0
       if (hasCache) {
         hydrateState(cached)
-        // Restore health check from IDB if not already in sessionStorage
-        if (cached.healthCheck !== undefined && cachedHealth === null) {
-          setHealthCheckCompleted(cached.healthCheck)
-          setHealthCache(cached.healthCheck)
+        // Health check: if answers exist in IDB, user is verified
+        if (cached.healthCheckAnswers && Object.keys(cached.healthCheckAnswers).length > 0) {
+          setHealthCheckCompleted(true)
+          setHCSession(true)
         }
         setLoading(false) // UI renders instantly with cached data
       }
@@ -267,11 +280,11 @@ export function DataProvider({ children }) {
 
     init()
     refreshSettings().catch(() => {})
-    // Only call health check API if no cache at all — IDB hydration in init handles the rest
-    if (cachedHealth === null) {
-      checkHealthCheck().catch(() => {})
+    // If no session cache for health check, resolve by checking IDB → API
+    if (cachedHC === null) {
+      resolveHealthCheck().catch(() => {})
     }
-  }, [isAuthenticated, hydrateState, persistToIDB, refreshSettings, checkHealthCheck])
+  }, [isAuthenticated, hydrateState, persistToIDB, refreshSettings, resolveHealthCheck])
 
   // Reset init ref when user logs out so re-login triggers fresh init
   useEffect(() => {
@@ -283,6 +296,15 @@ export function DataProvider({ children }) {
   // ── Family Members CRUD ──
   const addMember = useCallback(async (data) => {
     const result = await api.createMember(data)
+    // Auto-invite: register in Script Properties + share sheet so they can log in
+    if (data.email) {
+      try {
+        await api.inviteFamilyMember(data.email, data.memberName)
+      } catch (e) {
+        // Non-blocking — member is still added even if sharing fails
+        console.warn('Auto-invite failed (non-blocking):', e.message)
+      }
+    }
     await refreshMembers()
     return result
   }, [refreshMembers])
@@ -495,9 +517,9 @@ export function DataProvider({ children }) {
   }, [refreshMF])
 
   // ── Filtered helpers ──
-  const activeMembers = members.filter((m) => m.status === 'Active')
-  const activeBanks = banks.filter((b) => b.status === 'Active')
-  const activeInvestmentAccounts = investments.filter((a) => a.status === 'Active')
+  const activeMembers = (members || []).filter((m) => m.status === 'Active')
+  const activeBanks = (banks || []).filter((b) => b.status === 'Active')
+  const activeInvestmentAccounts = (investments || []).filter((a) => a.status === 'Active')
 
   return (
     <DataContext.Provider value={{

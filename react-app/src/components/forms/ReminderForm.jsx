@@ -36,6 +36,7 @@ export default function ReminderForm({ initial, onSave, onDelete, onCancel }) {
     status: initial?.status || 'Pending',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -52,12 +53,15 @@ export default function ReminderForm({ initial, onSave, onDelete, onCancel }) {
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave({
-      ...form,
-      advanceNoticeDays: Number(form.advanceNoticeDays) || 7,
-    })
+    setSaving(true)
+    try {
+      await onSave({
+        ...form,
+        advanceNoticeDays: Number(form.advanceNoticeDays) || 7,
+      })
+    } finally { setSaving(false) }
   }
 
   return (
@@ -107,7 +111,7 @@ export default function ReminderForm({ initial, onSave, onDelete, onCancel }) {
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} label="Delete" /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update Reminder' : 'Add Reminder'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update Reminder' : 'Add Reminder'} loading={saving} />
       </div>
     </div>
   )

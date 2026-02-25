@@ -7,7 +7,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
   const isEdit = !!initial
 
   const [form, setForm] = useState({
-    portfolioName: initial?.portfolioName || '',
+    portfolioName: (initial?.portfolioName || '').replace(/^PFL-/, ''),
     investmentAccountId: initial?.investmentAccountId || '',
     ownerId: initial?.ownerId || '',
     initialInvestment: initial?.initialInvestment || 0,
@@ -16,6 +16,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
     rebalanceThreshold: initial ? (initial.rebalanceThreshold * 100) : 5,
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -27,10 +28,9 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
     setErrors((e) => ({ ...e, ownerId: undefined }))
   }
 
-  // MF-type investment accounts for selected member
+  // Investment accounts for selected member
   const mfAccounts = activeInvestmentAccounts
     .filter((a) => form.ownerId ? a.memberId === form.ownerId : true)
-    .filter((a) => a.accountType === 'Mutual Fund' || a.accountType === 'Direct AMC')
     .map((a) => ({ value: a.accountId, label: `${a.accountName} - ${a.platformBroker}` }))
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
@@ -44,15 +44,22 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave({
-      ...form,
-      initialInvestment: Number(form.initialInvestment) || 0,
-      sipTarget: Number(form.sipTarget) || 0,
-      lumpsumTarget: Number(form.lumpsumTarget) || 0,
-      rebalanceThreshold: Number(form.rebalanceThreshold) / 100,
-    })
+    setSaving(true)
+    try {
+      // Resolve account name from ID — GAS expects investmentAccount (name), not investmentAccountId
+      const selectedAccount = activeInvestmentAccounts.find((a) => a.accountId === form.investmentAccountId)
+      const accountLabel = selectedAccount ? `${selectedAccount.accountName} - ${selectedAccount.platformBroker}` : form.investmentAccountId
+      await onSave({
+        ...form,
+        investmentAccount: accountLabel,
+        initialInvestment: Number(form.initialInvestment) || 0,
+        sipTarget: Number(form.sipTarget) || 0,
+        lumpsumTarget: Number(form.lumpsumTarget) || 0,
+        rebalanceThreshold: Number(form.rebalanceThreshold),  // Send as percentage — GAS divides by 100
+      })
+    } finally { setSaving(false) }
   }
 
   return (
@@ -90,7 +97,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Create Portfolio'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Create Portfolio'} loading={saving} />
       </div>
     </div>
   )

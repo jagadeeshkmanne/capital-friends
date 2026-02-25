@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
-import { Plus, Pencil, Users, Mail, Landmark, Briefcase, Shield } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Pencil, Users } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import MemberForm from '../../components/forms/MemberForm'
 import PageLoading from '../../components/PageLoading'
@@ -23,49 +25,49 @@ const relationBadge = {
 }
 
 export default function Family() {
-  const { loading, members, banks, investments, insurancePolicies, addMember, updateMember, deleteMember } = useData()
-
-  if (loading) return <PageLoading title="Loading family" cards={3} />
+  const { members, addMember, updateMember, deleteMember } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const { mv } = useMask()
   const [modal, setModal] = useState(null)
 
+  if (members === null) return <PageLoading title="Loading family" cards={3} />
+
   const activeMembers = members.filter((m) => m.status !== 'Inactive')
-  const emailCount = activeMembers.filter((m) => m.includeInEmailReports).length
 
-  // Per-member stats
-  const memberStats = useMemo(() => {
-    const stats = {}
-    activeMembers.forEach((m) => {
-      stats[m.memberId] = {
-        bankCount: banks.filter((b) => b.memberId === m.memberId && b.status !== 'Inactive').length,
-        invCount: investments.filter((a) => a.memberId === m.memberId && a.status !== 'Inactive').length,
-        insCount: insurancePolicies.filter((p) => p.memberId === m.memberId && p.status !== 'Inactive').length,
-      }
-    })
-    return stats
-  }, [activeMembers, banks, investments, insurancePolicies])
-
-  function handleSave(data) {
-    if (modal?.edit) updateMember(modal.edit.memberId, data)
-    else addMember(data)
-    setModal(null)
-  }
-
-  function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this family member?')) {
-      deleteMember(modal.edit.memberId)
+  async function handleSave(data) {
+    showBlockUI('Saving member...')
+    try {
+      if (modal?.edit) await updateMember(modal.edit.memberId, data)
+      else await addMember(data)
+      showToast(modal?.edit ? 'Member updated' : 'Member added')
       setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save member', 'error')
+    } finally {
+      hideBlockUI()
     }
   }
 
+  async function handleDelete() {
+    if (modal?.edit && confirm('Deactivate this family member?')) {
+      showBlockUI('Deactivating...')
+      try {
+        await deleteMember(modal.edit.memberId)
+        showToast('Member deactivated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate member', 'error')
+      } finally {
+        hideBlockUI()
+      }
+    }
+  }
+
+  // Collect dynamic field keys across all members for display
+  const dynamicFieldKeys = [...new Set(activeMembers.flatMap((m) => Object.keys(m.dynamicFields || {})))]
+
   return (
     <div className="space-y-4">
-      {/* Stat Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Members" value={activeMembers.length} />
-        <StatCard label="Email Reports" value={`${emailCount} / ${activeMembers.length}`} />
-        <StatCard label="Bank Accounts" value={banks.filter((b) => b.status !== 'Inactive').length} />
-      </div>
-
       {/* Header with Add */}
       <div className="flex items-center justify-end px-1">
         <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
@@ -85,24 +87,22 @@ export default function Family() {
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           {/* Desktop table */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm min-w-[680px]">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                   <th className="text-left py-2.5 px-4 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Member</th>
                   <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Relationship</th>
+                  <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">PAN</th>
+                  <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Aadhaar</th>
                   <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Email</th>
                   <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Mobile</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
-                    <div>Accounts</div>
-                    <div className="text-[10px] font-medium text-[var(--text-dim)]">Bank / Inv / Ins</div>
-                  </th>
-                  <th className="text-center py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Email Rpt</th>
                   <th className="w-8 py-2.5 px-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {activeMembers.map((m, idx) => {
-                  const s = memberStats[m.memberId] || {}
+                  const df = m.dynamicFields || {}
+                  const dfEntries = Object.entries(df)
                   return (
                     <tr key={m.memberId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors group">
                       <td className="py-2.5 px-4">
@@ -112,7 +112,16 @@ export default function Family() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-[var(--text-primary)]">{m.memberName}</p>
-                            <p className="text-xs text-[var(--text-dim)]">{m.memberId}</p>
+                            {dfEntries.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {dfEntries.slice(0, 3).map(([k, v]) => (
+                                  <span key={k} className="text-[10px] text-[var(--text-dim)] bg-[var(--bg-inset)] px-1.5 py-0.5 rounded">
+                                    {k}: {v}
+                                  </span>
+                                ))}
+                                {dfEntries.length > 3 && <span className="text-[10px] text-[var(--text-dim)]">+{dfEntries.length - 3} more</span>}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -121,22 +130,10 @@ export default function Family() {
                           {m.relationship}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] truncate max-w-[180px]">{m.email}</td>
-                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{m.mobile}</td>
-                      <td className="py-2.5 px-3 text-center">
-                        <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-dim)]">
-                          <span className="flex items-center gap-0.5" title="Bank accounts"><Landmark size={10} /> {s.bankCount || 0}</span>
-                          <span className="flex items-center gap-0.5" title="Investment accounts"><Briefcase size={10} /> {s.invCount || 0}</span>
-                          <span className="flex items-center gap-0.5" title="Insurance policies"><Shield size={10} /> {s.insCount || 0}</span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        {m.includeInEmailReports ? (
-                          <Mail size={13} className="inline text-emerald-400" />
-                        ) : (
-                          <span className="text-xs text-[var(--text-dim)]">—</span>
-                        )}
-                      </td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] font-mono tabular-nums">{mv(m.pan, 'pan') || '—'}</td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] font-mono tabular-nums">{mv(m.aadhar, 'aadhaar') || '—'}</td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] truncate max-w-[180px]">{mv(m.email, 'email')}</td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{mv(m.mobile, 'mobile')}</td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: m })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
                           <Pencil size={12} />
@@ -152,7 +149,8 @@ export default function Family() {
           {/* Mobile card list */}
           <div className="sm:hidden divide-y divide-[var(--border-light)]">
             {activeMembers.map((m, idx) => {
-              const s = memberStats[m.memberId] || {}
+              const df = m.dynamicFields || {}
+              const dfEntries = Object.entries(df)
               return (
                 <div key={m.memberId} onClick={() => setModal({ edit: m })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                   <div className="flex items-center gap-2.5 mb-1.5">
@@ -166,17 +164,26 @@ export default function Family() {
                           {m.relationship}
                         </span>
                       </div>
-                      <p className="text-xs text-[var(--text-muted)] truncate">{m.email}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate">{mv(m.email, 'email')}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-[var(--text-dim)] tabular-nums">{m.mobile}</p>
-                    <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">
-                      <span className="flex items-center gap-0.5"><Landmark size={10} /> {s.bankCount || 0}</span>
-                      <span className="flex items-center gap-0.5"><Briefcase size={10} /> {s.invCount || 0}</span>
-                      <span className="flex items-center gap-0.5"><Shield size={10} /> {s.insCount || 0}</span>
+                    <p className="text-xs text-[var(--text-dim)] tabular-nums">{mv(m.mobile, 'mobile')}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-[var(--text-dim)] font-mono">PAN: {mv(m.pan, 'pan') || '—'}</p>
+                      {m.aadhar && <p className="text-xs text-[var(--text-dim)] font-mono">Aadhaar: {mv(m.aadhar, 'aadhaar')}</p>}
                     </div>
                   </div>
+                  {dfEntries.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {dfEntries.slice(0, 3).map(([k, v]) => (
+                        <span key={k} className="text-[10px] text-[var(--text-dim)] bg-[var(--bg-inset)] px-1.5 py-0.5 rounded">
+                          {k}: {v}
+                        </span>
+                      ))}
+                      {dfEntries.length > 3 && <span className="text-[10px] text-[var(--text-dim)]">+{dfEntries.length - 3} more</span>}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -192,15 +199,6 @@ export default function Family() {
           onCancel={() => setModal(null)}
         />
       </Modal>
-    </div>
-  )
-}
-
-function StatCard({ label, value }) {
-  return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3">
-      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{value}</p>
     </div>
   )
 }

@@ -13,15 +13,12 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { selectedMember } = useFamily()
   const {
-    loading,
     mfPortfolios, mfHoldings,
     stockPortfolios, stockHoldings,
     otherInvList, liabilityList,
     banks, insurancePolicies,
     reminderList, goalList,
   } = useData()
-
-  if (loading) return <PageLoading title="Loading dashboard" cards={4} />
 
   // Filter by selected member
   const data = useMemo(() => {
@@ -175,6 +172,8 @@ export default function Dashboard() {
       .sort((a, b) => a.days - b.days)
       .slice(0, 5)
   }, [selectedMember, reminderList])
+
+  if (members === null || mfPortfolios === null) return <PageLoading title="Loading dashboard" cards={4} />
 
   return (
     <div className="space-y-4">

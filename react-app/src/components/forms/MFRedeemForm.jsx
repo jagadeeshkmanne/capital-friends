@@ -23,6 +23,7 @@ export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
     notes: '',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -62,9 +63,10 @@ export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave(form)
+    setSaving(true)
+    try { await onSave(form) } finally { setSaving(false) }
   }
 
   const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))
@@ -126,7 +128,7 @@ export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
         <FormInput value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." />
       </FormField>
 
-      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Redeem" />
+      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Redeem" loading={saving} />
     </div>
   )
 }

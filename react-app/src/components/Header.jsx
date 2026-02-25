@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronLeft, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon } from 'lucide-react'
+import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronLeft, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 import { useTheme } from '../context/ThemeContext'
@@ -7,15 +7,13 @@ import { useFamily } from '../context/FamilyContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { formatINR } from '../data/familyData'
+import { useMask } from '../context/MaskContext'
 import MarketTicker from './MarketTicker'
 import useAlerts from '../hooks/useAlerts'
 import MFBuyOpportunities from './forms/MFBuyOpportunities'
 import MFRebalanceDialog from './forms/MFRebalanceDialog'
 
 const LOGO = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png'
-
-// ── Toggle this to false when real data is available ──
-const USE_DUMMY = true
 
 const SECTION_META = {
   mf: { label: 'Mutual Funds', color: 'bg-violet-500', order: 1, route: '/investments/mutual-funds' },
@@ -27,43 +25,6 @@ const SECTION_META = {
   Alternative: { label: 'Alternative', color: 'bg-violet-400', order: 7, route: '/investments/other' },
   Equity: { label: 'Equity', color: 'bg-emerald-500', order: 8, route: '/investments/other' },
   Other: { label: 'Other', color: 'bg-gray-500', order: 9, route: '/investments/other' },
-}
-
-const DUMMY_NW = {
-  netWorth: 7585000, totalInv: 8585000,
-  totalLiab: 1000000,
-  sections: [
-    { key: 'mf', label: 'Mutual Funds', color: 'bg-violet-500', route: '/investments/mutual-funds', total: 2850000, items: [
-      { label: 'Jags Growth Portfolio', value: 1500000 },
-      { label: 'Priya Conservative MF', value: 1350000 },
-    ]},
-    { key: 'stocks', label: 'Stocks', color: 'bg-blue-500', route: '/investments/stocks', total: 1250000, items: [
-      { label: 'Zerodha Stocks', value: 1250000 },
-    ]},
-    { key: 'Property', label: 'Real Estate', color: 'bg-orange-500', route: '/investments/other', total: 2500000, items: [
-      { label: '2BHK Flat - Hyderabad', value: 2500000 },
-    ]},
-    { key: 'Debt', label: 'Debt', color: 'bg-cyan-500', route: '/investments/other', total: 950000, items: [
-      { label: 'HDFC PPF', value: 350000 },
-      { label: 'SBI FD - 7.5%', value: 200000 },
-      { label: 'EPF', value: 400000 },
-    ]},
-    { key: 'Gold', label: 'Gold', color: 'bg-amber-500', route: '/investments/other', total: 285000, items: [
-      { label: 'SBI Gold Bond 2029', value: 120000 },
-      { label: 'Digital Gold', value: 65000 },
-      { label: 'Physical Gold', value: 100000 },
-    ]},
-    { key: 'Equity', label: 'Equity', color: 'bg-emerald-500', route: '/investments/other', total: 500000, items: [
-      { label: 'NPS - Tier 1', value: 500000 },
-    ]},
-    { key: 'Alternative', label: 'Alternative', color: 'bg-violet-400', route: '/investments/other', total: 250000, items: [
-      { label: 'Smallcase - Momentum', value: 250000 },
-    ]},
-  ],
-  liabilities: [
-    { label: 'HDFC Home Loan', value: 750000 },
-    { label: 'Car Loan - SBI', value: 250000 },
-  ],
 }
 
 export const avatarColors = [
@@ -100,6 +61,7 @@ export default function Header({ onMenuClick }) {
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
   const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList } = useData()
   const { user, signOut } = useAuth()
+  const { masked, toggleMask, mv } = useMask()
 
   const navigate = useNavigate()
   const location = useLocation()
@@ -108,6 +70,7 @@ export default function Header({ onMenuClick }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [dialogKey, setDialogKey] = useState(null)
+  const [nwExpanded, setNwExpanded] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
   const dropdownRef = useRef(null)
@@ -133,8 +96,6 @@ export default function Header({ onMenuClick }) {
 
   // Compute net worth breakdown
   const nw = useMemo(() => {
-    if (USE_DUMMY) return DUMMY_NW
-
     const filterOwner = (items, key) =>
       selectedMember === 'all' ? items : items.filter((i) => i[key] === selectedMember)
 
@@ -145,23 +106,23 @@ export default function Header({ onMenuClick }) {
       sectionMap[key].invested += invested
     }
 
-    const activeMF = filterOwner(mfPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
+    const activeMF = filterOwner((mfPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')
     activeMF.forEach((p) => {
-      const pH = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
+      const pH = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
       const value = pH.reduce((s, h) => s + h.currentValue, 0)
       const inv = pH.reduce((s, h) => s + h.investment, 0)
-      if (value > 0) addToSection('mf', p.portfolioName, value, inv)
+      if (value > 0) addToSection('mf', p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value, inv)
     })
 
-    const activeStk = filterOwner(stockPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
+    const activeStk = filterOwner((stockPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')
     activeStk.forEach((p) => {
-      const pH = stockHoldings.filter((h) => h.portfolioId === p.portfolioId)
+      const pH = (stockHoldings || []).filter((h) => h.portfolioId === p.portfolioId)
       const value = pH.reduce((s, h) => s + h.currentValue, 0)
       const inv = pH.reduce((s, h) => s + h.totalInvestment, 0)
       if (value > 0) addToSection('stocks', p.portfolioName, value, inv)
     })
 
-    const activeOther = filterOwner(otherInvList.filter((i) => i.status === 'Active'), 'familyMemberId')
+    const activeOther = filterOwner((otherInvList || []).filter((i) => i.status === 'Active'), 'familyMemberId')
     activeOther.forEach((i) => {
       const cat = i.investmentCategory || 'Other'
       addToSection(cat, i.investmentName || i.investmentType || 'Other', i.currentValue, i.investedAmount || 0)
@@ -176,7 +137,7 @@ export default function Header({ onMenuClick }) {
       .filter((s) => s.total > 0)
       .sort((a, b) => a.order - b.order)
 
-    const activeLiab = filterOwner(liabilityList.filter((l) => l.status === 'Active'), 'familyMemberId')
+    const activeLiab = filterOwner((liabilityList || []).filter((l) => l.status === 'Active'), 'familyMemberId')
     const liabilities = activeLiab.map((l) => ({ label: l.liabilityName || l.liabilityType || 'Loan', value: l.outstandingBalance }))
     const totalLiab = activeLiab.reduce((s, l) => s + l.outstandingBalance, 0)
     const totalInv = sections.reduce((s, sec) => s + sec.total, 0)
@@ -204,8 +165,8 @@ export default function Header({ onMenuClick }) {
     cardsRef.current.scrollBy({ left: dir * cardWidth, behavior: 'smooth' })
   }
 
-  // Check scroll arrows on mount and data change
-  useEffect(() => { handleCardsScroll() }, [nw])
+  // Check scroll arrows when data changes or carousel is expanded
+  useEffect(() => { handleCardsScroll() }, [nw, nwExpanded])
 
   return (
     <header className="sticky top-0 z-30 shrink-0">
@@ -267,6 +228,11 @@ export default function Header({ onMenuClick }) {
                 <span className="text-[11px] bg-violet-500/30 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
               </button>
             )}
+
+            {/* Mask toggle */}
+            <button onClick={toggleMask} className={`p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>
+              {masked ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
 
             {/* Theme toggle */}
             <button onClick={toggle} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
@@ -414,7 +380,7 @@ export default function Header({ onMenuClick }) {
                     </Link>
                     {user && (
                       <div className="px-4 py-1.5">
-                        <p className="text-[11px] text-[var(--text-muted)] truncate">{user.email}</p>
+                        <p className="text-[11px] text-[var(--text-muted)] truncate">{mv(user.email, 'email')}</p>
                       </div>
                     )}
                     <button
@@ -458,95 +424,103 @@ export default function Header({ onMenuClick }) {
             })}
           </div>
 
-          {/* Net Worth — right side */}
-          <div className="shrink-0 ml-3 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+          {/* Net Worth — clickable toggle for breakdown */}
+          <button
+            onClick={() => setNwExpanded(!nwExpanded)}
+            className="shrink-0 ml-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">Net Worth</span>
             <span className="text-sm font-extrabold text-emerald-400 tabular-nums">{formatINR(nw.netWorth)}</span>
-          </div>
+            <ChevronDown size={12} className={`text-emerald-400/60 transition-transform duration-200 ${nwExpanded ? 'rotate-180' : ''}`} />
+          </button>
         </div>
       </nav>
 
-      {/* ── Net Worth Breakdown — Carousel ── */}
-      <div className="relative bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
-        {/* Left arrow */}
-        {canScrollLeft && (
-          <button
-            onClick={() => scrollCards(-1)}
-            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ChevronLeft size={16} />
-          </button>
-        )}
+      {/* ── Net Worth Breakdown — Carousel (collapsible) ── */}
+      {nwExpanded && (
+        <div className="bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)] animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="relative max-w-7xl mx-auto">
+            {/* Left arrow */}
+            {canScrollLeft && (
+              <button
+                onClick={() => scrollCards(-1)}
+                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            )}
 
-        {/* Cards container — responsive: 2 mobile, 3 tablet, 4 desktop */}
-        <div
-          ref={cardsRef}
-          onScroll={handleCardsScroll}
-          className="flex gap-3 px-3 sm:px-4 py-2.5 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar"
-        >
-          {nw.sections?.map((sec) => (
-            <Link
-              key={sec.key}
-              to={sec.route}
-              className="group snap-start shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] rounded-lg p-3 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+            {/* Cards container — responsive: 2 mobile, 3 tablet, 4 desktop */}
+            <div
+              ref={cardsRef}
+              onScroll={handleCardsScroll}
+              className="flex gap-3 px-12 sm:px-14 py-3 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar"
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  <span className={`w-1.5 h-1.5 rounded-full ${sec.color}`} />{sec.label}
-                </span>
-                <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-base font-bold text-[var(--text-primary)] tabular-nums mb-1">{formatINR(sec.total)}</p>
-              {sec.items.length > 0 && (
-                <div className="space-y-0.5">
-                  {sec.items.map((item) => (
-                    <div key={item.label} className="flex items-center justify-between">
-                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{item.label}</span>
-                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{formatINR(item.value)}</span>
+              {nw.sections?.map((sec) => (
+                <Link
+                  key={sec.key}
+                  to={sec.route}
+                  className="group snap-start shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] rounded-lg p-3 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      <span className={`w-1.5 h-1.5 rounded-full ${sec.color}`} />{sec.label}
+                    </span>
+                    <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <p className="text-base font-bold text-[var(--text-primary)] tabular-nums mb-1">{formatINR(sec.total)}</p>
+                  {sec.items.length > 0 && (
+                    <div className="space-y-0.5">
+                      {sec.items.map((item) => (
+                        <div key={item.label} className="flex items-center justify-between">
+                          <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{item.label}</span>
+                          <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{formatINR(item.value)}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </Link>
-          ))}
+                  )}
+                </Link>
+              ))}
 
-          {/* Liabilities card */}
-          {nw.totalLiab > 0 && (
-            <Link
-              to="/liabilities"
-              className="group snap-start shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] rounded-lg p-3 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Liabilities
-                </span>
-                <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-base font-bold text-[var(--accent-rose)] tabular-nums mb-1">&minus;{formatINR(nw.totalLiab)}</p>
-              {nw.liabilities?.length > 0 && (
-                <div className="space-y-0.5">
-                  {nw.liabilities.map((item) => (
-                    <div key={item.label} className="flex items-center justify-between">
-                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{item.label}</span>
-                      <span className="text-[11px] text-[var(--accent-rose)]/70 tabular-nums shrink-0">{formatINR(item.value)}</span>
+              {/* Liabilities card */}
+              {nw.totalLiab > 0 && (
+                <Link
+                  to="/liabilities"
+                  className="group snap-start shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] rounded-lg p-3 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Liabilities
+                    </span>
+                    <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <p className="text-base font-bold text-[var(--accent-rose)] tabular-nums mb-1">&minus;{formatINR(nw.totalLiab)}</p>
+                  {nw.liabilities?.length > 0 && (
+                    <div className="space-y-0.5">
+                      {nw.liabilities.map((item) => (
+                        <div key={item.label} className="flex items-center justify-between">
+                          <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{item.label}</span>
+                          <span className="text-[11px] text-[var(--accent-rose)]/70 tabular-nums shrink-0">{formatINR(item.value)}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </Link>
               )}
-            </Link>
-          )}
+            </div>
+
+            {/* Right arrow */}
+            {canScrollRight && (
+              <button
+                onClick={() => scrollCards(1)}
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Right arrow */}
-        {canScrollRight && (
-          <button
-            onClick={() => scrollCards(1)}
-            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ChevronRight size={16} />
-          </button>
-        )}
-      </div>
+      )}
 
       {/* ── Dialog Overlay (Buy Opps / Rebalance) ── */}
       {dialogKey && (

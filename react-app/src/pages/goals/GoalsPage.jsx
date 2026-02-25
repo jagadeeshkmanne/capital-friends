@@ -3,6 +3,7 @@ import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy } from 'lucide-rea
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/Modal'
 import GoalForm from '../../components/forms/GoalForm'
 import GoalPortfolioMapping from '../../components/forms/GoalPortfolioMapping'
@@ -31,14 +32,16 @@ const barColor = {
 
 export default function GoalsPage() {
   const { selectedMember, member } = useFamily()
-  const { loading, goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
 
-  if (loading) return <PageLoading title="Loading goals" cards={5} />
   const [modal, setModal] = useState(null)
   const [mappingGoal, setMappingGoal] = useState(null)
   const [withdrawalGoal, setWithdrawalGoal] = useState(null)
   const [showCelebration, setShowCelebration] = useState(null)
   const prevAchievedRef = useRef(new Set())
+
+  if (goalList === null) return <PageLoading title="Loading goals" cards={5} />
 
   const filtered = useMemo(() => {
     const active = goalList.filter((g) => g.isActive !== false)
@@ -68,16 +71,32 @@ export default function GoalsPage() {
     prevAchievedRef.current = currentAchieved
   }, [filtered])
 
-  function handleSave(data) {
-    if (modal?.edit) updateGoal(modal.edit.goalId, data)
-    else addGoal(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateGoal(modal.edit.goalId, data)
+      else await addGoal(data)
+      showToast(modal?.edit ? 'Goal updated' : 'Goal added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save goal', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Delete this goal?')) {
-      deleteGoal(modal.edit.goalId)
-      setModal(null)
+      showBlockUI('Deleting...')
+      try {
+        await deleteGoal(modal.edit.goalId)
+        showToast('Goal deleted')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to delete goal', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 

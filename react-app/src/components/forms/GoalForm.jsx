@@ -100,6 +100,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
     }
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -237,30 +238,33 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
     setStep((s) => Math.min(s + 1, 2))
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validateAll()) return
     const memberName = form.familyMemberId
       ? activeMembers.find((m) => m.memberId === form.familyMemberId)?.memberName || 'Family'
       : 'Family'
-    onSave({
-      goalType: form.goalType,
-      goalName: form.goalName,
-      familyMemberId: form.familyMemberId || '',
-      familyMember: memberName,
-      targetAmount: calc.inflatedTarget,
-      targetDate: form.targetDate,
-      priority: form.priority,
-      status: form.status,
-      notes: form.notes,
-      expectedInflation: (Number(form.inflation) || 0) / 100,
-      expectedCAGR: (Number(form.cagr) || 0) / 100,
-      monthlyInvestment: Number(form.monthlySIP) || 0,
-      lumpsumInvested: Number(form.lumpsum) || 0,
-      monthlyExpenses: (isRetirement || isEmergency) ? Number(form.monthlyExpenses) || 0 : undefined,
-      emergencyMonths: isEmergency ? Number(form.emergencyMonths) || 6 : undefined,
-      isRetirement: isRetirement,
-      currentCost: calc.todaysCost,
-    })
+    setSaving(true)
+    try {
+      await onSave({
+        goalType: form.goalType,
+        goalName: form.goalName,
+        familyMemberId: form.familyMemberId || '',
+        familyMember: memberName,
+        targetAmount: calc.inflatedTarget,
+        targetDate: form.targetDate,
+        priority: form.priority,
+        status: form.status,
+        notes: form.notes,
+        expectedInflation: (Number(form.inflation) || 0) / 100,
+        expectedCAGR: (Number(form.cagr) || 0) / 100,
+        monthlyInvestment: Number(form.monthlySIP) || 0,
+        lumpsumInvested: Number(form.lumpsum) || 0,
+        monthlyExpenses: (isRetirement || isEmergency) ? Number(form.monthlyExpenses) || 0 : undefined,
+        emergencyMonths: isEmergency ? Number(form.emergencyMonths) || 6 : undefined,
+        isRetirement: isRetirement,
+        currentCost: calc.todaysCost,
+      })
+    } finally { setSaving(false) }
   }
 
   // Computed for review
@@ -340,7 +344,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
         </FormField>
         <div className="flex items-center justify-between">
           {onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-          <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Update Goal" />
+          <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Update Goal" loading={saving} />
         </div>
       </div>
     )
@@ -545,8 +549,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
               Next <ChevronRight size={14} />
             </button>
           ) : (
-            <button onClick={handleSubmit} className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors">
-              Create Goal
+            <button onClick={handleSubmit} disabled={saving} className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {saving ? 'Saving...' : 'Create Goal'}
             </button>
           )}
         </div>

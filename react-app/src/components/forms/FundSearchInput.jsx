@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
-import { searchFunds } from '../../data/familyData'
-import { Search, X } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { searchFunds } from '../../services/api'
+import { Search, X, Loader2 } from 'lucide-react'
 
 export default function FundSearchInput({ value, onSelect, placeholder, disabled }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
+  const [searching, setSearching] = useState(false)
   const ref = useRef(null)
+  const debounceRef = useRef(null)
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -16,19 +18,30 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const doSearch = useCallback(async (q) => {
+    if (q.length < 2) { setResults([]); setOpen(false); return }
+    setSearching(true)
+    try {
+      const data = await searchFunds(q)
+      setResults(Array.isArray(data) ? data : [])
+      setOpen(true)
+    } catch {
+      setResults([])
+    } finally {
+      setSearching(false)
+    }
+  }, [])
+
   function handleSearch(q) {
     setQuery(q)
-    if (q.length >= 2) {
-      setResults(searchFunds(q))
-      setOpen(true)
-    } else {
-      setResults([])
-      setOpen(false)
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (q.length < 2) { setResults([]); setOpen(false); setSearching(false); return }
+    setSearching(true)
+    debounceRef.current = setTimeout(() => doSearch(q), 350)
   }
 
   function handleSelect(fund) {
-    onSelect({ schemeCode: fund.schemeCode, fundName: fund.fundName })
+    onSelect({ schemeCode: fund.fundCode || fund.schemeCode, fundName: fund.fundName })
     setQuery('')
     setResults([])
     setOpen(false)
@@ -56,7 +69,10 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
   return (
     <div ref={ref} className="relative">
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+        {searching
+          ? <Loader2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400 animate-spin" />
+          : <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+        }
         <input
           type="text"
           value={query}
@@ -72,23 +88,24 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
         <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl max-h-[240px] overflow-y-auto">
           {results.map((fund) => (
             <button
-              key={fund.schemeCode}
+              key={fund.fundCode || fund.schemeCode}
               type="button"
               onClick={() => handleSelect(fund)}
               className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-light)] last:border-0"
             >
               <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{fund.fundName}</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-[var(--text-dim)]">{fund.schemeCode}</span>
-                <span className="text-xs font-semibold text-violet-400/70 bg-violet-500/10 px-1.5 py-0.5 rounded">{fund.category}</span>
-                <span className="text-xs text-[var(--text-dim)]">{fund.amc}</span>
+                <span className="text-xs text-[var(--text-dim)]">{fund.fundCode || fund.schemeCode}</span>
+                {fund.category && fund.category !== 'N/A' && (
+                  <span className="text-xs font-semibold text-violet-400/70 bg-violet-500/10 px-1.5 py-0.5 rounded">{fund.category}</span>
+                )}
               </div>
             </button>
           ))}
         </div>
       )}
 
-      {open && query.length >= 2 && results.length === 0 && (
+      {open && query.length >= 2 && results.length === 0 && !searching && (
         <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl p-4 text-center">
           <p className="text-xs text-[var(--text-muted)]">No funds found for "{query}"</p>
         </div>

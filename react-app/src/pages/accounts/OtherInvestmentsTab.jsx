@@ -3,6 +3,7 @@ import { Plus, Pencil, Package } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/Modal'
 import OtherInvestmentForm from '../../components/forms/OtherInvestmentForm'
 import PageLoading from '../../components/PageLoading'
@@ -17,10 +18,12 @@ const catBadge = {
 
 export default function OtherInvestmentsTab() {
   const { selectedMember, member } = useFamily()
-  const { loading, otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
+  const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
 
-  if (loading) return <PageLoading title="Loading investments" cards={5} />
   const [modal, setModal] = useState(null)
+
+  if (otherInvList === null) return <PageLoading title="Loading investments" cards={5} />
 
   const filtered = useMemo(() => {
     const active = otherInvList.filter((i) => i.status !== 'Inactive')
@@ -44,16 +47,32 @@ export default function OtherInvestmentsTab() {
     return s + (loan?.outstandingBalance || 0)
   }, 0)
 
-  function handleSave(data) {
-    if (modal?.edit) updateOtherInvestment(modal.edit.investmentId, data)
-    else addOtherInvestment(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateOtherInvestment(modal.edit.investmentId, data)
+      else await addOtherInvestment(data)
+      showToast(modal?.edit ? 'Investment updated' : 'Investment added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save investment', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Deactivate this investment?')) {
-      deleteOtherInvestment(modal.edit.investmentId)
-      setModal(null)
+      showBlockUI('Deactivating...')
+      try {
+        await deleteOtherInvestment(modal.edit.investmentId)
+        showToast('Investment deactivated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate investment', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 

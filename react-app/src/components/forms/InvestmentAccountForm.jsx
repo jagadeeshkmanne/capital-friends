@@ -22,6 +22,7 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     status: initial?.status || 'Active',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -48,9 +49,10 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave(form)
+    setSaving(true)
+    try { await onSave(form) } finally { setSaving(false) }
   }
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
@@ -86,20 +88,20 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
           <FormInput value={form.platformBroker} onChange={(v) => set('platformBroker', v)} placeholder="e.g., Zerodha, Groww" />
         </FormField>
         <FormField label="Account / Client ID" required error={errors.accountClientId}>
-          <FormInput value={form.accountClientId} onChange={(v) => set('accountClientId', v)} placeholder="e.g., ZR1234" />
+          <FormInput sensitive value={form.accountClientId} onChange={(v) => set('accountClientId', v)} placeholder="e.g., ZR1234" />
         </FormField>
       </div>
 
       <FormField label="Demat DP ID" error={errors.dematDpId}>
-        <FormInput value={form.dematDpId} onChange={(v) => set('dematDpId', v)} placeholder="16-digit DP ID (optional)" maxLength={16} />
+        <FormInput sensitive value={form.dematDpId} onChange={(v) => set('dematDpId', v)} placeholder="16-digit DP ID (optional)" maxLength={16} />
       </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Registered Email" required error={errors.registeredEmail}>
-          <FormInput type="email" value={form.registeredEmail} onChange={(v) => set('registeredEmail', v)} placeholder="email@example.com" />
+          <FormInput sensitive type="email" value={form.registeredEmail} onChange={(v) => set('registeredEmail', v)} placeholder="email@example.com" />
         </FormField>
         <FormField label="Registered Phone" required error={errors.registeredPhone}>
-          <FormInput value={form.registeredPhone} onChange={(v) => set('registeredPhone', v)} placeholder="9876543210" />
+          <FormInput sensitive value={form.registeredPhone} onChange={(v) => set('registeredPhone', v)} placeholder="9876543210" />
         </FormField>
       </div>
 
@@ -111,7 +113,7 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Account'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Account'} loading={saving} />
       </div>
     </div>
   )

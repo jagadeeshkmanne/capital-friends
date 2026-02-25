@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 import { FormField, FormInput, FormSelect, FormCheckbox, FormActions, DeleteButton } from '../Modal'
 
 const RELATIONSHIPS = [
@@ -25,6 +26,13 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
     status: initial?.status || 'Active',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  // Dynamic fields (custom key-value pairs stored as JSON in GAS column L)
+  const [dynamicFields, setDynamicFields] = useState(() => {
+    const fields = initial?.dynamicFields || {}
+    return Object.entries(fields).map(([key, value]) => ({ key, value }))
+  })
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -43,9 +51,33 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  // Dynamic fields helpers
+  function addField() {
+    setDynamicFields((f) => [...f, { key: '', value: '' }])
+  }
+
+  function updateField(idx, field, val) {
+    setDynamicFields((f) => f.map((item, i) => i === idx ? { ...item, [field]: val } : item))
+  }
+
+  function removeField(idx) {
+    setDynamicFields((f) => f.filter((_, i) => i !== idx))
+  }
+
+  async function handleSubmit() {
     if (!validate()) return
-    onSave({ ...form, pan: form.pan.toUpperCase() })
+    // Build dynamic fields object (skip empty keys)
+    const dfObj = {}
+    dynamicFields.forEach(({ key, value }) => {
+      const k = key.trim()
+      if (k) dfObj[k] = value
+    })
+    setSaving(true)
+    try {
+      await onSave({ ...form, pan: form.pan.toUpperCase(), dynamicFields: dfObj })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -61,19 +93,19 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="PAN" required error={errors.pan}>
-          <FormInput value={form.pan} onChange={(v) => set('pan', v.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} />
+          <FormInput sensitive value={form.pan} onChange={(v) => set('pan', v.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} />
         </FormField>
         <FormField label="Aadhar" required error={errors.aadhar}>
-          <FormInput value={form.aadhar} onChange={(v) => set('aadhar', v.replace(/\D/g, ''))} placeholder="123456789012" maxLength={12} />
+          <FormInput sensitive value={form.aadhar} onChange={(v) => set('aadhar', v.replace(/\D/g, ''))} placeholder="123456789012" maxLength={12} />
         </FormField>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Email" required error={errors.email}>
-          <FormInput type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="email@example.com" />
+          <FormInput sensitive type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="email@example.com" />
         </FormField>
         <FormField label="Mobile" required error={errors.mobile}>
-          <FormInput value={form.mobile} onChange={(v) => set('mobile', v.replace(/\D/g, ''))} placeholder="9876543210" maxLength={10} />
+          <FormInput sensitive value={form.mobile} onChange={(v) => set('mobile', v.replace(/\D/g, ''))} placeholder="9876543210" maxLength={10} />
         </FormField>
       </div>
 
@@ -85,9 +117,43 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
         </FormField>
       )}
 
+      {/* Dynamic Fields */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-[var(--text-muted)]">Custom Fields</p>
+          <button onClick={addField} type="button" className="flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors">
+            <Plus size={12} /> Add Field
+          </button>
+        </div>
+        {dynamicFields.length === 0 && (
+          <p className="text-xs text-[var(--text-dim)]">No custom fields. Add DOB, occupation, blood group, etc.</p>
+        )}
+        <div className="space-y-2">
+          {dynamicFields.map((f, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                value={f.key}
+                onChange={(e) => updateField(idx, 'key', e.target.value)}
+                placeholder="Field name"
+                className="flex-1 px-2.5 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] transition-colors"
+              />
+              <input
+                value={f.value}
+                onChange={(e) => updateField(idx, 'value', e.target.value)}
+                placeholder="Value"
+                className="flex-1 px-2.5 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] transition-colors"
+              />
+              <button onClick={() => removeField(idx)} type="button" className="p-1 text-[var(--text-dim)] hover:text-rose-400 transition-colors">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Member'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Member'} loading={saving} />
       </div>
     </div>
   )

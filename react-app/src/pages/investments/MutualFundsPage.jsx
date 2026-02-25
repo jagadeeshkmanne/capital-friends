@@ -3,6 +3,8 @@ import { Plus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDo
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import MFPortfolioForm from '../../components/forms/MFPortfolioForm'
 import MFInvestForm from '../../components/forms/MFInvestForm'
@@ -12,6 +14,9 @@ import MFAllocationManager from '../../components/forms/MFAllocationManager'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
 import PageLoading from '../../components/PageLoading'
+
+// Strip PFL- prefix for display
+const displayName = (name) => name?.replace(/^PFL-/, '') || name
 
 // ATH color coding (matching email report)
 function athColor(pct) {
@@ -25,40 +30,60 @@ function athColor(pct) {
 export default function MutualFundsPage() {
   const { selectedMember } = useFamily()
   const {
-    loading,
     mfPortfolios, mfHoldings, mfTransactions,
-    activeInvestmentAccounts,
+    activeMembers, activeInvestmentAccounts,
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
     investMF, redeemMF, switchMF, updateHoldingAllocations,
   } = useData()
 
-  if (loading) return <PageLoading title="Loading mutual funds" cards={5} />
-
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const { mv } = useMask()
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
+  if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading mutual funds" cards={5} />
+
+  // Enrich portfolios: resolve investmentAccountId, ownerId & ownerName from investment accounts
+  const enrichedPortfolios = useMemo(() => {
+    return mfPortfolios.filter((p) => p.status !== 'Inactive').map((p) => {
+      // GAS may store name label instead of ID in investmentAccountId
+      let account = activeInvestmentAccounts.find((a) => a.accountId === p.investmentAccountId)
+      if (!account && p.investmentAccountId) {
+        account = activeInvestmentAccounts.find((a) =>
+          `${a.accountName} - ${a.platformBroker}` === p.investmentAccountId
+        )
+      }
+      const resolvedOwnerId = account?.memberId || p.ownerId || ''
+      const member = resolvedOwnerId ? activeMembers.find((m) => m.memberId === resolvedOwnerId) : null
+      return {
+        ...p,
+        investmentAccountId: account?.accountId || p.investmentAccountId,
+        ownerId: resolvedOwnerId,
+        ownerName: member?.memberName || p.ownerName || '',
+        platform: account?.platformBroker || p.investmentAccountName || '—',
+        clientId: account?.accountClientId || '—',
+      }
+    })
+  }, [mfPortfolios, activeInvestmentAccounts, activeMembers])
+
   // Filter portfolios by member
   const portfolios = useMemo(() => {
-    const active = mfPortfolios.filter((p) => p.status !== 'Inactive')
-    return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
-  }, [mfPortfolios, selectedMember])
+    return selectedMember === 'all' ? enrichedPortfolios : enrichedPortfolios.filter((p) => p.ownerId === selectedMember)
+  }, [enrichedPortfolios, selectedMember])
 
   // Per-portfolio computed data
   const portfolioData = useMemo(() => {
     return portfolios.map((p) => {
       const holdings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId)
       const txns = mfTransactions.filter((t) => t.portfolioId === p.portfolioId)
-      const account = activeInvestmentAccounts.find((a) => a.accountId === p.investmentAccountId)
       return {
         ...p, holdings, txns,
         fundCount: holdings.length,
-        platform: account?.platformBroker || p.investmentAccountName || '—',
-        clientId: account?.accountClientId || '—',
       }
     })
-  }, [portfolios, mfHoldings, mfTransactions, activeInvestmentAccounts])
+  }, [portfolios, mfHoldings, mfTransactions])
 
   // Stats for selected view
   const stats = useMemo(() => {
@@ -139,42 +164,90 @@ export default function MutualFundsPage() {
 
   const dropdownLabel = selectedPortfolioId === 'all'
     ? `All Portfolios (${portfolios.length})`
-    : `${selectedPortfolio?.portfolioName} — ${selectedPortfolio?.ownerName}`
+    : `${displayName(selectedPortfolio?.portfolioName)} — ${selectedPortfolio?.ownerName}`
 
   // Handlers
-  function handleSavePortfolio(data) {
-    if (modal?.editPortfolio) updateMFPortfolio(modal.editPortfolio.portfolioId, data)
-    else addMFPortfolio(data)
-    setModal(null)
-  }
-
-  function handleDeletePortfolio() {
-    if (modal?.editPortfolio && confirm('Deactivate this portfolio?')) {
-      deleteMFPortfolio(modal.editPortfolio.portfolioId)
-      setSelectedPortfolioId('all')
+  async function handleSavePortfolio(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.editPortfolio) await updateMFPortfolio(modal.editPortfolio.portfolioId, data)
+      else await addMFPortfolio(data)
+      showToast(modal?.editPortfolio ? 'Portfolio updated' : 'Portfolio created')
       setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save portfolio', 'error')
+    } finally {
+      hideBlockUI()
     }
   }
 
-  function handleInvest(data) {
-    investMF(data, data.transactionType)
-    setModal(null)
+  async function handleDeletePortfolio() {
+    if (modal?.editPortfolio && confirm('Deactivate this portfolio?')) {
+      showBlockUI('Deactivating...')
+      try {
+        await deleteMFPortfolio(modal.editPortfolio.portfolioId)
+        showToast('Portfolio deactivated')
+        setSelectedPortfolioId('all')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate portfolio', 'error')
+      } finally {
+        hideBlockUI()
+      }
+    }
   }
 
-  function handleRedeem(data) {
-    redeemMF(data)
-    setModal(null)
-  }
-
-  function handleSwitch(data) {
-    switchMF(data)
-    setModal(null)
-  }
-
-  function handleSaveAllocations(allocations) {
-    if (modal?.allocations) {
-      updateHoldingAllocations(modal.allocations, allocations)
+  async function handleInvest(data) {
+    showBlockUI('Recording investment...')
+    try {
+      await investMF(data, data.transactionType)
+      showToast('Investment recorded')
       setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to record investment', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleRedeem(data) {
+    showBlockUI('Recording redemption...')
+    try {
+      await redeemMF(data)
+      showToast('Redemption recorded')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to record redemption', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleSwitch(data) {
+    showBlockUI('Recording switch...')
+    try {
+      await switchMF(data)
+      showToast('Switch recorded')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to record switch', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleSaveAllocations(allocations) {
+    if (modal?.allocations) {
+      showBlockUI('Saving allocations...')
+      try {
+        await updateHoldingAllocations(modal.allocations, allocations)
+        showToast('Allocations updated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to update allocations', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 
@@ -226,7 +299,7 @@ export default function MutualFundsPage() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <p className={`text-sm ${selectedPortfolioId === p.portfolioId ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
-                                  {p.portfolioName}
+                                  {displayName(p.portfolioName)}
                                 </p>
                                 {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
@@ -294,7 +367,7 @@ export default function MutualFundsPage() {
           {selectedPortfolio && (
             <div className="flex items-center gap-4 text-xs text-[var(--text-dim)] px-1 flex-wrap">
               <span><span className="font-semibold">Platform:</span> {selectedPortfolio.platform}</span>
-              <span><span className="font-semibold">Client ID:</span> {selectedPortfolio.clientId}</span>
+              <span><span className="font-semibold">Client ID:</span> {mv(selectedPortfolio.clientId, 'clientId')}</span>
               <span><span className="font-semibold">Funds:</span> {selectedPortfolio.fundCount}</span>
               {selectedPortfolio.sipTarget > 0 && <span><span className="font-semibold">SIP Target:</span> {formatINR(selectedPortfolio.sipTarget)}/mo</span>}
               {selectedPortfolio.lumpsumTarget > 0 && <span><span className="font-semibold">Lumpsum Target:</span> {formatINR(selectedPortfolio.lumpsumTarget)}</span>}
@@ -439,7 +512,7 @@ export default function MutualFundsPage() {
                                   {h.fundName}
                                   {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
                                 </p>
-                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{portfolio.portfolioName}</p>}
+                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
                                 {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
                                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                     {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">Buy {formatINR(plannedBuy)}</span>}
@@ -530,7 +603,7 @@ export default function MutualFundsPage() {
                                 {h.fundName}
                                 {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
                               </p>
-                              {portfolio && <p className="text-xs text-[var(--text-dim)]">{portfolio.portfolioName}</p>}
+                              {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
                               {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
                                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                   {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">Buy {formatINR(plannedBuy)}</span>}
@@ -632,7 +705,7 @@ export default function MutualFundsPage() {
                               </td>
                               <td className="py-2.5 px-3">
                                 <p className="text-xs text-[var(--text-primary)] truncate max-w-[200px]">{t.fundName}</p>
-                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{portfolio.portfolioName}</p>}
+                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
                               </td>
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-secondary)] tabular-nums">{t.units.toFixed(2)}</td>
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">₹{t.price.toFixed(2)}</td>

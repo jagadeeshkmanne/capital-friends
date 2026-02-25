@@ -31,6 +31,7 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
     notes: '',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -65,9 +66,10 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave(form)
+    setSaving(true)
+    try { await onSave(form) } finally { setSaving(false) }
   }
 
   const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))
@@ -141,7 +143,7 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
         <FormInput value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." />
       </FormField>
 
-      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={form.transactionType === 'SIP' ? 'Record SIP' : form.transactionType === 'LUMPSUM' ? 'Record Lumpsum' : 'Add Holdings'} />
+      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={form.transactionType === 'SIP' ? 'Record SIP' : form.transactionType === 'LUMPSUM' ? 'Record Lumpsum' : 'Add Holdings'} loading={saving} />
     </div>
   )
 }

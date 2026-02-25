@@ -3,6 +3,8 @@ import { Plus, Pencil, Shield } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import InsuranceForm from '../../components/forms/InsuranceForm'
 import PageLoading from '../../components/PageLoading'
@@ -19,10 +21,13 @@ const typeBadge = {
 
 export default function InsurancePage() {
   const { selectedMember, member } = useFamily()
-  const { loading, insurancePolicies, addInsurance, updateInsurance, deleteInsurance } = useData()
+  const { insurancePolicies, addInsurance, updateInsurance, deleteInsurance } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const { mv } = useMask()
 
-  if (loading) return <PageLoading title="Loading insurance" cards={5} />
   const [modal, setModal] = useState(null)
+
+  if (insurancePolicies === null) return <PageLoading title="Loading insurance" cards={5} />
 
   const filtered = useMemo(() => {
     const active = insurancePolicies.filter((p) => p.status !== 'Inactive')
@@ -34,16 +39,32 @@ export default function InsurancePage() {
   const lifeCover = filtered.filter((p) => p.policyType === 'Term Life' || p.policyType === 'Life Insurance').reduce((s, p) => s + (p.sumAssured || 0), 0)
   const healthCover = filtered.filter((p) => p.policyType === 'Health').reduce((s, p) => s + (p.sumAssured || 0), 0)
 
-  function handleSave(data) {
-    if (modal?.edit) updateInsurance(modal.edit.policyId, data)
-    else addInsurance(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateInsurance(modal.edit.policyId, data)
+      else await addInsurance(data)
+      showToast(modal?.edit ? 'Insurance policy updated' : 'Insurance policy added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save insurance policy', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Deactivate this insurance policy?')) {
-      deleteInsurance(modal.edit.policyId)
-      setModal(null)
+      showBlockUI('Deactivating...')
+      try {
+        await deleteInsurance(modal.edit.policyId)
+        showToast('Insurance policy deactivated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate insurance policy', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 
@@ -116,7 +137,7 @@ export default function InsurancePage() {
                     <tr key={p.policyId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors group">
                       <td className="py-2.5 px-4">
                         <p className="text-sm font-medium text-[var(--text-primary)]">{p.policyName}</p>
-                        <p className="text-xs text-[var(--text-dim)]">{p.policyNumber}</p>
+                        <p className="text-xs text-[var(--text-dim)]">{mv(p.policyNumber, 'policy')}</p>
                       </td>
                       <td className="py-2.5 px-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${typeBadge[p.policyType] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>

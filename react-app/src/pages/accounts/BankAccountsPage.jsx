@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { Plus, Pencil, Landmark } from 'lucide-react'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import BankAccountForm from '../../components/forms/BankAccountForm'
 import PageLoading from '../../components/PageLoading'
@@ -17,10 +19,13 @@ const typeBadge = {
 
 export default function BankAccountsPage() {
   const { selectedMember, member } = useFamily()
-  const { loading, banks, addBankAccount, updateBankAccount, deleteBankAccount } = useData()
+  const { banks, addBankAccount, updateBankAccount, deleteBankAccount } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const { mv } = useMask()
 
-  if (loading) return <PageLoading title="Loading bank accounts" cards={3} />
   const [modal, setModal] = useState(null)
+
+  if (banks === null) return <PageLoading title="Loading bank accounts" cards={3} />
 
   const filtered = useMemo(() => {
     const active = banks.filter((a) => a.status !== 'Inactive')
@@ -30,16 +35,32 @@ export default function BankAccountsPage() {
   const uniqueBanks = useMemo(() => new Set(filtered.map((a) => a.bankName)).size, [filtered])
   const savingsCount = useMemo(() => filtered.filter((a) => a.accountType === 'Savings' || a.accountType === 'Savings Account' || a.accountType === 'Salary').length, [filtered])
 
-  function handleSave(data) {
-    if (modal?.edit) updateBankAccount(modal.edit.accountId, data)
-    else addBankAccount(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateBankAccount(modal.edit.accountId, data)
+      else await addBankAccount(data)
+      showToast(modal?.edit ? 'Bank account updated' : 'Bank account added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save bank account', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Deactivate this bank account?')) {
-      deleteBankAccount(modal.edit.accountId)
-      setModal(null)
+      showBlockUI('Deactivating...')
+      try {
+        await deleteBankAccount(modal.edit.accountId)
+        showToast('Bank account deactivated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate bank account', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 
@@ -97,7 +118,7 @@ export default function BankAccountsPage() {
                           {a.accountType}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{a.accountNumber}</td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{mv(a.accountNumber, 'account')}</td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-dim)]">{a.branchName}</td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: a })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
@@ -122,7 +143,7 @@ export default function BankAccountsPage() {
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">{a.bankName}{!member ? ` · ${a.memberName}` : ''}</p>
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-[var(--text-dim)] tabular-nums">{a.accountNumber}</p>
+                    <p className="text-xs text-[var(--text-dim)] tabular-nums">{mv(a.accountNumber, 'account')}</p>
                     <p className="text-xs text-[var(--text-dim)]">{a.branchName}</p>
                   </div>
                 </div>

@@ -3,6 +3,8 @@ import { Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, Chevro
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
 import BuyStockForm from '../../components/forms/BuyStockForm'
@@ -12,19 +14,20 @@ import PageLoading from '../../components/PageLoading'
 export default function StocksPage() {
   const { selectedMember } = useFamily()
   const {
-    loading,
     stockPortfolios, stockHoldings, stockTransactions,
     activeInvestmentAccounts,
     addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
     buyStock, sellStock,
   } = useData()
 
-  if (loading) return <PageLoading title="Loading stocks" cards={5} />
-
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const { mv } = useMask()
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  if (stockPortfolios === null || stockHoldings === null) return <PageLoading title="Loading stocks" cards={5} />
 
   // Filter portfolios by member
   const portfolios = useMemo(() => {
@@ -89,22 +92,61 @@ export default function StocksPage() {
     : `${selectedPortfolio?.portfolioName} — ${selectedPortfolio?.ownerName}`
 
   // Handlers
-  function handleSavePortfolio(data) {
-    if (modal?.editPortfolio) updateStockPortfolio(modal.editPortfolio.portfolioId, data)
-    else addStockPortfolio(data)
-    setModal(null)
-  }
-
-  function handleDeletePortfolio() {
-    if (modal?.editPortfolio && confirm('Deactivate this portfolio?')) {
-      deleteStockPortfolio(modal.editPortfolio.portfolioId)
-      setSelectedPortfolioId('all')
+  async function handleSavePortfolio(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.editPortfolio) await updateStockPortfolio(modal.editPortfolio.portfolioId, data)
+      else await addStockPortfolio(data)
+      showToast(modal?.editPortfolio ? 'Portfolio updated' : 'Portfolio created')
       setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save portfolio', 'error')
+    } finally {
+      hideBlockUI()
     }
   }
 
-  function handleBuy(data) { buyStock(data); setModal(null) }
-  function handleSell(data) { sellStock(data); setModal(null) }
+  async function handleDeletePortfolio() {
+    if (modal?.editPortfolio && confirm('Deactivate this portfolio?')) {
+      showBlockUI('Deactivating...')
+      try {
+        await deleteStockPortfolio(modal.editPortfolio.portfolioId)
+        showToast('Portfolio deactivated')
+        setSelectedPortfolioId('all')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate portfolio', 'error')
+      } finally {
+        hideBlockUI()
+      }
+    }
+  }
+
+  async function handleBuy(data) {
+    showBlockUI('Recording purchase...')
+    try {
+      await buyStock(data)
+      showToast('Stock purchase recorded')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to record purchase', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleSell(data) {
+    showBlockUI('Recording sale...')
+    try {
+      await sellStock(data)
+      showToast('Stock sale recorded')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to record sale', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -195,7 +237,7 @@ export default function StocksPage() {
           {selectedPortfolio && (
             <div className="flex items-center gap-4 text-xs text-[var(--text-dim)] px-1">
               <span><span className="font-semibold">Platform:</span> {selectedPortfolio.platform}</span>
-              <span><span className="font-semibold">Client ID:</span> {selectedPortfolio.clientId}</span>
+              <span><span className="font-semibold">Client ID:</span> {mv(selectedPortfolio.clientId, 'clientId')}</span>
               <span><span className="font-semibold">Stocks:</span> {selectedPortfolio.stockCount}</span>
             </div>
           )}

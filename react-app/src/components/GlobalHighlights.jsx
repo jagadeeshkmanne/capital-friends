@@ -13,10 +13,10 @@ export default function GlobalHighlights() {
   const { buyOppCount, rebalanceCount } = useMemo(() => {
     let buyOpp = 0
     let rebalance = 0
-    mfPortfolios
+    ;(mfPortfolios || [])
       .filter((p) => p.status !== 'Inactive')
       .forEach((p) => {
-        const pHoldings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
+        const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
         const threshold = (p.rebalanceThreshold || 0.05) * 100
         pHoldings.forEach((h) => {

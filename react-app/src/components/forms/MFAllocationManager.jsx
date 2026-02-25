@@ -28,6 +28,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
   const [newFund, setNewFund] = useState(null)
   const [newTarget, setNewTarget] = useState('')
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [customLumpsum, setCustomLumpsum] = useState('')
 
   const totalTarget = allocations.reduce((s, a) => s + a.targetAllocationPct, 0)
@@ -67,12 +68,15 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
     setError('')
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (totalTarget > 100) {
       setError(`Total allocation is ${totalTarget.toFixed(1)}% — must be ≤ 100%`)
       return
     }
-    onSave(allocations.map((a) => ({ schemeCode: a.schemeCode, fundName: a.fundName, targetAllocationPct: a.targetAllocationPct, isNew: a.isNew })))
+    setSaving(true)
+    try {
+      await onSave(allocations.map((a) => ({ schemeCode: a.schemeCode, fundName: a.fundName, targetAllocationPct: a.targetAllocationPct, isNew: a.isNew })))
+    } finally { setSaving(false) }
   }
 
   // Gap analysis
@@ -452,7 +456,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
       {error && <p className="text-xs text-[var(--accent-rose)] font-medium">{error}</p>}
 
-      <FormActions onCancel={onCancel} onSubmit={handleSave} submitLabel="Save Allocations" />
+      <FormActions onCancel={onCancel} onSubmit={handleSave} submitLabel="Save Allocations" loading={saving} />
     </div>
   )
 }

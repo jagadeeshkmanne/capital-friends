@@ -20,7 +20,7 @@ function processAddPortfolio(formData) {
       portfolioName = 'PFL-' + portfolioName;
     }
 
-    const investmentAccount = formData.investmentAccount ? formData.investmentAccount.trim() : '';
+    const investmentAccount = (formData.investmentAccount || formData.investmentAccountId || '').toString().trim();
     const initialInvestment = parseFloat(formData.initialInvestment) || 0;
     const sipTarget = parseFloat(formData.sipTarget) || 0;
     const lumpsumTarget = parseFloat(formData.lumpsumTarget) || 0;

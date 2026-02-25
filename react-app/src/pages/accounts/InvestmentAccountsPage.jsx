@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { Plus, Pencil, Briefcase } from 'lucide-react'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
+import { useToast } from '../../context/ToastContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import InvestmentAccountForm from '../../components/forms/InvestmentAccountForm'
 import PageLoading from '../../components/PageLoading'
@@ -17,10 +19,13 @@ const typeBadge = {
 
 export default function InvestmentAccountsPage() {
   const { selectedMember, member } = useFamily()
-  const { loading, investments, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
+  const { investments, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const { mv } = useMask()
 
-  if (loading) return <PageLoading title="Loading investment accounts" cards={4} />
   const [modal, setModal] = useState(null)
+
+  if (investments === null) return <PageLoading title="Loading investment accounts" cards={4} />
 
   const filtered = useMemo(() => {
     const active = investments.filter((a) => a.status !== 'Inactive')
@@ -31,16 +36,32 @@ export default function InvestmentAccountsPage() {
   const dematCount = filtered.filter((a) => a.accountType === 'Demat + Trading' || a.accountType === 'Demat' || a.accountType === 'Trading').length
   const mfCount = filtered.filter((a) => a.accountType === 'Mutual Fund' || a.accountType === 'Direct AMC').length
 
-  function handleSave(data) {
-    if (modal?.edit) updateInvestmentAccount(modal.edit.accountId, data)
-    else addInvestmentAccount(data)
-    setModal(null)
+  async function handleSave(data) {
+    showBlockUI('Saving...')
+    try {
+      if (modal?.edit) await updateInvestmentAccount(modal.edit.accountId, data)
+      else await addInvestmentAccount(data)
+      showToast(modal?.edit ? 'Investment account updated' : 'Investment account added')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save investment account', 'error')
+    } finally {
+      hideBlockUI()
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (modal?.edit && confirm('Deactivate this investment account?')) {
-      deleteInvestmentAccount(modal.edit.accountId)
-      setModal(null)
+      showBlockUI('Deactivating...')
+      try {
+        await deleteInvestmentAccount(modal.edit.accountId)
+        showToast('Investment account deactivated')
+        setModal(null)
+      } catch (err) {
+        showToast(err.message || 'Failed to deactivate investment account', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 
@@ -99,7 +120,7 @@ export default function InvestmentAccountsPage() {
                           {a.accountType}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{a.accountClientId}</td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{mv(a.accountClientId, 'clientId')}</td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-dim)]">{a.bankAccountName}</td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: a })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
@@ -124,7 +145,7 @@ export default function InvestmentAccountsPage() {
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">{a.platformBroker}{!member ? ` · ${a.memberName}` : ''}</p>
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-[var(--text-dim)]">Client: {a.accountClientId}</p>
+                    <p className="text-xs text-[var(--text-dim)]">Client: {mv(a.accountClientId, 'clientId')}</p>
                     <p className="text-xs text-[var(--text-dim)]">{a.bankAccountName}</p>
                   </div>
                 </div>

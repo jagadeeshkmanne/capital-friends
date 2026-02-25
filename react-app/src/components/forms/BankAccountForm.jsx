@@ -21,6 +21,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
     status: initial?.status || 'Active',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -32,7 +33,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
     if (!form.accountName.trim()) e.accountName = 'Required'
     if (!form.memberId) e.memberId = 'Required'
     if (!form.bankName.trim()) e.bankName = 'Required'
-    if (!form.accountNumber.trim()) e.accountNumber = 'Required'
+    if (!String(form.accountNumber || '').trim()) e.accountNumber = 'Required'
     if (!form.ifscCode.trim()) e.ifscCode = 'Required'
     if (!form.branchName.trim()) e.branchName = 'Required'
     if (!form.accountType) e.accountType = 'Required'
@@ -40,9 +41,10 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave({ ...form, ifscCode: form.ifscCode.toUpperCase() })
+    setSaving(true)
+    try { await onSave({ ...form, ifscCode: form.ifscCode.toUpperCase() }) } finally { setSaving(false) }
   }
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
@@ -69,7 +71,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Account Number" required error={errors.accountNumber}>
-          <FormInput value={form.accountNumber} onChange={(v) => set('accountNumber', v)} placeholder="e.g., 1234567890" />
+          <FormInput sensitive value={form.accountNumber} onChange={(v) => set('accountNumber', v)} placeholder="e.g., 1234567890" />
         </FormField>
         <FormField label="IFSC Code" required error={errors.ifscCode}>
           <FormInput value={form.ifscCode} onChange={(v) => set('ifscCode', v.toUpperCase())} placeholder="e.g., HDFC0001234" maxLength={11} />
@@ -88,7 +90,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Account'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Add Account'} loading={saving} />
       </div>
     </div>
   )

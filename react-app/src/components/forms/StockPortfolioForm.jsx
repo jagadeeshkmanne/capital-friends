@@ -12,6 +12,7 @@ export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel
     investmentAccountId: initial?.investmentAccountId || '',
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -41,9 +42,10 @@ export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
-    onSave(form)
+    setSaving(true)
+    try { await onSave(form) } finally { setSaving(false) }
   }
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
@@ -69,7 +71,7 @@ export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel
 
       <div className="flex items-center justify-between">
         {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Create Portfolio'} />
+        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Create Portfolio'} loading={saving} />
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ClipboardCheck, CheckCircle, AlertTriangle, XCircle, ArrowRight, Save, Loader2 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import * as api from '../services/api'
+import * as idb from '../services/idb'
 
 const QUESTIONS = [
   { id: 'healthIns', question: 'Does your family have Health Insurance?', tip: '₹50L to ₹1Cr family floater recommended (considering inflation & future expenses)', category: 'Insurance' },
@@ -37,14 +38,32 @@ export default function HealthCheckPage() {
     return hints
   }, [insurancePolicies, goalList, otherInvList])
 
-  // Load previous answers if they exist
+  // Load previous answers: IDB first (instant), then background API refresh
   useEffect(() => {
-    api.getHealthCheckAnswers()
-      .then((data) => {
-        if (data) setPreviousAnswers(data)
-      })
-      .catch(() => {})
-      .finally(() => setLoadingPrevious(false))
+    let cancelled = false
+
+    async function loadAnswers() {
+      // Step 1: Try IndexedDB cache (instant)
+      const cached = await idb.get('healthCheckAnswers')
+      if (!cancelled && cached) {
+        setPreviousAnswers(cached)
+        setLoadingPrevious(false)
+      }
+
+      // Step 2: Background refresh from API
+      try {
+        const data = await api.getHealthCheckAnswers()
+        if (!cancelled && data) {
+          setPreviousAnswers(data)
+          idb.put('healthCheckAnswers', data)
+        }
+      } catch { /* silent */ }
+
+      if (!cancelled) setLoadingPrevious(false)
+    }
+
+    loadAnswers()
+    return () => { cancelled = true }
   }, [])
 
   const [answers, setAnswers] = useState(() => {
