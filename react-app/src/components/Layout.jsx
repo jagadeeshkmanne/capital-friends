@@ -8,7 +8,6 @@ import { useData } from '../context/DataContext'
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { loading, error } = useData()
 
   if (loading) {
@@ -34,24 +33,18 @@ export default function Layout() {
 
   return (
     <div className="flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">
-      {/* Header spans full width on top */}
+      {/* Header spans full width — includes nav, ticker, NW breakdown */}
       <Header onMenuClick={() => setSidebarOpen(true)} />
 
-      {/* Below header: sidebar + content side by side */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
+      {/* Mobile sidebar overlay */}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <main className="flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
-          <div className="px-3 sm:px-4 py-3 sm:py-4 w-full">
-            <Outlet />
-          </div>
-        </main>
-      </div>
+      {/* Content — full width, no sidebar on desktop */}
+      <main className="flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
+        <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
+          <Outlet />
+        </div>
+      </main>
 
       <BottomNav />
     </div>

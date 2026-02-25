@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon } from 'lucide-react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 import { useTheme } from '../context/ThemeContext'
 import { useFamily } from '../context/FamilyContext'
@@ -8,14 +8,15 @@ import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { formatINR } from '../data/familyData'
 import MarketTicker from './MarketTicker'
-import ActionStrip from './ActionStrip'
 import useAlerts from '../hooks/useAlerts'
+import MFBuyOpportunities from './forms/MFBuyOpportunities'
+import MFRebalanceDialog from './forms/MFRebalanceDialog'
 
 const LOGO = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png'
 
 // ── Toggle this to false when real data is available ──
 const USE_DUMMY = true
-// Section metadata: order, label, color, route
+
 const SECTION_META = {
   mf: { label: 'Mutual Funds', color: 'bg-violet-500', order: 1, route: '/investments/mutual-funds' },
   stocks: { label: 'Stocks', color: 'bg-blue-500', order: 2, route: '/investments/stocks' },
@@ -81,6 +82,18 @@ const avatarSolids = [
   'bg-emerald-500',
 ]
 
+const NAV_ITEMS = [
+  { label: 'Family', path: '/family', match: '/family' },
+  { label: 'Accounts', path: '/accounts/bank', match: '/accounts' },
+  { label: 'Insurance', path: '/insurance', match: '/insurance' },
+  { label: 'Mutual Funds', path: '/investments/mutual-funds', match: '/investments/mutual-funds' },
+  { label: 'Stocks', path: '/investments/stocks', match: '/investments/stocks' },
+  { label: 'Other Investments', path: '/investments/other', match: '/investments/other' },
+  { label: 'Goals', path: '/goals', match: '/goals' },
+]
+
+const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance' }
+
 export default function Header({ onMenuClick }) {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
@@ -88,14 +101,17 @@ export default function Header({ onMenuClick }) {
   const { user, signOut } = useAuth()
 
   const navigate = useNavigate()
-  const { criticalAlerts, upcomingReminders } = useAlerts()
+  const location = useLocation()
+  const { criticalAlerts, upcomingReminders, investmentSignals } = useAlerts()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [dialogKey, setDialogKey] = useState(null)
   const dropdownRef = useRef(null)
   const notifRef = useRef(null)
 
   const notifCount = criticalAlerts.length + upcomingReminders.length
+  const { buyOppCount, rebalanceCount } = investmentSignals
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -118,15 +134,13 @@ export default function Header({ onMenuClick }) {
     const filterOwner = (items, key) =>
       selectedMember === 'all' ? items : items.filter((i) => i[key] === selectedMember)
 
-    // Build sectioned breakdown
-    const sectionMap = {} // key → { items: [], invested: 0 }
+    const sectionMap = {}
     const addToSection = (key, label, value, invested) => {
       if (!sectionMap[key]) sectionMap[key] = { items: [], invested: 0 }
       sectionMap[key].items.push({ label, value })
       sectionMap[key].invested += invested
     }
 
-    // MF portfolios
     const activeMF = filterOwner(mfPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
     activeMF.forEach((p) => {
       const pH = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
@@ -135,7 +149,6 @@ export default function Header({ onMenuClick }) {
       if (value > 0) addToSection('mf', p.portfolioName, value, inv)
     })
 
-    // Stock portfolios
     const activeStk = filterOwner(stockPortfolios.filter((p) => p.status === 'Active'), 'ownerId')
     activeStk.forEach((p) => {
       const pH = stockHoldings.filter((h) => h.portfolioId === p.portfolioId)
@@ -144,14 +157,12 @@ export default function Header({ onMenuClick }) {
       if (value > 0) addToSection('stocks', p.portfolioName, value, inv)
     })
 
-    // Other investments — all individual by investmentName, grouped into sections by category
     const activeOther = filterOwner(otherInvList.filter((i) => i.status === 'Active'), 'familyMemberId')
     activeOther.forEach((i) => {
       const cat = i.investmentCategory || 'Other'
       addToSection(cat, i.investmentName || i.investmentType || 'Other', i.currentValue, i.investedAmount || 0)
     })
 
-    // Build sections array sorted by SECTION_META order
     const sections = Object.entries(sectionMap)
       .map(([key, { items: sItems, invested }]) => {
         const meta = SECTION_META[key] || SECTION_META.Other
@@ -161,7 +172,6 @@ export default function Header({ onMenuClick }) {
       .filter((s) => s.total > 0)
       .sort((a, b) => a.order - b.order)
 
-    // Liabilities with names
     const activeLiab = filterOwner(liabilityList.filter((l) => l.status === 'Active'), 'familyMemberId')
     const liabilities = activeLiab.map((l) => ({ label: l.liabilityName || l.liabilityType || 'Loan', value: l.outstandingBalance }))
     const totalLiab = activeLiab.reduce((s, l) => s + l.outstandingBalance, 0)
@@ -170,12 +180,31 @@ export default function Header({ onMenuClick }) {
     return { netWorth: totalInv - totalLiab, totalInv, totalInvested, sections, totalLiab, liabilities }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList])
 
+  function closeAll() {
+    setDropdownOpen(false)
+    setNotifOpen(false)
+  }
+
   return (
     <header className="sticky top-0 z-30 shrink-0">
-      {/* Top bar — z-10 so dropdowns render above ticker/NW sections */}
+      {/* Glow animation styles */}
+      <style>{`
+        @keyframes glow-emerald {
+          0%, 100% { box-shadow: 0 0 6px rgba(16,185,129,0.3), 0 0 12px rgba(16,185,129,0.15); }
+          50% { box-shadow: 0 0 12px rgba(16,185,129,0.5), 0 0 24px rgba(16,185,129,0.25); }
+        }
+        @keyframes glow-violet {
+          0%, 100% { box-shadow: 0 0 6px rgba(139,92,246,0.3), 0 0 12px rgba(139,92,246,0.15); }
+          50% { box-shadow: 0 0 12px rgba(139,92,246,0.5), 0 0 24px rgba(139,92,246,0.25); }
+        }
+        .glow-emerald { animation: glow-emerald 2s ease-in-out infinite; }
+        .glow-violet { animation: glow-violet 2s ease-in-out infinite; }
+      `}</style>
+
+      {/* ── Top Bar ── */}
       <div className="relative z-10 bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
-          {/* Left: hamburger + logo */}
+          {/* Left: hamburger (mobile) + logo */}
           <div className="flex items-center gap-2">
             <button onClick={onMenuClick} className="lg:hidden p-2 -ml-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
               <Menu size={20} />
@@ -183,8 +212,47 @@ export default function Header({ onMenuClick }) {
             <img src={LOGO} alt="Capital Friends" className="h-10" />
           </div>
 
-          {/* Right: theme toggle + notification bell + member avatar */}
-          <div className="flex items-center gap-1.5">
+          {/* Right: action pills + NW + theme + bell + avatar */}
+          <div className="flex items-center gap-2">
+            {/* Buy Opps pill — glowing */}
+            {buyOppCount > 0 && (
+              <button
+                onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
+                className={`glow-emerald flex items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                  dialogKey === 'buyopp'
+                    ? 'bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-400/50'
+                    : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                }`}
+              >
+                <TrendingDown size={13} strokeWidth={2.5} />
+                <span className="hidden sm:inline">Buy Opps</span>
+                <span className="text-[11px] bg-emerald-500/30 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
+              </button>
+            )}
+
+            {/* Rebalance pill — glowing */}
+            {rebalanceCount > 0 && (
+              <button
+                onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
+                className={`glow-violet flex items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                  dialogKey === 'rebalance'
+                    ? 'bg-violet-500/30 text-violet-300 ring-1 ring-violet-400/50'
+                    : 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/25'
+                }`}
+              >
+                <RefreshCw size={13} strokeWidth={2.5} />
+                <span className="hidden sm:inline">Rebalance</span>
+                <span className="text-[11px] bg-violet-500/30 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
+              </button>
+            )}
+
+            {/* Net Worth — highlighted */}
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">NW</span>
+              <span className="text-sm font-extrabold text-emerald-400 tabular-nums">{formatINR(nw.netWorth)}</span>
+            </div>
+
+            {/* Theme toggle */}
             <button onClick={toggle} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -270,22 +338,17 @@ export default function Header({ onMenuClick }) {
                 <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Dropdown */}
               {dropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl shadow-black/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
-                  {/* Header */}
                   <div className="px-4 py-2.5 border-b border-[var(--border-light)]">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Viewing as</p>
                   </div>
 
                   <div className="py-1.5">
-                    {/* Everyone option */}
                     <button
                       onClick={() => { setSelectedMember('all'); setDropdownOpen(false) }}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                        selectedMember === 'all'
-                          ? 'bg-violet-500/10'
-                          : 'hover:bg-[var(--bg-hover)]'
+                        selectedMember === 'all' ? 'bg-violet-500/10' : 'hover:bg-[var(--bg-hover)]'
                       }`}
                     >
                       <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white shadow-sm shrink-0">
@@ -295,17 +358,11 @@ export default function Header({ onMenuClick }) {
                         <p className={`text-sm font-semibold truncate ${selectedMember === 'all' ? 'text-violet-400' : 'text-[var(--text-primary)]'}`}>Everyone</p>
                         <p className="text-[11px] text-[var(--text-muted)]">All family members</p>
                       </div>
-                      {selectedMember === 'all' && (
-                        <Check size={16} className="text-violet-400 shrink-0" />
-                      )}
+                      {selectedMember === 'all' && <Check size={16} className="text-violet-400 shrink-0" />}
                     </button>
 
-                    {/* Divider */}
-                    {familyMembers.length > 0 && (
-                      <div className="mx-4 my-1 border-t border-[var(--border-light)]" />
-                    )}
+                    {familyMembers.length > 0 && <div className="mx-4 my-1 border-t border-[var(--border-light)]" />}
 
-                    {/* Individual members */}
                     {familyMembers.map((m, i) => {
                       const isSelected = selectedMember === m.memberId
                       return (
@@ -313,28 +370,32 @@ export default function Header({ onMenuClick }) {
                           key={m.memberId}
                           onClick={() => { setSelectedMember(m.memberId); setDropdownOpen(false) }}
                           className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                            isSelected
-                              ? `${avatarSolids[i % avatarSolids.length]}/10`
-                              : 'hover:bg-[var(--bg-hover)]'
+                            isSelected ? `${avatarSolids[i % avatarSolids.length]}/10` : 'hover:bg-[var(--bg-hover)]'
                           }`}
                         >
                           <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-sm font-bold shadow-sm shrink-0`}>
                             {m.memberName.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-semibold truncate ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>{m.memberName}</p>
+                            <p className="text-sm font-semibold truncate text-[var(--text-primary)]">{m.memberName}</p>
                             <p className="text-[11px] text-[var(--text-muted)]">{m.relationship || 'Family member'}</p>
                           </div>
-                          {isSelected && (
-                            <Check size={16} className="text-emerald-400 shrink-0" />
-                          )}
+                          {isSelected && <Check size={16} className="text-emerald-400 shrink-0" />}
                         </button>
                       )
                     })}
                   </div>
 
-                  {/* Sign out */}
+                  {/* Settings + Sign out */}
                   <div className="border-t border-[var(--border-light)] py-1.5">
+                    <Link
+                      to="/settings"
+                      onClick={() => setDropdownOpen(false)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      <SettingsIcon size={16} />
+                      <span className="text-sm font-medium">Settings</span>
+                    </Link>
                     {user && (
                       <div className="px-4 py-1.5">
                         <p className="text-[11px] text-[var(--text-muted)] truncate">{user.email}</p>
@@ -355,79 +416,106 @@ export default function Header({ onMenuClick }) {
         </div>
       </div>
 
-      {/* Market Ticker */}
+      {/* ── Market Ticker ── */}
       <MarketTicker />
 
-      {/* Action Strip — pills that open dialogs */}
-      <ActionStrip />
+      {/* ── Navigation Strip ── */}
+      <nav className="bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)]">
+        <div className="flex items-center gap-1 px-3 sm:px-4 py-1.5 overflow-x-auto no-scrollbar">
+          {NAV_ITEMS.map((item) => {
+            const isActive = location.pathname.startsWith(item.match)
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  isActive
+                    ? 'bg-violet-500/15 text-violet-400'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
 
-      {/* Net Worth Breakdown — always visible */}
+      {/* ── Net Worth Breakdown — horizontal scroll single row ── */}
       <div className="bg-[var(--bg-card)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
-        <div className="px-3 sm:px-4 py-2.5">
-          {/* Section cards grid — auto-fill adapts to any number of cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2">
-            {nw.sections?.map((sec) => (
-              <Link
-                key={sec.key}
-                to={sec.route}
-                className="group rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
-              >
-                {/* Section header */}
-                <div className="flex items-center justify-between mb-1">
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    <span className={`w-1.5 h-1.5 rounded-full ${sec.color}`} />{sec.label}
-                  </span>
-                  <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="flex gap-2 px-3 sm:px-4 py-2.5 overflow-x-auto no-scrollbar">
+          {nw.sections?.map((sec) => (
+            <Link
+              key={sec.key}
+              to={sec.route}
+              className="group shrink-0 w-[170px] sm:w-[190px] rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  <span className={`w-1.5 h-1.5 rounded-full ${sec.color}`} />{sec.label}
+                </span>
+                <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mb-0.5">{formatINR(sec.total)}</p>
+              {sec.items.length > 0 && (
+                <div className="space-y-0">
+                  {sec.items.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
+                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{formatINR(item.value)}</span>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mb-0.5">{formatINR(sec.total)}</p>
-                {/* Items */}
-                {sec.items.length > 0 && (
-                  <div className="space-y-0">
-                    {sec.items.map((item) => (
-                      <div key={item.label} className="flex items-center justify-between">
-                        <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
-                        <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{formatINR(item.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Link>
-            ))}
+              )}
+            </Link>
+          ))}
 
-            {/* Liabilities card with individual names */}
-            {nw.totalLiab > 0 && (
-              <Link
-                to="/accounts/liabilities"
-                className="group rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Liabilities
-                  </span>
-                  <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* Liabilities card */}
+          {nw.totalLiab > 0 && (
+            <Link
+              to="/liabilities"
+              className="group shrink-0 w-[170px] sm:w-[190px] rounded-lg p-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-colors"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Liabilities
+                </span>
+                <ChevronRight size={10} className="text-[var(--text-dim)] opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <p className="text-sm font-bold text-[var(--accent-rose)] tabular-nums mb-0.5">&minus;{formatINR(nw.totalLiab)}</p>
+              {nw.liabilities?.length > 0 && (
+                <div className="space-y-0">
+                  {nw.liabilities.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
+                      <span className="text-[11px] text-[var(--accent-rose)]/70 tabular-nums shrink-0">{formatINR(item.value)}</span>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm font-bold text-[var(--accent-rose)] tabular-nums mb-0.5">&minus;{formatINR(nw.totalLiab)}</p>
-                {nw.liabilities?.length > 0 && (
-                  <div className="space-y-0">
-                    {nw.liabilities.map((item) => (
-                      <div key={item.label} className="flex items-center justify-between">
-                        <span className="text-[11px] text-[var(--text-dim)] truncate mr-1.5">{item.label}</span>
-                        <span className="text-[11px] text-[var(--accent-rose)]/70 tabular-nums shrink-0">{formatINR(item.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Link>
-            )}
+              )}
+            </Link>
+          )}
+        </div>
+      </div>
 
-            {/* Net Worth — highlighted card */}
-            <div className="rounded-lg p-2.5 bg-gradient-to-br from-emerald-500/15 to-teal-500/10 border border-emerald-500/30 flex flex-col justify-center">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">Net Worth</span>
-              <p className="text-xl font-extrabold text-emerald-400 tabular-nums mt-1">{formatINR(nw.netWorth)}</p>
+      {/* ── Dialog Overlay (Buy Opps / Rebalance) ── */}
+      {dialogKey && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-3">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDialogKey(null)} />
+          <div className="relative w-full max-w-3xl max-h-[75vh] rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-2xl shadow-black/40 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-4 duration-200">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] shrink-0">
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">{DIALOG_TITLES[dialogKey]}</h2>
+              <button onClick={() => setDialogKey(null)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {dialogKey === 'buyopp' && <MFBuyOpportunities />}
+              {dialogKey === 'rebalance' && <MFRebalanceDialog />}
             </div>
           </div>
         </div>
-      </div>
+      )}
     </header>
   )
 }

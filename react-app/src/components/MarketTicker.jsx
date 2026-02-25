@@ -24,7 +24,7 @@ function setCachedMarketData(data) {
 
 export default function MarketTicker() {
   const [data, setData] = useState(() => getCachedMarketData())
-  const [btc, setBtc] = useState(null)
+  const [btc, setBtc] = useState([])
   const trackRef = useRef(null)
   const [shouldAnimate, setShouldAnimate] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -57,17 +57,27 @@ export default function MarketTicker() {
 
     async function fetchBTC() {
       try {
-        const resp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=inr&include_24hr_change=true')
+        const resp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=inr&include_24hr_change=true')
         if (!cancelled && resp.ok) {
           const json = await resp.json()
+          const cryptos = []
           if (json.bitcoin) {
-            setBtc({
+            cryptos.push({
               name: 'BTC',
               price: json.bitcoin.inr,
               changePct: json.bitcoin.inr_24h_change || 0,
               type: 'crypto'
             })
           }
+          if (json.ethereum) {
+            cryptos.push({
+              name: 'ETH',
+              price: json.ethereum.inr,
+              changePct: json.ethereum.inr_24h_change || 0,
+              type: 'crypto'
+            })
+          }
+          setBtc(cryptos)
         }
       } catch { /* Silent fail */ }
     }
@@ -81,7 +91,7 @@ export default function MarketTicker() {
   const items = []
   if (data?.indices) items.push(...data.indices)
   if (data?.metals) items.push(...data.metals)
-  if (btc) items.push(btc)
+  if (btc.length > 0) items.push(...btc)
 
   // Check if content overflows and needs scrolling
   useEffect(() => {

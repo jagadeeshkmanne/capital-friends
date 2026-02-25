@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { X, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { X, ChevronDown } from 'lucide-react'
 import navigation from '../data/navigation'
 
-export default function Sidebar({ open, onClose, collapsed, onToggleCollapse }) {
+export default function Sidebar({ open, onClose }) {
   const location = useLocation()
 
   const initialOpen = navigation
@@ -22,20 +22,19 @@ export default function Sidebar({ open, onClose, collapsed, onToggleCollapse }) 
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay backdrop */}
       {open && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={onClose} />}
 
+      {/* Mobile-only sidebar */}
       <aside className={`
-        fixed top-0 left-0 z-50 h-full
-        lg:relative lg:top-auto lg:left-auto lg:z-auto lg:h-auto
-        ${collapsed ? 'lg:w-[60px]' : 'lg:w-56'}
-        w-56 bg-[var(--bg-sidebar)] border-r border-[var(--border)]
-        flex flex-col transition-all duration-300
-        lg:translate-x-0
+        fixed top-0 left-0 z-50 h-full w-56
+        bg-[var(--bg-sidebar)] border-r border-[var(--border)]
+        flex flex-col transition-transform duration-300
+        lg:hidden
         ${open ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        {/* Mobile header with close button */}
-        <div className="flex items-center justify-between px-3 h-12 border-b border-[var(--border)] shrink-0 lg:hidden">
+        {/* Header with close button */}
+        <div className="flex items-center justify-between px-3 h-12 border-b border-[var(--border)] shrink-0">
           <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Menu</p>
           <button onClick={onClose} className="p-1.5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={16} /></button>
         </div>
@@ -51,78 +50,44 @@ export default function Sidebar({ open, onClose, collapsed, onToggleCollapse }) 
                 onToggle={() => toggleGroup(item.label)}
                 onNavigate={onClose}
                 currentPath={location.pathname}
-                collapsed={collapsed}
               />
             ) : (
-              <SidebarLink key={item.path} item={item} onNavigate={onClose} collapsed={collapsed} />
+              <SidebarLink key={item.path} item={item} onNavigate={onClose} />
             )
           )}
         </nav>
-
-        {/* Desktop collapse toggle at bottom */}
-        <div className="hidden lg:block border-t border-[var(--border)] shrink-0">
-          <button
-            onClick={onToggleCollapse}
-            className={`flex items-center gap-2 w-full px-3 py-2.5 text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-xs font-medium ${collapsed ? 'justify-center' : ''}`}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeftOpen size={15} /> : <><PanelLeftClose size={15} /><span>Collapse</span></>}
-          </button>
-        </div>
       </aside>
     </>
   )
 }
 
-function SidebarLink({ item, onNavigate, nested, collapsed }) {
+function SidebarLink({ item, onNavigate, nested }) {
   const { label, icon: Icon, path } = item
   return (
     <NavLink to={path} onClick={onNavigate} end={path === '/'}
       className={({ isActive }) =>
         `group flex items-center gap-2.5 ${
-          collapsed
-            ? 'justify-center px-2 py-2.5'
-            : nested ? 'pl-11 pr-4 py-[7px]' : 'px-4 py-2.5'
-        } text-[13px] font-medium transition-all ${
-          collapsed ? '' : 'border-r-2'
-        } ${
+          nested ? 'pl-11 pr-4 py-[7px]' : 'px-4 py-2.5'
+        } text-[13px] font-medium transition-all border-r-2 ${
           isActive
-            ? `bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] ${collapsed ? 'border-l-2 border-[var(--sidebar-active-text)]' : 'border-[var(--sidebar-active-text)]'}`
-            : `text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] ${collapsed ? '' : 'border-transparent'}`
+            ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] border-[var(--sidebar-active-text)]'
+            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] border-transparent'
         }`
       }
-      title={collapsed ? label : undefined}
     >
       {({ isActive }) => (
         <>
-          <Icon size={collapsed ? 18 : nested ? 14 : 17} strokeWidth={isActive ? 2.2 : 1.7} />
-          {!collapsed && <span>{label}</span>}
+          <Icon size={nested ? 14 : 17} strokeWidth={isActive ? 2.2 : 1.7} />
+          <span>{label}</span>
         </>
       )}
     </NavLink>
   )
 }
 
-function SidebarGroup({ item, isOpen, onToggle, onNavigate, currentPath, collapsed }) {
+function SidebarGroup({ item, isOpen, onToggle, onNavigate, currentPath }) {
   const { label, icon: Icon, children } = item
   const hasActiveChild = children.some((c) => currentPath.startsWith(c.path))
-
-  if (collapsed) {
-    return (
-      <NavLink
-        to={children[0].path}
-        onClick={onNavigate}
-        className={`group flex items-center justify-center px-2 py-2.5 text-[13px] font-medium transition-all ${
-          hasActiveChild
-            ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] border-l-2 border-[var(--sidebar-active-text)]'
-            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-        }`}
-        title={label}
-      >
-        <Icon size={18} strokeWidth={hasActiveChild ? 2.2 : 1.7} />
-      </NavLink>
-    )
-  }
 
   return (
     <div>
@@ -142,7 +107,7 @@ function SidebarGroup({ item, isOpen, onToggle, onNavigate, currentPath, collaps
       {isOpen && (
         <div className="py-0.5">
           {children.map((child) => (
-            <SidebarLink key={child.path} item={child} onNavigate={onNavigate} nested collapsed={false} />
+            <SidebarLink key={child.path} item={child} onNavigate={onNavigate} nested />
           ))}
         </div>
       )}
