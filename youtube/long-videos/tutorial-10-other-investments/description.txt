@@ -1,0 +1,61 @@
+FREE Portfolio Tracker for Mutual Funds, Stocks, Gold, Insurance & Family Wealth Management — Web App
+
+Does your family know about ALL your investments? Bank accounts? Insurance policies? Loans? What happens if something happens to you tomorrow?
+
+Capital Friends is a 100% FREE web app that solves this problem. Track your entire family's wealth in one place and send automated email reports to your family daily, weekly, or monthly. All data stays in your Google Drive.
+
+✅ What You Can Track:
+→ Mutual Funds with Live NAV updates from AMFI database
+→ Stocks with Live Google Finance prices (5000+ NSE stocks)
+→ Gold (Physical + Digital), PPF, EPF, NPS, Real Estate, Fixed Deposits
+→ Health Insurance, Term Life Insurance, Motor Insurance policies
+→ Home Loan, Car Loan, Personal Loan, Credit Card debt tracking
+→ Family Members, Bank Accounts, Investment Accounts, Demat accounts
+→ Financial Goals with SIP Calculator and Goal Planner
+
+🎯 Key Features:
+✓ SIGN IN & GO: Sign in at capitalfriends.in and start in 30 seconds
+✓ LIVE NAV UPDATES: Mutual fund prices update automatically every day
+✓ ATH TRACKING: See how much below All-Time High each fund is
+✓ AUTO REBALANCING: Get exact amounts to invest in each fund to maintain target allocation
+✓ REALIZED vs UNREALIZED P&L: Know your real profit vs paper profit
+✓ SIP CALCULATOR: Calculate exact monthly SIP needed for your goals
+✓ GOAL TRACKING: Map portfolios to goals, track progress automatically
+✓ EMAIL REPORTS: Automated daily/weekly/monthly wealth reports to entire family
+✓ REMINDERS: SIP payments, EMI due dates, insurance renewals, tax deadlines
+✓ WEALTH DASHBOARD: Complete family net worth with asset allocation breakdown
+
+💯 Why 100% FREE Forever?
+→ Data stays in YOUR Google Drive
+→ No company servers storing your data
+→ Maximum privacy - only you and your family can see
+→ No subscription ever - free for every Indian family
+
+In this video:
+• Other investments — Gold, PPF, Real Estate, FD
+• Link real estate to loan
+• Insurance policies — Health, Term Life, Motor
+• Liabilities — Home Loan, Car Loan
+• Real Net Worth = Assets minus Liabilities
+
+Get started FREE: https://www.capitalfriends.in
+Full playlist: [YouTube playlist link]
+
+Timestamps:
+0:00 - Why track other investments
+0:30 - Add Gold (Physical)
+1:30 - Add PPF
+2:00 - Add Real Estate (with loan link)
+3:00 - Add Fixed Deposit
+3:30 - Edit / View All investments
+4:00 - Why insurance tracking is critical
+4:30 - Add Health Insurance
+5:30 - Add Term Life Insurance
+6:00 - Add Motor Insurance
+6:30 - Health Check auto-update
+7:00 - Add Car Loan
+7:30 - Net Worth = Assets - Liabilities
+8:00 - Close a loan
+8:30 - View All — complete picture
+
+#AssetTracker #InvestmentTracker #PortfolioTracker #FreeWebApp #PersonalFinance #WealthManagement #GoldTracking #InsuranceTracker #NetWorth #LoanTracker

@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capital Friends - YouTube Tutorial Scripts</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #1e1e1e; color: #ddd; line-height: 1.5; font-size: 14px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 10px 20px; }
+    .top-bar { margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+    h1 { color: #4ecca3; font-size: 18px; }
+    .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+    .nav a { background: #333; color: #ddd; padding: 3px 8px; border-radius: 4px; text-decoration: none; font-size: 11px; }
+    .nav a:hover { background: #4ecca3; color: #1e1e1e; }
+    .video { background: #252526; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid #4ecca3; }
+    .video-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .vid-num { background: #4ecca3; color: #1e1e1e; font-weight: bold; font-size: 10px; padding: 2px 6px; border-radius: 8px; }
+    .vid-len { background: #ffd369; color: #1e1e1e; font-size: 10px; padding: 2px 6px; border-radius: 8px; }
+    .vid-title { color: #4ecca3; font-size: 14px; font-weight: bold; }
+    .section { margin: 6px 0; }
+    .section-title { color: #ffd369; font-size: 12px; font-weight: bold; margin-bottom: 3px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+    .yt-desc { background: #1a3a5c; padding: 6px 10px; border-radius: 4px; font-size: 12px; color: #aad; white-space: pre-line; }
+    .demo-data { background: #2d1f0e; padding: 6px 10px; border-radius: 4px; font-size: 12px; color: #ffd369; }
+    .demo-data table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+    .demo-data th { background: #3d2f1e; padding: 3px 6px; text-align: left; font-size: 11px; }
+    .demo-data td { padding: 3px 6px; border-bottom: 1px solid #3d2f1e; font-size: 12px; }
+    .script p { margin-bottom: 6px; }
+    .script .fn { color: #4ecca3; font-weight: bold; }
+    .script .hl { color: #ffd369; font-weight: bold; }
+    .script .action { color: #f97; font-style: italic; font-size: 12px; }
+    .script .warn { color: #f97; font-size: 12px; }
+    .script .math { background: #1a3a2c; color: #4ecca3; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 12px; display: inline-block; margin: 2px 0; }
+    .demo-family { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .demo-card { background: #1e2d1e; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+    .demo-card b { color: #4ecca3; }
+    .duration { text-align: center; color: #888; font-size: 12px; margin-top: 10px; padding: 6px; }
+    .note { background: #1a1a3a; padding: 6px 10px; border-radius: 4px; font-size: 11px; color: #aac; border-left: 2px solid #66f; margin: 4px 0; }
+    @media print {
+      body { background: white; color: #222; font-size: 12px; }
+      .video { background: #f9f9f9; border-color: #333; }
+      .vid-title { color: #333; }
+      .section-title { color: #8B6914; }
+      .script .fn { color: #006644; }
+      .script .hl { color: #8B6914; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+<div class="top-bar">
+  <h1>Capital Friends — Tutorial Video Scripts</h1>
+  <span style="color:#888;font-size:12px;">13 Videos | Demo Data Included | Every Menu Item Covered</span>
+</div>
+
+<div class="note">Each V1, V2, V3... is ONE single YouTube video. The section headers inside each video (like "BUY SIP", "SELL/REDEEM") become YouTube timestamps/chapters — they are NOT separate videos.</div>
+
+<!-- NAV -->
+<div class="nav">
+  <a href="#v1">1.Intro</a> <a href="#v2">2.Setup</a> <a href="#v3">3.Family+Accounts</a> <a href="#v4">4.Portfolio+Migrate</a>
+  <a href="#v5">5.Buy/Sell/Switch</a> <a href="#v6">6.P&L</a> <a href="#v7">7.ATH+Crashes</a> <a href="#v8">8.Rebalancing</a>
+  <a href="#v9">9.Stocks</a> <a href="#v10">10.Assets+Insurance</a> <a href="#v11">11.Goal Planner</a> <a href="#v12">12.Goal Tracking</a>
+  <a href="#v13">13.Reminders+Email+Dashboard</a>
+</div>
+
+<!-- Demo Data section removed — use your own real data while recording -->
+
+<!-- ============================================================ -->
+<!-- VIDEO 1 - INTRO -->
+<!-- ============================================================ -->
+<div class="video" id="v1">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 1</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">The ULTIMATE All-in-One Portfolio Tracker (MF, Stocks, Gold, Goals) | FREE Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Your family should know about your investments. Capital Friends is a FREE web app that tracks your entire family's wealth — mutual funds, stocks, gold, insurance, loans — everything in one place.
+
+No downloads. No subscription. Your data stays in your own Google Drive.
+
+Get started FREE: https://www.capitalfriends.in
+
+#MutualFundTracker #PortfolioTracker #FreePortfolioTracker #FreeWebApp #PersonalFinance #MutualFunds</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p>See <b>youtube-script.html</b> — the presentation script is already done for all 14 slides.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 2 - SETUP -->
+<!-- ============================================================ -->
+<div class="video" id="v2">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 2</span>
+    <span class="vid-len">5-7 min</span>
+    <span class="vid-title">FREE Portfolio Tracker Web App — Setup in Just 2 Minutes!</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Setup Capital Friends in just 2 minutes! Visit capitalfriends.in, sign in with Google, answer 8 questions, and you're ready to go.
+
+Features covered: Sign In, Auto Setup, Financial Health Check
+
+Timestamps:
+0:00 - Visit capitalfriends.in
+1:00 - Sign in with Google
+2:00 - Financial Health Check (8 questions)
+4:00 - Explore the app — Dashboard, Portfolios, Goals
+5:00 - Your data stays in your own Google Drive
+
+Get started: https://www.capitalfriends.in
+Full playlist: [link]
+
+#MutualFundTracker #PortfolioTracker #FreeWebApp #FreeTools #PersonalFinance #Setup</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: FREE Portfolio Tracker Web App — Setup in Just 2 Minutes!]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In the intro video we saw what Capital Friends can do — track your family's mutual funds, stocks, insurance, loans, and goals all in one free web app. Now let's set it up.</i></p>
+
+      <p>Hi everyone, welcome back to Capital Friends. In this video I will show you how to set up Capital Friends. It takes only 2 minutes.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Visit capitalfriends.in and sign in with Google</p>
+      <p>2. The app sets up everything automatically</p>
+      <p>3. Financial Health Check — 8 simple questions</p>
+      <p>4. Explore the app — Dashboard, Portfolios, Goals</p>
+      <p>Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p class="action">[Show browser with capitalfriends.in]</p>
+      <p>First, go to www.capitalfriends.in. You will see a "Sign in with Google" button. Click it. Sign in with your Google account. That's it — no templates to copy, no files to download.</p>
+
+      <p class="action">[Show the app after sign-in — modern dark UI with sidebar]</p>
+      <p>Now you are inside the app. On the left you can see the sidebar navigation — Dashboard, Portfolios, Goals, Settings, and more. The app has already set up everything for you automatically.</p>
+
+      <p class="action">[Show the sidebar navigation — highlight all the pages]</p>
+      <p>You can see all the pages. But first, let's do the Financial Health Check. The app will prompt you to complete it on first sign-in.</p>
+
+      <p class="action">[Financial Health Check opens]</p>
+      <p>This is the <span class="fn">Financial Health Check</span>. It asks you 8 simple yes or no questions about your financial health. Let me answer them.</p>
+
+      <p><span class="hl">Q1:</span> Does your family know about your accounts? Yes.</p>
+      <p><span class="hl">Q2:</span> Do you have health insurance? Yes.</p>
+      <p><span class="hl">Q3:</span> Do you have term insurance? Yes.</p>
+      <p><span class="hl">Q4:</span> Have you created a Will? No. I need to do this.</p>
+      <p><span class="hl">Q5:</span> Are nominees updated? Yes.</p>
+      <p><span class="hl">Q6:</span> Emergency fund? Yes.</p>
+      <p><span class="hl">Q7:</span> Documents organized? Yes.</p>
+      <p><span class="hl">Q8:</span> Access shared with family? Yes.</p>
+
+      <p>Click <span class="fn">Complete Check</span>.</p>
+
+      <p class="action">[Show progress, then success screen]</p>
+      <p>Score: 7 out of 8. It tells me — I need to create a Will. Very helpful.</p>
+
+      <p class="action">[Show the sidebar pages — Dashboard, Portfolios, Goals, Family Members, Bank Accounts, Insurance, Reminders, Settings]</p>
+      <p>Look at the sidebar. All the pages are ready — Dashboard, Portfolios, Goals, Family Members, Bank Accounts, Insurance, Reminders, Settings. Everything is set up automatically. The app connects to the mutual fund database for latest NAV prices — no manual setup needed.</p>
+
+      <p>Your data is stored safely in your own Google Drive. Nobody else can see it. The app works on any device — phone, tablet, or computer. No downloads needed.</p>
+
+      <p>If you want to retake the health check later, go to <span class="fn">Settings → Financial Health Check</span>. It opens the same form with your previous answers pre-filled. You can update anytime.</p>
+
+      <p>That's it! Setup done in 2 minutes. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for the full tutorial series. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 3 - FAMILY + BANKS + INVESTMENT ACCOUNTS -->
+<!-- ============================================================ -->
+<div class="video" id="v3">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 3</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">Add Family, Banks & Investment Accounts | FREE Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Set up the foundation — add family members, bank accounts, and investment accounts. Everything in Capital Friends is linked to these. Your family will know exactly where your money is.
+
+Pages: Family Members | Bank Accounts | Investment Accounts (all in the sidebar)
+
+Timestamps:
+0:00 - Why add family members first
+0:30 - Add Member (Self — Rajesh)
+2:00 - Add Spouse (Priya)
+2:30 - Edit Member / View All
+3:00 - Add Bank Accounts (HDFC, SBI)
+4:30 - Edit / View All Bank Accounts
+5:00 - Add Investment Accounts (your broker/platform)
+6:30 - Link bank to investment account
+7:00 - Why this matters for your family
+
+Get started: https://www.capitalfriends.in
+
+#MutualFundTracker #PortfolioTracker #FamilyFinance #FreeWebApp #PersonalFinance #InvestmentTracker</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Add Family, Banks & Investment Accounts | FREE Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In the previous video we completed the setup — signed in to capitalfriends.in and answered the financial health check. Now let's build the foundation.</i></p>
+
+      <p>Hi everyone. After setup, the first thing — add your family members, bank accounts, and investment accounts. These are the foundation. Everything in Capital Friends is linked to a family member and an account.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Add family members — name, PAN, Aadhar, email for reports</p>
+      <p>2. Add bank accounts — link to family members</p>
+      <p>3. Add investment accounts — wherever you invest</p>
+      <p>4. Edit and view all — complete family directory</p>
+      <p>Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">FAMILY MEMBERS</p>
+
+      <p class="action">[Click Family Members in the sidebar → Add Member]</p>
+
+      <p>Enter your details — <span class="fn">Name</span>, <span class="fn">Relationship</span> (Self), <span class="fn">PAN</span>, <span class="fn">Aadhar</span>, <span class="fn">Email</span>, <span class="fn">Mobile</span>.</p>
+      <p><span class="fn">Include in Email Reports:</span> Yes — very important. Only checked members receive the daily wealth email.</p>
+      <p>You can also add custom fields like Date of Birth. Click <span class="fn">Add Member</span>.</p>
+
+      <p class="action">[Show success message, then add spouse as second member]</p>
+      <p>Now add your spouse. Same form — select Relationship as Spouse. Make sure <span class="hl">Include in Email Reports = Yes</span> so both of you get the daily email.</p>
+
+      <p><span class="hl">Edit Member:</span></p>
+      <p class="action">[Click Edit Member]</p>
+      <p>If you need to change anything later — phone number, email, address — click <span class="fn">Edit Member</span>. Select the member from dropdown. All fields are pre-filled. Change what you need, click Save.</p>
+
+      <p><span class="hl">View All:</span></p>
+      <p class="action">[Click View All on the Family Members page]</p>
+      <p>This shows all family members with their details. Your family can open the app anytime and see everyone's details.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BANK ACCOUNTS</p>
+
+      <p class="action">[Click Bank Accounts in the sidebar → Add Account]</p>
+
+      <p><span class="fn">Account Name:</span> Give it a name you understand (like "Salary Account")</p>
+      <p><span class="fn">Family Member:</span> Select from the members we just added</p>
+      <p>Enter <span class="fn">Bank Name</span>, <span class="fn">Account Number</span>, <span class="fn">IFSC Code</span>, <span class="fn">Account Type</span>.</p>
+      <p>Click <span class="fn">Add Account</span>. Done!</p>
+
+      <p class="action">[Add one more bank account for spouse quickly]</p>
+
+      <p><span class="hl">Edit / View All:</span></p>
+      <p class="action">[Click Edit Account / View All]</p>
+      <p>Same pattern — select from dropdown to edit, or View All to see all your bank accounts.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">INVESTMENT ACCOUNTS</p>
+
+      <p class="action">[Click Investment Accounts in the sidebar → Add Account]</p>
+      <p>Investment accounts are wherever you invest — your broker, your MF platform, your demat account.</p>
+      <p>Enter <span class="fn">Account Name</span>, <span class="fn">Family Member</span>, <span class="fn">Linked Bank Account</span> (it shows our bank accounts!), <span class="fn">Account Type</span>, <span class="fn">Platform</span>, <span class="fn">Client ID</span>.</p>
+      <p>Click <span class="fn">Add Account</span>. Done!</p>
+
+      <p class="action">[Add one or two more investment accounts quickly — for spouse, or a demat account]</p>
+
+      <p>Now your family knows exactly which banks and platforms you use, and who owns each account. If something happens to you, they know exactly where to look. That is the whole point of Capital Friends.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. Add <span class="hl">all family members</span> — even if they don't invest. Your family needs to know who is who.</p>
+      <p>2. Add PAN and Aadhar — when you need to file taxes or claim insurance, these details save hours.</p>
+      <p>3. Add <span class="hl">every bank account and investment account</span> — even dormant ones. If something happens to you, your family should not have to guess.</p>
+      <p>4. Share access with your spouse right away — they should be able to open the app from day one.</p>
+      <p>5. Update whenever something changes — new bank account, new demat, closed account — keep it current.</p>
+
+      <p>That is the foundation. Now you are ready to create portfolios and start tracking investments. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 4 - CREATE PORTFOLIO & MIGRATE HOLDINGS -->
+<!-- ============================================================ -->
+<div class="video" id="v4">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 4</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">Create Mutual Fund Portfolio & Migrate Existing Holdings | FREE Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Create a mutual fund portfolio and add your existing holdings. Set target allocation, rebalance threshold, and see live NAV tracking with P&L — all in Capital Friends for FREE.
+
+Pages: Portfolios → Create Portfolio / Edit Portfolio / View All / Migrate Holdings
+
+Timestamps:
+0:00 - Open Portfolios page
+0:30 - Create Portfolio form
+1:30 - What is Original Investment
+2:00 - What is Rebalance Threshold
+3:00 - Portfolio view explained
+3:30 - Migrate Fund 1 (Parag Parikh Flexi Cap)
+5:00 - Migrate Fund 2 (Nippon India Multi Cap)
+6:30 - Live NAV & P&L calculation
+7:30 - AllPortfolios summary
+8:00 - Edit Portfolio
+
+Get started: https://www.capitalfriends.in
+
+#MutualFundTracker #PortfolioTracker #SIPTracker #FreeWebApp #MutualFunds #FreeTools</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Create Mutual Fund Portfolio & Migrate Existing Holdings | FREE Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we completed the setup and added family members, bank accounts, and investment accounts. Now let's create our first mutual fund portfolio.</i></p>
+
+      <p>Hi everyone. Now the exciting part — mutual funds!</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Create a mutual fund portfolio</p>
+      <p>2. Set target allocation and rebalance threshold</p>
+      <p>3. Migrate your existing fund holdings</p>
+      <p>4. Live NAV tracking and P&L calculation</p>
+      <p>5. AllPortfolios summary view</p>
+      <p>Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p class="action">[Click Portfolios in the sidebar — show all options]</p>
+      <p>See all the options: Create Portfolio, Edit Portfolio, Manage Portfolio Allocation, View All, Migrate Holdings, Buy SIP, Buy Lumpsum, Sell/Redeem, Switch Funds, Fund Composition Breakdown. We will cover each one. Today — Create Portfolio and Migrate your existing holdings.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">CREATE PORTFOLIO</p>
+
+      <p class="action">[Click Create Portfolio]</p>
+
+      <p><span class="fn">Portfolio Name:</span> Give it a meaningful name — it will become PFL-YourName</p>
+      <p><span class="fn">Investment Account:</span> Select from the accounts we added earlier</p>
+
+      <p><span class="fn">Original Investment (₹):</span> This is important. Enter your <span class="hl">total invested amount</span> — how much money you actually put in. If you switched between funds, that does NOT change your invested amount — switching just moves money inside the portfolio. If you don't know this number, leave it as 0 — Capital Friends will auto-calculate from your holdings.</p>
+
+      <p><span class="fn">Monthly SIP Target:</span> How much you invest every month</p>
+      <p><span class="fn">Rebalance Threshold:</span> Enter 5% — if any fund goes 5% above or below your target allocation, the app tells you to rebalance. We will cover rebalancing in detail in a separate video.</p>
+
+      <p>Click <span class="fn">Create Portfolio</span>.</p>
+
+      <p class="action">[Show the new portfolio in the app]</p>
+      <p>A new portfolio is created! It shows columns — Fund Name, Units, Avg NAV, Current NAV, Investment, Current Value, Target %, Current %, Rebalance SIP, P&L, <span class="hl">ATH NAV, % Below ATH</span>. All empty. Let me add my funds.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">MIGRATE EXISTING HOLDINGS</p>
+
+      <p class="action">[Click Migrate Holdings in the Portfolios page]</p>
+      <p>See the info box — "Add Existing Holdings — Use this to track investments you already own. This will NOT increase your portfolio's Total Investment (to avoid double-counting)". This is for bringing your current holdings into Capital Friends.</p>
+
+      <p class="action">[Migrate your first fund]</p>
+      <p>Select your portfolio. <span class="fn">Search Fund</span> — type the fund name. Capital Friends has a database of <span class="hl">all mutual funds in India — over 8,500 funds</span>. It does fuzzy search so even partial names work. Select your fund.</p>
+      <p>Enter <span class="fn">Purchase Date</span>, <span class="fn">Units</span> (total units you hold right now), <span class="fn">Avg Price per Unit</span> (your average buy price). Total Amount is auto-calculated.</p>
+      <p><span class="fn">Target Allocation:</span> What percentage of your portfolio should this fund be? If you have 2 funds, maybe 50-50. If 3 funds, maybe 40-30-30.</p>
+      <p>Click <span class="fn">Add Existing Holdings</span>.</p>
+
+      <p class="action">[Show portfolio in the app with fund added]</p>
+      <p>Look! The fund is added. <span class="hl">Current NAV is auto-fetched</span> — live from our database. If current NAV is higher than your average, you are in profit!</p>
+      <p class="action">[Point to Current Value and P&L columns — explain the profit]</p>
+
+      <p class="action">[Migrate your second fund the same way — enter units, avg price, target allocation]</p>
+      <p>Make sure all your target allocations add up to <span class="hl">100%</span>.</p>
+
+      <p class="action">[Show portfolio in the app with all funds]</p>
+      <p>All funds showing with live NAV. See the totals at the bottom — total invested, total current value, total P&L. All auto-calculated.</p>
+
+      <p>And see columns R and S — <span class="hl">ATH NAV and % Below ATH</span>. This shows how far each fund is from its all-time high. Very useful to spot buying opportunities when markets fall.</p>
+
+      <p><span class="hl">View All Portfolios:</span></p>
+      <p class="action">[Click View All on the Portfolios page]</p>
+      <p>AllPortfolios view shows the summary — Original Investment, Current Value, Unrealized P&L. All auto-calculated. Tomorrow when NAV changes, these numbers update automatically.</p>
+
+      <p><span class="hl">Edit Portfolio:</span></p>
+      <p class="action">[Click Edit Portfolio]</p>
+      <p>If you want to change SIP amount, threshold, or original investment later — use Edit Portfolio. Select from dropdown, change values, save.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. Create <span class="hl">separate portfolios for separate goals</span> — one for retirement, one for education, one for emergency. This makes goal tracking much easier later.</p>
+      <p>2. Set the rebalance threshold to <span class="hl">5%</span> — this is a good default. Too low (1-2%) means constant rebalancing. Too high (10%+) means you miss imbalances.</p>
+      <p>3. Enter your <span class="hl">correct original investment</span> — if you know it. This ensures P&L is accurate from day one.</p>
+      <p>4. Target allocation should add up to <span class="hl">100%</span> — if you have 3 funds, maybe 40-30-30. Not 50-50-50.</p>
+      <p>5. Don't create too many portfolios — one per goal is enough. Keep it simple.</p>
+
+      <p>Your portfolio is set up with live NAV tracking. Now you can start recording transactions — buy, sell, switch — all from the Portfolios page. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 5 - BUY, SELL & SWITCH MUTUAL FUNDS -->
+<!-- ============================================================ -->
+<div class="video" id="v5">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 5</span>
+    <span class="vid-len">12-15 min</span>
+    <span class="vid-title">Record SIP, Lumpsum, Sell & Switch Transactions | FREE Mutual Fund Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Record every mutual fund transaction — SIP, lumpsum, sell/redeem, and switch between funds. See your profit BEFORE selling! Understand how Total Investment changes for each transaction type.
+
+Pages: Portfolios → Buy (SIP) / Buy (Lumpsum) / Sell/Redeem / Switch Funds
+
+Timestamps:
+0:00 - Four transaction types explained
+0:30 - Record monthly SIP (Parag Parikh)
+2:00 - How average NAV updates (rupee cost averaging)
+3:00 - Record Lumpsum (Nippon)
+4:30 - SIP vs Lumpsum — what's the difference?
+5:00 - Sell/Redeem — see profit before selling!
+6:30 - Transaction Preview (Capital Gain/Loss)
+7:30 - How Total Investment changes on sell
+8:00 - Switch between funds
+9:30 - Switch does NOT change Total Investment
+10:30 - When to use Sell vs Switch
+11:00 - Transaction History summary
+
+Get started: https://www.capitalfriends.in
+
+#MutualFundTracker #SIPTracker #PortfolioTracker #FreeWebApp #MutualFunds #PersonalFinance</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Record SIP, Lumpsum, Sell & Switch Transactions | FREE Mutual Fund Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we set up Capital Friends, added family and accounts, created a mutual fund portfolio, and migrated our existing holdings with live NAV tracking. Now let's record transactions.</i></p>
+
+      <p>Hi everyone. Your portfolio is set up. Now every month you invest, sometimes you sell, sometimes you switch. There are 4 transaction types and each affects your portfolio differently.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Record monthly SIP — and how average NAV updates</p>
+      <p>2. Record lumpsum investment — for bonus or dip buying</p>
+      <p>3. Sell/Redeem — see your profit before selling!</p>
+      <p>4. Switch between funds — why total investment stays the same</p>
+      <p>5. Transaction History — all 4 types recorded</p>
+      <p>Let me show you all of them.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">RECORD MONTHLY SIP</p>
+
+      <p class="action">[Click Buy (SIP) on the Portfolios page]</p>
+      <p>See the info box — "SIP Investment — Record your monthly SIP contributions. This will increase your portfolio's Total Investment."</p>
+
+      <p>Select your <span class="fn">Portfolio</span>, <span class="fn">Search Fund</span> (it shows your existing holdings), enter <span class="fn">Purchase Date</span>, <span class="fn">Units Purchased</span> (the new units you got this month), and <span class="fn">Purchase NAV</span> (the NAV at which SIP was processed). Total Amount is auto-calculated. Click <span class="fn">Record SIP Investment</span>.</p>
+
+      <p class="action">[Show portfolio in the app — point to units, avg NAV, and total investment changes]</p>
+      <p>See — units increased. And average NAV changed because you bought at a different price. If the market falls and you buy at a lower NAV, your average will come down. This is the power of SIP — <span class="hl">rupee cost averaging</span>.</p>
+      <p class="action">[Explain: old investment + new SIP ÷ total units = new average NAV]</p>
+
+      <p>And Total Investment in AllPortfolios also increased — because new money came in.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">RECORD LUMPSUM INVESTMENT</p>
+
+      <p>Now let's say I got a bonus at work, or the market fell 10% and I want to invest extra. That is a lumpsum investment.</p>
+
+      <p class="action">[Click Buy (Lumpsum) on the Portfolios page]</p>
+      <p>See the info box — "Lumpsum Investment — Record one-time investments. This will increase your portfolio's Total Investment. Use this for bonus/windfall investments, or buying in dips."</p>
+
+      <p>Same form — select your <span class="fn">Portfolio</span>, search for a fund, enter <span class="fn">Date</span>, <span class="fn">Units</span>, <span class="fn">Purchase NAV</span>. Total is auto-calculated. Click <span class="fn">Record Lumpsum Investment</span>.</p>
+
+      <p class="action">[Show portfolio in the app — point to units, avg NAV, and total investment changes]</p>
+      <p>Units increased. Average NAV also changed — because you bought at a different price than your earlier average.</p>
+      <p class="action">[Explain: old investment + new lumpsum ÷ total units = new average NAV]</p>
+
+      <p>And Total Investment in AllPortfolios increased — because new money came in.</p>
+
+      <p><span class="hl">SIP vs Lumpsum — what's the difference?</span> Both add new units and increase your total investment. The <span class="hl">only difference is the label</span>. SIP is your regular monthly. Lumpsum is one-time. Capital Friends tracks them separately in <span class="fn">TransactionHistory</span> so you always know which was regular and which was extra.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">SELL / REDEEM</p>
+
+      <p>Now the best part — selling. Capital Friends shows your <span class="hl">exact profit or loss before you sell</span>.</p>
+
+      <p class="action">[Click Sell/Redeem on the Portfolios page]</p>
+      <p>See the info box — "Redeem/Withdraw — This will DECREASE your portfolio's Total Investment. This is for taking money OUT of your portfolio."</p>
+
+      <p>Select your <span class="fn">Portfolio</span>. <span class="fn">Select Fund</span> — see, it shows a dropdown of funds you own in this portfolio, with current units and avg price.</p>
+      <p>Enter <span class="fn">Sale Date</span>, <span class="fn">Units to Redeem</span>, <span class="fn">Sale NAV</span>. Sale Proceeds is auto-calculated.</p>
+
+      <p>Now look at the <span class="hl">Transaction Preview</span> box! This is the best part. It shows your current holdings, average buy price, sale price, remaining units, and the <span class="hl">capital gain or loss</span> — all before you click Sell.</p>
+      <p class="action">[Point to preview box — explain: sold at higher price than avg buy price = PROFIT in green. If sold at lower price = LOSS in red]</p>
+      <p>You see exactly what you will make <span class="hl">before clicking Sell</span>.</p>
+
+      <p>Click <span class="fn">Sell</span>. Done!</p>
+
+      <p class="action">[Show portfolio in the app]</p>
+      <p>Units decreased. But average NAV stays the same — selling does not change your average. Investment adjusted. P&L updated.</p>
+
+      <p>Your Total Investment in AllPortfolios <span class="hl">decreased</span> — because money went OUT of the portfolio. This is the opposite of SIP and Lumpsum which increase it.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">SWITCH BETWEEN FUNDS</p>
+
+      <p>Switch is very important to understand. When you sell one fund and buy another inside the same portfolio — your <span class="hl">total investment does not change</span>. You are just moving money from one fund to another.</p>
+
+      <p class="action">[Click Switch Funds on the Portfolios page]</p>
+      <p>See the info box — "Switch Funds — This will NOT change your portfolio's Total Investment. It's just moving money internally."</p>
+
+      <p>Select your <span class="fn">Portfolio</span> and <span class="fn">Switch Date</span>.</p>
+
+      <p style="color:#f66;font-weight:bold;">FROM FUND (Selling):</p>
+      <p>Select the fund you want to sell from. Enter <span class="fn">Units to Switch</span> and <span class="fn">Sale NAV</span>. Sell amount is auto-calculated.</p>
+
+      <p style="color:#4f8;font-weight:bold;">TO FUND (Buying):</p>
+      <p>Search for the fund you want to buy into. Enter <span class="fn">Purchase NAV</span>.</p>
+      <p class="action">[Point to the calculated amounts — explain: the sell amount goes entirely into buying the new fund at its NAV]</p>
+
+      <p>Same money, different fund. Not one rupee goes in or out — it just moves internally.</p>
+
+      <p>Click <span class="fn">Switch</span>.</p>
+
+      <p class="action">[Show portfolio in the app]</p>
+      <p>See — the FROM fund lost units, the TO fund gained units. But <span class="hl">Total Investment did not change!</span> Not one rupee was added or removed. Money just moved from one fund to another inside the portfolio.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">4 TRANSACTION TYPES — SUMMARY</p>
+
+      <p class="action">[Show TransactionHistory in the app]</p>
+      <p>All 4 types are recorded in Transaction History with date, fund, units, price, amount:</p>
+      <p><span class="hl">Buy (SIP):</span> Total Investment <span style="color:#4f8;">INCREASES ↑</span> — regular monthly investment</p>
+      <p><span class="hl">Buy (Lumpsum):</span> Total Investment <span style="color:#4f8;">INCREASES ↑</span> — one-time extra investment</p>
+      <p><span class="hl">Sell/Redeem:</span> Total Investment <span style="color:#f66;">DECREASES ↓</span> — taking money out</p>
+      <p><span class="hl">Switch:</span> Total Investment <span style="color:#ffd369;">STAYS SAME →</span> — moving money between funds</p>
+
+      <p><span class="hl">When to use Sell vs Switch?</span> If you sell one fund to buy another inside the <span class="hl">same portfolio</span> — use Switch. If you sell to take money out, or to buy in a <span class="hl">different portfolio</span> — use Sell in one and Buy in the other.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. Record your SIP <span class="hl">on the same day it gets processed</span> — check your AMC statement for exact units and NAV.</p>
+      <p>2. Always use <span class="hl">Switch</span> when moving between funds in the same portfolio — never do a Sell + Buy. Switch keeps your total investment correct.</p>
+      <p>3. Before selling, always check the <span class="hl">Transaction Preview</span> — it shows your exact profit or loss before you confirm.</p>
+      <p>4. If the market crashes and a fund is below ATH — that is a good time for <span class="hl">Lumpsum Buy</span>, not panic selling.</p>
+      <p>5. Record transactions regularly — don't let 6 months pile up. Do it monthly after each SIP.</p>
+
+      <p>When you sell or switch, did you actually make a profit? Capital Friends tracks <span class="hl">Realized P&L</span> (actual profit from withdrawals) and <span class="hl">Unrealized P&L</span> (paper profit on holdings) separately. Check the AllPortfolios view — columns J through O show the complete breakdown. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 6 - REALIZED VS UNREALIZED P&L -->
+<!-- ============================================================ -->
+<div class="video" id="v6">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 6</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">Realized vs Unrealized P&L — When Did You Actually Make Money? | FREE Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Most investors confuse paper profit with real profit. This video explains: Unrealized P&L (paper profit on holdings you still own) vs Realized P&L (actual money you took out). And why switching funds is NOT realized profit — your money is still in the market!
+
+Capital Friends tracks both separately with exact math.
+
+Timestamps:
+0:00 - What is P&L (Profit & Loss)?
+0:30 - Unrealized P&L — paper profit
+1:30 - Realized P&L — actual profit
+3:00 - Why Switch is NOT realized profit
+4:30 - How Capital Friends calculates each
+5:30 - AllPortfolios: 6 P&L columns explained
+7:00 - Transaction History: Gain/Loss column
+8:00 - Real example with our demo data
+
+Get started: https://www.capitalfriends.in
+
+#MutualFundTracker #PortfolioTracker #MutualFunds #FreeWebApp #PersonalFinance #InvestmentTracker</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Realized vs Unrealized P&L — When Did You Actually Make Money? | FREE Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we created portfolios, migrated holdings, and recorded all transaction types — SIP, lumpsum, sell, and switch. Now let's understand when you actually made money.</i></p>
+
+      <p>Hi everyone. You buy mutual funds, you sell them, you switch between them. But <span class="hl">when did you actually make money?</span> Most people don't know the answer.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Unrealized P&L — paper profit on holdings you still own</p>
+      <p>2. Realized P&L — actual profit you took out</p>
+      <p>3. Why switching funds is NOT realized profit</p>
+      <p>4. AllPortfolios — 6 P&L columns explained</p>
+      <p>5. Transaction History — gain/loss tracking</p>
+      <p>Let me explain.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p>Most people look at their portfolio showing +₹13,000 profit and think they made ₹13,000. But did you? You did not take that money out. It is still invested. Tomorrow if the market crashes, that ₹13,000 can become -₹5,000. That is the difference between <span class="hl">unrealized</span> and <span class="hl">realized</span> profit.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">UNREALIZED P&L — PAPER PROFIT</p>
+
+      <p class="action">[Show PFL-Retirement portfolio — P&L column]</p>
+      <p>The P&L column in your portfolio shows profit/loss for each fund. This is <span class="hl">unrealized P&L</span> — paper profit. You have not sold these funds. The profit exists only on paper.</p>
+
+      <p>If Current NAV goes up tomorrow → your unrealized profit increases.</p>
+      <p>If Current NAV crashes tomorrow → your unrealized profit decreases or becomes a loss.</p>
+
+      <p class="action">[Explain: Unrealized P&L = Current Value minus your Investment. It is simply what your holdings are worth today minus what you paid for them]</p>
+
+      <p>This changes every day as NAV changes. That is why it is called "unrealized" — you have not realized (collected) this money yet.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">REALIZED P&L — ACTUAL PROFIT</p>
+
+      <p>Realized P&L is the profit or loss on money you <span class="hl">actually took out</span> of the market. You sold, money came to your bank account, done. That profit is real — the market cannot take it away.</p>
+
+      <p>Let's say you sold some units of a fund. You bought at a certain average NAV and sold at a higher NAV. That difference — the profit per unit times the units sold — is your <span class="hl">realized profit</span>.</p>
+      <p class="action">[Point to a sell transaction — explain: sold at higher NAV than avg buy price = profit. This profit is real money in your bank]</p>
+
+      <p>This is <span class="hl">real money</span>. It came to my bank. Market can crash 50% tomorrow — my profit is safe.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHY SWITCH IS NOT REALIZED PROFIT</p>
+
+      <p>This is where most people get confused. Let's say you switched units from Fund A to Fund B. Fund A's avg NAV was lower than the sell NAV, so there is a gain per unit. Looks like profit right?</p>
+
+      <p>But is that a <span class="hl">realized</span> profit? <span style="color:#f66;font-weight:bold;">NO!</span></p>
+
+      <p>The money never left the market. It went from Fund A → Fund B. You are still invested. If the market crashes tomorrow, that "gain" from switching can disappear because Fund B's value will also fall.</p>
+
+      <p>Think of it this way: you moved money from your left pocket to your right pocket. You did not take any money out. <span class="hl">Switch = internal movement, not profit booking.</span></p>
+
+      <p>Capital Friends handles this correctly. The gain from switch is calculated and stored in Transaction History (for your records), but it is <span class="hl">NOT counted in Realized P&L</span>. Only actual withdrawals (money out of the market) count as realized.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">ALLPORTFOLIOS — 6 P&L COLUMNS</p>
+
+      <p class="action">[Show AllPortfolios view — highlight the P&L columns]</p>
+      <p>The AllPortfolios view has 6 P&L columns:</p>
+
+      <p><span class="fn">Column J: Unrealized P&L ₹</span> — paper profit on holdings you still own</p>
+      <p><span class="fn">Column K: Unrealized P&L %</span> — as a percentage</p>
+      <p><span class="fn">Column L: Realized P&L ₹</span> — actual profit from withdrawals only</p>
+      <p><span class="fn">Column M: Realized P&L %</span> — as a percentage</p>
+      <p><span class="fn">Column N: Total P&L ₹</span> — Unrealized + Realized combined</p>
+      <p><span class="fn">Column O: Total P&L %</span> — overall return percentage</p>
+
+      <p class="action">[Explain: Total P&L = Current Value minus Total Investment. Realized P&L only counts gains from actual withdrawals (NOT switches). Unrealized = Total minus Realized]</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">TRANSACTION HISTORY — GAIN/LOSS COLUMN</p>
+
+      <p class="action">[Show TransactionHistory view — Gain/Loss column]</p>
+      <p>Every sell transaction (whether withdrawal or switch) records the gain/loss. This is useful to see your history. But only WITHDRAWAL gains feed into the Realized P&L calculation.</p>
+
+      <p>For example:</p>
+      <p>• <span style="color:#4f8;">Sell/Withdrawal</span> — gain is counted in Realized P&L (money left the market)</p>
+      <p>• <span style="color:#ffd369;">Sell/Switch</span> — gain is NOT counted in Realized P&L (money still in market, just moved to another fund)</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">REAL EXAMPLE</p>
+
+      <p class="action">[Show AllPortfolios view with P&L columns highlighted]</p>
+      <p>Let me show you a real example with one of your portfolios.</p>
+      <p class="action">[Point to each column as you explain — Total Investment, Current Value, Total P&L, Realized P&L, Unrealized P&L. Show how Total P&L splits into Realized (from withdrawal) and Unrealized (paper profit still in market)]</p>
+
+      <p>The email report also shows both Realized and Unrealized P&L separately. Your family sees the true picture — not just the headline number.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. <span class="hl">Don't celebrate unrealized profits</span> — the market can take them away tomorrow. Only realized profit is real.</p>
+      <p>2. <span class="hl">Switching is not profit booking</span> — your money is still at risk in the market. Don't confuse switch gains with real profit.</p>
+      <p>3. Check the <span class="hl">Realized P&L column</span> before filing taxes — this is what matters for capital gains tax.</p>
+      <p>4. If your unrealized P&L is negative, <span class="hl">don't panic sell</span> — paper losses are temporary if the fund is fundamentally good.</p>
+      <p>5. Review P&L quarterly, not daily — checking every day creates unnecessary anxiety.</p>
+
+      <p>Now you understand the real difference between paper profit and real profit. Capital Friends tracks both automatically. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 7 - ATH & INVESTING DURING MARKET CRASHES -->
+<!-- ============================================================ -->
+<div class="video" id="v7">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 7</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">How to Invest During Market Crashes — ATH Tracking | FREE Mutual Fund Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">When markets crash, smart investors buy more. But how do you know which funds have fallen the most? Capital Friends tracks the All-Time High (ATH) NAV of every mutual fund and shows you exactly how far below ATH each fund is — with color-coded alerts.
+
+A fund 20% below its all-time high? That could be a buying opportunity!
+
+Timestamps:
+0:00 - What is All-Time High (ATH)?
+1:00 - Why ATH matters for investing
+2:00 - How Capital Friends tracks ATH
+3:00 - Portfolio columns: ATH NAV & % Below ATH
+4:00 - Color-coded alerts explained
+5:00 - MF_ATH_Data explained
+6:00 - Email report — ATH info per fund
+7:00 - How to use ATH for buying decisions
+8:00 - When NOT to blindly buy the dip
+
+Get started: https://www.capitalfriends.in
+
+#MutualFundTracker #PortfolioTracker #MutualFunds #FreeWebApp #InvestingIndia #PersonalFinance</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: How to Invest During Market Crashes — ATH Tracking | FREE Mutual Fund Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we created portfolios, recorded transactions, and learned the difference between realized and unrealized P&L. Now let's use ATH tracking to find buying opportunities.</i></p>
+
+      <p>Hi everyone. When the market falls 10-20%, news channels scream "CRASH!" and most people panic and stop their SIPs. But smart investors do the opposite — they look for buying opportunities. The question is: <span class="hl">which funds have fallen the most?</span></p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. What is All-Time High (ATH) and why it matters</p>
+      <p>2. Portfolio columns — ATH NAV & % Below ATH</p>
+      <p>3. Color-coded alerts — goldenrod to red</p>
+      <p>4. ATH info in your email report</p>
+      <p>5. How to use ATH for buying decisions</p>
+      <p>6. When NOT to blindly buy the dip</p>
+      <p>Capital Friends answers this automatically. Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT IS ALL-TIME HIGH (ATH)?</p>
+
+      <p>Every mutual fund has a highest NAV it has ever reached. That is its All-Time High. For example, if a fund's peak NAV was ₹100 and current NAV is ₹93.80, it is about 6% below its ATH.</p>
+      <p class="action">[Explain: % Below ATH = how much the current NAV has fallen from its highest ever point]</p>
+
+      <p>A fund that is 6% below ATH has had a small correction. A fund that is 25% below ATH has had a major crash. <span class="hl">That 25% dip could be a buying opportunity</span> — the same fund at a much lower price.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHY ATH MATTERS</p>
+
+      <p>Markets always recover. In the history of Indian markets, every crash has been followed by a recovery to new highs. So when a quality fund is 20% below its ATH:</p>
+      <p>1. You are buying at a <span class="hl">discount</span> compared to its proven ability</p>
+      <p>2. When it recovers (and quality funds always do), your returns will be higher</p>
+      <p>3. This is the best time to add extra lumpsum — buy more when others are scared</p>
+
+      <p>But you need data to know which funds are down and by how much. That is exactly what Capital Friends gives you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">PORTFOLIO COLUMNS — ATH NAV & % BELOW ATH</p>
+
+      <p class="action">[Show PFL-Retirement portfolio — ATH NAV and % Below ATH columns]</p>
+      <p>Every portfolio has two ATH columns:</p>
+      <p><span class="fn">ATH NAV</span> — the all-time highest NAV this fund has ever reached</p>
+      <p><span class="fn">% Below ATH</span> — how far below ATH the current NAV is</p>
+
+      <p class="action">[Point to each fund's ATH NAV and % Below ATH columns — explain what the numbers mean for your specific funds]</p>
+
+      <p>These numbers update automatically. When the fund makes a new ATH, % Below ATH becomes 0%. When it falls, the percentage increases.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">COLOR-CODED ALERTS</p>
+
+      <p>In the email report, ATH information is shown below each fund's NAV with color coding that gets more intense as the drop gets bigger:</p>
+
+      <p>• <span style="color:#b8860b;">1-5% below ATH: goldenrod</span> — small dip, normal market movement</p>
+      <p>• <span style="color:#e67e00;">5-10% below ATH: orange</span> — worth watching, consider extra SIP</p>
+      <p>• <span style="color:#d84315;font-weight:bold;">10-20% below ATH: deep orange bold</span> — significant correction, good buying opportunity</p>
+      <p>• <span style="color:#c62828;font-weight:bold;">20%+ below ATH: red bold</span> — major dip, seriously consider adding lumpsum</p>
+
+      <p>When you see red in your email — that is the market telling you "sale is on!" Like Flipkart Big Billion Day but for mutual funds.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">MF_ATH_DATA — HOW IT WORKS</p>
+
+      <p class="action">[Explain the ATH data source]</p>
+      <p>Capital Friends maintains a database of ATH NAV for ALL mutual funds in India — not just the ones you own. The app pulls ATH data from our master database automatically. For each fund: Scheme Code, Fund Name, ATH NAV, ATH Date, Last Checked, Current NAV, % Below ATH.</p>
+
+      <p>Your portfolio automatically shows the ATH data for your specific funds from this database.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">EMAIL REPORT — ATH PER FUND</p>
+
+      <p class="action">[Show sample email report — ATH section under each fund]</p>
+      <p>In the daily email, below each fund's NAV line (Current/Avg), you see the ATH info. For example:</p>
+      <p>"NAV: ₹93.80 (Avg: ₹81.25)"</p>
+      <p style="color:#e67e00;">"6.2% below ATH (₹100.00 on 15-Jan-2026)"</p>
+
+      <p>Every morning without opening the app, you know which of your funds are in a dip. If you see a fund 15% below ATH — that is your signal to open the Buy Lumpsum form and invest extra.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">HOW TO USE ATH FOR BUYING DECISIONS</p>
+
+      <p>Here is a simple strategy:</p>
+      <p>1. <span class="hl">0-5% below ATH:</span> Continue normal SIP. No action needed.</p>
+      <p>2. <span class="hl">5-10% below ATH:</span> Consider increasing SIP amount for that fund.</p>
+      <p>3. <span class="hl">10-20% below ATH:</span> Good time to add lumpsum. Use the Buy Lumpsum feature.</p>
+      <p>4. <span class="hl">20%+ below ATH:</span> Strong buying opportunity. Invest significant lumpsum if you have cash available.</p>
+
+      <p>Capital Friends combined with the rebalancing feature gives you the complete picture — ATH tells you WHERE the opportunity is, rebalancing tells you HOW MUCH to invest.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHEN NOT TO BLINDLY BUY THE DIP</p>
+
+      <p class="warn">Important: ATH is not investment advice. A fund falling 30% could mean:</p>
+      <p>1. Temporary market correction → great buying opportunity</p>
+      <p>2. Fundamental problem with the fund → avoid buying more</p>
+
+      <p>Always check WHY the fund fell. If the entire market is down, it is usually temporary. If only your specific fund is down while the market is up, something may be wrong with that fund. Use ATH as a <span class="hl">signal</span>, not a <span class="hl">blind strategy</span>.</p>
+
+      <p>ATH tracking is automatic — you don't need to do anything. Just check the ATH columns in your portfolio, or wait for the daily email report. Capital Friends does the work for you. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 8 - ASSET ALLOCATION, REBALANCING & FUND COMPOSITION -->
+<!-- ============================================================ -->
+<div class="video" id="v8">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 8</span>
+    <span class="vid-len">12-15 min</span>
+    <span class="vid-title">Auto Rebalancing & Asset Allocation — Never Invest Blindly Again! | FREE Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Stop investing blindly! Set target allocation for each fund, and Capital Friends tells you exactly how much to invest — rebalanced SIP, lumpsum, or buy/sell amounts. Plus — see the real equity/debt/market cap split of your entire portfolio.
+
+Pages: Portfolios → Manage Portfolio Allocation / Fund Composition Breakdown
+
+Timestamps:
+0:00 - Why asset allocation matters (most investors get this wrong)
+1:00 - Target vs Current allocation — real example
+2:00 - What is the rebalance threshold
+3:00 - Rebalance SIP explained with math
+4:30 - Rebalance Lumpsum — exact amount to invest
+5:30 - Buy/Sell — instant rebalance with Switch
+6:30 - When threshold is NOT breached — normal SIP
+7:00 - Manage Portfolio Allocation visual view
+7:30 - Best practices — how often to rebalance
+8:00 - Fund Composition Breakdown
+9:30 - Enter equity/debt/market cap split
+10:30 - Overall portfolio composition
+11:00 - Where to find this data (AMC factsheet)
+
+Get started: https://www.capitalfriends.in
+
+#PortfolioRebalancing #AssetAllocation #PortfolioTracker #MutualFundTracker #PortfolioManagement #FreeWebApp</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Auto Rebalancing & Asset Allocation — Never Invest Blindly Again! | FREE Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we set up portfolios, recorded transactions, understood P&L, and used ATH tracking for buying opportunities. Now let's make sure our portfolio stays balanced.</i></p>
+
+      <p>Hi everyone. This is the most powerful feature of Capital Friends. Most investors get this wrong — they invest equally every month without checking if their portfolio is still balanced.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Why asset allocation matters — target vs current</p>
+      <p>2. Rebalance threshold — when it activates</p>
+      <p>3. Rebalance SIP — smarter monthly investment split</p>
+      <p>4. Rebalance Lumpsum — where to put extra money</p>
+      <p>5. Buy/Sell — instant rebalancing with Switch</p>
+      <p>6. Manage Portfolio Allocation — visual view</p>
+      <p>7. Fund Composition Breakdown — equity/debt/market cap split</p>
+      <p>Let me show you why this matters and how Capital Friends solves it.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHY ASSET ALLOCATION MATTERS</p>
+
+      <p>Let's say you set your portfolio to 50-50 between two funds. That was your plan. But the market doesn't care about your plan. Different funds grow at different speeds.</p>
+
+      <p class="action">[Show a portfolio in the app — point to current allocation column]</p>
+      <p>Look at this portfolio. Target was 50-50. But one fund grew faster than the other. So now one fund is around 41% and the other is 59%. The carefully planned allocation has drifted.</p>
+      <p class="action">[Point to target vs current allocation columns — explain the drift]</p>
+
+      <p>If you just keep investing equally, the imbalance stays. Capital Friends tells you — invest <span class="hl">more</span> in the underweight fund and <span class="hl">less</span> in the overweight fund.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">REBALANCE THRESHOLD</p>
+
+      <p>When creating a portfolio, you set a rebalance threshold — say 5%. This means:</p>
+      <p>If the gap between target and current is <span class="hl">less than 5%</span> → normal SIP (split equally)</p>
+      <p>If the gap is <span class="hl">more than 5%</span> → rebalancing activates</p>
+
+      <p>In this example, the gap is about 9% which is > 5%. So rebalancing is active. Let me show you the three rebalancing columns.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">REBALANCE SIP</p>
+
+      <p>Say your monthly SIP target is ₹10,000. Normally you split it equally. But rebalancing says:</p>
+      <p class="action">[Point to Rebalance SIP column. Explain: the underweight fund gets a bigger share of SIP, the overweight fund gets less. Instead of equal split, it adjusts to bring you back to target]</p>
+
+      <p>So instead of equal split, the rebalanced SIP tells you to invest more in the underweight fund and less in the overweight one.</p>
+
+      <p>Over a few months of doing this, your portfolio gradually comes back to 50-50. No selling needed — just smarter SIP allocation.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">REBALANCE LUMPSUM</p>
+
+      <p>If you have extra money to invest right now as a lumpsum, this column tells you exactly where to put it.</p>
+      <p class="action">[Point to Rebalance Lumpsum column. Explain: it shows the exact rupee amount each fund needs to reach its target. Positive = buy more, Negative = already over target, don't buy]</p>
+
+      <p>So if you have a lumpsum to invest, this column tells you exactly how to split it — or put it all in the underweight fund.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BUY/SELL</p>
+
+      <p>This column shows the exact rupee amount to buy or sell for <span class="hl">instant perfect rebalancing</span>.</p>
+      <p class="action">[Point to Buy/Sell column. Explain: one fund shows BUY ₹X, the other shows SELL ₹X. If you sell the overweight and buy the underweight — that is a Switch!]</p>
+
+      <p>Go to <span class="fn">Switch Funds</span> on the Portfolios page and do the switch. After that, both funds will be at exactly their target allocation.</p>
+
+      <p>And important — this switch does NOT create realized P&L. The money stays in the market. You are just rebalancing internally, not taking any money out.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHEN THRESHOLD IS NOT BREACHED</p>
+
+      <p>What if one fund is at 48% and the other at 52%? The gap is only 2%. Since 2% < 5% threshold, rebalancing does NOT activate. The app shows normal SIP — equal split. This prevents unnecessary trading for small fluctuations.</p>
+
+      <p>You can change the threshold in Edit Portfolio. 3% = more frequent rebalancing, 10% = less frequent. 5% is a good default.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">MANAGE PORTFOLIO ALLOCATION</p>
+
+      <p class="action">[Click Manage Portfolio Allocation on the Portfolios page]</p>
+      <p>This is a nice visual view showing all your funds with their current and target allocations. You can adjust target percentages from here too. If you add a third fund later and want 40-30-30 instead of 50-50, change it here.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+
+      <p>1. Check rebalancing columns once a month when you do your SIP</p>
+      <p>2. If columns show rebalanced SIP — follow those amounts instead of equal split</p>
+      <p>3. Only do a Switch (sell one, buy another) if the imbalance is very large (15%+)</p>
+      <p>4. Don't rebalance daily — once a month or quarter is enough</p>
+      <p>5. Check ATH columns — if a fund is 20% below ATH AND underweight, that is a double signal to buy more</p>
+
+      <p>This single feature replaces paid robo-advisors. You get it free in Capital Friends.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">FUND COMPOSITION BREAKDOWN</p>
+
+      <p>Now let me show you another important feature. Do you know the real composition of your portfolio? Most people think "I invest in 2 equity funds, so I am 100% equity." That is wrong. Your flexi cap fund might be 65% equity and 35% cash/debt. Capital Friends helps you see the full picture.</p>
+
+      <p class="action">[Click Fund Composition Breakdown on the Portfolios page]</p>
+
+      <p class="action">[Select a fund from dropdown]</p>
+      <p>Enter the breakdown for each fund:</p>
+      <p><span class="fn">Equity %</span> | <span class="fn">Debt %</span> | <span class="fn">Cash/Others %</span></p>
+      <p>Within equity: <span class="fn">Large Cap %</span> | <span class="fn">Mid Cap %</span> | <span class="fn">Small Cap %</span></p>
+      <p>Click Save. Do this for each fund in your portfolio.</p>
+
+      <p>Now Capital Friends calculates your <span class="hl">overall portfolio composition</span> based on how much money is in each fund — total equity, debt, cash split, and within equity: large, mid, small cap breakdown.</p>
+
+      <p><span class="hl">Where to get this data?</span> Go to your AMC's website. Download the monthly factsheet. It shows the exact breakdown. Update this once every 3 months.</p>
+
+      <p>This information shows in the <span class="fn">email report</span> and <span class="fn">Dashboard</span> page — complete asset allocation of your portfolio. If you see 80% small cap, you know your risk is very high and you should rebalance.</p>
+
+      <p>Asset allocation, rebalancing, and fund composition — three features that replace paid robo-advisors. You get them free in Capital Friends. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 9 - STOCKS -->
+<!-- ============================================================ -->
+<div class="video" id="v9">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 9</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">Track Stocks with Live Prices & FIFO P&L | FREE Stock Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Track your stock investments with live prices from Google Finance! Create stock portfolios, buy stocks, sell with FIFO P&L calculation, and view complete holdings.
+
+Pages: Stocks section in the app → Create Portfolio / Buy / Sell / View Holdings / View Transactions / View All / View Stock Database
+
+Timestamps:
+0:00 - Stocks section overview
+0:30 - Create Stock Portfolio
+1:30 - Buy Stocks
+3:30 - Live prices from Google Finance
+4:00 - Sell Stocks with FIFO P&L
+5:30 - What is FIFO (First In First Out)
+6:00 - View Holdings & Transactions
+7:00 - View Stock Database (5000+ NSE stocks)
+
+Get started: https://www.capitalfriends.in
+
+#StockTracker #PortfolioTracker #InvestmentTracker #FreeWebApp #PersonalFinance #StockMarket</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Track Stocks with Live Prices & FIFO P&L | FREE Stock Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we covered mutual funds completely — portfolios, transactions, P&L, ATH tracking, and rebalancing. Now let's track stocks.</i></p>
+
+      <p>Hi everyone. Capital Friends is not just mutual funds — it tracks stocks too! With <span class="hl">live prices from Google Finance</span>.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Create a stock portfolio</p>
+      <p>2. Buy stocks with search</p>
+      <p>3. Live prices from Google Finance</p>
+      <p>4. Sell stocks with FIFO P&L calculation</p>
+      <p>5. View holdings, transactions & stock database</p>
+      <p>Let me show you the complete stocks workflow.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p class="action">[Click Stocks in the sidebar — show all options]</p>
+      <p>Options: Create Stock Portfolio, View All Portfolios, Buy Stocks, Sell Stocks, View Holdings, View Transactions, View Stock Database. Let me walk through each one.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">CREATE STOCK PORTFOLIO</p>
+
+      <p class="action">[Click Create Stock Portfolio]</p>
+      <p>Enter a portfolio name, select your investment account and owner from the dropdowns. Click Create. Done!</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BUY STOCKS</p>
+
+      <p class="action">[Click Buy Stocks]</p>
+      <p>Search for any stock — Capital Friends has a database of 5000+ NSE stocks. Select the stock from results.</p>
+      <p>Enter <span class="fn">Quantity</span>, <span class="fn">Buy Price</span>, and <span class="fn">Brokerage</span>. Total is auto-calculated including brokerage. Click Buy.</p>
+
+      <p class="action">[Buy 2-3 different stocks to show the flow — enter quantity, price, brokerage for each]</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">VIEW HOLDINGS — LIVE PRICES</p>
+
+      <p class="action">[Click View Holdings]</p>
+      <p>StockHoldings view shows all stocks with <span class="hl">live current prices from Google Finance</span>! Prices update automatically when the market is open. Current value, unrealized P&L — all live.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">SELL STOCKS — FIFO P&L</p>
+
+      <p class="action">[Click Sell Stocks]</p>
+      <p>Select your portfolio and stock. It shows available quantity. Enter the number of shares to sell, sell price, and brokerage.</p>
+
+      <p>See the preview — it shows sale proceeds, cost basis (using FIFO — oldest shares first), brokerage, and your <span class="hl">profit or loss</span>. Everything calculated automatically.</p>
+      <p class="action">[Point to the preview — explain: sold at higher price than buy price = profit. Brokerage is deducted from both sides]</p>
+      <p>Click Sell.</p>
+
+      <p><span class="hl">What is FIFO?</span> First In First Out. If you bought a stock at two different prices — when you sell, Capital Friends sells the oldest shares first. This is how tax calculation works in India for stocks held over 1 year.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">VIEW TRANSACTIONS & DATABASE</p>
+
+      <p><span class="hl">View Transactions:</span></p>
+      <p class="action">[Click View Transactions]</p>
+      <p>Complete history — every buy, sell, date, price, quantity, brokerage, P&L.</p>
+
+      <p><span class="hl">View All Portfolios:</span></p>
+      <p class="action">[Click View All Portfolios]</p>
+      <p>StockPortfolios view shows all your stock portfolios with summary.</p>
+
+      <p><span class="hl">View Stock Database:</span></p>
+      <p class="action">[Click View Stock Database]</p>
+      <p>StockMasterData with 5000+ NSE stocks — symbol, name, sector, industry. This is where the search picks stocks from.</p>
+
+      <p>Stocks with live prices, FIFO P&L, complete transaction history — all in Capital Friends. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 10 - OTHER INVESTMENTS + INSURANCE + LIABILITIES -->
+<!-- ============================================================ -->
+<div class="video" id="v10">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 10</span>
+    <span class="vid-len">10-12 min</span>
+    <span class="vid-title">Track Gold, PPF, Insurance & Loans in One Place | FREE Investment Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Track ALL investments, insurance policies, and loans in one place. Gold, PPF, EPF, Real Estate, Fixed Deposits, Health Insurance, Term Life, Home Loan — everything your family needs to know. Real Net Worth = Assets minus Liabilities.
+
+Pages: Other Investments | Insurance | Liabilities (all in the sidebar)
+
+Timestamps:
+0:00 - Why track other investments
+0:30 - Add Gold (Physical)
+1:30 - Add PPF
+2:00 - Add Real Estate (with loan link)
+3:00 - Add Fixed Deposit
+3:30 - Edit / View All investments
+4:00 - Why insurance tracking is critical
+4:30 - Add Health Insurance
+5:30 - Add Term Life Insurance
+6:00 - Add Motor Insurance
+6:30 - Health Check auto-update
+7:00 - Add Car Loan
+7:30 - Net Worth = Assets - Liabilities
+8:00 - Close a loan
+8:30 - View All — complete picture
+
+Get started: https://www.capitalfriends.in
+
+#AssetTracker #InvestmentTracker #PortfolioTracker #FreeWebApp #PersonalFinance #WealthManagement</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Track Gold, PPF, Insurance & Loans in One Place | FREE Investment Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we set up mutual fund portfolios with rebalancing, P&L, and ATH tracking, plus stock portfolios with live prices. Now let's track everything else.</i></p>
+
+      <p>Hi everyone. Your wealth is more than mutual funds and stocks. You have gold, PPF, real estate, FDs. You have insurance policies your family must know about. You have loans that reduce your net worth.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Other investments — Gold, PPF, Real Estate, FD</p>
+      <p>2. Link real estate to loan</p>
+      <p>3. Insurance policies — Health, Term Life, Motor</p>
+      <p>4. Liabilities — Home Loan, Car Loan</p>
+      <p>5. Real Net Worth = Assets minus Liabilities</p>
+      <p>Capital Friends tracks all of them. Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">OTHER INVESTMENTS</p>
+
+      <p class="action">[Click Other Investments in the sidebar → Add Investment]</p>
+
+      <p><span class="hl">Gold:</span></p>
+      <p>Select type Gold. Enter a name, select the family member, and fill in invested amount and current value. You can add custom fields like quantity and storage location. Click Add.</p>
+
+      <p><span class="hl">PPF:</span></p>
+      <p class="action">[Add PPF — select member, enter invested and current value]</p>
+
+      <p><span class="hl">Real Estate with Loan Link:</span></p>
+      <p class="action">[Add Real Estate — enter property details, invested and current value]</p>
+      <p>See this option — <span class="fn">Link to Loan</span>. Select "Quick add new loan" — enter loan type, lender, outstanding balance. Now property and loan are connected. In the dashboard, it shows: Asset value minus Loan = Net equity.</p>
+
+      <p><span class="hl">Fixed Deposit:</span></p>
+      <p class="action">[Add FD — select member, enter invested and current value]</p>
+
+      <p><span class="hl">Edit / View All:</span></p>
+      <p class="action">[Click Edit Investment]</p>
+      <p>Update current values whenever you want. Gold price went up? Select Gold investment, update current value, save. Takes 10 seconds.</p>
+
+      <p class="action">[Click View All]</p>
+      <p>All investments in one view. Total invested, total current value, P&L.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">INSURANCE POLICIES</p>
+
+      <p>Insurance is the most important thing your family should know. If something happens to you, they need policy numbers and how to claim. Most families don't know this information.</p>
+
+      <p class="action">[Click Insurance in the sidebar → Add Insurance Policy]</p>
+
+      <p><span class="hl">Health Insurance:</span></p>
+      <p>Select type Health Insurance. Fill in the details:</p>
+      <p><span class="fn">Company</span>, <span class="fn">Policy Number</span>, <span class="fn">Policy Name</span>, <span class="fn">Insured Member</span>, <span class="fn">Nominee</span>, <span class="fn">Sum Assured</span></p>
+      <p>Add premium amount, expiry date. Click Add.</p>
+
+      <p>See — it also <span class="hl">updated the Financial Health Check</span> automatically! It knows I have health insurance now.</p>
+
+      <p><span class="hl">Term Life Insurance:</span></p>
+      <p class="action">[Add Term Life — enter company, sum assured, premium]</p>
+
+      <p><span class="hl">Motor Insurance:</span></p>
+      <p class="action">[Add Motor — enter company, vehicle details, IDV amount]</p>
+
+      <p><span class="hl">Edit / View All:</span></p>
+      <p><span class="fn">Edit Insurance Policy</span> — update premium, renew, change nominee.</p>
+      <p><span class="fn">View All Policies</span> — all policies in one view. Your family opens the app and sees everything.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIABILITIES (LOANS)</p>
+
+      <p>Many people only count assets — "I have X lakhs in investments!" But if you have loans, your real net worth is assets minus loans. Capital Friends shows the true picture.</p>
+
+      <p>We already added a Home Loan when we linked it to the property. Let me add another loan.</p>
+
+      <p class="action">[Click Liabilities in the sidebar → Add Liability]</p>
+      <p>Select type (Home Loan, Auto Loan, Personal Loan, etc.). Enter lender, member, outstanding balance, EMI, interest rate, tenure. Click Add.</p>
+
+      <p class="action">[Click View All Liabilities]</p>
+      <p>All loans in one place with total liabilities.</p>
+
+      <p>In dashboard and email: Total Assets minus Total Liabilities = <span class="hl">Real Net Worth</span>. That is the number that matters.</p>
+
+      <p>When you pay off a loan — click <span class="fn">Edit Liability</span>, change status to "Closed". Balance becomes zero. Your net worth goes up!</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. Update <span class="hl">current values quarterly</span> — gold price changes, FD matures, real estate appreciates. Keep numbers current.</p>
+      <p>2. Add <span class="hl">all insurance policies</span> — health, term, motor, home. Your family needs this information if something happens to you.</p>
+      <p>3. Always add <span class="hl">nominee details</span> to insurance — this is the most critical information for claims.</p>
+      <p>4. Link real estate to its loan — the dashboard then shows the <span class="hl">net equity</span>, not just the property value.</p>
+      <p>5. Update loan <span class="hl">outstanding balance yearly</span> — as you pay EMIs, the balance reduces and your net worth increases.</p>
+      <p>6. Focus on <span class="hl">net worth, not just assets</span> — ₹50 lakh in investments with ₹36 lakh in loans means only ₹14 lakh real net worth.</p>
+
+      <p>Your complete financial picture — mutual funds, stocks, gold, PPF, insurance, loans — all tracked in one free web app. Your family knows everything. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 11 - GOAL PLANNER -->
+<!-- ============================================================ -->
+<div class="video" id="v11">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 11</span>
+    <span class="vid-len">8-10 min</span>
+    <span class="vid-title">FREE SIP Calculator & Goal Planner (Retirement, Education, House) | Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Plan your financial goals! Calculate exact monthly SIP for retirement, education, emergency fund, house, car — any goal. Inflation-aware with per-goal-type defaults. Optional lumpsum + SIP combined mode.
+
+Pages: Goals in the sidebar → Goal Planner (Wizard) / Add Goal / Edit Goal
+
+Timestamps:
+0:00 - Why goals matter
+0:30 - Goal Planner Wizard
+2:00 - Emergency Fund
+3:00 - Retirement
+4:00 - Child's Education
+5:00 - Lumpsum + SIP combined mode
+6:00 - Investment Summary
+7:00 - Create All Goals
+8:00 - Goals page explained
+
+Get started: https://www.capitalfriends.in
+
+#PortfolioTracker #SIPCalculator #FinancialGoals #FreeWebApp #PersonalFinance #MutualFunds</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: FREE SIP Calculator & Goal Planner (Retirement, Education, House) | Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we set up tracking for mutual funds, stocks, gold, PPF, insurance, and loans — your complete financial picture. Now let's plan our goals.</i></p>
+
+      <p>Hi everyone. Without a goal, you are investing blindly. You don't know if your SIP is enough. Should I invest ₹5,000 per month or ₹50,000? It depends on your goals.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Goal Planner Wizard — plan all goals at once</p>
+      <p>2. Emergency Fund, Retirement, Education goals</p>
+      <p>3. Lumpsum + SIP combined mode — reduce your SIP</p>
+      <p>4. Investment Summary — total monthly SIP needed</p>
+      <p>5. Create all goals & Goals page explained</p>
+      <p>Capital Friends calculates exactly how much you need. Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p class="action">[Click Goals in the sidebar → Goal Planner (Wizard)]</p>
+      <p>Goal types: Emergency Fund, Retirement, House, Education, Marriage, Car, Vacation, Custom.</p>
+      <p>Enter your <span class="fn">Age</span> and <span class="fn">Monthly Expenses</span>.</p>
+
+      <p>The goal planner is <span class="hl">inflation-aware</span> with smart per-goal-type defaults — each goal type automatically uses a realistic inflation rate. Emergency fund uses 0%, retirement uses 6%, education uses 10%, and so on. You can always override these defaults.</p>
+
+      <p><span class="hl">Emergency Fund:</span></p>
+      <p>Auto-calculates 6 months of expenses as target. Set target year, expected return (8%), and inflation (0% for emergencies — already set as default). It calculates SIP needed instantly.</p>
+
+      <p><span class="hl">Retirement:</span></p>
+      <p>Enter your retirement age. It uses the 25x annual expenses rule with inflation to calculate the target corpus. Enter expected return (12% for equity). The SIP might seem high — but that is the power of compounding over many years.</p>
+
+      <p><span class="hl">Child's Education:</span></p>
+      <p>Enter child's current age, when you need the money, today's cost. With 10% education inflation (auto-suggested), the future cost is calculated automatically. SIP needed to reach that target is shown.</p>
+
+      <p><span class="hl">Lumpsum + SIP Mode:</span></p>
+      <p>This is optional but very smart. If you can invest a lumpsum right now, the SIP drops significantly. Because that lumpsum will grow over the years through compounding, so you need less from SIP.</p>
+      <p>Just enter the lumpsum amount in the optional field. If left empty, it shows only SIP + reference lumpsum. If filled, it recalculates: remaining SIP = what is needed after lumpsum grows.</p>
+
+      <p>Bottom shows <span class="fn">Investment Summary</span> — total monthly SIP across all goals. This is your total monthly investment target.</p>
+
+      <p>Click <span class="fn">Create All Goals</span>.</p>
+
+      <p class="action">[Show Goals page in the app]</p>
+      <p>All goals created! Several columns are <span class="hl">live formulas</span> that auto-update. When you map your portfolios to these goals using <span class="fn">Map Portfolios to Goal</span> on the Goals page, the "Current Allocated" column updates automatically based on real portfolio values. No manual tracking needed.</p>
+
+      <p><span class="hl">Add Goal individually:</span> <span class="fn">Add Goal</span> on the Goals page — for adding one goal at a time.</p>
+      <p><span class="hl">Edit Goal:</span> <span class="fn">Edit Goal</span> — change target, year, or inflation rate later.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. Use <span class="hl">realistic return rates</span> — 10-12% for equity, 7-8% for debt. Don't assume 15-20%.</p>
+      <p>2. Use <span class="hl">realistic inflation</span> — 6-7% general, 10% for education, 8-10% for medical. Underestimating inflation is the biggest mistake.</p>
+      <p>3. Start with your <span class="hl">top 3 goals</span> — Emergency Fund, Retirement, and one more. Don't overwhelm yourself with 8 goals on day one.</p>
+      <p>4. Emergency fund should be your <span class="hl">first goal</span> — before retirement, before education. Without this safety net, any crisis forces you to break investments.</p>
+      <p>5. If total SIP seems too high — use the <span class="hl">Lumpsum + SIP mode</span> to reduce monthly burden. Even a small lumpsum today makes a big difference over 10+ years.</p>
+      <p>6. <span class="hl">Review goals yearly</span> — expenses change, income changes. Use Edit Goal to update targets.</p>
+
+      <p>Now you know exactly how much SIP you need for every goal. Capital Friends does the math — you just invest. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 12 - GOAL TRACKING & PORTFOLIO MAPPING -->
+<!-- ============================================================ -->
+<div class="video" id="v12">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 12</span>
+    <span class="vid-len">6-8 min</span>
+    <span class="vid-title">Live Goal Tracking — Map Portfolios to Financial Goals | FREE Investment Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Map your investment portfolios to financial goals and track progress in real-time! See how much is allocated, gap remaining, and status — all auto-updating. Plan withdrawals when goals are achieved.
+
+Pages: Goals in the sidebar → Map Portfolios / Goals Dashboard / Mark Goal Achieved / Withdrawal Planning / View All
+
+Timestamps:
+0:00 - Map Portfolios to Goal
+2:00 - Goals Dashboard
+3:30 - Live progress tracking
+4:30 - Mark Goal as Achieved
+5:00 - Withdrawal Planning
+5:30 - View All Goals
+
+Get started: https://www.capitalfriends.in
+
+#PortfolioTracker #FinancialGoals #InvestmentTracker #FreeWebApp #PersonalFinance #MutualFunds</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Live Goal Tracking — Map Portfolios to Financial Goals | FREE Investment Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In the previous video we planned financial goals and calculated exact SIP needed for each. Now let's connect those goals to real portfolios and track progress automatically.</i></p>
+
+      <p>Hi everyone. You have financial goals — retirement, education, emergency fund. And you have mutual fund portfolios. Now let me connect them so progress updates automatically.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Map portfolios to goals — connect real investments</p>
+      <p>2. Goals Dashboard — live progress tracking</p>
+      <p>3. Mark goal as achieved</p>
+      <p>4. Withdrawal planning — which fund to redeem</p>
+      <p>5. View all goals in one place</p>
+      <p>Let me show you.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">MAP PORTFOLIOS TO GOALS</p>
+
+      <p class="action">[Click Map Portfolios to Goal on the Goals page]</p>
+      <p>Select a goal. It shows all your portfolios. Check the portfolio dedicated to this goal, enter 100% allocation. This means 100% of that portfolio's current value counts toward this goal. Click Map.</p>
+
+      <p class="action">[Map another portfolio to another goal]</p>
+
+      <p>You can also split — if one portfolio serves two goals, put 60% for one goal and 40% for another. Flexible.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">GOALS DASHBOARD</p>
+
+      <p class="action">[Click Goals Dashboard on the Goals page]</p>
+      <p>Beautiful dashboard! Each goal shows:</p>
+      <p>Target amount, current allocated, gap remaining, progress %, status, SIP needed, time left.</p>
+      <p>A long-term goal like retirement will initially show "Behind" — that is normal when you have just started. As your portfolio grows, the progress updates <span class="hl">automatically</span> because the formulas read live portfolio values.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">MARK GOAL AS ACHIEVED</p>
+
+      <p class="action">[In the Goals Dashboard, click "Mark as Achieved" on a goal]</p>
+      <p>When a goal reaches its target — click "Mark as Achieved" on that goal in the dashboard. Status changes to "Achieved" permanently. Celebrate!</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WITHDRAWAL PLANNING</p>
+
+      <p class="action">[Click Withdrawal Planning on the Goals page]</p>
+      <p>When a goal is achieved, Capital Friends tells you exactly which fund to sell and how much to withdraw. You can plan the exit — which fund to redeem first, tax implications, etc.</p>
+
+      <p><span class="hl">View All Goals:</span></p>
+      <p class="action">[Click View All Goals on the Goals page]</p>
+      <p>Shows all goals in one view. All data in one place. Several columns are live formulas. They update automatically as your portfolio values change. No manual calculation needed ever.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">BEST PRACTICES</p>
+      <p>1. Check the Goals Dashboard <span class="hl">once a month</span> — don't check daily. Long-term goals need patience.</p>
+      <p>2. Map <span class="hl">one portfolio to one goal</span> when possible — this gives the clearest picture. Split only if necessary.</p>
+      <p>3. If a goal shows "Behind" status — don't panic. <span class="hl">Increase your SIP</span> or add lumpsum rather than changing the goal target.</p>
+      <p>4. When a goal is near completion, <span class="hl">shift to safer funds</span> — move from equity to liquid/debt before withdrawing. Don't let a market crash destroy a goal that is 90% done.</p>
+      <p>5. Use <span class="hl">Withdrawal Planning</span> before redeeming — it helps you plan which fund to sell and shows tax implications.</p>
+
+      <p>Your goals are mapped to real portfolios and progress updates automatically. When you achieve a goal, plan the withdrawal. If you haven't watched the introduction video, watch it first — it explains why your family needs Capital Friends and how it protects your financial future. Capital Friends is completely free — the only cost is the website domain fee to keep it running. If this tool helps you, consider supporting through <span class="fn">Settings → Support Developer</span> — every small donation helps keep it alive. Check the playlist for more tutorials. Like and subscribe!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIDEO 13 - REMINDERS, EMAIL REPORTS, DASHBOARD & RECAP -->
+<!-- ============================================================ -->
+<div class="video" id="v13">
+  <div class="video-header">
+    <span class="vid-num">VIDEO 13</span>
+    <span class="vid-len">12-15 min</span>
+    <span class="vid-title">Automated Email Reports, Reminders & Dashboard | FREE Portfolio Tracker Web App</span>
+  </div>
+  <div class="section">
+    <div class="section-title">YouTube Description</div>
+    <div class="yt-desc">Final video! Never miss insurance renewal or EMI with automated reminders. Get a complete family wealth report by email — daily, weekly, or monthly. See everything in a beautiful dashboard inside the app.
+
+Pages: Reminders | Settings (Email, About, Support) | Dashboard — all in the sidebar
+
+Timestamps:
+0:00 - Why reminders matter
+0:30 - Add Insurance Renewal reminder
+1:30 - Add Monthly EMI reminder
+2:00 - Add Tax Filing reminder
+2:30 - Setup Daily Check (auto trigger)
+3:00 - Test Reminder Email
+3:30 - Edit & View All Reminders
+4:00 - Family Wealth Email Reports
+4:30 - Email Settings (frequency, time)
+5:30 - Who receives the email
+6:00 - Send report now (demo)
+6:30 - What the email contains
+8:00 - ATH color coding in email
+8:30 - Realized vs Unrealized P&L in email
+9:00 - Open Dashboard
+10:00 - Net Worth & Asset Allocation
+11:00 - About & Support Developer
+11:30 - Series recap — all 13 videos
+12:30 - What's next
+
+Get started: https://www.capitalfriends.in
+
+#PortfolioTracker #MutualFundTracker #FamilyFinance #FreeWebApp #PersonalFinance #WealthManagement</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Script</div>
+    <div class="script">
+      <p class="action">[TITLE CARD: Automated Email Reports, Reminders & Dashboard | FREE Portfolio Tracker Web App]</p>
+
+      <p style="color:#888;font-size:11px;"><i>In previous videos we set up everything — mutual funds, stocks, other investments, insurance, loans, financial goals, and portfolio mapping. Now let's automate it all.</i></p>
+
+      <p>Hi everyone. Last video of this series! We will cover three big features — reminders, email reports, and the dashboard.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">WHAT WE'LL COVER</p>
+      <p>1. Reminders — never miss insurance renewal or EMI</p>
+      <p>2. Email Reports — automated family wealth report</p>
+      <p>3. Dashboard — complete financial picture in one view</p>
+      <p>4. Series recap — all 13 videos covered</p>
+      <p>Let me start with reminders.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">LIVE DEMO</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">REMINDERS</p>
+
+      <p>How many times have you missed an insurance renewal? Or forgot a tax filing deadline? Capital Friends sends you email alerts before any due date.</p>
+
+      <p class="action">[Click Reminders in the sidebar → Add Reminder]</p>
+
+      <p><span class="hl">Insurance Renewal:</span></p>
+      <p>Select type Insurance Renewal — it auto-suggests a title and 60 days advance notice. Enter your policy name, due date, set frequency to Yearly, priority High. Click Add.</p>
+
+      <p><span class="hl">Monthly EMI:</span></p>
+      <p class="action">[Add EMI reminder — Monthly frequency, set the date and advance notice days]</p>
+
+      <p><span class="hl">Tax Filing:</span></p>
+      <p class="action">[Add Tax Filing reminder — Yearly, set due date and advance notice]</p>
+
+      <p>12 types available: Insurance, EMI, Tax Filing, SIP, Investment Review, Document Renewal, Fixed Deposit Maturity, and more.</p>
+
+      <p><span class="hl">Setup Daily Check:</span></p>
+      <p class="action">[Click Setup Daily Check on the Reminders page]</p>
+      <p>This creates a trigger that runs at 8 AM every day. If any reminder is due within the advance notice period, you get an email. One click setup. Done!</p>
+
+      <p><span class="hl">Test Reminder Email:</span></p>
+      <p class="action">[Click Test Reminder Email on the Reminders page]</p>
+      <p>Sends a test email right now to check if reminders are working.</p>
+
+      <p><span class="hl">Edit Reminder:</span> <span class="fn">Edit Reminder</span> — change due date, frequency, or delete.</p>
+      <p><span class="hl">View All:</span> <span class="fn">View All Reminders</span> — all reminders in one view.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">FAMILY WEALTH EMAIL REPORT</p>
+
+      <p>This is the feature that makes Capital Friends truly special. Imagine every morning, your entire family gets a complete wealth report by email. Automatically.</p>
+
+      <p><span class="hl">Email Settings:</span></p>
+      <p class="action">[Click Settings in the sidebar → Email Settings]</p>
+      <p><span class="fn">Enable Email Reports:</span> Yes</p>
+      <p><span class="fn">Frequency:</span> Daily (or Weekly/Monthly)</p>
+      <p><span class="fn">Time:</span> 9 AM</p>
+      <p>Click Save. Every day at 9 AM, report is sent automatically. No manual work needed.</p>
+
+      <p><span class="hl">Who receives?</span> All family members with "Include in Email Reports" = Yes. When you add family members on the <span class="fn">Family Members</span> page, you check this box. Anyone who has it checked gets the email.</p>
+
+      <p><span class="hl">Send Now:</span></p>
+      <p class="action">[Click Send Email Report → Yes]</p>
+      <p class="action">[Show email in inbox]</p>
+
+      <p>Look at this email! Everything is here:</p>
+      <p><span class="fn">Summary:</span> Total Net Worth, Total Assets, Total Liabilities</p>
+      <p><span class="fn">Mutual Funds:</span> Each fund with NAV (Current/Avg), current value, P&L.</p>
+
+      <p>And below each fund — <span class="hl">ATH info</span> showing how far below the all-time high:</p>
+      <p>• <span style="color:#b8860b;">1-5% below ATH: goldenrod</span> — small dip, normal</p>
+      <p>• <span style="color:#e67e00;">5-10% below: orange</span> — worth watching</p>
+      <p>• <span style="color:#d84315;font-weight:bold;">10-20% below: deep orange bold</span> — significant correction</p>
+      <p>• <span style="color:#c62828;font-weight:bold;">20%+ below: red bold</span> — major dip, possible buying opportunity</p>
+
+      <p>The email also shows <span class="hl">Unrealized P&L</span> (blue — paper profit on holdings you still own) and <span class="hl">Realized P&L</span> (green — actual profit from withdrawals) separately. Your family sees the true picture.</p>
+
+      <p><span class="fn">Stocks:</span> Live prices, P&L for each stock</p>
+      <p><span class="fn">Other Investments:</span> Gold, PPF, Real Estate values</p>
+      <p><span class="fn">Insurance:</span> All policies with sum assured and nominee</p>
+      <p><span class="fn">Goals:</span> Progress for each financial goal</p>
+      <p><span class="fn">Action Items:</span> From health check — what you need to fix (like "Create a Will")</p>
+
+      <p>Your family gets this every day. If something happens to you, they have everything — where the money is, how much, who is the nominee, which insurance to claim. That is the real purpose of Capital Friends.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">DASHBOARD</p>
+
+      <p class="action">[Click Dashboard in the sidebar]</p>
+      <p>Same information as the email — but viewable anytime inside the app.</p>
+
+      <p><span class="fn">Top:</span> Total Net Worth, Total Assets, Total Liabilities, Net P&L.</p>
+      <p><span class="fn">Asset Allocation:</span> Equity, debt, gold, real estate — how your money is divided.</p>
+      <p><span class="fn">Market Cap:</span> Large cap, mid cap, small cap split — based on Fund Composition data you enter via <span class="fn">Fund Composition Breakdown</span> on the Portfolios page.</p>
+      <p><span class="fn">Portfolio Details:</span> Each portfolio with funds, P&L, rebalancing suggestions.</p>
+
+      <p>Takes 10-30 seconds to generate because it reads all your sheets. But the result is a complete financial picture.</p>
+
+      <p><span class="hl">About:</span> <span class="fn">Settings → About</span> — version info and credits.</p>
+      <p><span class="hl">Support Developer:</span> <span class="fn">Settings → Support Developer</span> — Capital Friends is completely free. The only cost I pay is the website domain fee to keep it running. If Capital Friends is useful to you, a small donation helps renew the domain and keep this tool alive for everyone.</p>
+
+      <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:8px;">SERIES RECAP — ALL 13 VIDEOS</p>
+
+      <p><span class="hl">Getting Started:</span> Video 1 (Intro) → Video 2 (Setup)</p>
+      <p><span class="hl">Foundation:</span> Video 3 (Family, Banks, Investment Accounts)</p>
+      <p><span class="hl">Mutual Funds:</span> Video 4 (Create & Migrate) → Video 5 (Buy, Sell & Switch)</p>
+      <p><span class="hl">Understanding Your Money:</span> Video 6 (Realized vs Unrealized P&L) → Video 7 (ATH & Market Crashes)</p>
+      <p><span class="hl">Smart Management:</span> Video 8 (Asset Allocation, Rebalancing & Composition)</p>
+      <p><span class="hl">Stocks:</span> Video 9 (Buy, Sell & Track)</p>
+      <p><span class="hl">Other Assets:</span> Video 10 (Gold, PPF, Insurance & Loans)</p>
+      <p><span class="hl">Planning:</span> Video 11 (Goal Planner) → Video 12 (Goal Tracking)</p>
+      <p><span class="hl">Automation & Overview:</span> Video 13 (Reminders, Email Reports & Dashboard — this video)</p>
+
+      <p>Every single menu item is covered. Your complete family wealth — tracked, protected, and shared.</p>
+
+      <p>If you haven't watched the introduction video (Video 1), definitely watch it — it explains why Capital Friends was built and why every family needs this.</p>
+
+      <p>Capital Friends is <span class="hl">free forever</span>. The only cost is the website domain fee. If this tool helped you, please support through <span class="fn">Settings → Support Developer</span> — every small donation keeps it running for everyone.</p>
+
+      <p>Go to capitalfriends.in and sign in today. Share access with your family. Make sure they know where your money is.</p>
+
+      <p>If this series helped you, please like, comment, share, and subscribe. Share it with your friends and family — everyone deserves financial clarity.</p>
+
+      <p>Thank you for watching. Take care of your money. And take care of your family.</p>
+    </div>
+  </div>
+</div>
+
+<div class="duration">— END OF ALL SCRIPTS — 13 Videos | Every Menu Item Covered | Ready to Record —</div>
+
+<!-- ============================================================ -->
+<!-- SEO REFERENCE — TAGS, HASHTAGS, DESCRIPTION TEMPLATE -->
+<!-- ============================================================ -->
+<div class="video" style="border-left-color: #66f; margin-top: 20px;">
+  <div class="video-header">
+    <span class="vid-num" style="background:#66f;color:#fff;">SEO</span>
+    <span class="vid-title" style="color:#66f;">YouTube SEO Reference — Tags, Hashtags & Description Template</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Description Template (Use for ALL videos)</div>
+    <div class="yt-desc" style="background:#1a1a3a;">
+[2-3 sentence video summary with primary keyword in first sentence]
+
+Capital Friends is a 100% FREE web app for tracking your entire family's investments — mutual funds, stocks, gold, insurance, loans, goals. Sign in with Google at capitalfriends.in. No downloads. No subscriptions. Your data stays in your own Google Drive. Works on any device.
+
+[Video-specific content outline with timestamps — copy from each video's YouTube Description above]
+
+--- Key Features ---
+✅ Track mutual funds, stocks, insurance, loans, and more
+✅ Family-wide portfolio management (multiple members)
+✅ Automated email portfolio reports with ATH alerts
+✅ SIP/Lumpsum/Sell/Switch transaction tracking
+✅ Realized vs Unrealized P&L tracking
+✅ Portfolio rebalancing with custom thresholds
+✅ All-Time High tracker — spot buying opportunities in market crashes
+✅ Financial goal planning (retirement, education, emergency fund)
+✅ Real-time NAV updates from AMFI database
+✅ One-click setup, zero coding required
+
+--- Playlist ---
+Full tutorial series: [link to playlist]
+
+--- Get Capital Friends FREE ---
+🔗 Website: https://www.capitalfriends.in
+🔗 Setup Instructions: [link]
+🔗 GitHub: [link]
+
+--- Support ---
+Capital Friends is free forever. The only cost is the website domain fee. If this tool helps you, consider supporting: Settings → Support Developer (in the app).
+
+--- Related Videos ---
+[Links to previous and next videos in the series]
+
+[video-specific tags from below]
+
+[video-specific hashtags from below]
+
+--- Disclaimer ---
+Capital Friends is a portfolio tracking tool, not a financial advisory service. This is not investment advice. Past returns do not guarantee future results. Please consult a SEBI-registered investment advisor before making investment decisions. The creator (Jagadeesh Manne) is not responsible for any investment decisions made using this tool.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Universal Hashtags (Use on EVERY video — max 3 in title area, rest in description)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+#MutualFundTracker #PortfolioTracker #FreePortfolioTracker #SIPTracker #PortfolioRebalancing #AssetAllocation #AssetTracker #FreeWebApp #MutualFunds #PersonalFinance #InvestmentTracker #InvestingIndia #WealthManagement</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">SEO Strategy</div>
+    <div class="note" style="background:#1a1a3a; border-color:#66f;">
+      <b>Core principle:</b> Every video's tags, title, and description should lead with what people SEARCH for — "free mutual fund tracker", "free portfolio tracker app", "portfolio tracker India free". Nobody searches for niche features like "ATH tracker" or "FIFO P&L" unless they already know the tool. Every video is an entry point to Capital Friends, so every video must rank for the core product keywords first, then add topic-specific ones as secondary.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Core Tags (Include in EVERY video — these are what people actually search for)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <p><b>Primary — use in EVERY video (highest searched terms):</b></p>
+      <p>mutual fund tracker, portfolio tracker, SIP tracker, free mutual fund tracker, mutual fund portfolio tracker, track investments one place, free portfolio tracker app, Capital Friends, mutual fund app alternative, investment tracker India, free web app portfolio tracker</p>
+      <p style="margin-top:6px;"><b>Secondary — pick 3-4 per video based on topic:</b></p>
+      <p>SIP calculator, SIP return calculator, how to track mutual fund, mutual fund for beginners, best portfolio tracker app India, free portfolio tracker web app, track SIP returns, portfolio management, how to check mutual fund returns, retirement planning India, financial goal planner, how to invest in mutual fund, manage family investments, stock portfolio tracker, all investments one place, personal finance India</p>
+      <p style="margin-top:6px;"><b>Competitor comparison tags (use in V1, V2):</b></p>
+      <p>free portfolio tracker alternative, best free investment tracker, free portfolio tracker app India, no subscription investment tracker, free web app finance tool, free portfolio management tool
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Per-Video Tags (core tags first + topic-specific tags — max 500 chars total)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <table>
+        <tr><th style="width:80px;">Video</th><th>Topic-Specific Tags (ADD after core tags above)</th><th style="width:200px;">Extra Hashtags</th></tr>
+        <tr>
+          <td><b>V1: Intro</b></td>
+          <td style="font-size:11px;">personal finance India, family wealth management, free investment tracker, free web app portfolio tracker, free portfolio tracker alternative, best free investment tracker, track investments in one place, mutual fund portfolio management, wealth tracker for family, capitalfriends.in</td>
+          <td style="font-size:11px;">#FreeTools #FamilyFinance #FreeWebApp</td>
+        </tr>
+        <tr>
+          <td><b>V2: Setup</b></td>
+          <td style="font-size:11px;">how to setup portfolio tracker, one click setup, no coding required, free web app setup, sign in with Google, free portfolio tracker India, financial health check, setup in 2 minutes, portfolio tracker free app, automatic setup portfolio tracker</td>
+          <td style="font-size:11px;">#OneClickSetup #NoCoding #FreeWebApp</td>
+        </tr>
+        <tr>
+          <td><b>V3: Family+Accounts</b></td>
+          <td style="font-size:11px;">family wealth tracker, track family investments, bank account tracker, investment account tracker, manage family finances, family finance web app, where is my money, investment accounts India, demat account tracker, track all investments one place</td>
+          <td style="font-size:11px;">#FamilyWealth #BankAccounts #ManageMoney</td>
+        </tr>
+        <tr>
+          <td><b>V4: Portfolio+Migrate</b></td>
+          <td style="font-size:11px;">create mutual fund portfolio, add existing holdings, migrate mutual fund data, live NAV tracking, auto NAV update, AMFI database, 8500 mutual funds, import mutual fund holdings, current NAV tracker, portfolio setup tutorial</td>
+          <td style="font-size:11px;">#LiveNAV #MigrateHoldings #AutoUpdate</td>
+        </tr>
+        <tr>
+          <td><b>V5: Buy/Sell/Switch</b></td>
+          <td style="font-size:11px;">SIP tracker free, record SIP investment, lumpsum investment tracker, sell mutual fund, switch mutual fund, rupee cost averaging, SIP vs lumpsum, track monthly SIP, mutual fund transaction tracker, average NAV calculator</td>
+          <td style="font-size:11px;">#SIPTracker #TrackSIP #RecordInvestments</td>
+        </tr>
+        <tr>
+          <td><b>V6: P&L</b></td>
+          <td style="font-size:11px;">mutual fund profit loss, how to calculate mutual fund returns, realized vs unrealized profit, did I make profit mutual fund, paper profit vs real profit, mutual fund capital gains, P&L tracker, switch is not profit, mutual fund returns calculator, track profit loss free</td>
+          <td style="font-size:11px;">#MutualFundReturns #ProfitTracker #PandL</td>
+        </tr>
+        <tr>
+          <td><b>V7: ATH+Crashes</b></td>
+          <td style="font-size:11px;">how to invest during market crash, when to buy mutual funds, market crash India, should I invest in market fall, buy the dip strategy, mutual fund correction, best time to invest lumpsum, SIP during market crash, market crash buying opportunity, invest during correction India</td>
+          <td style="font-size:11px;">#MarketCrash #WhenToInvest #BuyTheDip</td>
+        </tr>
+        <tr>
+          <td><b>V8: Rebalancing</b></td>
+          <td style="font-size:11px;">how to rebalance mutual fund portfolio, asset allocation India, how much to invest in each fund, portfolio rebalancing calculator, target allocation mutual fund, SIP allocation calculator, stop investing blindly, smart SIP strategy, fund composition analysis, equity debt ratio</td>
+          <td style="font-size:11px;">#SmartInvesting #AssetAllocation #Rebalancing</td>
+        </tr>
+        <tr>
+          <td><b>V9: Stocks</b></td>
+          <td style="font-size:11px;">stock portfolio tracker free, track stocks free web app, live stock prices free, free stock tracker India, NSE stock tracker, buy sell stocks tracker, stock P&L calculator, Google Finance stock tracker, share market tracker free, stock investment tracker India</td>
+          <td style="font-size:11px;">#StockTracker #FreeStockTracker #LivePrices</td>
+        </tr>
+        <tr>
+          <td><b>V10: Assets+Insurance</b></td>
+          <td style="font-size:11px;">track all investments one place, gold tracker, PPF tracker, insurance policy tracker, loan EMI tracker, net worth calculator India, FD tracker, complete investment tracker, real estate tracker, track insurance policies free, family should know your insurance</td>
+          <td style="font-size:11px;">#NetWorth #TrackEverything #InsuranceTracker</td>
+        </tr>
+        <tr>
+          <td><b>V11: Goal Planner</b></td>
+          <td style="font-size:11px;">SIP calculator for goals, how much SIP for retirement, retirement planning calculator India, child education fund calculator, emergency fund calculator, SIP for 1 crore, financial goal planner free, how much to invest monthly, retirement corpus calculator, goal based investing India</td>
+          <td style="font-size:11px;">#SIPCalculator #RetirementPlanning #GoalPlanner</td>
+        </tr>
+        <tr>
+          <td><b>V12: Goal Tracking</b></td>
+          <td style="font-size:11px;">track financial goals, link SIP to goals, goal progress tracker, am I on track for retirement, withdrawal planning mutual fund, portfolio goal mapping, investment goal tracker free, financial planning progress, SIP goal tracker India, retirement progress tracker</td>
+          <td style="font-size:11px;">#GoalTracker #RetirementTracker #FinancialPlanning</td>
+        </tr>
+        <tr>
+          <td><b>V13: Reminders+Email+Dashboard</b></td>
+          <td style="font-size:11px;">automated portfolio report, daily investment email, portfolio summary email free, investment dashboard free, insurance renewal reminder, EMI reminder, wealth report email, family wealth report, net worth dashboard free, portfolio dashboard web app</td>
+          <td style="font-size:11px;">#AutomatedReports #WealthDashboard #FreeEmail</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">SEO-Optimized Title Options (Every title must include "Free" or "Web App" — the core hook)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <table>
+        <tr><th style="width:60px;">Video</th><th>Option A (Recommended)</th><th>Option B</th></tr>
+        <tr><td>V1</td><td>FREE Mutual Fund Portfolio Tracker Web App | Capital Friends</td><td>Track Your Family's Investments FREE — No Downloads | Web App</td></tr>
+        <tr><td>V2</td><td>Setup FREE Portfolio Tracker Web App — 2 Minutes, No Coding!</td><td>How to Setup a FREE Mutual Fund Tracker — Just Sign In! (2 Min!)</td></tr>
+        <tr><td>V3</td><td>FREE Family Wealth Tracker — Add Members, Banks & Accounts | Web App</td><td>Your Family Should Know Your Bank Accounts | FREE Tracker Setup</td></tr>
+        <tr><td>V4</td><td>Add Mutual Funds to FREE Portfolio Tracker — Live NAV! | Web App</td><td>FREE Mutual Fund Tracker with Live NAV — Add Your Existing Holdings</td></tr>
+        <tr><td>V5</td><td>Track SIP, Lumpsum, Sell & Switch — FREE Mutual Fund Tracker</td><td>How to Record Every Mutual Fund Transaction | FREE Web App Tracker</td></tr>
+        <tr><td>V6</td><td>Did You ACTUALLY Make Profit? | FREE Mutual Fund P&L Tracker</td><td>Paper Profit vs Real Profit — Your FREE Tracker Shows Both</td></tr>
+        <tr><td>V7</td><td>How to Invest During Market Crashes | FREE Portfolio Tracker Alerts</td><td>Market Crashed? This FREE Tracker Shows Which Funds to Buy Now</td></tr>
+        <tr><td>V8</td><td>Stop Investing Blindly! FREE Portfolio Rebalancing Web App</td><td>How Much to Invest in Each Fund? | FREE Rebalancing Calculator</td></tr>
+        <tr><td>V9</td><td>FREE Stock Tracker with Live Prices | Web App India</td><td>Track Stocks FREE — Live NSE Prices & P&L | Web App</td></tr>
+        <tr><td>V10</td><td>Track Gold, PPF, Insurance & Loans FREE in One Web App</td><td>Your Complete Net Worth — FREE Tracker for ALL Investments</td></tr>
+        <tr><td>V11</td><td>How Much SIP for Retirement? FREE Goal Planner | Web App</td><td>FREE SIP Calculator — Plan Retirement, Education, House | Web App</td></tr>
+        <tr><td>V12</td><td>Am I On Track for Retirement? | FREE Goal Progress Tracker</td><td>Link Your SIPs to Goals — FREE Live Progress Tracker | Web App</td></tr>
+        <tr><td>V13</td><td>Get FREE Daily Wealth Report by Email | Portfolio Dashboard Web App</td><td>Automated Email Reports & Reminders — FREE Portfolio Tracker</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">First 30 Seconds — Say These Keywords (YouTube transcribes audio for ranking)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <table>
+        <tr><th style="width:60px;">Video</th><th>Must Say (core product hook)</th><th>Also Say (topic-specific)</th></tr>
+        <tr><td>V1</td><td>"free mutual fund portfolio tracker", "web app", "Capital Friends"</td><td>"family wealth", "no downloads needed", "track investments free"</td></tr>
+        <tr><td>V2</td><td>"free portfolio tracker", "web app", "setup in 2 minutes"</td><td>"sign in with Google", "no coding"</td></tr>
+        <tr><td>V3</td><td>"free family investment tracker", "web app"</td><td>"family members", "bank accounts", "investment accounts"</td></tr>
+        <tr><td>V4</td><td>"free mutual fund tracker", "live NAV", "web app"</td><td>"create portfolio", "add existing holdings", "auto NAV update"</td></tr>
+        <tr><td>V5</td><td>"free SIP tracker", "mutual fund tracker", "web app"</td><td>"record SIP", "lumpsum", "sell", "switch"</td></tr>
+        <tr><td>V6</td><td>"free mutual fund tracker", "profit and loss"</td><td>"realized profit", "unrealized", "did you actually make money"</td></tr>
+        <tr><td>V7</td><td>"free portfolio tracker", "market crash", "when to invest"</td><td>"buying opportunity", "which funds to buy"</td></tr>
+        <tr><td>V8</td><td>"free portfolio tracker", "how much to invest in each fund"</td><td>"rebalancing", "asset allocation", "stop investing blindly"</td></tr>
+        <tr><td>V9</td><td>"free stock tracker", "web app", "live prices"</td><td>"NSE stocks", "buy sell tracker", "P&L calculator"</td></tr>
+        <tr><td>V10</td><td>"free investment tracker", "track everything in one place"</td><td>"gold", "PPF", "insurance", "loans", "net worth"</td></tr>
+        <tr><td>V11</td><td>"free SIP calculator", "how much SIP for retirement"</td><td>"goal planner", "education fund", "emergency fund"</td></tr>
+        <tr><td>V12</td><td>"free goal tracker", "am I on track"</td><td>"link SIP to goals", "progress tracker", "withdrawal planning"</td></tr>
+        <tr><td>V13</td><td>"free portfolio report by email", "automated", "web app"</td><td>"reminders", "dashboard", "daily wealth report"</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Competitive Differentiation — Use in Descriptions</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <p>Stand out from paid portfolio tracking apps. Use these phrases:</p>
+      <p>• "Free web app — no downloads, works on any device"</p>
+      <p>• "100% free forever — no premium plan, no hidden charges"</p>
+      <p>• "Your data stays in your own Google Drive — complete privacy"</p>
+      <p>• "Works on phone, tablet, and computer — modern dark UI"</p>
+      <p>• "Sign in with Google — no separate account to create"</p>
+      <p>• "Family-wide portfolio tracker — not just individual"</p>
+      <p>• "No vendor lock-in — your data is in your own Google account"</p>
+      <p>• "Open source — see exactly how it works"</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">India Finance Market Stats (Use in Video Descriptions for Credibility)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <p>• Mutual fund search volume in India: 298 lakh monthly searches (31.8% YoY growth)</p>
+      <p>• SIP inflows hit record ₹29,361 crore/month in India</p>
+      <p>• Equity mutual fund AUM: ₹35.66 lakh crore (40.3% YoY increase)</p>
+      <p>• India has 491 million YouTube users (largest market globally)</p>
+      <p>• 91.8% of investment searches are long-tail keywords</p>
+      <p>• SIP/SWP calculator searches grew 413% year-over-year</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Thumbnail Text Suggestions (3-5 words max — focus on benefit, not feature name)</div>
+    <div class="demo-data" style="background:#1a1a3a; color:#aac;">
+      <table>
+        <tr><th style="width:60px;">Video</th><th>Thumbnail Text</th><th>Visual Idea</th></tr>
+        <tr><td>V1</td><td>100% FREE Tracker</td><td>Web app screenshot + ₹ symbol + "FREE" stamp + family silhouette</td></tr>
+        <tr><td>V2</td><td>Setup in 2 Min!</td><td>Timer showing 2:00 + green checkmark + sign-in with Google button</td></tr>
+        <tr><td>V3</td><td>Your Family Needs This</td><td>Family icons + bank/account icons connected by lines</td></tr>
+        <tr><td>V4</td><td>Live NAV Tracking!</td><td>Portfolio app screenshot with green NAV numbers updating</td></tr>
+        <tr><td>V5</td><td>Track Every ₹ Rupee</td><td>SIP/Sell/Switch icons with ₹ amounts flowing</td></tr>
+        <tr><td>V6</td><td>Real Profit or Fake?</td><td>₹ bill (real) vs fading ₹ (paper) — split screen with question mark</td></tr>
+        <tr><td>V7</td><td>Market Crash = BUY?</td><td>Red falling chart + "BUY" stamp in green + scared emoji</td></tr>
+        <tr><td>V8</td><td>Invest Smart, Not Blind</td><td>Pie chart: messy → balanced, with before/after arrow</td></tr>
+        <tr><td>V9</td><td>FREE Stock Tracker</td><td>Live stock prices (green/red) + web app screenshot + "FREE"</td></tr>
+        <tr><td>V10</td><td>ALL in One App</td><td>Icons: gold + house + insurance + loan all flowing into one app screen</td></tr>
+        <tr><td>V11</td><td>₹5 Crore Retirement?</td><td>Old couple icon + SIP calculator showing monthly amount</td></tr>
+        <tr><td>V12</td><td>On Track? Check FREE</td><td>Progress bar at 45% + goal flag + green arrow up</td></tr>
+        <tr><td>V13</td><td>Daily Report — FREE</td><td>Email icon with portfolio summary inside + bell notification</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ================================================================ -->
+<!-- ========== YOUTUBE SHORTS SCRIPTS (6 Shorts · 30-60 sec) ======= -->
+<!-- ================================================================ -->
+
+<div style="margin-top:60px;background:linear-gradient(135deg,#1a1a2e,#16213e);padding:30px;border-radius:16px;border:2px solid #6366f1;">
+  <h2 style="color:#ffd369;font-size:24px;margin-bottom:5px;">YOUTUBE SHORTS SCRIPTS</h2>
+  <p style="color:#aaa;font-size:14px;margin-bottom:20px;">6 Shorts · 30-60 seconds each · Hook → Problem → Solution → CTA</p>
+
+  <!-- HOW TO RECORD SHORTS -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:30px;">
+    <h3 style="color:#4ecca3;font-size:16px;margin-bottom:12px;">HOW TO CREATE SHORTS</h3>
+    <div style="color:#ccc;font-size:13px;line-height:1.8;">
+      <p><b style="color:#ffd369;">Recording (Super Simple):</b></p>
+      <p>1. Open <b>youtube-thumbnails.html</b> in Chrome → scroll to the Short thumbnail you want</p>
+      <p>2. Use <b>QuickTime → File → New Screen Recording</b> → select just the thumbnail area</p>
+      <p>3. Read the script below while pointing at the thumbnail on screen</p>
+      <p>4. Keep it under 60 seconds — shorter is better (30-45 sec ideal)</p>
+      <p>5. No editing needed — the thumbnail IS your visual content</p>
+      <br>
+      <p><b style="color:#ffd369;">Uploading:</b></p>
+      <p>1. Upload to YouTube as normal video</p>
+      <p>2. YouTube auto-detects Shorts if under 60 seconds</p>
+      <p>3. Add <b>#Shorts</b> in title or description to be safe</p>
+      <p>4. Horizontal recording is fine — YouTube Shorts supports it</p>
+      <br>
+      <p><b style="color:#ff6b6b;">Tips:</b></p>
+      <p>• First 2 seconds = HOOK — say something shocking or ask a question</p>
+      <p>• Don't introduce yourself — jump straight into the content</p>
+      <p>• Speak fast but clearly — no "umm" or pauses</p>
+      <p>• End with CTA: "Link in bio" or "Watch the full tutorial"</p>
+      <p>• No intro music needed — just start talking</p>
+    </div>
+  </div>
+
+  <!-- SHORT 1 -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#c62828;color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">SHORT 1</span>
+      <span style="color:#fff;font-weight:700;">Your Family Doesn't Know Where Your Money Is</span>
+      <span style="color:#888;font-size:12px;">~40 sec</span>
+    </div>
+    <div style="color:#ccc;font-size:13px;line-height:2;">
+      <p><b style="color:#ff6b6b;">HOOK (2 sec):</b> "What happens to your money if something happens to you tomorrow?"</p>
+      <p><b style="color:#ffd369;">PROBLEM (10 sec):</b> "Your family doesn't know your mutual fund portfolios. They don't know your insurance policy numbers. They don't know which bank accounts have money. They don't know your loan details. All this information is scattered across 10 different apps."</p>
+      <p><b style="color:#4ecca3;">SOLUTION (15 sec):</b> "Capital Friends is a free web app that puts everything in one place — your family can access it anytime from any device. Your spouse, your parents — everyone gets access. If something happens, they know exactly where every rupee is."</p>
+      <p><b style="color:#6366f1;">CTA (5 sec):</b> "It's completely free. Link in description. Watch the full setup tutorial on this channel."</p>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;">
+      <p style="color:#888;font-size:12px;"><b>Show on screen:</b> Display the SHORT 1 thumbnail while you speak. That's it — the thumbnail already shows all the key points visually.</p>
+    </div>
+  </div>
+
+  <!-- SHORT 2 -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#6366f1;color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">SHORT 2</span>
+      <span style="color:#fff;font-weight:700;">This FREE Tool Replaces Paid Apps</span>
+      <span style="color:#888;font-size:12px;">~45 sec</span>
+    </div>
+    <div style="color:#ccc;font-size:13px;line-height:2;">
+      <p><b style="color:#ff6b6b;">HOOK (2 sec):</b> "You're paying for portfolio tracking apps? Stop."</p>
+      <p><b style="color:#ffd369;">PROBLEM (10 sec):</b> "Most portfolio tracking apps track your mutual funds. But do they track your insurance? Your loans? Your stocks with FIFO P&L? Your gold and PPF? Do they auto-rebalance your portfolio? Do they send your family a daily email report? No."</p>
+      <p><b style="color:#4ecca3;">SOLUTION (20 sec):</b> "Capital Friends does ALL of this. In one free web app. For free. Forever. Mutual funds with live NAV from AMFI. Stocks with live prices from Google Finance. Insurance tracking. Loan tracking. Goal planning. Auto rebalancing. Daily email reports to your whole family. Your data stays in YOUR Google Drive. No third-party server. No subscription. Works on phone, tablet, computer."</p>
+      <p><b style="color:#6366f1;">CTA (5 sec):</b> "Link in description. It's free. The only cost is my domain fee — and even that is optional to support."</p>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;">
+      <p style="color:#888;font-size:12px;"><b>Show on screen:</b> Display the SHORT 2 thumbnail while you speak. The thumbnail already shows the Paid Apps vs Capital Friends comparison visually.</p>
+    </div>
+  </div>
+
+  <!-- SHORT 3 -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#e65100;color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">SHORT 3</span>
+      <span style="color:#fff;font-weight:700;">Market Crashed? Smart Investors See THIS</span>
+      <span style="color:#888;font-size:12px;">~40 sec</span>
+    </div>
+    <div style="color:#ccc;font-size:13px;line-height:2;">
+      <p><b style="color:#ff6b6b;">HOOK (2 sec):</b> "When the market crashes, most people panic. Smart investors open THIS."</p>
+      <p><b style="color:#ffd369;">PROBLEM (8 sec):</b> "Your fund's NAV dropped. Everyone is scared. But is it actually a good time to buy? How do you know? You need to see how far each fund has fallen from its all-time high."</p>
+      <p><b style="color:#4ecca3;">SOLUTION (20 sec):</b> "Capital Friends tracks ATH — All Time High — for every mutual fund automatically. See this? This fund is only 3% below ATH — small dip, not a big deal. But THIS fund? 23% below ATH. That's a sale. That's where you put your extra money. The colors tell you instantly — gold means small dip, orange means moderate, red means big opportunity."</p>
+      <p><b style="color:#6366f1;">CTA (5 sec):</b> "Red means sale is on. Get Capital Friends — link in description. Free forever."</p>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;">
+      <p style="color:#888;font-size:12px;"><b>Show on screen:</b> Display the SHORT 3 thumbnail while you speak. Point at the ATH data and color coding shown in the thumbnail.</p>
+    </div>
+  </div>
+
+  <!-- SHORT 4 -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#c62828;color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">SHORT 4</span>
+      <span style="color:#fff;font-weight:700;">Your App Shows Profit. It's FAKE.</span>
+      <span style="color:#888;font-size:12px;">~35 sec</span>
+    </div>
+    <div style="color:#ccc;font-size:13px;line-height:2;">
+      <p><b style="color:#ff6b6b;">HOOK (2 sec):</b> "Your app says you made profit. It's lying to you."</p>
+      <p><b style="color:#ffd369;">PROBLEM (10 sec):</b> "Most apps show you one number — total P&L. But that's UNREALIZED profit. Paper profit. The market can take it back tomorrow. You haven't actually made that money until you sell."</p>
+      <p><b style="color:#4ecca3;">SOLUTION (15 sec):</b> "Capital Friends tracks BOTH separately. Unrealized — what you'd get if you sold today. Realized — money you actually received from past sells. These are two very different numbers. If you don't track them separately, you don't know your real profit."</p>
+      <p><b style="color:#6366f1;">CTA (5 sec):</b> "Know the truth about your money. Capital Friends — free. Link in description."</p>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;">
+      <p style="color:#888;font-size:12px;"><b>Show on screen:</b> Display the SHORT 4 thumbnail while you speak. The thumbnail already shows the Unrealized vs Realized comparison visually.</p>
+    </div>
+  </div>
+
+  <!-- SHORT 5 -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#7c3aed;color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">SHORT 5</span>
+      <span style="color:#fff;font-weight:700;">Your SIP is Equal Every Month? You're Doing It WRONG</span>
+      <span style="color:#888;font-size:12px;">~45 sec</span>
+    </div>
+    <div style="color:#ccc;font-size:13px;line-height:2;">
+      <p><b style="color:#ff6b6b;">HOOK (3 sec):</b> "You're putting the same SIP amount in every fund every month? That's wrong."</p>
+      <p><b style="color:#ffd369;">PROBLEM (10 sec):</b> "Let's say you have two funds. Target allocation: 50-50. You put the same amount in both every month. But one fund grew more than the other. Now it's 60-40. Your portfolio is imbalanced. And your equal SIP keeps it imbalanced."</p>
+      <p><b style="color:#4ecca3;">SOLUTION (20 sec):</b> "Capital Friends has auto-rebalancing. It calculates EXACTLY how much to put in each fund to bring your portfolio back to target. This fund is underweight — invest more. This fund is overweight — invest less. You set your threshold — and the app does the math."</p>
+      <p><b style="color:#6366f1;">CTA (5 sec):</b> "Stop investing blindly. Get Capital Friends — link in description."</p>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;">
+      <p style="color:#888;font-size:12px;"><b>Show on screen:</b> Display the SHORT 5 thumbnail while you speak. Point at the Without Rebalancing vs With Capital Friends comparison shown in the thumbnail.</p>
+    </div>
+  </div>
+
+  <!-- SHORT 6 -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#0d47a1;color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">SHORT 6</span>
+      <span style="color:#fff;font-weight:700;">One FREE App Tracks EVERYTHING</span>
+      <span style="color:#888;font-size:12px;">~50 sec</span>
+    </div>
+    <div style="color:#ccc;font-size:13px;line-height:2;">
+      <p><b style="color:#ff6b6b;">HOOK (2 sec):</b> "One free web app. Your entire family's financial life. For free."</p>
+      <p><b style="color:#ffd369;">OVERVIEW (35 sec):</b> "Watch this. Family members and bank accounts — who owns what. Mutual fund portfolios with live NAV from AMFI — updated daily. Stocks with live prices from Google Finance — FIFO P&L calculated automatically. Gold, PPF, NPS — all your other investments. Insurance policies — health, term, car — with renewal reminders. Loans and EMIs — home loan, car loan, personal loan. Goal planner — retirement, education, emergency — calculates exactly how much SIP you need. Auto rebalancing — tells you exactly where to invest more and where to invest less. ATH tracking — shows you which funds are on sale. And every morning, your entire family gets an email report with everything."</p>
+      <p><b style="color:#6366f1;">CTA (5 sec):</b> "All of this. One app. Free forever. Capital Friends — link in description. If you haven't watched the intro video, start there."</p>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;">
+      <p style="color:#888;font-size:12px;"><b>Show on screen:</b> Display the SHORT 6 thumbnail or the web app while you speak. Show the sidebar with all pages — Dashboard, Portfolios, Goals, Insurance, etc. — point at each one as you mention it.</p>
+    </div>
+  </div>
+
+  <!-- SHORTS SEO -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+    <h3 style="color:#ffd369;font-size:16px;margin-bottom:12px;">SHORTS — TITLE & DESCRIPTION TEMPLATES</h3>
+    <div style="color:#ccc;font-size:13px;line-height:1.8;">
+      <p><b style="color:#4ecca3;">Title format:</b> [Hook text] | Capital Friends #Shorts</p>
+      <br>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tr style="border-bottom:1px solid #333;">
+          <th style="text-align:left;padding:8px;color:#ffd369;">Short</th>
+          <th style="text-align:left;padding:8px;color:#ffd369;">Title</th>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:8px;color:#888;">S1</td>
+          <td style="padding:8px;">Your Family Doesn't Know Where Your Money Is | Capital Friends #Shorts</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:8px;color:#888;">S2</td>
+          <td style="padding:8px;">This FREE Tool Replaces ₹5,000/yr Paid Apps | Capital Friends #Shorts</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:8px;color:#888;">S3</td>
+          <td style="padding:8px;">Market Crashed? Smart Investors Check THIS | Capital Friends #Shorts</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:8px;color:#888;">S4</td>
+          <td style="padding:8px;">Your App Shows Profit — It's FAKE | Capital Friends #Shorts</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:8px;color:#888;">S5</td>
+          <td style="padding:8px;">₹5,000 + ₹5,000 Every Month? WRONG! | Capital Friends #Shorts</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#888;">S6</td>
+          <td style="padding:8px;">One FREE App Tracks Your ENTIRE Financial Life | Capital Friends #Shorts</td>
+        </tr>
+      </table>
+      <br>
+      <p><b style="color:#4ecca3;">Description (same for all Shorts):</b></p>
+      <div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-top:8px;font-size:12px;color:#aaa;">
+        Capital Friends — FREE portfolio tracker web app for your entire family.<br><br>
+        Get it FREE: https://capitalfriends.in<br>
+        Full Tutorial Playlist: [playlist link]<br>
+        Support the developer: Settings → Support Developer<br><br>
+        #Shorts #MutualFunds #PortfolioTracker #FreeWebApp #FREE #PersonalFinance #SIP #Investing #CapitalFriends
+      </div>
+    </div>
+  </div>
+
+  <!-- POSTING STRATEGY -->
+  <div style="background:#111;border:1px solid #333;border-radius:12px;padding:20px;">
+    <h3 style="color:#ffd369;font-size:16px;margin-bottom:12px;">SHORTS POSTING STRATEGY</h3>
+    <div style="color:#ccc;font-size:13px;line-height:1.8;">
+      <p><b style="color:#4ecca3;">When to post:</b></p>
+      <p>• Post Shorts BEFORE your tutorial videos — they bring discovery traffic</p>
+      <p>• Best time: 6-9 AM IST or 7-10 PM IST (when Indians browse YouTube)</p>
+      <p>• Post 1-2 Shorts per week alongside your tutorial uploads</p>
+      <br>
+      <p><b style="color:#4ecca3;">Recommended order:</b></p>
+      <p>1. SHORT 1 (Family safety) — emotional hook, works even before tutorials are up</p>
+      <p>2. SHORT 6 (Track everything) — shows the full product, wow factor</p>
+      <p>3. SHORT 2 (Free vs Paid) — competitive angle, attracts searchers</p>
+      <p>4. SHORT 3 (Market crash/ATH) — post when market is red for viral potential</p>
+      <p>5. SHORT 5 (Rebalancing) — educational, unique feature</p>
+      <p>6. SHORT 4 (Fake profit) — controversial hook, good engagement</p>
+      <br>
+      <p><b style="color:#ff6b6b;">Pro tip:</b> SHORT 3 (Market Crashed) — save this for a day when NIFTY/SENSEX drops 1%+. Post it that same day. It will get views because everyone is searching "market crash" that day.</p>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

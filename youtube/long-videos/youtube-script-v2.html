@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capital Friends - YouTube Video 1 Script (Revised)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #1e1e1e;
+      color: #ddd;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 15px 20px;
+    }
+    .top-bar {
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    h1 { color: #4ecca3; font-size: 20px; display: inline; }
+    .subtitle { display: inline; color: #888; font-size: 13px; margin-left: 10px; }
+    .version-note { background: #1a3a2c; color: #4ecca3; padding: 8px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; border-left: 3px solid #4ecca3; }
+
+    .slide {
+      background: #252526;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      border-left: 3px solid #4ecca3;
+    }
+    .slide.demo { border-left-color: #ffd369; }
+    .slide.closing { border-left-color: #ff6b6b; }
+
+    .slide-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .slide-number {
+      background: #4ecca3;
+      color: #1a1a2e;
+      font-weight: bold;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .slide-number.demo-badge { background: #ffd369; }
+    .slide-number.closing-badge { background: #ff6b6b; color: #fff; }
+    .slide-title {
+      color: #4ecca3;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .slide-time {
+      color: #888;
+      font-size: 11px;
+      margin-left: auto;
+    }
+
+    .slide-note {
+      background: #1a3a5c;
+      color: #ffd369;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-bottom: 6px;
+      font-style: italic;
+    }
+
+    .script-text { color: #ddd; line-height: 1.7; }
+    .script-text p { margin-bottom: 8px; }
+    .hl { color: #ffd369; font-weight: bold; }
+    .fn { color: #4ecca3; font-weight: bold; }
+    .action { color: #f97; font-style: italic; font-size: 13px; }
+    .pause { color: #888; font-style: italic; font-size: 12px; }
+
+    .feature-list {
+      background: #1a1a2e;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin: 8px 0;
+    }
+    .feature-list .feat {
+      padding: 3px 0;
+      font-size: 14px;
+    }
+    .feature-list .feat::before {
+      content: "  ";
+      color: #4ecca3;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+
+    .duration {
+      text-align: center;
+      color: #888;
+      font-size: 12px;
+      margin-top: 12px;
+      padding: 8px;
+    }
+    .timestamps {
+      background: #1a1a3a;
+      border-radius: 6px;
+      padding: 10px 16px;
+      margin-top: 10px;
+    }
+    .timestamps h3 { color: #4ecca3; font-size: 13px; margin-bottom: 6px; }
+    .timestamps p { color: #aaa; font-size: 13px; margin-bottom: 2px; }
+
+    @media print {
+      body { background: white; color: #222; font-size: 14px; }
+      .slide { border-color: #333; background: #f9f9f9; }
+      .script-text { color: #222; }
+      .hl { color: #b8860b; }
+      .fn { color: #006644; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="top-bar">
+      <h1>Capital Friends &mdash; Video 1 Script (Revised)</h1>
+      <span class="subtitle">~14 min | 15 Slides + Live Demo | Natural Conversational Style</span>
+    </div>
+
+    <div class="version-note">
+      <strong>V2 Script (Conversational)</strong> &mdash; Aligned with slides from <b>youtube-slides.html</b> (8 slides). Expanded live demo based on Menu.js functionality. Natural speaking style, not bullet points.
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 1 — HOOK -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 1</span>
+        <span class="slide-title">Hook &mdash; Your Family Should Know</span>
+        <span class="slide-time">0:00 - 0:30</span>
+      </div>
+      <div class="slide-note">Show SLIDE 1 from youtube-slides.html</div>
+      <div class="script-text">
+        <p>Hi everyone, welcome to Capital Friends.</p>
+
+        <p>Quick thing before we start. I'm not a professional video maker. I just make simple videos about this tool. And I'm not a money expert, so please don't take this as professional advice. My English might not be perfect, but I'll keep everything very simple so everyone can understand.</p>
+
+        <p>OK, now think about this. <span class="hl">Does your family know about all your money?</span> Your bank accounts, your investments, your insurance. Everything.</p>
+
+        <p>Most people will say no. And that's a big problem.</p>
+
+        <p>Capital Friends is a <span class="hl">free tool</span> that fixes this problem. Your family can see everything about your money. It's free forever. No charges. Your family knows everything, and your information stays private with you.</p>
+
+        <p>Let me show you how.</p>
+
+        <p style="margin-top:10px;"><span class="hl">Quick challenge for you</span> - pause this video right now, go ask your family members if they know about ALL your investments. Then come back and comment what you found out. Do they know everything? Some things? Nothing at all? Just comment honestly - I'm genuinely curious to see what people discover.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 2 — HIDDEN DANGER -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 2</span>
+        <span class="slide-title">The Hidden Danger</span>
+        <span class="slide-time">0:30 - 1:30</span>
+      </div>
+      <div class="slide-note">Show SLIDE 2 from youtube-slides.html &mdash; 4 card-based sections in 2x2 grid</div>
+      <div class="script-text">
+        <p>OK so think about this honestly. Where is your money right now? You probably have a few bank accounts. Some mutual funds. Maybe some stocks. PPF, or fixed deposits, or some gold at home. Maybe a home loan or car loan running. Health insurance, maybe a term policy too.</p>
+
+        <p>It is all in different places. And only YOU have the full picture in your head. Your wife does not have it. Your parents do not have it. Your kids definitely do not have it.</p>
+
+        <p>Now think - what happens if something bad happens to you? Even just for a few months, not permanently. Who finds the bank accounts? Who knows which insurance you have and how to claim it? Who knows where the loan papers are? Nobody. Your family is completely stuck. They can't find anything.</p>
+
+        <p>And here's something that will shock you. Every year in India, thousands of crores of insurance money just sits there, unclaimed. The policy was perfectly fine. The family just didn't know it existed. Think about that. Real families losing crores of rupees simply because nobody told them.</p>
+
+        <p style="margin-top:10px;"><span class="hl">If this has ever made you worried</span> - that your family doesn't know where everything is - just hit the like button. That way I know this topic matters and I'll make more videos about protecting your family.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 3 — EXISTING SOLUTIONS FAIL -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 3</span>
+        <span class="slide-title">Why Existing Apps Don't Solve This</span>
+        <span class="slide-time">1:30 - 2:15</span>
+      </div>
+      <div class="slide-note">Show SLIDE 3 from youtube-slides.html &mdash; two columns: Problems on the left, What You Need on the right</div>
+      <div class="script-text">
+        <p>You might be thinking, "But there are already apps to track money, right?" Yes, I know. I tried them myself actually. Let me tell you what happened.</p>
+
+        <p>I tried these apps. I gave them my PAN card to track my mutual fund investments. It worked for tracking my investments. But I wanted to see my whole family's money together. My wife has her investments, kids have their accounts. I couldn't add them. The app only showed my investments, not the family's complete wealth. And I had to pay every month just to see my own information.</p>
+
+        <p>Then I thought - even after paying, my family can't see any of this. If something happens to me, they don't know which app I use, they don't know passwords, nothing. They would be completely lost. Plus all my information is sitting in some company's computer somewhere. I didn't like that.</p>
+
+        <p>So I thought, what do I actually need? I need something completely free. I need everything in one place - my money, my wife's money, kids' money, everything together. I need my family to get updates by email automatically without me doing anything. And I need privacy - information stays in my Google account only, not some other company.</p>
+
+        <p>I couldn't find anything like this. So I built it myself. That's why Capital Friends exists.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 4 — THE SOLUTION -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 4</span>
+        <span class="slide-title">How Capital Friends Works</span>
+        <span class="slide-time">2:15 - 3:00</span>
+      </div>
+      <div class="slide-note">Show SLIDE 4 from youtube-slides.html &mdash; 4 cards in 2x2 grid with bullet points</div>
+      <div class="script-text">
+        <p>So how does this actually work? Very simple.</p>
+
+        <p>You go to capitalfriends dot in and sign in with your Google account. That's it. The app opens and you see your dashboard. You use simple forms to add your information — bank accounts, mutual funds, insurance, loans, whatever you have. You don't need to know anything about computers. If you can use WhatsApp, you can use this. Seriously. It works on your phone, tablet, computer — any device with a browser.</p>
+
+        <p>Once you put in your information, the app does everything by itself. Mutual fund prices? Updated every day automatically. Stock prices? Live, always current. You see your total wealth, profit, loss - all updating on their own. You just check it, you don't have to do anything.</p>
+
+        <p>Then you add your family. Wife, parents, kids, whoever. You say - send them an email every Monday morning, or every day, or every month. And that's it. They start getting a complete report in their inbox automatically. You don't have to remember to tell them anything. It just happens.</p>
+
+        <p>And the most important thing - everything stays in YOUR Google account. Your Google Drive. There is no other company involved. Nobody else can see your information. Not me, not anyone. It's just between you and your family. The app just gives you a beautiful way to manage it all.</p>
+
+        <p style="margin-top:10px;"><span class="hl">All your financial data stays in YOUR Google Drive only. No company servers, no third party.</span> If that matters to you, hit the like button. And drop a comment below - are you using any portfolio tracker right now, or is this the first time you're thinking about this? I read every comment.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 5 — WHAT IT DOES (FEATURE OVERVIEW) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 5</span>
+        <span class="slide-title">What Capital Friends Does &mdash; Feature Overview</span>
+        <span class="slide-time">3:00 - 3:15</span>
+      </div>
+      <div class="slide-note">Show SLIDE 5 from youtube-slides.html &mdash; 8 feature boxes in 4x2 grid (show briefly for ~10 sec, then switch to LIVE DEMO)</div>
+      <div class="script-text">
+        <p>Here's what Capital Friends can do. One-click setup, financial health check, complete wealth dashboard. Mutual funds with live NAV and ATH tracking, portfolio rebalancing. Stock tracking, goal planner with SIP calculator. Bank accounts, insurance, loans, everything. Let me open the app and show you how it works.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- LIVE DEMO -->
+    <!-- ============================================================ -->
+    <div class="slide demo">
+      <div class="slide-header">
+        <span class="slide-number demo-badge">LIVE DEMO</span>
+        <span class="slide-title">Web App Walkthrough — What Capital Friends Can Do</span>
+        <span class="slide-time">3:15 - 7:45</span>
+      </div>
+      <div class="slide-note">Switch to SCREEN RECORDING of capitalfriends.in. Walk through SIDEBAR NAVIGATION — in the exact order the pages appear. No need to show live data. For each feature, one or two lines of what it does, then "full tutorial in the playlist."</div>
+      <div class="script-text">
+        <p class="action">[Open capitalfriends.in in browser, show the web app]</p>
+        <p>OK so this is the Capital Friends web app. On the left side you see a sidebar with all the sections. This is where everything is. Let me go through it quickly — I have a separate detailed video for each feature, all in a playlist. Links are in the description below.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">1. ONE-CLICK SETUP &amp; FINANCIAL HEALTH CHECK</p>
+        <p class="action">[Show the Settings page and Financial Health Check section]</p>
+        <p><span class="fn">ONE-CLICK SETUP</span> — when you first sign in, the app sets everything up for you automatically. Done in seconds. Then there is <span class="fn">Financial Health Check</span> — simple yes or no questions. Do you have health insurance? Emergency fund? A will? It gives you a score and tells you what is missing. Good to do first. Both have tutorials in the playlist.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">2. DASHBOARD, SEND EMAIL REPORT, EMAIL SETTINGS</p>
+        <p class="action">[Click on Dashboard in the sidebar, then show Email Settings]</p>
+        <p><span class="fn">Dashboard</span> — your full family money picture in one screen. Total wealth, loans, real net worth. <span class="fn">Send Email Report</span> — sends everything to your whole family by email in one click. And <span class="fn">Email Settings</span> — you choose how often: daily, weekly, monthly. After that it goes automatically. You do nothing.</p>
+
+        <p style="margin-top:14px;padding:14px;background:rgba(78,204,163,0.08);border-left:3px solid #4ecca3;border-radius:6px;">I want to say something honestly. I have seen families lose someone and then on top of that pain, they have to start searching everywhere. Which bank? Which insurance? Where are the papers? The family is already suffering. And now this extra struggle on top of it. No family should go through that. That is why I made this. That is the only reason.<br><br>
+        So if you know someone who needs this — your parents, a brother, a sister, a close friend — please <span class="hl">share this video with them right now</span>. Just tap share and send. Takes five seconds. You might save that family from a lot of trouble. That is all I am asking.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">3. GOALS</p>
+        <p class="action">[Click on Goals in the sidebar — show Goal Planner, Goals list, Add Goal]</p>
+        <p><span class="fn">Goals</span> — what are you saving for? House, retirement, child education. You put how much you need and in how many years. The app tells you exactly how much SIP you need every month. <span class="fn">Goals Dashboard</span> shows all your goals with progress. And the <span class="fn">Goal Planner wizard</span> walks you through everything step by step. Full tutorial in the playlist.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">4. FAMILY MEMBERS, BANK ACCOUNTS, INVESTMENT ACCOUNTS</p>
+        <p class="action">[Click through Family Members, Bank Accounts, Investment Accounts pages in the sidebar]</p>
+        <p><span class="fn">Family Members</span> — add everyone with their email, they get the reports. <span class="fn">Bank Accounts</span> — which banks you use, rough balance. <span class="fn">Investment Accounts</span> — Zerodha, Groww, Kuvera, whichever platforms you use. All of this goes into your complete family picture.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">5. MUTUAL FUNDS</p>
+        <p class="action">[Click on Portfolios in the sidebar — show Create Portfolio, Buy SIP, Buy Lumpsum, Sell, Switch, Portfolio Allocation]</p>
+        <p><span class="fn">Mutual Funds</span> — create portfolios, record SIP and lumpsum, sell, switch funds. NAV updates every day automatically from the official AMFI database. You also get ATH tracking — how far below its all-time high each fund is right now — and rebalancing suggestions to keep your allocation on plan. Each of these has a full tutorial in the playlist.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">6. STOCKS, OTHER INVESTMENTS, LIABILITIES, INSURANCE</p>
+        <p class="action">[Click through each section in the sidebar: Stocks, Other Investments, Liabilities, Insurance]</p>
+        <p><span class="fn">Stocks</span> — all NSE stocks, live price from Google, buy and sell tracking. <span class="fn">Other Investments</span> — gold, PPF, EPF, fixed deposits, real estate. <span class="fn">Liabilities</span> — home loan, car loan, personal loan. Total assets minus liabilities shows your real net worth. And <span class="fn">Insurance</span> — all your policies, what they cover, when to renew. Your family can see all of this anytime.</p>
+
+        <p style="color:#4ecca3;font-weight:bold;font-size:13px;margin-top:10px;">7. REMINDERS</p>
+        <p class="action">[Click on Reminders in the sidebar]</p>
+        <p><span class="fn">Reminders</span> — insurance renewal coming? SIP date? It sends email reminders to your family before the date. Nothing gets missed. No policy lapses because someone forgot.</p>
+
+        <p style="margin-top:12px;">That is the full app — every section you see in the sidebar. Everything in one free web app. No downloads, no subscription, no company storing your data. All your data stays in your Google account — just between you and your family. Every feature has a step-by-step tutorial in the playlist below.</p>
+
+        <p style="margin-top:10px;"><span class="hl">Tell me in the comments — what is your biggest financial goal right now?</span> House? Retirement? Child's education? I want to make separate videos for each and your comments help me decide which one to do first.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SUBSCRIBE CALL-OUT AFTER DEMO -->
+    <!-- ============================================================ -->
+    <div class="slide" style="border-left-color: #ffd369; background: #2a2a1e;">
+      <div class="slide-header">
+        <span class="slide-number" style="background: #ffd369; color: #1a1a2e;">SUBSCRIBE</span>
+        <span class="slide-title" style="color: #ffd369;">Subscribe for Detailed Tutorials</span>
+        <span class="slide-time">7:45 - 8:05</span>
+      </div>
+      <div class="slide-note">Stay on screen or show subscribe button animation</div>
+      <div class="script-text">
+        <p><span class="hl">Before we continue, please subscribe to this channel and turn on the bell icon.</span> I'm creating a complete learning series with detailed tutorials for every feature. How to set up your account, how to track mutual funds, how to use the goal planner, how to set up email reports, everything step by step. You don't want to miss those tutorials.</p>
+
+        <p>Hit that <span class="hl">subscribe button</span> and the <span class="hl">bell icon</span> right now so you get notified when new videos come out.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 6 — WHY IS THIS FREE -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 6</span>
+        <span class="slide-title">Why Is This Free</span>
+        <span class="slide-time">8:05 - 8:50</span>
+      </div>
+      <div class="slide-note">Show SLIDE 6 from youtube-slides.html &mdash; 4 numbered cards (01-04) in 2x2 grid + highlight box</div>
+      <div class="script-text">
+        <p>I know what you're thinking. Why is this free? Everyone asks me this. What's the catch? Let me tell you honestly.</p>
+
+        <p>I made this for myself and my family first. I couldn't find anything that did what I needed. I wanted to track everything, I wanted my family to see everything, and I wanted privacy. Nothing was there. So I made it myself. It worked for me, so I kept using it.</p>
+
+        <p>But then I realized - every family needs this. Whether you have one lakh or one crore, your family should know where everything is. Money knowledge shouldn't be only for rich people. Every family needs this. So if every family needs it, it must be free. Simple.</p>
+
+        <p>Also, think how this works. Everything runs on YOUR Google account. Your data stays in your Google Drive. The app just gives you a beautiful way to manage it. Your Gmail sends emails. There is nothing on my side. I don't have any computer storing data. I don't have any costs. My cost is zero rupees. So what should I charge you for? Nothing.</p>
+
+        <p>And here's the most important reason it will stay free forever. I can never see your information. Never. Your money information stays between you and your family only. If I made this a paid thing, I would have to collect your information, take payments, store everything. I don't want to do that. I want your information to stay yours only.</p>
+
+        <p>The goal is very simple. Help every Indian family know their money situation clearly. That's it. That's the only goal.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 7 — 7 QUESTIONS OVERVIEW -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 7</span>
+        <span class="slide-title">7 Questions Every Family Must Answer</span>
+        <span class="slide-time">8:50 - 9:35</span>
+      </div>
+      <div class="slide-note">Show SLIDE 7 from youtube-slides.html &mdash; All 7 questions on ONE slide.</div>
+      <div class="script-text">
+        <p>Alright, now let me ask you seven critical questions. Can you and your family honestly answer "Yes" to all of these right now, today?</p>
+
+        <p class="pause">[Point to each question on the slide as you read it]</p>
+
+        <p><span class="hl">One.</span> Do you have adequate health insurance?</p>
+        <p><span class="hl">Two.</span> Do you have term life insurance?</p>
+        <p><span class="hl">Three.</span> Do you have six or more months of emergency fund saved up?</p>
+        <p><span class="hl">Four.</span> Does your family actually know where all your assets are?</p>
+        <p><span class="hl">Five.</span> Do you have a registered will?</p>
+        <p><span class="hl">Six.</span> Are your nominees updated on every single account?</p>
+        <p><span class="hl">Seven.</span> Have you set clear financial goals with an actual plan to reach them?</p>
+
+        <p style="margin-top:10px;">Look, these aren't just random questions. These seven things literally decide whether your family will be financially secure or completely destroyed when life throws surprises at you. And life will throw surprises. These matter way more than which mutual funds you picked or what returns you're getting. Let me break down each one with real examples so you understand exactly why they matter. Pay close attention here.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 8 — QUESTION 1: HEALTH INSURANCE (DETAILED) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 8</span>
+        <span class="slide-title">Question 1: Health Insurance — The Math</span>
+        <span class="slide-time">9:35 - 10:05</span>
+      </div>
+      <div class="slide-note">Create a new slide showing health insurance calculations and comparison</div>
+      <div class="script-text">
+        <p><span class="hl">Question one. Do you have good health insurance?</span></p>
+
+        <p>Think about this simply. The total amount you pay as premium over 20 years - that same amount might cover just one big hospital bill. One serious operation, one ICU stay. Just one. But your insurance is covering you every single year for those 20 years. Every year you get full coverage. That is the deal you are getting. The exact numbers will be different for everyone based on your age and what plan you take - but the idea is the same. What you pay over 20 years is what one hospital bill can cost you.</p>
+
+        <p>And without insurance, one big medical problem can finish everything you saved for years. Everything gone in a few weeks. I personally have health insurance and I am very happy about it. The peace of mind is worth so much more than the premium.</p>
+
+        <p>One thing - get it when you are young. The younger you are, the cheaper it is. After a certain age, companies will not give you new insurance. So please do not wait. If you do not have health insurance today, make this the first thing you do.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 9 — QUESTION 2: TERM INSURANCE (DETAILED) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 9</span>
+        <span class="slide-title">Question 2: Term Insurance — Your Family's Safety Net</span>
+        <span class="slide-time">10:05 - 10:30</span>
+      </div>
+      <div class="slide-note">Create a new slide showing term insurance impact</div>
+      <div class="script-text">
+        <p><span class="hl">Question two. Do you have term life insurance?</span> This is the most important thing you can do for your family.</p>
+
+        <p>Term insurance is very simple. You pay a small amount every month. If something happens to you, your family gets a big amount - one crore, two crore, whatever you choose. And the monthly cost is very low. Usually less than what you spend going out to eat twice a month. The exact amount depends on your age and health, but it is genuinely very affordable.</p>
+
+        <p>Think about what that means for your family. If something happens to you, they get a big lump sum. They can put that money in a fixed deposit or safe investment. The monthly interest from that is enough to cover all their living costs. Your children's school fees keep going. Your home loan EMI keeps running. Life does not fall apart for your family. That is what term insurance does for a small monthly payment.</p>
+
+        <p>Please get this done. If you do not have term insurance right now, make this your second priority after health insurance. Your family depends on you.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 10 — QUESTION 3: EMERGENCY FUND (COVID EXAMPLE) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 10</span>
+        <span class="slide-title">Question 3: Emergency Fund — The COVID Lesson</span>
+        <span class="slide-time">10:30 - 11:00</span>
+      </div>
+      <div class="slide-note">Create a new slide showing COVID 2020 scenario with timeline</div>
+      <div class="script-text">
+        <p><span class="hl">Question three. Do you have six months of emergency fund?</span> COVID two thousand twenty taught us this lesson very clearly.</p>
+
+        <p>Remember March two thousand twenty lockdown? Millions of people lost jobs overnight. Imagine two people. Both lost jobs in April. Both had monthly expenses around fifty to sixty thousand. Market had crashed thirty percent.</p>
+
+        <p>First person had no emergency fund. Had to sell mutual funds at a big loss just to pay EMIs and daily expenses. Lost close to one lakh rupees. And missed the whole market recovery that came later.</p>
+
+        <p>Second person had six months emergency fund kept in a savings account. Used that money for expenses and EMIs. Did not touch the investments at all. When the market came back in December, the portfolio recovered and made profit.</p>
+
+        <p>Same situation. Both lost jobs. But one had an emergency fund and came out fine. The other took a big loss. That is why you need six months of expenses kept aside — in a savings account or liquid fund — where you can get it immediately. This one thing protects you when life surprises you.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 11 — QUESTION 4: FAMILY AWARENESS (DETAILED) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 11</span>
+        <span class="slide-title">Question 4: Family Awareness — The Search Nightmare</span>
+        <span class="slide-time">11:00 - 11:25</span>
+      </div>
+      <div class="slide-note">Create a new slide showing scattered assets visualization</div>
+      <div class="script-text">
+        <p><span class="hl">Question four. Does your family know where all your assets are?</span></p>
+
+        <p>Think about a family that just lost someone. They are already going through the hardest time of their life. The family is broken. There is so much pain. There are so many things to handle. And right in the middle of all this, they also have to figure out the money. Which bank accounts? Which insurance? Where are the papers? They don't know. Nobody told them.</p>
+
+        <p>So they start searching. They find one bank account, maybe two. But there could be more — nobody knows which banks. There were mutual fund investments, but in which apps? Fixed deposits somewhere, but which bank? There was a term insurance policy with one crore coverage — but the family had no idea it existed. They find out years later from some old file. All that time they thought there was nothing. PPF account, property papers, bank locker — each one is a new search, a new phone call, a new struggle. And this is all happening while they are already broken inside.</p>
+
+        <p>This is not rare. This happens to real families all the time. Not because anyone was bad or careless. Just because nobody ever sat down and told their family where everything is.</p>
+
+        <p>Capital Friends solves exactly this. You put everything in one place — one app that your family can access anytime. They get a report every week or every month. They know what you have, where it is, and how to find it — without having to search anywhere. That peace of mind is why this tool exists.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 12 — QUESTION 5: WILL & LEGAL HEIR (DETAILED) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 12</span>
+        <span class="slide-title">Question 5: Will — The Legal Nightmare</span>
+        <span class="slide-time">11:25 - 12:00</span>
+      </div>
+      <div class="slide-note">Create a new slide showing legal heir certificate process timeline</div>
+      <div class="script-text">
+        <p><span class="hl">Question five. Do you have a registered will?</span> Let me tell you what happens when the answer is no.</p>
+
+        <p>Without a will, your family has to go to court to get something called a Legal Heir Certificate. Until they get that paper, they cannot touch any bank account. Cannot sell property. Cannot claim insurance. Nothing. Everything is locked. Not one rupee is available.</p>
+
+        <p>And here is the hard part. All family members have to come to court in person. Your son is working in another country? He has to come back. Your daughter is sick or pregnant? She has to come. The court will not give the certificate unless everyone is physically there. So there are delays, lawyer fees, and your family is borrowing money from relatives just to pay daily bills.</p>
+
+        <p>This whole process takes one to three years. Sometimes more. All that time, your family is struggling - even though you had money.</p>
+
+        <p>But with a registered will, everything goes to the right people in one or two months. Simple and clean. Making a will costs very little - maybe five to ten thousand rupees total, one time. Please do not keep putting this off. Do it this month.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 13 — QUESTION 6: NOMINEES (DETAILED) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 13</span>
+        <span class="slide-title">Question 6: Nominees — The Forgotten Detail</span>
+        <span class="slide-time">12:00 - 12:25</span>
+      </div>
+      <div class="slide-note">Create a new slide showing nominee update checklist</div>
+      <div class="script-text">
+        <p><span class="hl">Question six. Are your nominees updated on every account?</span></p>
+
+        <p>When you were young and not married, you probably put your parents as nominees. That was right at that time. Then you got married. Then you had children. But did you go back and update the nominee? Most people never did. So if something happens, the money goes to whoever is written there. Your wife and kids may not even be listed.</p>
+
+        <p>This is very easy to fix. Most banks now let you change nominees online from your phone. You open your account, go to settings, and add whoever should be there - your wife, children, parents, anyone. You can also split it. Half to your wife, half to your kids. Whatever feels right. Takes five minutes per account.</p>
+
+        <p>This weekend, just check each account - who is your nominee right now? Update it if needed. It is one of the easiest things on this list. Please do not skip it.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 14 — QUESTION 7: GOALS (DETAILED) -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 14</span>
+        <span class="slide-title">Question 7: Goals — Know Your Target</span>
+        <span class="slide-time">12:25 - 12:50</span>
+      </div>
+      <div class="slide-note">Create a new slide showing goal planning example with calculations</div>
+      <div class="script-text">
+        <p><span class="hl">Question seven. Do you have clear goals for your money with a real plan?</span></p>
+
+        <p>Many people start investing by putting a small amount — maybe one thousand rupees in some fund — just to try it out and see how it works. That is fine as a first step. But here is something to think about. Let's say you put one thousand rupees in a mutual fund and after two years it becomes two thousand. That is one hundred percent return. Very good. But then what? You have one thousand rupees of profit. What will you do with that? Will it pay for your child's college? Will it help you buy a house? It will not. The return was good, but the amount was never enough to matter.</p>
+
+        <p>This is what happens when there is no goal. You are investing, but you do not know how much you actually need to invest. You are just putting whatever feels okay. And ten years later, you realize the number is not enough for what you wanted.</p>
+
+        <p>When you have a real goal, everything changes. Let's say you want money for your child's education in ten years — maybe fifteen lakhs. You put that into the Goal Planner — how much you need, how many years. It tells you the exact SIP amount you need every month. Now you know. Not five hundred, not one thousand, but the exact number. Every month you pay that amount, you are one step closer. You are not guessing anymore.</p>
+
+        <p>Capital Friends has a Goal Planner built in. You just enter what you want, when you need it, and what return you expect. It gives you the number. No calculation needed. Simple.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 7 CONTINUED — COUNT YOUR SCORE -->
+    <!-- ============================================================ -->
+    <div class="slide">
+      <div class="slide-header">
+        <span class="slide-number">SLIDE 7 (CONT)</span>
+        <span class="slide-title">Count Your Score</span>
+        <span class="slide-time">12:50 - 13:05</span>
+      </div>
+      <div class="slide-note">Go back to SLIDE 7 from youtube-slides.html with all 7 questions</div>
+      <div class="script-text">
+        <p>So now you know why each question matters. Each one of these can save your family from years of pain and a lot of money.</p>
+
+        <p><span class="hl">Count your score right now.</span> Out of these seven questions, how many have you actually done? Be honest with yourself.</p>
+
+        <p><span class="hl">Write your number in the comments below.</span> Just the number - like 3 out of 7, or 5 out of 7. Let's see where everyone is. When you see other people's scores you realize you are not alone - and you know what to work on next.</p>
+
+        <p>If you got 5 or more - that is really good. You are doing much better than most people. Keep going and finish the remaining ones.</p>
+
+        <p>If you got less than 5 - that is fine. Most people are in the same place. The good thing is you now know what to fix. Take it one by one. Start with the most important ones - health insurance, term insurance, nominees. You can do this.</p>
+
+        <p>Capital Friends helps you with all seven of these. It helps you track your money, plan your goals, and keep your family informed. Start using it today. It is free. Your family is worth it.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- SLIDE 15 — HOW TO START + CTA -->
+    <!-- ============================================================ -->
+    <div class="slide closing">
+      <div class="slide-header">
+        <span class="slide-number closing-badge">SLIDE 15</span>
+        <span class="slide-title">Get Started in 2 Minutes + Closing CTA</span>
+        <span class="slide-time">13:05 - 13:30</span>
+      </div>
+      <div class="slide-note">Show SLIDE 8 from youtube-slides.html &mdash; 4 step cards + CTA buttons at bottom</div>
+      <div class="script-text">
+        <p>One last thing before we finish. Think about someone you care about - your parents, brother, sister, close friend - who has money in many different places and their family has no idea about any of it. Share this video with them right now. Takes five seconds. It is completely free for everyone and every family in India needs this.</p>
+
+        <p style="margin-top:10px;">Getting started takes two minutes. Go to capitalfriends dot in and sign in with your Google account. The app sets everything up for you automatically. Add your family members, set up email reports, and you are done. The reports start going to your family on their own. It works on your phone, tablet, computer — any device. No downloads needed.</p>
+
+        <p>And this is free forever. For every family. No payment ever. No hidden cost. Just free.</p>
+
+        <p>I have a full tutorial series in the description that shows each feature step by step. Link is right below this video. I will also put it in the comments.</p>
+
+        <p><span class="hl">If you want more videos like this, please subscribe and turn on the bell.</span> I will see you in the next video.</p>
+
+        <p><span class="hl">And please comment below</span> - tell me which feature you want to see next. ATH tracking? Rebalancing? Goals? Insurance? Whatever gets the most comments, I will make that video first. And if this video helped you, please hit the like button. It helps more families find this free tool.</p>
+
+        <p>Thank you so much for watching. Take care of your money. Take care of your family.</p>
+      </div>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!-- TIMESTAMPS & DESCRIPTION -->
+    <!-- ============================================================ -->
+    <div class="timestamps">
+      <h3>YouTube Timestamps (for description)</h3>
+      <p>0:00 - What happens to your family if something happens to you?</p>
+      <p>0:30 - Your money is in many places — and only YOU know where it all is</p>
+      <p>1:30 - Why every portfolio tracker app fails Indian families</p>
+      <p>2:15 - The fix: One free web app your whole family can see</p>
+      <p>3:15 - Live demo: Full web app walkthrough</p>
+      <p>8:05 - Why Capital Friends is 100% free forever</p>
+      <p>8:50 - 7 questions every Indian family must answer honestly</p>
+      <p>12:50 - What's your score out of 7? Comment below</p>
+      <p>13:05 - How to get started free in 2 minutes</p>
+    </div>
+
+    <div class="timestamps" style="margin-top:10px;">
+      <h3>YouTube Description</h3>
+      <p style="white-space:pre-line;color:#ccc;">FREE Portfolio Tracker: Mutual Funds, Stocks, All-Time High Tracking, Rebalancing Suggestions | Free Web App
+
+Does your family know about ALL your investments? Bank accounts? Insurance policies? Loans? What happens if something happens to you tomorrow?
+
+Capital Friends is a 100% FREE web app for portfolio tracking with LIVE NAV updates, All-Time High (ATH) tracking, portfolio rebalancing suggestions, realized vs unrealized P&L tracking, and complete family wealth management. Your data stays in your own Google Drive — private and secure.
+
+🔥 KEY FEATURES:
+✓ ALL-TIME HIGH (ATH) TRACKING: See how much below peak NAV every mutual fund is
+✓ PORTFOLIO REBALANCING SUGGESTIONS: Get exact recommendations via SIP, lumpsum, or buy/sell
+✓ REALIZED vs UNREALIZED P&L: Track actual profit withdrawn vs paper profit still in market
+✓ LIVE NAV UPDATES: Mutual fund prices update daily from AMFI database
+✓ LIVE STOCK PRICES: 5000+ NSE stocks with real-time Google Finance data
+✓ ONE-CLICK SETUP: Sign in with Google and the app sets everything up automatically
+✓ SIP CALCULATOR: Calculate exact monthly SIP needed for your goals
+✓ GOAL PLANNER: Plan retirement, emergency fund, child education with automatic progress tracking
+✓ EMAIL AUTOMATION: Daily/weekly/monthly wealth reports sent to entire family automatically
+✓ WORKS EVERYWHERE: Phone, tablet, computer — any device with a browser
+
+📊 TRACK EVERYTHING:
+→ Mutual Funds: SIP, lumpsum, live NAV, ATH comparison, realized vs unrealized P&L
+→ Stocks: NSE live prices, FIFO P&L, transaction history
+→ Gold, PPF, EPF, NPS, Fixed Deposits, Real Estate, Crypto
+→ Insurance: Health, term life, motor policies with renewal tracking
+→ Loans: Home, car, personal loan, credit card debt with EMI tracking
+
+🎯 REBALANCING SUGGESTIONS:
+Via SIP, Lumpsum, or Buy/Sell - Get exact recommendations to maintain target allocation
+
+🚀 Get Started in 2 Minutes:
+1. Visit capitalfriends.in and sign in with your Google account
+2. The app sets everything up for you automatically
+3. Add your family members and set up email reports
+4. Start tracking — works on any device, no downloads needed
+
+Perfect for:
+→ Free portfolio tracker web app for Indian investors
+→ Mutual fund portfolio tracker with all-time high (ATH) tracking
+→ Should I invest during market crash? Use ATH tracking to find buying opportunities
+→ Track which mutual funds are below ATH (5%, 10%, 20% below peak NAV)
+→ Is it the right time to invest in mutual funds? See which funds are at discount
+→ Portfolio rebalancing calculator with suggestions via SIP, lumpsum, buy/sell
+→ SIP tracker with live NAV updates from AMFI
+→ Stock portfolio tracker with FIFO P&L calculation
+→ Realized vs unrealized profit tracking (actual profit vs paper profit)
+→ Goal-based investing with retirement planner, emergency fund calculator
+→ Family wealth management with automated email reports
+→ Free investment tracker app for mutual funds, stocks, PPF, NPS, gold, crypto
+
+Get started FREE: https://www.capitalfriends.in
+
+📺 Tutorial Playlist: [Add your playlist link here]
+
+#FreePortfolioTracker #PortfolioTrackerApp #MutualFundTracker #ATHTracking #AllTimeHighTracking #PortfolioRebalancing #RebalancingSuggestions #SIPCalculator #GoalPlanner #IndianInvestors #RealizedVsUnrealizedProfit #WhenToInvest #MarketCrash #StockTracker #CapitalFriends #WebApp #FreeWebApp</p>
+    </div>
+
+    <div class="timestamps" style="margin-top:30px;">
+      <h3>YouTube Tags (CSV - Copy & Paste)</h3>
+      <p style="white-space:pre-line;color:#ccc;background:rgba(0,0,0,0.3);padding:15px;border-radius:8px;font-size:13px;">free portfolio tracker, portfolio tracker app, free web app, mutual fund tracker, ATH tracking, all time high tracking, when to invest in mutual funds, should i invest during market crash, portfolio rebalancing suggestions, mutual fund ATH, SIP calculator, goal planner india, indian investors, stock portfolio tracker, realized vs unrealized profit, best time to buy mutual funds, mutual fund rebalancing, live NAV, retirement planning, family wealth tracker, portfolio tracker web app</p>
+    </div>
+
+    <div class="duration">&mdash; END &mdash; Total: ~13:30 minutes (with detailed 7 questions breakdown + subscribe call-out + visual slides)</div>
+
+  </div>
+</body>
+</html>
