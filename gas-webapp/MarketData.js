@@ -82,11 +82,11 @@ function fetchMarketData() {
 function fetchIndianIndices() {
   var indices = [
     { symbol: 'INDEXNSE:NIFTY_50', name: 'Nifty 50' },
-    { symbol: 'INDEXNSE:NIFTY_BANK', name: 'Bank Nifty' },
+    { symbol: 'INDEXNSE:NIFTY_100', name: 'Nifty 100' },
     { symbol: 'INDEXNSE:NIFTY_NEXT_50', name: 'Nifty Next 50' },
-    { symbol: 'INDEXNSE:NIFTY_MIDCAP_150', name: 'Nifty Midcap 150' },
-    { symbol: 'INDEXNSE:NIFTY_SMLCAP_250', name: 'Nifty Smallcap 250' },
-    { symbol: 'INDEXNSE:NIFTY100_QUALITY_30', name: 'Nifty 100' }
+    { symbol: 'INDEXNSE:NIFTY_MIDCAP_150', name: 'Midcap 150' },
+    { symbol: 'INDEXNSE:NIFTY_SMLCAP_250', name: 'Smallcap 250' },
+    { symbol: 'INDEXNSE:NIFTY_BANK', name: 'Bank Nifty' }
   ];
 
   // Use a temporary sheet with GOOGLEFINANCE formulas
