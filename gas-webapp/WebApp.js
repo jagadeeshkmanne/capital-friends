@@ -315,6 +315,10 @@ function routeAction(action, params, userRecord) {
     case 'data:check-freshness':
       return { stale: isMasterDataStale() };
 
+    // ── Market Data ──
+    case 'market:data':
+      return getMarketData();
+
     // ── Diagnostics (for testing) ──
     case 'test:diagnose':
       return runDiagnostics();

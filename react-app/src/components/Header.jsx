@@ -6,6 +6,7 @@ import { useFamily } from '../context/FamilyContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { formatINR } from '../data/familyData'
+import MarketTicker from './MarketTicker'
 
 const LOGO = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png'
 
@@ -215,6 +216,9 @@ export default function Header({ onMenuClick }) {
           )}
         </div>
       </div>
+
+      {/* Market Ticker */}
+      <MarketTicker />
     </header>
   )
 }

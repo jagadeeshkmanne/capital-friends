@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+
+const MARKET_CACHE_KEY = 'cf_market_data'
 
 const INVESTMENT_TYPES = [
   { value: 'Fixed Deposit', category: 'Debt' },
@@ -13,6 +15,8 @@ const INVESTMENT_TYPES = [
   { value: 'Digital Gold', category: 'Gold' },
   { value: 'Real Estate', category: 'Property' },
   { value: 'Bonds', category: 'Debt' },
+  { value: 'Physical Silver', category: 'Silver' },
+  { value: 'Digital Silver', category: 'Silver' },
   { value: 'Crypto', category: 'Alternative' },
   { value: 'Other', category: 'Other' },
 ]
@@ -25,13 +29,46 @@ const LOAN_SUGGESTIONS = {
 }
 
 const TYPE_OPTIONS = INVESTMENT_TYPES.map((t) => ({ value: t.value, label: t.value }))
-const CATEGORY_OPTIONS = ['Equity', 'Debt', 'Gold', 'Property', 'Alternative', 'Other'].map((c) => ({ value: c, label: c }))
+const CATEGORY_OPTIONS = ['Equity', 'Debt', 'Gold', 'Silver', 'Property', 'Alternative', 'Other'].map((c) => ({ value: c, label: c }))
 const STATUS_OPTIONS = [
   { value: 'Active', label: 'Active' },
   { value: 'Sold', label: 'Sold' },
   { value: 'Matured', label: 'Matured' },
   { value: 'Inactive', label: 'Inactive' },
 ]
+
+// Gold/Silver purity factors
+const GOLD_PURITY = [
+  { value: '24K', label: '24K (99.9%)', factor: 0.999 },
+  { value: '22K', label: '22K (91.6%)', factor: 0.916 },
+  { value: '18K', label: '18K (75.0%)', factor: 0.750 },
+]
+const SILVER_PURITY = [
+  { value: '999', label: '999 Fine (99.9%)', factor: 0.999 },
+  { value: '925', label: '925 Sterling (92.5%)', factor: 0.925 },
+]
+
+function isGoldType(type) {
+  return ['Physical Gold', 'Digital Gold', 'Sovereign Gold Bond'].includes(type)
+}
+function isSilverType(type) {
+  return ['Physical Silver', 'Digital Silver'].includes(type) || (type && type.toLowerCase().includes('silver'))
+}
+function isMetalType(type) {
+  return isGoldType(type) || isSilverType(type)
+}
+
+function getMarketMetalPrice(metalType) {
+  try {
+    const cached = sessionStorage.getItem(MARKET_CACHE_KEY)
+    if (!cached) return null
+    const data = JSON.parse(cached)
+    if (!data.metals) return null
+    const name = metalType === 'gold' ? 'Gold' : 'Silver'
+    const metal = data.metals.find((m) => m.name.toLowerCase().includes(name.toLowerCase()))
+    return metal ? metal.price : null
+  } catch { return null }
+}
 
 export default function OtherInvestmentForm({ initial, onSave, onDelete, onCancel }) {
   const { activeMembers, liabilityList } = useData()
@@ -40,6 +77,9 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   function getCategory(type) {
     return INVESTMENT_TYPES.find((t) => t.value === type)?.category || 'Other'
   }
+
+  // Parse dynamic fields from initial data
+  const initDynamic = initial?.dynamicFields ? (typeof initial.dynamicFields === 'string' ? JSON.parse(initial.dynamicFields) : initial.dynamicFields) : {}
 
   const [form, setForm] = useState({
     investmentType: initial?.investmentType || '',
@@ -52,6 +92,11 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     status: initial?.status || 'Active',
     notes: initial?.notes || '',
   })
+
+  // Metal-specific fields
+  const [weightGrams, setWeightGrams] = useState(initDynamic.weightGrams || '')
+  const [purity, setPurity] = useState(initDynamic.purity || '')
+  const [calculatedValue, setCalculatedValue] = useState(null)
   const [showQuickLoan, setShowQuickLoan] = useState(false)
   const [quickLoan, setQuickLoan] = useState({
     lenderName: '',
@@ -59,6 +104,23 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     emiAmount: '',
     interestRate: '',
   })
+  // Auto-calculate metal value from weight × purity × market rate
+  useEffect(() => {
+    if (!isMetalType(form.investmentType) || !weightGrams || Number(weightGrams) <= 0) {
+      setCalculatedValue(null)
+      return
+    }
+    const metalType = isGoldType(form.investmentType) ? 'gold' : 'silver'
+    const marketRate = getMarketMetalPrice(metalType)
+    if (!marketRate) { setCalculatedValue(null); return }
+
+    const purities = metalType === 'gold' ? GOLD_PURITY : SILVER_PURITY
+    const purityEntry = purities.find((p) => p.value === purity)
+    const factor = purityEntry ? purityEntry.factor : 1
+
+    setCalculatedValue(Math.round(Number(weightGrams) * marketRate * factor))
+  }, [form.investmentType, weightGrams, purity])
+
   const [errors, setErrors] = useState({})
 
   function set(key, val) {
@@ -94,6 +156,13 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
       ...form,
       investedAmount: Number(form.investedAmount) || 0,
       currentValue: Number(form.currentValue) || 0,
+    }
+    // Include metal dynamic fields if applicable
+    if (isMetalType(form.investmentType)) {
+      data.dynamicFields = JSON.stringify({
+        weightGrams: Number(weightGrams) || 0,
+        purity: purity || '',
+      })
     }
     if (showQuickLoan && quickLoan.lenderName) {
       data.quickLoan = {
@@ -149,6 +218,43 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
           <FormInput type="number" value={form.currentValue} onChange={(v) => set('currentValue', v)} placeholder="e.g., 537500" />
         </FormField>
       </div>
+
+      {/* Metal Weight & Purity fields */}
+      {isMetalType(form.investmentType) && (
+        <div className="p-3 bg-[var(--bg-inset)] rounded-lg space-y-3">
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+            {isGoldType(form.investmentType) ? 'Gold' : 'Silver'} Details
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField label="Weight (grams)">
+              <FormInput type="number" value={weightGrams} onChange={setWeightGrams} placeholder="e.g., 50" />
+            </FormField>
+            <FormField label="Purity">
+              <FormSelect
+                value={purity}
+                onChange={setPurity}
+                options={(isGoldType(form.investmentType) ? GOLD_PURITY : SILVER_PURITY).map((p) => ({ value: p.value, label: p.label }))}
+                placeholder="Select purity..."
+              />
+            </FormField>
+          </div>
+          {calculatedValue !== null && (
+            <div className="flex items-center justify-between bg-[var(--bg-card)] rounded-lg px-3 py-2 border border-[var(--border)]">
+              <div>
+                <p className="text-xs text-[var(--text-dim)]">Estimated market value</p>
+                <p className="text-sm font-bold text-emerald-400 tabular-nums">{formatINR(calculatedValue)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => set('currentValue', String(calculatedValue))}
+                className="text-xs font-semibold text-violet-400 hover:text-violet-300 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 transition-colors"
+              >
+                Use this value
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Linked Liability */}
       <div className="border-t border-[var(--border-light)] pt-4">

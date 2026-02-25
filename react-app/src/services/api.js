@@ -215,6 +215,9 @@ export const getHealthCheckAnswers = () => callAPI('healthcheck:get')
 export const getSettings = () => callAPI('settings:list')
 export const saveSettings = (data) => callAPI('settings:update', data)
 
+// Market Data
+export const getMarketData = () => callAPI('market:data')
+
 // Master Data Refresh
 export const refreshMasterData = () => callAPI('data:refresh-master')
 export const checkDataFreshness = () => callAPI('data:check-freshness')
