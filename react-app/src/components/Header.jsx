@@ -20,13 +20,13 @@ const USE_DUMMY = true
 const SECTION_META = {
   mf: { label: 'Mutual Funds', color: 'bg-violet-500', order: 1, route: '/investments/mutual-funds' },
   stocks: { label: 'Stocks', color: 'bg-blue-500', order: 2, route: '/investments/stocks' },
-  Debt: { label: 'Debt', color: 'bg-cyan-500', order: 3, route: '/accounts/other-investments' },
-  Gold: { label: 'Gold', color: 'bg-amber-500', order: 4, route: '/accounts/other-investments' },
-  Silver: { label: 'Silver', color: 'bg-slate-400', order: 5, route: '/accounts/other-investments' },
-  Property: { label: 'Real Estate', color: 'bg-orange-500', order: 6, route: '/accounts/other-investments' },
-  Alternative: { label: 'Alternative', color: 'bg-violet-400', order: 7, route: '/accounts/other-investments' },
-  Equity: { label: 'Equity', color: 'bg-emerald-500', order: 8, route: '/accounts/other-investments' },
-  Other: { label: 'Other', color: 'bg-gray-500', order: 9, route: '/accounts/other-investments' },
+  Debt: { label: 'Debt', color: 'bg-cyan-500', order: 3, route: '/investments/other' },
+  Gold: { label: 'Gold', color: 'bg-amber-500', order: 4, route: '/investments/other' },
+  Silver: { label: 'Silver', color: 'bg-slate-400', order: 5, route: '/investments/other' },
+  Property: { label: 'Real Estate', color: 'bg-orange-500', order: 6, route: '/investments/other' },
+  Alternative: { label: 'Alternative', color: 'bg-violet-400', order: 7, route: '/investments/other' },
+  Equity: { label: 'Equity', color: 'bg-emerald-500', order: 8, route: '/investments/other' },
+  Other: { label: 'Other', color: 'bg-gray-500', order: 9, route: '/investments/other' },
 }
 
 const DUMMY_NW = {
@@ -40,23 +40,23 @@ const DUMMY_NW = {
     { key: 'stocks', label: 'Stocks', color: 'bg-blue-500', route: '/investments/stocks', total: 1250000, items: [
       { label: 'Zerodha Stocks', value: 1250000 },
     ]},
-    { key: 'Property', label: 'Real Estate', color: 'bg-orange-500', route: '/accounts/other-investments', total: 2500000, items: [
+    { key: 'Property', label: 'Real Estate', color: 'bg-orange-500', route: '/investments/other', total: 2500000, items: [
       { label: '2BHK Flat - Hyderabad', value: 2500000 },
     ]},
-    { key: 'Debt', label: 'Debt', color: 'bg-cyan-500', route: '/accounts/other-investments', total: 950000, items: [
+    { key: 'Debt', label: 'Debt', color: 'bg-cyan-500', route: '/investments/other', total: 950000, items: [
       { label: 'HDFC PPF', value: 350000 },
       { label: 'SBI FD - 7.5%', value: 200000 },
       { label: 'EPF', value: 400000 },
     ]},
-    { key: 'Gold', label: 'Gold', color: 'bg-amber-500', route: '/accounts/other-investments', total: 285000, items: [
+    { key: 'Gold', label: 'Gold', color: 'bg-amber-500', route: '/investments/other', total: 285000, items: [
       { label: 'SBI Gold Bond 2029', value: 120000 },
       { label: 'Digital Gold', value: 65000 },
       { label: 'Physical Gold', value: 100000 },
     ]},
-    { key: 'Equity', label: 'Equity', color: 'bg-emerald-500', route: '/accounts/other-investments', total: 500000, items: [
+    { key: 'Equity', label: 'Equity', color: 'bg-emerald-500', route: '/investments/other', total: 500000, items: [
       { label: 'NPS - Tier 1', value: 500000 },
     ]},
-    { key: 'Alternative', label: 'Alternative', color: 'bg-violet-400', route: '/accounts/other-investments', total: 250000, items: [
+    { key: 'Alternative', label: 'Alternative', color: 'bg-violet-400', route: '/investments/other', total: 250000, items: [
       { label: 'Smallcase - Momentum', value: 250000 },
     ]},
   ],

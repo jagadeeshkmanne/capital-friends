@@ -29,7 +29,7 @@ cp "$DIST_TMP/404.html" .
 cp -r "$DIST_TMP/assets" .
 
 echo "🚀 Committing and pushing..."
-git add index.html 404.html assets/
+git add -A index.html 404.html assets/
 git commit -m "Deploy: $(date '+%Y-%m-%d %H:%M')" --allow-empty
 git push origin gh-pages
 
