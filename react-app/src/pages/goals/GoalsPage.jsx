@@ -106,10 +106,17 @@ export default function GoalsPage() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Goals" value={filtered.length} sub={achieved > 0 ? `${achieved} achieved` : undefined} />
             <StatCard label="Target" value={formatINR(totalTarget)} bold />
             <StatCard label="Current Value" value={formatINR(totalCurrent)} bold />
+            <StatCard
+              label="Total Gap"
+              value={formatINR(Math.max(totalTarget - totalCurrent, 0))}
+              sub={totalTarget > totalCurrent ? 'remaining to target' : 'all targets met'}
+              positive={totalTarget <= totalCurrent}
+              bold
+            />
             <StatCard
               label="Overall Progress"
               value={`${overallProgress.toFixed(1)}%`}

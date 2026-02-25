@@ -72,8 +72,13 @@ export default function MutualFundsPage() {
     const unrealizedPLPct = invested > 0 ? (unrealizedPL / invested) * 100 : 0
     const realizedPLPct = invested > 0 ? (realizedPL / invested) * 100 : 0
     const funds = source.reduce((s, p) => s + p.fundCount, 0)
-    return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds }
-  }, [portfolioData, selectedPortfolioId])
+    // Monthly SIP total from holdings
+    const relevantHoldings = selectedPortfolioId === 'all'
+      ? mfHoldings.filter((h) => source.some((p) => p.portfolioId === h.portfolioId))
+      : mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
+    const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.sipAmount || 0), 0)
+    return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP }
+  }, [portfolioData, selectedPortfolioId, mfHoldings])
 
   // Holdings & transactions for selected view
   const holdings = useMemo(() => {
@@ -298,7 +303,7 @@ export default function MutualFundsPage() {
           )}
 
           {/* ── Stat Cards ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Invested" value={formatINR(stats.invested)} />
             <StatCard label="Current Value" value={formatINR(stats.current)} bold />
             <StatCard
@@ -320,6 +325,7 @@ export default function MutualFundsPage() {
               positive={stats.totalPL >= 0}
               bold
             />
+            <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
           </div>
 
           {/* ── Sub-tabs + Actions ── */}

@@ -84,6 +84,7 @@ export default function LiabilitiesTab() {
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Outstanding</th>
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">EMI</th>
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Interest</th>
+                    <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Remaining</th>
                     <th className="w-8 py-2.5 px-2"></th>
                   </tr>
                 </thead>
@@ -101,6 +102,11 @@ export default function LiabilitiesTab() {
                       <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(l.outstandingBalance)}</td>
                       <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">{l.emiAmount ? `${formatINR(l.emiAmount)}/mo` : '—'}</td>
                       <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">{l.interestRate ? `${l.interestRate}%` : '—'}</td>
+                      <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">
+                        {l.emiAmount > 0 && l.outstandingBalance > 0
+                          ? `${Math.ceil(l.outstandingBalance / l.emiAmount)} mo`
+                          : '—'}
+                      </td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: l })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
                           <Pencil size={12} />
@@ -125,7 +131,12 @@ export default function LiabilitiesTab() {
                   <p className="text-sm font-medium text-[var(--text-primary)]">{l.lenderName}</p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-[var(--text-muted)]">{l.familyMemberName}{l.notes ? ` · ${l.notes}` : ''}</p>
-                    {l.emiAmount > 0 && <p className="text-xs text-[var(--text-dim)] tabular-nums">EMI: {formatINR(l.emiAmount)}/mo</p>}
+                    <div className="text-right">
+                      {l.emiAmount > 0 && <p className="text-xs text-[var(--text-dim)] tabular-nums">EMI: {formatINR(l.emiAmount)}/mo</p>}
+                      {l.emiAmount > 0 && l.outstandingBalance > 0 && (
+                        <p className="text-xs text-[var(--text-dim)] tabular-nums">{Math.ceil(l.outstandingBalance / l.emiAmount)} months left</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

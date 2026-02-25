@@ -68,6 +68,27 @@ export default function InsurancePage() {
             <StatCard label="Annual Premium" value={formatINR(totalPremium)} />
           </div>
 
+          {/* Coverage Adequacy */}
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Coverage Adequacy</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <AdequacyItem
+                label="Life Insurance"
+                current={lifeCover}
+                recommended="10-15x annual income"
+                tip="Term life cover should be 10-15x your annual income to protect dependents"
+                icon="heart"
+              />
+              <AdequacyItem
+                label="Health Insurance"
+                current={healthCover}
+                recommended="₹50L - ₹1Cr family floater"
+                tip="Considering medical inflation, a ₹50L-1Cr family floater is recommended"
+                icon="shield"
+              />
+            </div>
+          </div>
+
           {/* Header with Add */}
           <div className="flex items-center justify-end px-1">
             <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
@@ -155,6 +176,24 @@ export default function InsurancePage() {
           onCancel={() => setModal(null)}
         />
       </Modal>
+    </div>
+  )
+}
+
+function AdequacyItem({ label, current, recommended, tip }) {
+  const isLow = current === 0
+  return (
+    <div className={`rounded-lg border px-3 py-2.5 ${isLow ? 'border-rose-500/30 bg-rose-500/5' : 'border-[var(--border)] bg-[var(--bg-inset)]'}`}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-semibold text-[var(--text-primary)]">{label}</p>
+        {isLow ? (
+          <span className="text-xs font-bold text-[var(--accent-rose)]">Not covered</span>
+        ) : (
+          <span className="text-xs font-semibold text-emerald-400">{formatINR(current)}</span>
+        )}
+      </div>
+      <p className="text-xs text-[var(--text-dim)]">Recommended: {recommended}</p>
+      <p className="text-[10px] text-[var(--text-dim)] mt-0.5 italic">{tip}</p>
     </div>
   )
 }
