@@ -1,19 +1,37 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Fuse from 'fuse.js'
 import { getAllFunds } from '../../services/api'
+import { getWithMeta, put } from '../../services/idb'
 import { Search, X, Loader2 } from 'lucide-react'
 
 // Module-level fund cache — loaded once, shared across all instances
 let _fundsCache = null
 let _fundsPromise = null
 
+function isFreshToday(updatedAt) {
+  if (!updatedAt) return false
+  const cached = new Date(updatedAt)
+  const now = new Date()
+  return cached.getFullYear() === now.getFullYear() &&
+    cached.getMonth() === now.getMonth() &&
+    cached.getDate() === now.getDate()
+}
+
 function loadFunds() {
   if (_fundsCache) return Promise.resolve(_fundsCache)
   if (_fundsPromise) return _fundsPromise
-  _fundsPromise = getAllFunds()
-    .then((data) => {
-      _fundsCache = Array.isArray(data) ? data : []
-      return _fundsCache
+  _fundsPromise = getWithMeta('fundsList')
+    .then((record) => {
+      if (record && Array.isArray(record.data) && isFreshToday(record.updatedAt)) {
+        _fundsCache = record.data
+        return _fundsCache
+      }
+      // Stale or missing — fetch from API
+      return getAllFunds().then((data) => {
+        _fundsCache = Array.isArray(data) ? data : []
+        put('fundsList', _fundsCache) // fire-and-forget IDB write
+        return _fundsCache
+      })
     })
     .catch(() => {
       _fundsPromise = null // allow retry on failure

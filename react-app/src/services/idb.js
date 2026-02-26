@@ -59,6 +59,25 @@ export async function get(key) {
 }
 
 /**
+ * Get a single cached record with metadata (includes updatedAt).
+ * @param {string} key
+ * @returns {Promise<{data: any, updatedAt: number}|null>}
+ */
+export async function getWithMeta(key) {
+  try {
+    const db = await openDB()
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const request = tx.objectStore(STORE_NAME).get(key)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => resolve(null)
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
  * Store a single value by key.
  */
 export async function put(key, data) {
