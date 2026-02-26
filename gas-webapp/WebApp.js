@@ -194,6 +194,9 @@ function routeAction(action, params, userRecord) {
     case 'funds:search':
       return searchFunds(params.query);
 
+    case 'funds:all':
+      return getAllFundsForClientSearch();
+
     // ── Goals ──
     case 'goals:list':
       return getAllGoals();

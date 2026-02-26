@@ -171,6 +171,7 @@ export const redeemMF = (data) => callAPI('mf:redeem', data)
 export const switchMF = (data) => callAPI('mf:switch', data)
 export const updateAllocations = (portfolioId, allocations) => callAPI('mf:allocations-update', { portfolioId, allocations })
 export const searchFunds = (query) => callAPI('funds:search', { query })
+export const getAllFunds = () => callAPI('funds:all')
 
 // Goals
 export const getGoals = () => callAPI('goals:list')

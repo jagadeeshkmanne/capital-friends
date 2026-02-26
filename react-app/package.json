@@ -10,6 +10,7 @@
     "deploy": "vite build && echo 'Copy dist/ contents to your GitHub Pages repo /app/ folder'"
   },
   "dependencies": {
+    "fuse.js": "^7.1.0",
     "lucide-react": "^0.574.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
