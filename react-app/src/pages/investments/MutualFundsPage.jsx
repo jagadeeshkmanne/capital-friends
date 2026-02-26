@@ -481,6 +481,10 @@ export default function MutualFundsPage() {
                             <div>NAV</div>
                             <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Avg</div>
                           </th>
+                          <th className="text-center py-2 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
+                            <div>ATH</div>
+                            <div className="text-[10px] font-medium text-[var(--text-dim)]">Below Peak</div>
+                          </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>Allocation %</div>
                             <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Target</div>
@@ -536,12 +540,21 @@ export default function MutualFundsPage() {
                                   <>
                                     <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">₹{h.currentNav.toFixed(2)}</p>
                                     <p className="text-xs text-[var(--text-dim)] tabular-nums">₹{h.avgNav.toFixed(2)}</p>
-                                    {h.athNav > 0 && h.belowATHPct > 0 && (
-                                      <p className="text-xs tabular-nums" style={ath}>
-                                        ATH ₹{h.athNav.toFixed(2)} ↓{h.belowATHPct.toFixed(1)}%
-                                      </p>
-                                    )}
                                   </>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                {isPlanned ? (
+                                  <span className="text-xs text-[var(--text-dim)]">—</span>
+                                ) : h.athNav > 0 && h.belowATHPct > 0 ? (
+                                  <div>
+                                    <p className="text-xs font-bold tabular-nums" style={ath}>↓{h.belowATHPct.toFixed(1)}%</p>
+                                    <p className="text-[10px] text-[var(--text-dim)] tabular-nums">₹{h.athNav.toFixed(0)}</p>
+                                  </div>
+                                ) : h.athNav > 0 ? (
+                                  <span className="text-[10px] text-emerald-400/70 font-semibold">AT HIGH</span>
+                                ) : (
+                                  <span className="text-xs text-[var(--text-dim)]">—</span>
                                 )}
                               </td>
                               <td className="py-2.5 px-3 text-right">
@@ -644,9 +657,11 @@ export default function MutualFundsPage() {
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-dim)] flex-wrap">
                                 <span>Alloc: {h.currentAllocationPct.toFixed(1)}% / {h.targetAllocationPct.toFixed(1)}%</span>
-                                {h.athNav > 0 && h.belowATHPct > 0 && (
-                                  <span style={ath}>ATH ↓{h.belowATHPct.toFixed(1)}%</span>
-                                )}
+                                {h.athNav > 0 && h.belowATHPct > 0 ? (
+                                  <span className="font-semibold tabular-nums" style={ath}>ATH ↓{h.belowATHPct.toFixed(1)}%</span>
+                                ) : h.athNav > 0 ? (
+                                  <span className="text-emerald-400/70 font-semibold text-[10px]">AT HIGH</span>
+                                ) : null}
                               </div>
                             </>
                           )}
