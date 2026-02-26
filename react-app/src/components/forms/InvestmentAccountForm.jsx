@@ -42,7 +42,7 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     if (!form.bankAccountId) e.bankAccountId = 'Required'
     if (!form.accountType) e.accountType = 'Required'
     if (!form.platformBroker.trim()) e.platformBroker = 'Required'
-    if (!form.accountClientId.trim()) e.accountClientId = 'Required'
+    // Client ID is optional (e.g., broker accounts may not have one)
     if (!form.registeredEmail.trim()) e.registeredEmail = 'Required'
     if (!form.registeredPhone.trim()) e.registeredPhone = 'Required'
     setErrors(e)
@@ -87,8 +87,8 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
         <FormField label="Platform / Broker" required error={errors.platformBroker}>
           <FormInput value={form.platformBroker} onChange={(v) => set('platformBroker', v)} placeholder="e.g., Zerodha, Groww" />
         </FormField>
-        <FormField label="Account / Client ID" required error={errors.accountClientId}>
-          <FormInput sensitive value={form.accountClientId} onChange={(v) => set('accountClientId', v)} placeholder="e.g., ZR1234" />
+        <FormField label="Account / Client ID" error={errors.accountClientId}>
+          <FormInput sensitive value={form.accountClientId} onChange={(v) => set('accountClientId', v)} placeholder="e.g., ZR1234 (optional)" />
         </FormField>
       </div>
 

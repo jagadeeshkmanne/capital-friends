@@ -28,7 +28,7 @@ export function DataProvider({ children }) {
   // null = not loaded yet, [] = loaded but empty, [...] = loaded with data
   const [members, setMembers] = useState(null)
   const [banks, setBanks] = useState(null)
-  const [investments, setInvestments] = useState(null)
+  const [investmentAccounts, setInvestmentAccounts] = useState(null)
   const [insurancePolicies, setInsurance] = useState(null)
   const [liabilityList, setLiabilities] = useState(null)
   const [otherInvList, setOtherInvestments] = useState(null)
@@ -55,7 +55,7 @@ export function DataProvider({ children }) {
     if (!data) return
     if ('members' in data) setMembers(data.members || [])
     if ('bankAccounts' in data) setBanks(data.bankAccounts || [])
-    if ('investments' in data) setInvestments(data.investments || [])
+    if ('investments' in data) setInvestmentAccounts(data.investments || [])
     if ('insurancePolicies' in data) setInsurance(data.insurancePolicies || [])
     if ('liabilities' in data) setLiabilities(data.liabilities || [])
     if ('otherInvestments' in data) setOtherInvestments(data.otherInvestments || [])
@@ -124,7 +124,7 @@ export function DataProvider({ children }) {
 
   const refreshInvestmentAccounts = useCallback(async () => {
     const data = await api.getInvestmentAccounts()
-    setInvestments(data || [])
+    setInvestmentAccounts(data || [])
     idb.put('investments', data || [])
   }, [])
 
@@ -519,14 +519,14 @@ export function DataProvider({ children }) {
   // ── Filtered helpers ──
   const activeMembers = (members || []).filter((m) => m.status === 'Active')
   const activeBanks = (banks || []).filter((b) => b.status === 'Active')
-  const activeInvestmentAccounts = (investments || []).filter((a) => a.status === 'Active')
+  const activeInvestmentAccounts = (investmentAccounts || []).filter((a) => a.status === 'Active')
 
   return (
     <DataContext.Provider value={{
       // Loading state
       loading, isRefreshing, error, refreshData,
       // Data
-      members, banks, investments, insurancePolicies, liabilityList, otherInvList,
+      members, banks, investmentAccounts, insurancePolicies, liabilityList, otherInvList,
       // Filtered
       activeMembers, activeBanks, activeInvestmentAccounts,
       // Family Members CRUD

@@ -118,7 +118,12 @@ export async function callAPI(action, params = {}, retry = true) {
       err.code = result.code
       throw err
     }
-    return result ? result.data : null
+    const returnedData = result ? result.data : null
+    // GAS CRUD functions return { success: false, message } inside data — check inner result
+    if (returnedData && returnedData.success === false) {
+      throw new Error(returnedData.message || 'Operation failed')
+    }
+    return returnedData
   }
 
   throw new Error('Unexpected response format')

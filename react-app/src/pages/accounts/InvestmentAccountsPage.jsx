@@ -19,18 +19,18 @@ const typeBadge = {
 
 export default function InvestmentAccountsPage() {
   const { selectedMember, member } = useFamily()
-  const { investments, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
+  const { investmentAccounts, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
 
-  if (investments === null) return <PageLoading title="Loading investment accounts" cards={4} />
+  if (investmentAccounts === null) return <PageLoading title="Loading investment accounts" cards={4} />
 
   const filtered = useMemo(() => {
-    const active = investments.filter((a) => a.status !== 'Inactive')
+    const active = investmentAccounts.filter((a) => a.status !== 'Inactive')
     return selectedMember === 'all' ? active : active.filter((a) => a.memberId === selectedMember)
-  }, [investments, selectedMember])
+  }, [investmentAccounts, selectedMember])
 
   const uniquePlatforms = useMemo(() => new Set(filtered.map((a) => a.platformBroker)).size, [filtered])
   const dematCount = filtered.filter((a) => a.accountType === 'Demat + Trading' || a.accountType === 'Demat' || a.accountType === 'Trading').length
