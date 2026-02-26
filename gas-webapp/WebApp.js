@@ -180,7 +180,7 @@ function routeAction(action, params, userRecord) {
       return getPortfolioFunds(params.portfolioId);
 
     case 'mf:invest':
-      return addFundToPortfolioSheet(params);
+      return processInvestment(params, params.transactionType || 'LUMPSUM');
 
     case 'mf:redeem':
       return processRedeem(params);
