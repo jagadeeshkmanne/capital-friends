@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { X, Calendar } from 'lucide-react'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
 import { useMask } from '../context/MaskContext'
 
 export default function Modal({ open, onClose, title, children, wide }) {
@@ -67,15 +69,29 @@ export function FormInput({ value, onChange, placeholder, type = 'text', sensiti
 }
 
 export function FormDateInput({ value, onChange, ...props }) {
-  const inputRef = useRef(null)
+  // Convert YYYY-MM-DD string to Date object for react-datepicker
+  const dateValue = value ? new Date(value + 'T00:00:00') : null
+
+  function handleChange(date) {
+    if (!date) { onChange(''); return }
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    onChange(`${y}-${m}-${d}`)
+  }
+
   return (
-    <div className="relative">
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 pr-9 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+    <div className="relative cf-datepicker">
+      <DatePicker
+        selected={dateValue}
+        onChange={handleChange}
+        dateFormat="dd MMM yyyy"
+        maxDate={new Date()}
+        showMonthDropdown
+        showYearDropdown
+        dropdownMode="select"
+        placeholderText="Select date"
+        className="w-full px-3 py-2 pr-9 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
         {...props}
       />
       <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
