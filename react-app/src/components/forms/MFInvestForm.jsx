@@ -38,8 +38,8 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
     setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
-  function selectFund({ schemeCode, fundName }) {
-    setForm((f) => ({ ...f, fundCode: schemeCode, fundName }))
+  function selectFund({ schemeCode, fundName, nav, navDate }) {
+    setForm((f) => ({ ...f, fundCode: schemeCode, fundName, price: nav > 0 ? String(nav) : f.price }))
     setErrors((e) => ({ ...e, fundCode: undefined, fundName: undefined }))
   }
 
@@ -69,7 +69,18 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
   async function handleSubmit() {
     if (!validate()) return
     setSaving(true)
-    try { await onSave(form) } finally { setSaving(false) }
+    try {
+      await onSave({
+        portfolioId: form.portfolioId,
+        fundCode: form.fundCode,
+        fundName: form.fundName,
+        transactionType: form.transactionType,
+        purchaseDate: form.date,
+        units: form.units,
+        avgPrice: form.price,
+        notes: form.notes,
+      })
+    } finally { setSaving(false) }
   }
 
   const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))

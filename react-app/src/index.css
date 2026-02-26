@@ -7,6 +7,7 @@
 /* ── Theme tokens ── */
 :root,
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-base: #0f1629;
   --bg-sidebar: #0a0f1f;
   --bg-header: #0a0f1f;
