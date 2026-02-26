@@ -18,7 +18,7 @@ function addInvestmentAccount(data) {
     isRequired(data.bankAccountId, 'Bank Account');
     isRequired(data.accountType, 'Account Type');
     isRequired(data.platformBroker, 'Platform/Broker');
-    isRequired(data.accountClientId, 'Account/Client ID');
+    // accountClientId is optional (broker accounts may not have one)
     isRequired(data.registeredEmail, 'Registered Email');
     isRequired(data.registeredPhone, 'Registered Phone');
 
@@ -33,13 +33,7 @@ function addInvestmentAccount(data) {
       throw new Error('InvestmentAccounts sheet not found. Please run ONE-CLICK SETUP first.');
     }
 
-    // Check for duplicate Account/Client ID
     const existingData = sheet.getRange(3, 1, Math.max(1, sheet.getLastRow() - 2), 15).getValues();
-    for (let i = 0; i < existingData.length; i++) {
-      if (existingData[i][8] && existingData[i][8].toString() === data.accountClientId.toString()) {
-        throw new Error('Account/Client ID already exists');
-      }
-    }
 
     // Generate Record ID (IA-001, IA-002, etc.)
     const existingIds = existingData.map(row => row[0]);
@@ -211,7 +205,7 @@ function updateInvestmentAccount(data) {
     isRequired(data.bankAccountId, 'Bank Account');
     isRequired(data.accountType, 'Account Type');
     isRequired(data.platformBroker, 'Platform/Broker');
-    isRequired(data.accountClientId, 'Account/Client ID');
+    // accountClientId is optional (broker accounts may not have one)
     isRequired(data.registeredEmail, 'Registered Email');
     isRequired(data.registeredPhone, 'Registered Phone');
 
@@ -240,16 +234,6 @@ function updateInvestmentAccount(data) {
 
     if (rowIndex === -1) {
       throw new Error('Account not found');
-    }
-
-    // Check for duplicate Account/Client ID (excluding current account)
-    const existingData = sheet.getRange(3, 1, lastRow - 2, 15).getValues();
-    for (let i = 0; i < existingData.length; i++) {
-      if (existingData[i][0] !== data.accountId) { // Column A is Record ID
-        if (existingData[i][8] && existingData[i][8].toString() === data.accountClientId.toString()) { // Column I is Account/Client ID
-          throw new Error('Account/Client ID already exists for another account');
-        }
-      }
     }
 
     // Get member name from member ID
