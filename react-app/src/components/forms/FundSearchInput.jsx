@@ -70,13 +70,13 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
   }
 
   function handleSelect(fund) {
-    onSelect({ schemeCode: fund.fundCode || fund.schemeCode, fundName: fund.fundName })
+    onSelect({ schemeCode: fund.fundCode || fund.schemeCode, fundName: fund.fundName, nav: fund.nav, navDate: fund.navDate })
     setQuery('')
     setOpen(false)
   }
 
   function handleClear() {
-    onSelect({ schemeCode: '', fundName: '' })
+    onSelect({ schemeCode: '', fundName: '', nav: 0, navDate: '' })
     setQuery('')
   }
 
@@ -85,7 +85,12 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
       <div className="flex items-center gap-2 bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-3 py-2">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-[var(--text-primary)] truncate">{value.fundName}</p>
-          <p className="text-xs text-[var(--text-dim)]">Code: {value.schemeCode}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-[var(--text-dim)]">{value.schemeCode}</span>
+            {value.nav > 0 && (
+              <span className="text-xs font-medium text-emerald-400">NAV: {value.nav.toFixed(2)}{value.navDate ? ` (${value.navDate})` : ''}</span>
+            )}
+          </div>
         </div>
         <button type="button" onClick={handleClear} className="shrink-0 p-1 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-secondary)] transition-colors">
           <X size={14} />
@@ -122,7 +127,12 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
               className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-light)] last:border-0"
             >
               <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{fund.fundName}</p>
-              <span className="text-xs text-[var(--text-dim)]">{fund.fundCode || fund.schemeCode}</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-[var(--text-dim)]">{fund.fundCode || fund.schemeCode}</span>
+                {fund.nav > 0 && (
+                  <span className="text-xs text-emerald-400 tabular-nums">NAV: {fund.nav.toFixed(2)}{fund.navDate ? ` (${fund.navDate})` : ''}</span>
+                )}
+              </div>
             </button>
           ))}
         </div>

@@ -1142,9 +1142,29 @@ function prewarmFundCache() {
  */
 function getAllFundsForClientSearch() {
   try {
-    log('Loading all funds for client-side search');
-    const funds = getAllFundsWithCache();
-    log(`Returning ${funds.length} funds to client`);
+    log('Loading all funds with NAV for client-side search');
+    const sheet = getSheet(CONFIG.mutualFundDataSheet);
+    if (!sheet) return [];
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+
+    // Columns: A=Code, B=Name, C=Category, D=NAV, E=Date
+    const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    const funds = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const code = data[i][0] ? data[i][0].toString().trim() : '';
+      const name = data[i][1] ? data[i][1].toString().trim() : '';
+      if (!code || !name) continue;
+
+      const nav = parseFloat(data[i][3]) || 0;
+      const navDate = data[i][4] ? formatDate(data[i][4]) : '';
+
+      funds.push({ fundCode: code, fundName: name, nav: nav, navDate: navDate });
+    }
+
+    log(`Returning ${funds.length} funds with NAV to client`);
     return funds;
   } catch (error) {
     log(`Error in getAllFundsForClientSearch: ${error.toString()}`);
