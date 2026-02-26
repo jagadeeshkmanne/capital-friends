@@ -63,7 +63,8 @@ function apiRouter(request) {
     // Route to action handler
     var result = routeAction(action, params, userRecord);
 
-    return { success: true, data: result };
+    // Sanitize: strip non-serializable types (Date, Range, Sheet) for Execution API
+    return JSON.parse(JSON.stringify({ success: true, data: result }));
 
   } catch (error) {
     log('apiRouter error: ' + error.toString());
@@ -188,8 +189,20 @@ function routeAction(action, params, userRecord) {
     case 'mf:switch':
       return processSwitchFunds(params);
 
-    case 'mf:allocations-update':
-      return savePortfolioAllocation(params.portfolioId, params.allocations);
+    case 'mf:allocations-update': {
+      var portfolio = getPortfolioById(params.portfolioId);
+      if (!portfolio) throw new Error('Portfolio not found: ' + params.portfolioId);
+      var allocs = params.allocations || [];
+      return savePortfolioAllocation({
+        portfolioName: portfolio.portfolioName,
+        fundsToUpdate: allocs.filter(function(a) { return !a.isNew; }).map(function(a) {
+          return { schemeCode: a.schemeCode, fundName: a.fundName, targetPercent: a.targetAllocationPct };
+        }),
+        fundsToAdd: allocs.filter(function(a) { return a.isNew; }).map(function(a) {
+          return { schemeCode: a.schemeCode, fundName: a.fundName, targetPercent: a.targetAllocationPct };
+        })
+      });
+    }
 
     case 'funds:search':
       return searchFunds(params.query);
@@ -440,19 +453,20 @@ function getAllMFTransactions() {
     var row = data[i];
     if (!row[0]) continue;
     transactions.push({
-      transactionId: row[0],
+      date: row[0] ? formatDate(row[0]) : '',
       portfolioId: row[1],
       portfolioName: row[2] || '',
       fundCode: row[3] || '',
       fundName: row[4] || '',
       type: row[5] || '',
       transactionType: row[6] || '',
-      date: row[7] ? formatDate(row[7]) : '',
-      units: parseFloat(row[8]) || 0,
-      price: parseFloat(row[9]) || 0,
-      totalAmount: parseFloat(row[10]) || 0,
-      gainLoss: parseFloat(row[11]) || 0,
-      notes: row[12] || ''
+      units: parseFloat(row[7]) || 0,
+      price: parseFloat(row[8]) || 0,
+      totalAmount: parseFloat(row[9]) || 0,
+      notes: row[10] || '',
+      timestamp: row[11] ? formatDate(row[11]) : '',
+      gainLoss: parseFloat(row[12]) || 0,
+      transactionId: row[13] || ''
     });
   }
   return transactions;

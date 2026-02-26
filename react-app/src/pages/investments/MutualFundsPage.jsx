@@ -102,7 +102,7 @@ export default function MutualFundsPage() {
     const relevantHoldings = !mfHoldings ? [] : selectedPortfolioId === 'all'
       ? mfHoldings.filter((h) => source.some((p) => p.portfolioId === h.portfolioId))
       : mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
-    const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.sipAmount || 0), 0)
+    const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
     return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP }
   }, [portfolioData, selectedPortfolioId, mfHoldings])
 
@@ -131,7 +131,8 @@ export default function MutualFundsPage() {
     return holdings.map((h) => {
       const totalValue = portfolioTotals[h.portfolioId] || 0
       const currentAllocationPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-      return { ...h, currentAllocationPct }
+      const plPct = h.investment > 0 ? (h.pl / h.investment) * 100 : 0
+      return { ...h, currentAllocationPct, plPct }
     })
   }, [holdings])
 
@@ -149,7 +150,7 @@ export default function MutualFundsPage() {
       pHoldings.forEach((h) => {
         if (h.athNav > 0 && h.belowATHPct >= 5) buyOpp++
         const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-        if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
+        if (h.targetAllocationPct > 0 && Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
       })
       indicators[p.portfolioId] = { buyOpp, rebalance }
     })
@@ -685,7 +686,7 @@ export default function MutualFundsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {transactions.map((t) => {
+                        {transactions.map((t, idx) => {
                           const isBuy = t.type === 'BUY'
                           const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
                           const glUp = hasGL && t.gainLoss >= 0
@@ -698,7 +699,7 @@ export default function MutualFundsPage() {
                             SWITCH: { bg: 'bg-amber-500/15', text: 'text-amber-400' },
                           }[t.transactionType] || { bg: 'bg-gray-500/15', text: 'text-[var(--text-muted)]' }
                           return (
-                            <tr key={t.transactionId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                            <tr key={t.transactionId || `txn-${idx}`} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
                               <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{t.date}</td>
                               <td className="py-2.5 px-3">
                                 <div className="flex items-center gap-1.5">
@@ -735,12 +736,12 @@ export default function MutualFundsPage() {
 
                   {/* Mobile cards */}
                   <div className="sm:hidden divide-y divide-[var(--border-light)]">
-                    {transactions.map((t) => {
+                    {transactions.map((t, idx) => {
                       const isBuy = t.type === 'BUY'
                       const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
                       const glUp = hasGL && t.gainLoss >= 0
                       return (
-                        <div key={t.transactionId} className="px-4 py-3">
+                        <div key={t.transactionId || `txn-m-${idx}`} className="px-4 py-3">
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-1.5">
                               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>

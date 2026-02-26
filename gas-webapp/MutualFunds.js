@@ -507,6 +507,13 @@ function recordTransactionInHistory(transaction) {
       log(`Calculated Gain/Loss: (${transaction.price} - ${transaction.avgBuyPrice}) × ${transaction.units} = ${gainLoss}`);
     }
 
+    // Generate Transaction ID
+    var lastRow = sheet.getLastRow();
+    var existingIds = lastRow > 2
+      ? sheet.getRange(3, 14, lastRow - 2, 1).getValues().map(function(r) { return r[0]; })
+      : [];
+    var transactionId = generateId('TXN', existingIds);
+
     sheet.appendRow([
       new Date(transaction.date),       // A: Date
       transaction.portfolioId || '',    // B: Portfolio ID
@@ -520,12 +527,13 @@ function recordTransactionInHistory(transaction) {
       transaction.totalAmount,          // J: Total Amount
       transaction.notes || '',          // K: Notes
       now,                              // L: Timestamp
-      gainLoss                          // M: Gain/Loss ₹ (calculated for SELL, 0 for BUY)
+      gainLoss,                         // M: Gain/Loss ₹ (calculated for SELL, 0 for BUY)
+      transactionId                     // N: Transaction ID
     ]);
 
     // Apply formatting to the new row
     const newRow = sheet.getLastRow();
-    applyDataRowFormatting(sheet, newRow, newRow, 13);
+    applyDataRowFormatting(sheet, newRow, newRow, 14);
 
     // Apply number formats
     const indianCurrencyFormat = '₹#,##,##0.00';
@@ -534,7 +542,9 @@ function recordTransactionInHistory(transaction) {
     sheet.getRange(newRow, 10).setNumberFormat(indianCurrencyFormat);  // J: Total Amount
     sheet.getRange(newRow, 13).setNumberFormat(indianCurrencyFormat);  // M: Gain/Loss
 
-    log(`Transaction recorded in TransactionHistory: ${transaction.type}-${transaction.transactionType} - ${transaction.fund}${gainLoss !== 0 ? ' | Gain/Loss: ₹' + gainLoss.toFixed(2) : ''}`);
+    log(`Transaction ${transactionId} recorded: ${transaction.type}-${transaction.transactionType} - ${transaction.fund}${gainLoss !== 0 ? ' | Gain/Loss: ₹' + gainLoss.toFixed(2) : ''}`);
+
+    return transactionId;
 
   } catch (error) {
     log(`Error recording transaction in history: ${error.toString()}`);
@@ -775,12 +785,12 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
 
     // R (18): ATH NAV ₹ - All-Time High NAV from MF_ATH_Data
     portfolioSheet.getRange(newRow, 18).setFormula(
-      `=IF(A${newRow}="","",IFERROR(VLOOKUP(TEXT(A${newRow},"0"),MF_ATH_Data!$A:$C,3,FALSE),""))`
+      `=IF(A${newRow}="","",IFERROR(VLOOKUP(A${newRow}*1,MF_ATH_Data!$A:$C,3,FALSE),""))`
     );
 
     // S (19): % Below ATH - How far below ATH the fund currently is
     portfolioSheet.getRange(newRow, 19).setFormula(
-      `=IF(A${newRow}="","",IFERROR(VLOOKUP(TEXT(A${newRow},"0"),MF_ATH_Data!$A:$G,7,FALSE),""))`
+      `=IF(A${newRow}="","",IFERROR(VLOOKUP(A${newRow}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
     );
 
     log(`DEBUG: All formulas set, applying formatting...`);
@@ -923,6 +933,26 @@ function getPortfolioFunds(portfolioId) {
       log('Warning: Could not load NAV dates: ' + e.message);
     }
 
+    // Build ATH lookup from MF_ATH_Data sheet (fallback for broken VLOOKUPs)
+    // MF_ATH_Data: A=Scheme Code, B=Fund Name, C=ATH NAV, D=ATH Date, E=Last Checked, F=Current NAV, G=% Below ATH
+    var athMap = {};
+    try {
+      var athSheet = getSheet(CONFIG.mfATHDataSheet);
+      if (athSheet && athSheet.getLastRow() > 1) {
+        var athData = athSheet.getRange(1, 1, athSheet.getLastRow(), 7).getValues();
+        for (var a = 0; a < athData.length; a++) {
+          if (athData[a][0] && athData[a][2]) {
+            athMap[String(athData[a][0]).trim()] = {
+              athNav: parseFloat(athData[a][2]) || 0,
+              belowATHPct: parseFloat(athData[a][6]) || 0
+            };
+          }
+        }
+      }
+    } catch (e) {
+      log('Warning: Could not load ATH data: ' + e.message);
+    }
+
     const funds = [];
 
     data.forEach((row, index) => {
@@ -934,6 +964,13 @@ function getPortfolioFunds(portfolioId) {
             navDateStr = navDate instanceof Date ? navDate.toLocaleDateString('en-IN') : String(navDate);
           } catch (e) { navDateStr = String(navDate); }
         }
+
+        // ATH: try sheet columns R/S first, fall back to MF_ATH_Data lookup
+        var sheetATH = maxCol >= 18 ? (parseFloat(row[17]) || 0) : 0;
+        var sheetBelowATH = maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0;
+        var athEntry = athMap[String(row[0]).trim()];
+        var athNav = sheetATH > 0 ? sheetATH : (athEntry ? athEntry.athNav : 0);
+        var belowATHPct = sheetBelowATH > 0 ? sheetBelowATH : (athEntry ? athEntry.belowATHPct : 0);
 
         funds.push({
           fundCode: row[0],                         // Column A: Scheme Code
@@ -952,8 +989,8 @@ function getPortfolioFunds(portfolioId) {
           rebalanceLumpsum: parseFloat(row[13]) || 0, // Column N: Rebalance Lumpsum ₹
           buySell: parseFloat(row[14]) || 0,        // Column O: Buy/Sell ₹
           pl: parseFloat(row[15]) || 0,             // Column P: P&L ₹
-          athNav: maxCol >= 18 ? (parseFloat(row[17]) || 0) : 0,       // Column R: ATH NAV
-          belowATHPct: maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0,  // Column S: % Below ATH
+          athNav: athNav,                           // ATH NAV (sheet R or MF_ATH_Data fallback)
+          belowATHPct: belowATHPct,                 // % Below ATH (sheet S or MF_ATH_Data fallback)
           navDate: navDateStr,                      // NAV Date from MutualFundData
           portfolioId: portfolioId                  // Pass through for reference
         });

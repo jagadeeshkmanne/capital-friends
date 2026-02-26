@@ -1045,10 +1045,11 @@ function setupTransactionHistorySheet() {
   const spreadsheet = getSpreadsheet();
   const sheet = spreadsheet.insertSheet(CONFIG.transactionHistorySheet);
 
-  addDeveloperCredit(sheet, 13);  // 13 columns total (added Gain/Loss)
+  addDeveloperCredit(sheet, 14);  // 14 columns total
 
-  // TransactionHistory Structure (13 columns)
+  // TransactionHistory Structure (14 columns)
   // Column M: Gain/Loss ₹ - Realized P&L for SELL transactions
+  // Column N: Transaction ID - Unique ID for edit/delete
   sheet.appendRow([
     'Date',
     'Portfolio ID',
@@ -1062,10 +1063,11 @@ function setupTransactionHistorySheet() {
     'Total Amount',
     'Notes',
     'Timestamp',
-    'Gain/Loss (₹)'
+    'Gain/Loss (₹)',
+    'Transaction ID'
   ]);
 
-  formatHeaderRow(sheet, sheet.getRange('A2:M2'), 40);
+  formatHeaderRow(sheet, sheet.getRange('A2:N2'), 40);
   applyStandardFormatting(sheet);
 
   // Set tab color (Pink for transactions)

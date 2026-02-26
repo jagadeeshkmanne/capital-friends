@@ -392,10 +392,10 @@ function createPortfolioSheet(portfolioName, portfolioId) {
   portfolioSheet.getRange("P4").setFormula("=IF(A4=\"\",\"\",H4-F4)");
 
   // R: ATH NAV ₹ - All-Time High NAV from MF_ATH_Data
-  portfolioSheet.getRange("R4").setFormula('=IF(A4="","",IFERROR(VLOOKUP(TEXT(A4,"0"),MF_ATH_Data!$A:$C,3,FALSE),""))');
+  portfolioSheet.getRange("R4").setFormula('=IF(A4="","",IFERROR(VLOOKUP(A4*1,MF_ATH_Data!$A:$C,3,FALSE),""))');
 
   // S: % Below ATH - How far below ATH the fund currently is
-  portfolioSheet.getRange("S4").setFormula('=IF(A4="","",IFERROR(VLOOKUP(TEXT(A4,"0"),MF_ATH_Data!$A:$G,7,FALSE),""))');
+  portfolioSheet.getRange("S4").setFormula('=IF(A4="","",IFERROR(VLOOKUP(A4*1,MF_ATH_Data!$A:$G,7,FALSE),""))');
 
   // Freeze rows (watermark + headers)
   portfolioSheet.setFrozenRows(3);
@@ -1374,12 +1374,12 @@ function addFundRowToPortfolio(sheet, row, portfolioId, schemeCode, targetPercen
 
   // Column R (18): ATH NAV ₹ - All-Time High NAV from MF_ATH_Data
   sheet.getRange(row, 18).setFormula(
-    `=IF(A${row}="","",IFERROR(VLOOKUP(TEXT(A${row},"0"),MF_ATH_Data!$A:$C,3,FALSE),""))`
+    `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$C,3,FALSE),""))`
   );
 
   // Column S (19): % Below ATH - How far below ATH the fund currently is
   sheet.getRange(row, 19).setFormula(
-    `=IF(A${row}="","",IFERROR(VLOOKUP(TEXT(A${row},"0"),MF_ATH_Data!$A:$G,7,FALSE),""))`
+    `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
   );
 
   // Apply formatting
@@ -1620,13 +1620,13 @@ function fixAllPortfolioSheetFormulas() {
 
           // Fix 10: ATH NAV ₹ (column R = 18)
           portfolioSheet.getRange(row, 18).setFormula(
-            `=IF(A${row}="","",IFERROR(VLOOKUP(TEXT(A${row},"0"),MF_ATH_Data!$A:$C,3,FALSE),""))`
+            `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$C,3,FALSE),""))`
           );
           portfolioSheet.getRange(row, 18).setNumberFormat('₹#,##0.00');
 
           // Fix 11: % Below ATH (column S = 19)
           portfolioSheet.getRange(row, 19).setFormula(
-            `=IF(A${row}="","",IFERROR(VLOOKUP(TEXT(A${row},"0"),MF_ATH_Data!$A:$G,7,FALSE),""))`
+            `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
           );
           portfolioSheet.getRange(row, 19).setNumberFormat('0.00');
         }

@@ -16,39 +16,63 @@ function fmt(n) {
   return `₹${Math.round(n)}`
 }
 
+function NoTargetsMessage({ exitOnly }) {
+  return (
+    <div className="py-4 text-center space-y-1">
+      {exitOnly ? (
+        <p className="text-xs text-[var(--text-muted)]">Only exit candidates here — use <span className="font-semibold text-amber-400">Buy / Sell</span> tab</p>
+      ) : (
+        <>
+          <p className="text-xs text-[var(--text-muted)]">No target allocations set</p>
+          <p className="text-xs text-[var(--text-dim)]">Use <span className="font-semibold text-violet-400">Allocations</span> to set target % for each fund first</p>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   const sipTarget = portfolio.sipTarget || 0
+  const threshold = (portfolio.rebalanceThreshold || 0.05) * 100
+  const hasTargets = holdings.some((h) => h.targetAllocationPct > 0)
+  const hasExitCandidates = holdings.some((h) => h.targetAllocationPct === 0 && h.units > 0)
 
-  if (sipTarget <= 0) return <p className="text-xs text-[var(--text-dim)] py-2">No SIP target set</p>
+  if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
+  if (sipTarget <= 0) return <p className="text-xs text-[var(--text-dim)] py-2">No SIP target set for this portfolio</p>
 
   // Show ALL funds with targets — gap-based rebalance SIP
   const allFunds = holdings
     .filter((h) => h.targetAllocationPct > 0)
     .map((h) => {
       const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+      const drift = Math.abs(currentPct - h.targetAllocationPct)
+      const drifted = drift > threshold
       const targetValue = (h.targetAllocationPct / 100) * totalValue
       const gap = targetValue - h.currentValue // positive = underweight, negative = overweight
       const normalSIP = (h.targetAllocationPct / 100) * sipTarget
-      return { ...h, currentPct, gap, normalSIP }
+      return { ...h, currentPct, drift, drifted, gap, normalSIP }
     })
 
-  // Rebalance: overweight funds get ₹0, underweight funds share SIP proportional to gap
-  const underweight = allFunds.filter((h) => h.gap > 0)
-  const totalGap = underweight.reduce((s, h) => s + h.gap, 0)
+  // Only rebalance funds that exceed threshold
+  const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0)
+  const driftedOverweight = allFunds.filter((h) => h.drifted && h.gap <= 0)
+  const totalGap = driftedUnderweight.reduce((s, h) => s + h.gap, 0)
 
   const withSuggested = allFunds.map((h) => ({
     ...h,
-    suggestedSIP: h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * sipTarget : 0,
+    suggestedSIP: h.drifted && h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * sipTarget
+      : h.drifted && h.gap <= 0 ? 0 // overweight beyond threshold → ₹0
+      : h.normalSIP, // within threshold → keep normal SIP
   }))
 
-  // Only show if there's actually a change needed
-  const hasChanges = withSuggested.some((h) => Math.abs(h.suggestedSIP - h.normalSIP) > 10)
-  if (!hasChanges) return <p className="text-xs text-[var(--text-dim)] py-2">SIPs are balanced</p>
+  // Only show if there are funds drifted beyond threshold
+  const hasDrift = allFunds.some((h) => h.drifted)
+  if (!hasDrift) return <p className="text-xs text-[var(--text-dim)] py-2">SIPs are balanced (within {threshold.toFixed(0)}% threshold)</p>
 
   return (
     <div className="space-y-2">
       <p className="text-xs text-[var(--text-dim)] px-1">
-        Overweight funds get ₹0 SIP. All SIP goes to underweight funds to rebalance over time.
+        Funds drifted &gt;{threshold.toFixed(0)}%: overweight → ₹0, underweight → extra SIP. Others keep normal SIP.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -62,20 +86,24 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
           </thead>
           <tbody>
             {withSuggested.map((h) => {
-              const isOverweight = h.gap <= 0
+              const isOverweight = h.drifted && h.gap <= 0
+              const isUnderweight = h.drifted && h.gap > 0
+              const withinThreshold = !h.drifted
               return (
-                <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${isOverweight ? 'opacity-60' : ''}`}>
+                <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${withinThreshold ? 'opacity-50' : isOverweight ? 'opacity-60' : ''}`}>
                   <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px] truncate">{h.fundName}</td>
                   <td className="py-2 px-2 text-right tabular-nums">
-                    <span className={isOverweight ? 'text-amber-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
+                    <span className={isOverweight ? 'text-amber-400' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
                     <span className="text-[var(--text-dim)]"> / {h.targetAllocationPct.toFixed(1)}%</span>
                   </td>
                   <td className="py-2 px-2 text-right text-[var(--text-muted)] tabular-nums">{fmt(h.normalSIP)}</td>
                   <td className="py-2 px-2 text-right font-semibold tabular-nums">
                     {isOverweight ? (
                       <span className="text-amber-400/70">₹0</span>
-                    ) : (
+                    ) : isUnderweight ? (
                       <span className="text-blue-400">{fmt(h.suggestedSIP)}</span>
+                    ) : (
+                      <span className="text-[var(--text-dim)]">{fmt(h.suggestedSIP)}</span>
                     )}
                   </td>
                 </tr>
@@ -98,12 +126,33 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
 function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
   const [lumpsumInput, setLumpsumInput] = useState('')
   const threshold = (portfolio.rebalanceThreshold || 0.05) * 100
-  const lumpsumAmount = Number(lumpsumInput) || portfolio.lumpsumTarget || 0
+  const hasTargets = holdings.some((h) => h.targetAllocationPct > 0)
+  const hasExitCandidates = holdings.some((h) => h.targetAllocationPct === 0 && h.units > 0)
 
-  const enriched = holdings.map((h) => {
+  if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
+
+  const enriched = holdings.filter((h) => h.targetAllocationPct > 0).map((h) => {
     const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
     return { ...h, currentPct }
   })
+
+  // Calculate minimum lumpsum needed to rebalance (only for funds drifted beyond threshold)
+  const suggestedAmount = useMemo(() => {
+    if (totalValue <= 0) return 0
+    // Only count underweight funds that exceed the rebalance threshold
+    const gaps = enriched.map((h) => {
+      const currentPctVal = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+      const drift = Math.abs(currentPctVal - h.targetAllocationPct)
+      if (drift <= threshold) return 0 // Within threshold — no rebalance needed
+      const targetVal = (h.targetAllocationPct / 100) * totalValue
+      const gap = targetVal - h.currentValue
+      return gap > 0 ? gap : 0
+    })
+    const totalGap = gaps.reduce((s, g) => s + g, 0)
+    return Math.ceil(totalGap / 100) * 100 // Round up to nearest 100
+  }, [enriched, totalValue, threshold])
+
+  const lumpsumAmount = Number(lumpsumInput) || portfolio.lumpsumTarget || suggestedAmount
 
   const distribution = useMemo(() => {
     if (lumpsumAmount <= 0) return []
@@ -122,15 +171,18 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
     return raw
   }, [enriched, lumpsumAmount, totalValue])
 
+  const usingSource = lumpsumInput ? null : portfolio.lumpsumTarget ? 'target' : suggestedAmount > 0 ? 'suggested' : null
+
   return (
     <div className="space-y-2">
       <div className="flex items-end gap-3">
         <div className="flex-1 max-w-[200px]">
           <FormField label="Amount (₹)">
-            <FormInput type="number" value={lumpsumInput} onChange={setLumpsumInput} placeholder={portfolio.lumpsumTarget ? `Default: ${formatINR(portfolio.lumpsumTarget)}` : 'Enter amount...'} />
+            <FormInput type="number" value={lumpsumInput} onChange={setLumpsumInput} placeholder={portfolio.lumpsumTarget ? `Target: ${formatINR(portfolio.lumpsumTarget)}` : suggestedAmount > 0 ? `Suggested: ${formatINR(suggestedAmount)}` : 'Enter amount...'} />
           </FormField>
         </div>
-        {portfolio.lumpsumTarget > 0 && !lumpsumInput && <p className="text-xs text-[var(--text-dim)] pb-2.5">Using target</p>}
+        {usingSource === 'target' && <p className="text-xs text-[var(--text-dim)] pb-2.5">Using target</p>}
+        {usingSource === 'suggested' && <p className="text-xs text-emerald-400/70 pb-2.5">Auto: min to rebalance</p>}
       </div>
       {lumpsumAmount > 0 && distribution.length > 0 ? (
         <div className="overflow-x-auto">
@@ -168,13 +220,19 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
 
 function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
   const threshold = (portfolio.rebalanceThreshold || 0.05) * 100
+  const hasTargets = holdings.some((h) => h.targetAllocationPct > 0)
+  const hasExitCandidates = holdings.some((h) => h.targetAllocationPct === 0 && h.units > 0)
 
-  const buySellData = holdings.map((h) => {
+  if (!hasTargets && !hasExitCandidates) return <NoTargetsMessage />
+
+  // Include funds with target > 0 (normal drift) AND funds with target = 0 + units > 0 (exit/sell)
+  const buySellData = holdings.filter((h) => h.targetAllocationPct > 0 || h.units > 0).map((h) => {
     const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-    const drifted = Math.abs(currentPct - h.targetAllocationPct) > threshold
+    const isExit = h.targetAllocationPct === 0 && h.units > 0
+    const drifted = isExit || Math.abs(currentPct - h.targetAllocationPct) > threshold
     const targetVal = (h.targetAllocationPct / 100) * totalValue
     const amount = drifted ? targetVal - h.currentValue : 0
-    return { ...h, currentPct, amount }
+    return { ...h, currentPct, amount, isExit }
   }).filter((h) => Math.abs(h.amount) >= 500)
 
   if (buySellData.length === 0) return <p className="text-xs text-[var(--text-dim)] py-2">Portfolio is balanced</p>
@@ -193,12 +251,14 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
           {buySellData.map((h) => {
             const isBuy = h.amount > 0
             return (
-              <tr key={h.holdingId} className="border-b border-[var(--border-light)] last:border-0">
+              <tr key={h.schemeCode || h.fundCode} className="border-b border-[var(--border-light)] last:border-0">
                 <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px] truncate">{h.fundName}</td>
-                <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">{h.currentPct.toFixed(1)}% → {h.targetAllocationPct.toFixed(1)}%</td>
+                <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">
+                  {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${h.targetAllocationPct.toFixed(1)}%`}
+                </td>
                 <td className="py-2 px-2 text-right">
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
-                    {isBuy ? 'Buy' : 'Sell'} {fmt(Math.abs(h.amount))}
+                    {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
                   </span>
                 </td>
               </tr>
@@ -223,33 +283,49 @@ export default function MFRebalanceDialog() {
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
         const threshold = (p.rebalanceThreshold || 0.05) * 100
         const driftedCount = pHoldings.filter((h) => {
+          if (h.targetAllocationPct <= 0) return false
           const pct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
           return Math.abs(pct - h.targetAllocationPct) > threshold
         }).length
-        return { ...p, holdings: pHoldings, totalValue, driftedCount }
+        const exitCount = pHoldings.filter((h) => h.targetAllocationPct === 0 && h.units > 0 && h.currentValue >= 500).length
+        const hasTargets = pHoldings.some((h) => h.targetAllocationPct > 0)
+        return { ...p, holdings: pHoldings, totalValue, driftedCount, exitCount, hasTargets }
       })
-      .filter((p) => p.driftedCount > 0)
+      .filter((p) => p.driftedCount > 0 || p.exitCount > 0)
   }, [mfPortfolios, mfHoldings])
 
   if (portfolioGroups.length === 0) {
+    const anyTargets = mfHoldings.some((h) => h.targetAllocationPct > 0)
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-[var(--text-muted)]">All portfolios are balanced</p>
-        <p className="text-xs text-[var(--text-dim)] mt-1">No funds exceed their rebalance threshold</p>
+        {anyTargets ? (
+          <>
+            <p className="text-sm text-[var(--text-muted)]">All portfolios are balanced</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">No funds exceed their rebalance threshold</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-[var(--text-muted)]">No target allocations set</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">Use <span className="font-semibold text-violet-400">Allocations</span> to set target % for each fund, then rebalance will show drift</p>
+          </>
+        )}
       </div>
     )
   }
 
-  const activeMode = modes.find((m) => m.key === mode)
+  // Only show SIP tab if at least one portfolio has a SIP target
+  const anySIP = portfolioGroups.some((p) => (p.sipTarget || 0) > 0)
+  const availableModes = anySIP ? modes : modes.filter((m) => m.key !== 'sip')
+  const effectiveMode = availableModes.some((m) => m.key === mode) ? mode : availableModes[0]?.key || 'buysell'
 
   return (
     <div className="space-y-4">
       {/* Color-coded mode tabs */}
       <div className="flex bg-[var(--bg-inset)] rounded-lg p-0.5">
-        {modes.map(({ key, label, icon: MIcon, color, dimColor, activeBg }) => (
+        {availableModes.map(({ key, label, icon: MIcon, color, dimColor, activeBg }) => (
           <button key={key} onClick={() => setMode(key)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-colors ${
-              mode === key ? `${activeBg} ${color} shadow-sm` : dimColor
+              effectiveMode === key ? `${activeBg} ${color} shadow-sm` : dimColor
             }`}
           >
             <MIcon size={13} /> {label}
@@ -266,7 +342,8 @@ export default function MFRebalanceDialog() {
               <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center">{i + 1}</span>
               <p className="text-sm font-bold text-[var(--text-primary)]">{p.portfolioName}</p>
               <span className="text-xs text-[var(--text-muted)]">{p.ownerName}</span>
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>
+              {p.driftedCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
+              {p.exitCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
             </div>
             <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
               <span className="font-semibold text-[var(--text-secondary)]">{formatINR(p.totalValue)}</span>
@@ -277,9 +354,9 @@ export default function MFRebalanceDialog() {
 
           {/* Mode-specific content */}
           <div className="px-3 py-2">
-            {mode === 'sip' && <PortfolioSIPSection portfolio={p} holdings={p.holdings} totalValue={p.totalValue} />}
-            {mode === 'lumpsum' && <PortfolioLumpsumSection portfolio={p} holdings={p.holdings} totalValue={p.totalValue} />}
-            {mode === 'buysell' && <PortfolioBuySellSection portfolio={p} holdings={p.holdings} totalValue={p.totalValue} />}
+            {effectiveMode === 'sip' && <PortfolioSIPSection portfolio={p} holdings={p.holdings} totalValue={p.totalValue} />}
+            {effectiveMode === 'lumpsum' && <PortfolioLumpsumSection portfolio={p} holdings={p.holdings} totalValue={p.totalValue} />}
+            {effectiveMode === 'buysell' && <PortfolioBuySellSection portfolio={p} holdings={p.holdings} totalValue={p.totalValue} />}
           </div>
         </div>
       ))}

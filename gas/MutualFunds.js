@@ -775,12 +775,12 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
 
     // R (18): ATH NAV ₹ - All-Time High NAV from MF_ATH_Data
     portfolioSheet.getRange(newRow, 18).setFormula(
-      `=IF(A${newRow}="","",IFERROR(VLOOKUP(TEXT(A${newRow},"0"),MF_ATH_Data!$A:$C,3,FALSE),""))`
+      `=IF(A${newRow}="","",IFERROR(VLOOKUP(A${newRow}*1,MF_ATH_Data!$A:$C,3,FALSE),""))`
     );
 
     // S (19): % Below ATH - How far below ATH the fund currently is
     portfolioSheet.getRange(newRow, 19).setFormula(
-      `=IF(A${newRow}="","",IFERROR(VLOOKUP(TEXT(A${newRow},"0"),MF_ATH_Data!$A:$G,7,FALSE),""))`
+      `=IF(A${newRow}="","",IFERROR(VLOOKUP(A${newRow}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
     );
 
     log(`DEBUG: All formulas set, applying formatting...`);

@@ -63,7 +63,7 @@ export function DataProvider({ children }) {
     if ('stockHoldings' in data) setStockHoldings(data.stockHoldings || [])
     if ('stockTransactions' in data) setStockTransactions(data.stockTransactions || [])
     if ('mfPortfolios' in data) setMFPortfolios(data.mfPortfolios || [])
-    if ('mfHoldings' in data) setMFHoldings(data.mfHoldings || [])
+    if ('mfHoldings' in data) setMFHoldings((data.mfHoldings || []).map(h => h.schemeCode ? h : { ...h, schemeCode: h.fundCode }))
     if ('mfTransactions' in data) setMFTransactions(data.mfTransactions || [])
     if ('goals' in data) setGoals(data.goals || [])
     if ('reminders' in data) setReminders(data.reminders || [])
@@ -166,12 +166,13 @@ export function DataProvider({ children }) {
       api.getAllMFHoldings(),
       api.getAllMFTransactions(),
     ])
+    const normalizedHoldings = (holdings || []).map(h => h.schemeCode ? h : { ...h, schemeCode: h.fundCode })
     setMFPortfolios(portfolios || [])
-    setMFHoldings(holdings || [])
+    setMFHoldings(normalizedHoldings)
     setMFTransactions(transactions || [])
     idb.putMany({
       mfPortfolios: portfolios || [],
-      mfHoldings: holdings || [],
+      mfHoldings: normalizedHoldings,
       mfTransactions: transactions || [],
     })
   }, [])
