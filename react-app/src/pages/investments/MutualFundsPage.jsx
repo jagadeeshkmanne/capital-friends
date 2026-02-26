@@ -99,7 +99,7 @@ export default function MutualFundsPage() {
     const realizedPLPct = invested > 0 ? (realizedPL / invested) * 100 : 0
     const funds = source.reduce((s, p) => s + p.fundCount, 0)
     // Monthly SIP total from holdings
-    const relevantHoldings = selectedPortfolioId === 'all'
+    const relevantHoldings = !mfHoldings ? [] : selectedPortfolioId === 'all'
       ? mfHoldings.filter((h) => source.some((p) => p.portfolioId === h.portfolioId))
       : mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
     const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.sipAmount || 0), 0)
