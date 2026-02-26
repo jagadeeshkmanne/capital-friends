@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
-import { FormField, FormInput, FormSelect, FormActions } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
 
 const INVEST_TYPES = [
@@ -24,6 +24,8 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
     portfolioId: portfolioId || '',
     fundCode: '',
     fundName: '',
+    nav: 0,
+    navDate: '',
     transactionType: transactionType || 'SIP',
     date: new Date().toISOString().split('T')[0],
     units: '',
@@ -39,7 +41,7 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
   }
 
   function selectFund({ schemeCode, fundName, nav, navDate }) {
-    setForm((f) => ({ ...f, fundCode: schemeCode, fundName, price: nav > 0 ? String(nav) : f.price }))
+    setForm((f) => ({ ...f, fundCode: schemeCode, fundName, nav: nav || 0, navDate: navDate || '', price: nav > 0 ? String(nav) : f.price }))
     setErrors((e) => ({ ...e, fundCode: undefined, fundName: undefined }))
   }
 
@@ -98,7 +100,7 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
 
       <FormField label="Fund" required error={errors.fundCode}>
         <FundSearchInput
-          value={form.fundCode ? { schemeCode: form.fundCode, fundName: form.fundName } : null}
+          value={form.fundCode ? { schemeCode: form.fundCode, fundName: form.fundName, nav: form.nav || 0, navDate: form.navDate || '' } : null}
           onSelect={selectFund}
           placeholder="Search fund by name, code, or category..."
         />
@@ -124,15 +126,14 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
         </div>
       )}
 
-      <FormField label="Date" required error={errors.date}>
-        <FormInput type="date" value={form.date} onChange={(v) => set('date', v)} />
-      </FormField>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <FormField label="Date" required error={errors.date}>
+          <FormDateInput value={form.date} onChange={(v) => set('date', v)} />
+        </FormField>
         <FormField label="Units" required error={errors.units}>
           <FormInput type="number" value={form.units} onChange={(v) => set('units', v)} placeholder="e.g., 150.50" />
         </FormField>
-        <FormField label="NAV (₹ per unit)" required error={errors.price}>
+        <FormField label="NAV (₹)" required error={errors.price}>
           <FormInput type="number" value={form.price} onChange={(v) => set('price', v)} placeholder="e.g., 178.45" />
         </FormField>
       </div>

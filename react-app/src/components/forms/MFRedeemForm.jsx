@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
-import { FormField, FormInput, FormSelect, FormActions } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
 export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
   const { mfPortfolios, mfHoldings } = useData()
@@ -92,18 +92,17 @@ export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Redemption Date" required error={errors.date}>
-          <FormInput type="date" value={form.date} onChange={(v) => set('date', v)} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <FormField label="Date" required error={errors.date}>
+          <FormDateInput value={form.date} onChange={(v) => set('date', v)} />
         </FormField>
-        <FormField label="Units to Redeem" required error={errors.units}>
+        <FormField label="Units" required error={errors.units}>
           <FormInput type="number" value={form.units} onChange={(v) => set('units', v)} placeholder={selectedHolding ? `Max: ${selectedHolding.units.toFixed(2)}` : ''} />
         </FormField>
+        <FormField label="NAV (₹)" required error={errors.price}>
+          <FormInput type="number" value={form.price} onChange={(v) => set('price', v)} placeholder="e.g., 178.45" />
+        </FormField>
       </div>
-
-      <FormField label="Redemption NAV (₹)" required error={errors.price}>
-        <FormInput type="number" value={form.price} onChange={(v) => set('price', v)} placeholder="e.g., 178.45" />
-      </FormField>
 
       {totalAmount > 0 && (
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
