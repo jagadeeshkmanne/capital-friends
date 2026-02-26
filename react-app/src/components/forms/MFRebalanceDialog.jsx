@@ -136,84 +136,135 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
     return { ...h, currentPct }
   })
 
-  // Calculate minimum lumpsum needed to rebalance (only for funds drifted beyond threshold)
+  // Calculate exact lumpsum to bring all underweight funds to target %
+  // Formula: I = (P_under/100 × T - CV_under) / (1 - P_under/100)
+  // This accounts for the total growing when you invest, so targets actually land on exact %
   const suggestedAmount = useMemo(() => {
-    if (totalValue <= 0) return 0
-    // Only count underweight funds that exceed the rebalance threshold
-    const gaps = enriched.map((h) => {
-      const currentPctVal = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-      const drift = Math.abs(currentPctVal - h.targetAllocationPct)
-      if (drift <= threshold) return 0 // Within threshold — no rebalance needed
+    if (totalValue <= 0 || enriched.length === 0) return 0
+    const underweight = enriched.filter((h) => {
       const targetVal = (h.targetAllocationPct / 100) * totalValue
-      const gap = targetVal - h.currentValue
-      return gap > 0 ? gap : 0
+      return h.currentValue < targetVal
     })
-    const totalGap = gaps.reduce((s, g) => s + g, 0)
-    return Math.ceil(totalGap / 100) * 100 // Round up to nearest 100
-  }, [enriched, totalValue, threshold])
+    if (underweight.length === 0) return 0
+    const pUnder = underweight.reduce((s, h) => s + h.targetAllocationPct, 0)
+    if (pUnder >= 100) return 0
+    const cvUnder = underweight.reduce((s, h) => s + h.currentValue, 0)
+    const amount = (pUnder / 100 * totalValue - cvUnder) / (1 - pUnder / 100)
+    return amount > 0 ? Math.ceil(amount / 100) * 100 : 0
+  }, [enriched, totalValue])
 
   const lumpsumAmount = Number(lumpsumInput) || portfolio.lumpsumTarget || suggestedAmount
 
+  // Distribute lumpsum — show ALL funds (overweight get ₹0)
   const distribution = useMemo(() => {
-    if (lumpsumAmount <= 0) return []
-    const newTotal = totalValue + lumpsumAmount
-    const raw = enriched.map((h) => {
+    const newTotal = lumpsumAmount > 0 ? totalValue + lumpsumAmount : totalValue
+    const all = enriched.map((h) => {
       const targetVal = (h.targetAllocationPct / 100) * newTotal
-      const invest = Math.max(0, targetVal - h.currentValue)
+      const invest = lumpsumAmount > 0 ? Math.max(0, targetVal - h.currentValue) : 0
       const newPct = newTotal > 0 ? ((h.currentValue + invest) / newTotal) * 100 : 0
-      return { ...h, invest, newPct }
-    }).filter((h) => h.invest > 0)
-    const totalRaw = raw.reduce((s, h) => s + h.invest, 0)
-    if (totalRaw > 0 && Math.abs(totalRaw - lumpsumAmount) > 1) {
+      const isOverweight = h.currentValue > targetVal + 1 // small tolerance
+      return { ...h, invest, newPct, isOverweight }
+    })
+    // Scale if total investment doesn't match lumpsum
+    const totalRaw = all.reduce((s, h) => s + h.invest, 0)
+    if (lumpsumAmount > 0 && totalRaw > 0 && Math.abs(totalRaw - lumpsumAmount) > 1) {
       const scale = lumpsumAmount / totalRaw
-      return raw.map((h) => ({ ...h, invest: h.invest * scale, newPct: (totalValue + lumpsumAmount) > 0 ? ((h.currentValue + h.invest * scale) / (totalValue + lumpsumAmount)) * 100 : 0 }))
+      return all.map((h) => ({
+        ...h,
+        invest: h.invest > 0 ? h.invest * scale : 0,
+        newPct: newTotal > 0 ? ((h.currentValue + (h.invest > 0 ? h.invest * scale : 0)) / newTotal) * 100 : 0,
+      }))
     }
-    return raw
+    return all
   }, [enriched, lumpsumAmount, totalValue])
 
-  const usingSource = lumpsumInput ? null : portfolio.lumpsumTarget ? 'target' : suggestedAmount > 0 ? 'suggested' : null
+  const totalInvest = distribution.reduce((s, h) => s + h.invest, 0)
+  const hasOverweight = distribution.some((h) => h.isOverweight)
+  const customAmount = Number(lumpsumInput)
+  const isPartial = customAmount > 0 && suggestedAmount > 0 && customAmount < suggestedAmount
 
   return (
     <div className="space-y-2">
+      {/* Minimum needed banner */}
+      {suggestedAmount > 0 && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+          <p className="text-xs text-emerald-400">
+            <span className="font-bold">{formatINR(suggestedAmount)}</span> needed to bring all underweight funds to target %
+          </p>
+        </div>
+      )}
+
       <div className="flex items-end gap-3">
         <div className="flex-1 max-w-[200px]">
-          <FormField label="Amount (₹)">
-            <FormInput type="number" value={lumpsumInput} onChange={setLumpsumInput} placeholder={portfolio.lumpsumTarget ? `Target: ${formatINR(portfolio.lumpsumTarget)}` : suggestedAmount > 0 ? `Suggested: ${formatINR(suggestedAmount)}` : 'Enter amount...'} />
+          <FormField label="Invest Amount (₹)">
+            <FormInput type="number" value={lumpsumInput} onChange={setLumpsumInput} placeholder={suggestedAmount > 0 ? `${formatINR(suggestedAmount)}` : 'Enter amount...'} />
           </FormField>
         </div>
-        {usingSource === 'target' && <p className="text-xs text-[var(--text-dim)] pb-2.5">Using target</p>}
-        {usingSource === 'suggested' && <p className="text-xs text-emerald-400/70 pb-2.5">Auto: min to rebalance</p>}
+        {!customAmount && !portfolio.lumpsumTarget && suggestedAmount > 0 && (
+          <p className="text-xs text-emerald-400/70 pb-2.5">Using suggested</p>
+        )}
+        {!customAmount && portfolio.lumpsumTarget >= 100 && (
+          <p className="text-xs text-[var(--text-dim)] pb-2.5">Using lumpsum target</p>
+        )}
       </div>
-      {lumpsumAmount > 0 && distribution.length > 0 ? (
+
+      {/* Warning: partial amount */}
+      {isPartial && (
+        <p className="text-xs text-amber-400/80 px-1">
+          Below minimum — distributes proportionally but won't fully rebalance. Need {formatINR(suggestedAmount)} for exact target %.
+        </p>
+      )}
+
+      {distribution.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border-light)]">
                 <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
-                <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Drift</th>
+                <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Allocation</th>
                 <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Invest</th>
               </tr>
             </thead>
             <tbody>
               {distribution.map((h) => (
-                <tr key={h.holdingId} className="border-b border-[var(--border-light)] last:border-0">
+                <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${h.invest === 0 ? 'opacity-50' : ''}`}>
                   <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px] truncate">{h.fundName}</td>
-                  <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">{h.currentPct.toFixed(1)}% → {h.newPct.toFixed(1)}%</td>
-                  <td className="py-2 px-2 text-right font-semibold text-emerald-400 tabular-nums">{fmt(h.invest)}</td>
+                  <td className="py-2 px-2 text-right tabular-nums">
+                    <span className={h.isOverweight ? 'text-amber-400' : h.invest > 0 ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
+                    <span className="text-[var(--text-dim)]"> → {h.newPct.toFixed(1)}%</span>
+                  </td>
+                  <td className="py-2 px-2 text-right font-semibold tabular-nums">
+                    {h.isOverweight ? (
+                      <span className="text-amber-400/70 text-xs">Overweight</span>
+                    ) : h.invest > 0 ? (
+                      <span className="text-emerald-400">{fmt(h.invest)}</span>
+                    ) : (
+                      <span className="text-[var(--text-dim)] text-xs">Balanced</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr className="border-t border-[var(--border)]">
-                <td className="py-1.5 px-2 text-xs font-bold text-[var(--text-primary)]" colSpan={2}>Total</td>
-                <td className="py-1.5 px-2 text-right text-xs font-bold text-emerald-400 tabular-nums">{formatINR(lumpsumAmount)}</td>
-              </tr>
-            </tfoot>
+            {totalInvest > 0 && (
+              <tfoot>
+                <tr className="border-t border-[var(--border)]">
+                  <td className="py-1.5 px-2 text-xs font-bold text-[var(--text-primary)]" colSpan={2}>Total</td>
+                  <td className="py-1.5 px-2 text-right text-xs font-bold text-emerald-400 tabular-nums">{formatINR(totalInvest)}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
-      ) : lumpsumAmount > 0 ? (
-        <p className="text-xs text-[var(--text-dim)] py-2 text-center">Balanced — distributes proportionally</p>
-      ) : null}
+      ) : (
+        <p className="text-xs text-[var(--text-dim)] py-2 text-center">All funds balanced</p>
+      )}
+
+      {/* Hint for overweight funds */}
+      {hasOverweight && (
+        <p className="text-xs text-[var(--text-dim)] px-1">
+          Overweight funds can't be fixed by buying. Use <span className="font-semibold text-amber-400">Buy / Sell</span> tab to sell overweight and buy underweight.
+        </p>
+      )}
     </div>
   )
 }
@@ -272,7 +323,7 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
 
 export default function MFRebalanceDialog() {
   const { mfHoldings, mfPortfolios } = useData()
-  const [mode, setMode] = useState('sip')
+  const [mode, setMode] = useState('buysell')
 
   // All portfolios needing rebalance
   const portfolioGroups = useMemo(() => {
@@ -314,7 +365,7 @@ export default function MFRebalanceDialog() {
   }
 
   // Only show SIP tab if at least one portfolio has a SIP target
-  const anySIP = portfolioGroups.some((p) => (p.sipTarget || 0) > 0)
+  const anySIP = portfolioGroups.some((p) => (p.sipTarget || 0) >= 500)
   const availableModes = anySIP ? modes : modes.filter((m) => m.key !== 'sip')
   const effectiveMode = availableModes.some((m) => m.key === mode) ? mode : availableModes[0]?.key || 'buysell'
 
@@ -348,7 +399,7 @@ export default function MFRebalanceDialog() {
             <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
               <span className="font-semibold text-[var(--text-secondary)]">{formatINR(p.totalValue)}</span>
               <span>Threshold: {((p.rebalanceThreshold || 0.05) * 100).toFixed(0)}%</span>
-              {p.sipTarget > 0 && <span>SIP: {formatINR(p.sipTarget)}/mo</span>}
+              {p.sipTarget >= 100 && <span>SIP: {formatINR(p.sipTarget)}/mo</span>}
             </div>
           </div>
 

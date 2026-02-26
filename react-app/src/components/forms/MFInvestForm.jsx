@@ -4,6 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
+import { Search, Plus } from 'lucide-react'
 
 const INVEST_TYPES = [
   { value: 'INITIAL', label: 'Add Existing Holdings' },
@@ -11,7 +12,7 @@ const INVEST_TYPES = [
   { value: 'LUMPSUM', label: 'Lumpsum Investment' },
 ]
 
-export default function MFInvestForm({ portfolioId, transactionType, onSave, onCancel }) {
+export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, fundName: initialFundName, transactionType, onSave, onCancel }) {
   const { mfPortfolios, mfHoldings } = useData()
   const { selectedMember } = useFamily()
 
@@ -22,8 +23,8 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
 
   const [form, setForm] = useState({
     portfolioId: portfolioId || '',
-    fundCode: '',
-    fundName: '',
+    fundCode: initialFundCode || '',
+    fundName: initialFundName || '',
     nav: 0,
     navDate: '',
     transactionType: transactionType || 'SIP',
@@ -34,6 +35,7 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [showSearch, setShowSearch] = useState(!initialFundCode)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
@@ -43,7 +45,28 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
   function selectFund({ schemeCode, fundName, nav, navDate }) {
     setForm((f) => ({ ...f, fundCode: schemeCode, fundName, nav: nav || 0, navDate: navDate || '', price: nav > 0 ? String(nav) : f.price }))
     setErrors((e) => ({ ...e, fundCode: undefined, fundName: undefined }))
+    setShowSearch(false)
   }
+
+  function selectExistingFund(h) {
+    setForm((f) => ({
+      ...f,
+      fundCode: h.schemeCode,
+      fundName: h.fundName,
+      nav: h.currentNav || 0,
+      navDate: '',
+      price: h.currentNav > 0 ? String(h.currentNav) : f.price,
+    }))
+    setErrors((e) => ({ ...e, fundCode: undefined }))
+    setShowSearch(false)
+  }
+
+  // All holdings for selected portfolio (including planned funds with 0 units)
+  const portfolioHoldings = useMemo(() => {
+    if (!form.portfolioId) return []
+    return mfHoldings.filter((h) => h.portfolioId === form.portfolioId)
+      .sort((a, b) => b.currentValue - a.currentValue)
+  }, [mfHoldings, form.portfolioId])
 
   // Check if selected fund already exists in selected portfolio
   const existingHolding = useMemo(() => {
@@ -85,25 +108,74 @@ export default function MFInvestForm({ portfolioId, transactionType, onSave, onC
     } finally { setSaving(false) }
   }
 
-  const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))
+  const portfolioOptions = activePortfolios.map((p) => {
+    const name = p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName
+    const label = p.ownerName ? `${name} (${p.ownerName})` : name
+    return { value: p.portfolioId, label }
+  })
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Portfolio" required error={errors.portfolioId}>
-          <FormSelect value={form.portfolioId} onChange={(v) => set('portfolioId', v)} options={portfolioOptions} placeholder="Select portfolio..." />
+          <FormSelect value={form.portfolioId} onChange={(v) => { set('portfolioId', v); if (!initialFundCode) { set('fundCode', ''); set('fundName', ''); setShowSearch(false) } }} options={portfolioOptions} placeholder="Select portfolio..." />
         </FormField>
         <FormField label="Transaction Type" required>
           <FormSelect value={form.transactionType} onChange={(v) => set('transactionType', v)} options={INVEST_TYPES} />
         </FormField>
       </div>
 
+      {/* Fund Selection */}
       <FormField label="Fund" required error={errors.fundCode}>
-        <FundSearchInput
-          value={form.fundCode ? { schemeCode: form.fundCode, fundName: form.fundName, nav: form.nav || 0, navDate: form.navDate || '' } : null}
-          onSelect={selectFund}
-          placeholder="Search fund by name, code, or category..."
-        />
+        {form.fundCode && !showSearch ? (
+          /* Selected fund display */
+          <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{form.fundName}</p>
+              <p className="text-xs text-[var(--text-dim)]">{form.fundCode}{form.nav > 0 && <span className="ml-2 text-emerald-400">NAV: ₹{form.nav.toFixed(2)}</span>}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { set('fundCode', ''); set('fundName', ''); setShowSearch(true) }}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] underline shrink-0"
+            >
+              Change
+            </button>
+          </div>
+        ) : (
+          /* Fund picker: dropdown for existing + search for new */
+          <div className="space-y-2">
+            {portfolioHoldings.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  const h = portfolioHoldings.find((h) => h.schemeCode === e.target.value)
+                  if (h) selectExistingFund(h)
+                }}
+                className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+              >
+                <option value="" disabled>Select from portfolio funds...</option>
+                {portfolioHoldings.map((h) => (
+                  <option key={h.holdingId} value={h.schemeCode}>
+                    {h.fundName}{h.units > 0 ? ` — ${h.units.toFixed(0)} units · ${formatINR(h.currentValue)}` : ' (Planned)'}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div>
+              {portfolioHoldings.length > 0 && (
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 flex items-center gap-1">
+                  <Plus size={10} /> Add New Fund
+                </p>
+              )}
+              <FundSearchInput
+                value={null}
+                onSelect={selectFund}
+                placeholder="Search fund by name, code, or category..."
+              />
+            </div>
+          </div>
+        )}
       </FormField>
 
       {existingHolding && (

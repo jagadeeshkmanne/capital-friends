@@ -77,7 +77,7 @@ export default function GoalPortfolioMapping({ goal, onClose }) {
                   >
                     {activePortfolios.map((p) => (
                       <option key={p.portfolioId} value={p.portfolioId} disabled={mappings.some((o, i) => i !== idx && o.portfolioId === p.portfolioId)}>
-                        {p.portfolioName} ({p.ownerName}) — {formatINR(p.currentValue)}
+                        {p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName}{p.ownerName ? ` (${p.ownerName})` : ''} — {formatINR(p.currentValue)}
                       </option>
                     ))}
                   </select>

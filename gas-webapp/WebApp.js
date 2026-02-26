@@ -342,6 +342,12 @@ function routeAction(action, params, userRecord) {
     case 'mf-transactions:list':
       return getAllMFTransactions();
 
+    case 'mf-transaction:delete':
+      return deleteTransaction(params.transactionId);
+
+    case 'mf-transaction:edit':
+      return editTransaction(params);
+
     case 'stock-holdings:list-all':
       return getAllStockHoldingsData();
 
@@ -397,7 +403,8 @@ function loadAllData() {
     stockHoldings: safeCall(getAllStockHoldingsData),
     stockTransactions: safeCall(getAllStockTransactionsData),
     reminders: safeCall(getAllReminders),
-    _masterDataRefreshed: refreshResult !== null
+    _masterDataRefreshed: refreshResult !== null,
+    _errors: _safeCallErrors
   };
 }
 
@@ -423,19 +430,25 @@ function safeCall(fn) {
  */
 function getAllMFHoldings() {
   var portfolios = getAllPortfolios();
+  log('getAllMFHoldings: found ' + portfolios.length + ' portfolios');
+
   var allHoldings = [];
   for (var i = 0; i < portfolios.length; i++) {
-    if (portfolios[i].status !== 'Inactive') {
+    var p = portfolios[i];
+    log('Portfolio ' + p.portfolioId + ' (' + p.portfolioName + ') status=' + p.status);
+    if (p.status !== 'Inactive') {
       try {
-        var holdings = getPortfolioFunds(portfolios[i].portfolioId);
+        var holdings = getPortfolioFunds(p.portfolioId, portfolios);
+        log('  -> holdings: ' + (holdings ? holdings.length : 'null'));
         if (holdings && holdings.length) {
           allHoldings = allHoldings.concat(holdings);
         }
       } catch (e) {
-        log('Error getting holdings for ' + portfolios[i].portfolioId + ': ' + e.toString());
+        log('Error getting holdings for ' + p.portfolioId + ': ' + e.toString());
       }
     }
   }
+  log('getAllMFHoldings: returning ' + allHoldings.length + ' total holdings');
   return allHoldings;
 }
 

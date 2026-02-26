@@ -9,6 +9,12 @@ function belowColor(pct) {
   return 'bg-slate-500/20 text-[var(--text-muted)]'
 }
 
+function buySignal(pct) {
+  if (pct >= 10) return { label: 'Strong Buy', cls: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30' }
+  if (pct >= 5) return { label: 'Buy', cls: 'bg-blue-500/20 text-blue-400' }
+  return null
+}
+
 export default function MFBuyOpportunities() {
   const { mfHoldings, mfPortfolios } = useData()
 
@@ -64,51 +70,63 @@ export default function MFBuyOpportunities() {
               <thead>
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                   <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
+                  <th className="text-center py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Signal</th>
+                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Below ATH</th>
                   <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">ATH NAV</th>
                   <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Current</th>
-                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Below ATH</th>
-                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Alloc</th>
                   <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Value</th>
                 </tr>
               </thead>
               <tbody>
-                {p.opportunities.map((h) => (
+                {p.opportunities.map((h) => {
+                  const signal = buySignal(h.belowATHPct)
+                  return (
                   <tr key={h.holdingId} className="border-b border-[var(--border-light)] last:border-0">
                     <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[200px] truncate">{h.fundName}</td>
-                    <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">₹{h.athNav.toFixed(2)}</td>
-                    <td className="py-2 px-2 text-right text-[var(--text-muted)] tabular-nums">₹{h.currentNav.toFixed(2)}</td>
+                    <td className="py-2 px-2 text-center">
+                      {signal ? (
+                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${signal.cls}`}>{signal.label}</span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--text-dim)]">Watch</span>
+                      )}
+                    </td>
                     <td className="py-2 px-2 text-right">
                       <span className={`inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full ${belowColor(h.belowATHPct)}`}>
                         −{h.belowATHPct.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="py-2 px-2 text-right text-[var(--text-muted)] tabular-nums">
-                      {h.currentPct.toFixed(1)}% / {h.targetAllocationPct.toFixed(1)}%
-                    </td>
+                    <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">₹{h.athNav.toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right text-[var(--text-muted)] tabular-nums">₹{h.currentNav.toFixed(2)}</td>
                     <td className="py-2 px-2 text-right text-[var(--text-primary)] font-semibold tabular-nums">{formatINR(h.currentValue)}</td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile cards */}
           <div className="sm:hidden divide-y divide-[var(--border-light)]">
-            {p.opportunities.map((h) => (
+            {p.opportunities.map((h) => {
+              const signal = buySignal(h.belowATHPct)
+              return (
               <div key={h.holdingId} className="px-3 py-2.5">
                 <div className="flex items-start justify-between mb-1">
                   <p className="text-xs text-[var(--text-primary)] leading-tight flex-1 mr-2">{h.fundName}</p>
-                  <span className={`shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded-full ${belowColor(h.belowATHPct)}`}>
-                    −{h.belowATHPct.toFixed(1)}%
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {signal && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${signal.cls}`}>{signal.label}</span>}
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${belowColor(h.belowATHPct)}`}>
+                      −{h.belowATHPct.toFixed(1)}%
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-[var(--text-dim)]">
                   <span>ATH ₹{h.athNav.toFixed(2)} → ₹{h.currentNav.toFixed(2)}</span>
-                  <span>Alloc: {h.currentPct.toFixed(1)}%</span>
                   <span className="font-semibold text-[var(--text-primary)]">{formatINR(h.currentValue)}</span>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ))}

@@ -69,10 +69,8 @@ export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel
         />
       </FormField>
 
-      <div className="flex items-center justify-between">
-        {isEdit && onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-        <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Create Portfolio'} loading={saving} />
-      </div>
+      {isEdit && onDelete && <DeleteButton onClick={onDelete} />}
+      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={isEdit ? 'Update' : 'Create Portfolio'} loading={saving} />
     </div>
   )
 }

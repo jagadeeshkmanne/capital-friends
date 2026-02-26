@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Plus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ArrowDownCircle, Repeat2, Settings2, RefreshCw } from 'lucide-react'
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronUp, ArrowDownCircle, Repeat2, Settings2, RefreshCw, MoreVertical, Trash2, Filter } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -18,12 +18,24 @@ import PageLoading from '../../components/PageLoading'
 // Strip PFL- prefix for display
 const displayName = (name) => name?.replace(/^PFL-/, '') || name
 
+// Parse date string (handles dd/MM/yyyy from GAS, ISO, and Date objects)
+function parseDate(d) {
+  if (!d) return null
+  if (d instanceof Date) return isNaN(d.getTime()) ? null : d
+  const s = String(d)
+  // dd/MM/yyyy or dd/MM/yyyy HH:mm:ss
+  const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (ddmm) return new Date(Number(ddmm[3]), Number(ddmm[2]) - 1, Number(ddmm[1]))
+  const parsed = new Date(s)
+  return isNaN(parsed.getTime()) ? null : parsed
+}
+
 // ATH color coding (matching email report)
 function athColor(pct) {
   if (pct >= 20) return { color: '#c62828', fontWeight: 700 }
   if (pct >= 10) return { color: '#d84315', fontWeight: 700 }
-  if (pct >= 5) return { color: '#e67e00', fontWeight: 400 }
-  if (pct >= 1) return { color: '#b8860b', fontWeight: 400 }
+  if (pct >= 5) return { color: '#e67e00', fontWeight: 600 }
+  if (pct >= 1) return { color: '#b8860b', fontWeight: 600 }
   return { color: 'var(--text-dim)', fontWeight: 400 }
 }
 
@@ -34,6 +46,7 @@ export default function MutualFundsPage() {
     activeMembers, activeInvestmentAccounts,
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
     investMF, redeemMF, switchMF, updateHoldingAllocations,
+    deleteMFTransaction, editMFTransaction,
   } = useData()
 
   const { showToast, showBlockUI, hideBlockUI } = useToast()
@@ -42,6 +55,18 @@ export default function MutualFundsPage() {
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [expandedHoldingId, setExpandedHoldingId] = useState(null)
+  const [txnLimit, setTxnLimit] = useState({})
+  const [txnFundFilter, setTxnFundFilter] = useState('all')
+  const [txnMenuOpen, setTxnMenuOpen] = useState(null) // transactionId of open menu
+
+  const toggleExpand = useCallback((holdingId) => {
+    setExpandedHoldingId((prev) => prev === holdingId ? null : holdingId)
+  }, [])
+
+  const showMoreTxns = useCallback((holdingId) => {
+    setTxnLimit((prev) => ({ ...prev, [holdingId]: (prev[holdingId] || 5) + 10 }))
+  }, [])
 
   // Enrich portfolios: resolve investmentAccountId, ownerId & ownerName from investment accounts
   const enrichedPortfolios = useMemo(() => {
@@ -113,13 +138,25 @@ export default function MutualFundsPage() {
     return mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
   }, [mfHoldings, portfolios, selectedPortfolioId])
 
-  const transactions = useMemo(() => {
+  const allFilteredTxns = useMemo(() => {
     if (!mfTransactions) return []
     const txns = selectedPortfolioId === 'all'
       ? mfTransactions.filter((t) => portfolios.some((p) => p.portfolioId === t.portfolioId))
       : mfTransactions.filter((t) => t.portfolioId === selectedPortfolioId)
-    return txns.sort((a, b) => new Date(b.date) - new Date(a.date))
+    return txns.sort((a, b) => (parseDate(b.date) || 0) - (parseDate(a.date) || 0))
   }, [mfTransactions, portfolios, selectedPortfolioId])
+
+  // Unique fund names for filter
+  const txnFundNames = useMemo(() => {
+    const names = new Set()
+    allFilteredTxns.forEach((t) => { if (t.fundName) names.add(t.fundName) })
+    return [...names].sort()
+  }, [allFilteredTxns])
+
+  const transactions = useMemo(() => {
+    if (txnFundFilter === 'all') return allFilteredTxns
+    return allFilteredTxns.filter((t) => t.fundName === txnFundFilter)
+  }, [allFilteredTxns, txnFundFilter])
 
   // Enrich holdings with dynamic allocation % (rebalance logic moved to dialog)
   const enrichedHoldings = useMemo(() => {
@@ -132,9 +169,25 @@ export default function MutualFundsPage() {
       const totalValue = portfolioTotals[h.portfolioId] || 0
       const currentAllocationPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
       const plPct = h.investment > 0 ? (h.pl / h.investment) * 100 : 0
-      return { ...h, currentAllocationPct, plPct }
+      const _key = h.holdingId || `${h.portfolioId}::${h.schemeCode || h.fundCode}`
+      return { ...h, currentAllocationPct, plPct, _key }
     })
   }, [holdings])
+
+  // Group holdings by portfolio (for "All" view)
+  const holdingsByPortfolio = useMemo(() => {
+    if (selectedPortfolioId !== 'all') return null
+    const groups = []
+    const seen = {}
+    enrichedHoldings.forEach((h) => {
+      if (!seen[h.portfolioId]) {
+        seen[h.portfolioId] = { portfolioId: h.portfolioId, holdings: [] }
+        groups.push(seen[h.portfolioId])
+      }
+      seen[h.portfolioId].holdings.push(h)
+    })
+    return groups
+  }, [enrichedHoldings, selectedPortfolioId])
 
   // Per-portfolio indicator counts (buy opp + rebalance)
   const portfolioIndicators = useMemo(() => {
@@ -244,6 +297,33 @@ export default function MutualFundsPage() {
     }
   }
 
+  async function handleDeleteTransaction(transactionId) {
+    if (!confirm('Delete this transaction? This will recalculate your holdings.')) return
+    showBlockUI('Deleting...')
+    try {
+      await deleteMFTransaction(transactionId)
+      showToast('Transaction deleted')
+      setTxnMenuOpen(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to delete transaction', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleEditTransaction(data) {
+    showBlockUI('Updating...')
+    try {
+      await editMFTransaction(data)
+      showToast('Transaction updated')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to update transaction', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
   async function handleSaveAllocations(allocations) {
     if (modal?.allocations) {
       showBlockUI('Saving allocations...')
@@ -286,7 +366,7 @@ export default function MutualFundsPage() {
               {dropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-40 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl min-w-[300px] py-1 overflow-hidden">
+                  <div className="absolute left-0 top-full mt-1 z-40 bg-[var(--bg-dropdown)] border border-[var(--border)] rounded-lg shadow-xl min-w-[300px] py-1 overflow-hidden">
                     <button
                       onClick={() => { setSelectedPortfolioId('all'); setDropdownOpen(false); setSubTab('holdings') }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${selectedPortfolioId === 'all' ? 'bg-[var(--sidebar-active-bg)] text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
@@ -377,8 +457,8 @@ export default function MutualFundsPage() {
               <span><span className="font-semibold">Platform:</span> {selectedPortfolio.platform}</span>
               <span><span className="font-semibold">Client ID:</span> {mv(selectedPortfolio.clientId, 'clientId')}</span>
               <span><span className="font-semibold">Funds:</span> {selectedPortfolio.fundCount}</span>
-              {selectedPortfolio.sipTarget > 0 && <span><span className="font-semibold">SIP Target:</span> {formatINR(selectedPortfolio.sipTarget)}/mo</span>}
-              {selectedPortfolio.lumpsumTarget > 0 && <span><span className="font-semibold">Lumpsum Target:</span> {formatINR(selectedPortfolio.lumpsumTarget)}</span>}
+              {selectedPortfolio.sipTarget >= 100 && <span><span className="font-semibold">SIP Target:</span> {formatINR(selectedPortfolio.sipTarget)}/mo</span>}
+              {selectedPortfolio.lumpsumTarget >= 100 && <span><span className="font-semibold">Lumpsum Target:</span> {formatINR(selectedPortfolio.lumpsumTarget)}</span>}
               <span><span className="font-semibold">Rebalance Threshold:</span> {(selectedPortfolio.rebalanceThreshold * 100).toFixed(0)}%</span>
             </div>
           )}
@@ -469,12 +549,36 @@ export default function MutualFundsPage() {
           {subTab === 'holdings' && (
             <>
               {holdings.length > 0 ? (
-                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+                <div className={selectedPortfolioId === 'all' ? 'space-y-4' : ''}>
+                {(selectedPortfolioId === 'all' ? holdingsByPortfolio : [{ portfolioId: selectedPortfolioId, holdings: enrichedHoldings }]).map((group) => {
+                  const groupPortfolio = portfolioData.find((p) => p.portfolioId === group.portfolioId)
+                  const groupHoldings = group.holdings
+                  const groupPL = groupHoldings.reduce((s, h) => s + h.pl, 0)
+                  const groupPLUp = groupPL >= 0
+                  return (
+                <div key={group.portfolioId} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+                  {/* Portfolio header (only in "All" view) */}
+                  {selectedPortfolioId === 'all' && groupPortfolio && (
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-[var(--text-primary)]">{displayName(groupPortfolio.portfolioName)}</p>
+                        {groupPortfolio.ownerName && <span className="text-xs text-[var(--text-dim)]">({groupPortfolio.ownerName})</span>}
+                        <span className="text-xs text-[var(--text-dim)]">· {groupHoldings.filter(h => h.units > 0).length} funds</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs tabular-nums">
+                        <span className="text-[var(--text-muted)]">{formatINR(groupPortfolio.currentValue || 0)}</span>
+                        <span className={`font-bold ${groupPLUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                          {groupPLUp ? '+' : ''}{formatINR(groupPL)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   {/* Desktop table */}
                   <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-sm">
+                      {/* Only show column headers for single portfolio or first group */}
                       <thead>
-                        <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                        <tr className={`border-b border-[var(--border-light)] ${selectedPortfolioId !== 'all' ? 'bg-[var(--bg-inset)]' : ''}`}>
                           <th className="text-left py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Fund Name</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Units</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
@@ -497,15 +601,16 @@ export default function MutualFundsPage() {
                             <div>P&L</div>
                             <div className="text-[10px] font-medium text-[var(--text-dim)]">on Holdings</div>
                           </th>
+                          <th className="py-2 px-2 w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {enrichedHoldings.map((h) => {
+                        {groupHoldings.map((h) => {
                           const ath = athColor(h.belowATHPct)
-                          const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === h.portfolioId) : null
                           const isPlanned = h.units === 0
                           const pData = portfolioData.find((p) => p.portfolioId === h.portfolioId)
                           const totalPortfolioValue = pData?.currentValue || 0
+                          const isExpanded = expandedHoldingId === h._key
 
                           // P&L on current holdings
                           const unrealizedPL = h.pl
@@ -514,23 +619,41 @@ export default function MutualFundsPage() {
                           // Planned fund: catch-up lumpsum + steady SIP
                           const plannedBuy = isPlanned && h.targetAllocationPct > 0 && h.targetAllocationPct < 100 && totalPortfolioValue > 0
                             ? (h.targetAllocationPct / (100 - h.targetAllocationPct)) * totalPortfolioValue : 0
-                          const steadySIP = isPlanned && h.targetAllocationPct > 0 && pData?.sipTarget > 0
+                          const steadySIP = isPlanned && h.targetAllocationPct > 0 && pData?.sipTarget >= 100
                             ? (h.targetAllocationPct / 100) * pData.sipTarget : 0
 
+                          // Per-fund transactions (only compute when expanded)
+                          const fundTxns = isExpanded
+                            ? (mfTransactions || []).filter((t) => t.portfolioId === h.portfolioId && t.fundCode === h.schemeCode).sort((a, b) => (parseDate(b.date) || 0) - (parseDate(a.date) || 0))
+                            : []
+                          const visibleLimit = txnLimit[h._key] || 5
+                          const visibleTxns = fundTxns.slice(0, visibleLimit)
+                          const daysSince = (d) => { const p = parseDate(d); return p ? Math.floor((new Date() - p) / 86400000) : null }
+
                           return (
-                            <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors ${isPlanned ? 'opacity-60' : ''}`}>
+                            <React.Fragment key={h._key}>
+                            <tr
+                              onClick={() => !isPlanned && toggleExpand(h._key)}
+                              className={`border-b border-[var(--border-light)] last:border-0 transition-colors ${isPlanned ? 'opacity-60' : 'cursor-pointer hover:bg-[var(--bg-hover)]'} ${isExpanded ? 'bg-[var(--bg-hover)]' : ''}`}
+                            >
                               <td className="py-2.5 px-3 max-w-[240px]">
-                                <p className="text-xs text-[var(--text-primary)] leading-tight">
-                                  {h.fundName}
-                                  {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
-                                </p>
-                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
-                                {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
-                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                    {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">Buy {formatINR(plannedBuy)}</span>}
-                                    {steadySIP > 0 && <span className="text-xs text-blue-400 font-semibold">SIP {formatINR(steadySIP)}/mo</span>}
+                                <div className="flex items-center gap-1.5">
+                                  {!isPlanned && (
+                                    <ChevronDown size={12} className={`shrink-0 text-[var(--text-dim)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                  )}
+                                  <div>
+                                    <p className="text-xs text-[var(--text-primary)] leading-tight">
+                                      {h.fundName}
+                                      {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
+                                    </p>
+                                    {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
+                                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                        {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">Buy {formatINR(plannedBuy)}</span>}
+                                        {steadySIP > 0 && <span className="text-xs text-blue-400 font-semibold">SIP {formatINR(steadySIP)}/mo</span>}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
                               </td>
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-secondary)] tabular-nums">{isPlanned ? '—' : h.units.toFixed(2)}</td>
                               <td className="py-2.5 px-3 text-right">
@@ -548,8 +671,8 @@ export default function MutualFundsPage() {
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 ) : h.athNav > 0 && h.belowATHPct > 0 ? (
                                   <div>
-                                    <p className="text-xs font-bold tabular-nums" style={ath}>↓{h.belowATHPct.toFixed(1)}%</p>
-                                    <p className="text-[10px] text-[var(--text-dim)] tabular-nums">₹{h.athNav.toFixed(0)}</p>
+                                    <p className="text-sm font-bold tabular-nums" style={ath}>↓{h.belowATHPct.toFixed(1)}%</p>
+                                    <p className="text-[11px] text-[var(--text-muted)] tabular-nums">₹{h.athNav.toFixed(0)}</p>
                                   </div>
                                 ) : h.athNav > 0 ? (
                                   <span className="text-[10px] text-emerald-400/70 font-semibold">AT HIGH</span>
@@ -577,7 +700,6 @@ export default function MutualFundsPage() {
                                   </>
                                 )}
                               </td>
-                              {/* P&L on current holdings */}
                               <td className="py-2.5 px-3 text-right">
                                 {isPlanned ? (
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
@@ -592,7 +714,161 @@ export default function MutualFundsPage() {
                                   </>
                                 )}
                               </td>
+                              <td className="py-2.5 px-2 text-center">
+                                <div className="flex items-center gap-0.5 justify-center">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } }) }}
+                                    className="w-6 h-6 flex items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+                                    title="Buy / Invest"
+                                  >
+                                    <Plus size={14} strokeWidth={2.5} />
+                                  </button>
+                                  {!isPlanned && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } }) }}
+                                      className="w-6 h-6 flex items-center justify-center rounded-full bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 transition-colors"
+                                      title="Sell / Redeem"
+                                    >
+                                      <Minus size={14} strokeWidth={2.5} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
                             </tr>
+                            {/* Expanded: Zerodha-style fund details + transactions */}
+                            {isExpanded && !isPlanned && (
+                              <tr className="border-b border-[var(--border-light)]">
+                                <td colSpan={8} className="p-0">
+                                  <div className="bg-[var(--bg-expanded)] border-t border-[var(--border-light)]">
+                                    <div className="flex flex-col lg:flex-row">
+                                      {/* Left: Fund summary (Zerodha style) */}
+                                      <div className="lg:w-52 shrink-0 p-4 border-b lg:border-b-0 lg:border-r border-[var(--border-light)]">
+                                        <div className="space-y-4">
+                                          <div>
+                                            <p className="text-[10px] text-[var(--text-dim)] mb-0.5">Units</p>
+                                            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{h.units.toFixed(3)}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] text-[var(--text-dim)] mb-0.5">Avg NAV</p>
+                                            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">₹{h.avgNav.toFixed(2)}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] text-[var(--text-dim)] mb-0.5">Invested</p>
+                                            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(h.investment)}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] text-[var(--text-dim)] mb-0.5">Current Value</p>
+                                            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
+                                          </div>
+                                          {h.ongoingSIP > 0 && (
+                                            <div>
+                                              <p className="text-[10px] text-[var(--text-dim)] mb-0.5">Monthly SIP</p>
+                                              <p className="text-base font-bold text-blue-400 tabular-nums">{formatINR(h.ongoingSIP)}</p>
+                                            </div>
+                                          )}
+                                          <div className="pt-3 border-t border-[var(--border-light)] flex gap-2">
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } }) }}
+                                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors"
+                                            >
+                                              <span className="w-5 h-5 flex items-center justify-center rounded-full bg-emerald-500/20"><Plus size={12} strokeWidth={2.5} /></span> Buy
+                                            </button>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } }) }}
+                                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors"
+                                            >
+                                              <span className="w-5 h-5 flex items-center justify-center rounded-full bg-rose-500/20"><Minus size={12} strokeWidth={2.5} /></span> Sell
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      {/* Right: Transactions table (Zerodha style) */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="px-4 pt-3 pb-1">
+                                          <p className="text-xs font-semibold text-[var(--text-secondary)]">Transactions</p>
+                                        </div>
+                                        {fundTxns.length === 0 ? (
+                                          <p className="py-8 text-xs text-[var(--text-dim)] text-center">No transactions recorded</p>
+                                        ) : (
+                                          <>
+                                            <table className="w-full">
+                                              <thead>
+                                                <tr className="border-b border-[var(--border-light)]">
+                                                  <th className="text-left py-2 px-4 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Date</th>
+                                                  <th className="text-left py-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Type</th>
+                                                  <th className="text-center py-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Days</th>
+                                                  <th className="text-right py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Amount</th>
+                                                  <th className="text-right py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">NAV</th>
+                                                  <th className="text-right py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Units</th>
+                                                  <th className="text-right py-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">P&L</th>
+                                                  <th className="w-8 py-2 px-1"></th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {visibleTxns.map((t, idx) => {
+                                                  const dateObj = parseDate(t.date)
+                                                  const validDate = !!dateObj
+                                                  const dateStr = validDate
+                                                    ? dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                                    : t.date || '—'
+                                                  const days = validDate ? daysSince(t.date) : null
+                                                  const isBuy = t.type === 'BUY'
+                                                  const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
+                                                  const glUp = hasGL && t.gainLoss >= 0
+                                                  return (
+                                                    <tr key={t.transactionId || `txn-${idx}`} className="group border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                                                      <td className="py-2.5 px-4 text-xs text-[var(--text-secondary)] tabular-nums whitespace-nowrap">{dateStr}</td>
+                                                      <td className="py-2.5 px-2">
+                                                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isBuy ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>
+                                                          {t.transactionType || t.type}
+                                                        </span>
+                                                      </td>
+                                                      <td className="py-2.5 px-2 text-xs text-[var(--text-dim)] tabular-nums text-center">{days ?? '—'}</td>
+                                                      <td className="py-2.5 px-3 text-xs font-semibold text-[var(--text-primary)] tabular-nums text-right">{formatINR(t.totalAmount)}</td>
+                                                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums text-right">{Number(t.price).toFixed(4)}</td>
+                                                      <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums text-right">{Number(t.units).toFixed(3)}</td>
+                                                      <td className={`py-2.5 px-3 text-xs font-semibold tabular-nums text-right ${hasGL ? (glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]') : 'text-[var(--text-dim)]'}`}>
+                                                        {hasGL ? `${glUp ? '+' : ''}${formatINR(t.gainLoss)}` : '—'}
+                                                      </td>
+                                                      <td className="py-2.5 px-1">
+                                                        <TxnActionMenu
+                                                          txn={t}
+                                                          isOpen={txnMenuOpen === t.transactionId}
+                                                          onToggle={() => setTxnMenuOpen(txnMenuOpen === t.transactionId ? null : t.transactionId)}
+                                                          onEdit={() => { setTxnMenuOpen(null); setModal({ editTxn: t }) }}
+                                                          onDelete={() => { setTxnMenuOpen(null); handleDeleteTransaction(t.transactionId) }}
+                                                        />
+                                                      </td>
+                                                    </tr>
+                                                  )
+                                                })}
+                                              </tbody>
+                                            </table>
+                                            {fundTxns.length > visibleLimit && (
+                                              <div className="py-2 text-center border-t border-[var(--border-light)]">
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); showMoreTxns(h._key) }}
+                                                  className="text-xs font-semibold text-violet-400 hover:text-violet-300"
+                                                >
+                                                  Show More ({fundTxns.length - visibleLimit} remaining)
+                                                </button>
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {/* Collapse button */}
+                                    <div className="flex justify-center py-1.5 border-t border-[var(--border-light)]">
+                                      <button onClick={() => toggleExpand(h._key)} className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-muted)]">
+                                        <ChevronUp size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            </React.Fragment>
                           )
                         })}
                       </tbody>
@@ -601,74 +877,175 @@ export default function MutualFundsPage() {
 
                   {/* Mobile cards */}
                   <div className="lg:hidden divide-y divide-[var(--border-light)]">
-                    {enrichedHoldings.map((h) => {
+                    {groupHoldings.map((h) => {
                       const ath = athColor(h.belowATHPct)
-                      const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === h.portfolioId) : null
                       const isPlanned = h.units === 0
                       const pData = portfolioData.find((p) => p.portfolioId === h.portfolioId)
                       const totalPortfolioValue = pData?.currentValue || 0
+                      const isExpanded = expandedHoldingId === h._key
 
                       const unrealizedPL = h.pl
                       const unrealUp = unrealizedPL >= 0
 
                       const plannedBuy = isPlanned && h.targetAllocationPct > 0 && h.targetAllocationPct < 100 && totalPortfolioValue > 0
                         ? (h.targetAllocationPct / (100 - h.targetAllocationPct)) * totalPortfolioValue : 0
-                      const steadySIP = isPlanned && h.targetAllocationPct > 0 && pData?.sipTarget > 0
+                      const steadySIP = isPlanned && h.targetAllocationPct > 0 && pData?.sipTarget >= 100
                         ? (h.targetAllocationPct / 100) * pData.sipTarget : 0
 
+                      const fundTxns = isExpanded
+                        ? (mfTransactions || []).filter((t) => t.portfolioId === h.portfolioId && t.fundCode === h.schemeCode).sort((a, b) => (parseDate(b.date) || 0) - (parseDate(a.date) || 0))
+                        : []
+                      const visibleLimit = txnLimit[h._key] || 5
+                      const visibleTxns = fundTxns.slice(0, visibleLimit)
+                      const daysSince = (d) => { const p = parseDate(d); return p ? Math.floor((new Date() - p) / 86400000) : null }
+
                       return (
-                        <div key={h.holdingId} className={`px-4 py-3 ${isPlanned ? 'opacity-60' : ''}`}>
-                          <div className="flex items-start justify-between mb-1.5">
-                            <div className="flex-1 mr-3">
-                              <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">
-                                {h.fundName}
-                                {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
-                              </p>
-                              {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
-                              {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
-                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                  {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">Buy {formatINR(plannedBuy)}</span>}
-                                  {steadySIP > 0 && <span className="text-xs text-blue-400 font-semibold">SIP {formatINR(steadySIP)}/mo</span>}
+                        <div key={h._key} className={isPlanned ? 'opacity-60' : ''}>
+                          <div
+                            onClick={() => !isPlanned && toggleExpand(h._key)}
+                            className={`px-4 py-3 ${!isPlanned ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-[var(--bg-hover)]' : ''}`}
+                          >
+                            <div className="flex items-start justify-between mb-1.5">
+                              <div className="flex-1 mr-3">
+                                <div className="flex items-center gap-1.5">
+                                  {!isPlanned && <ChevronDown size={12} className={`shrink-0 text-[var(--text-dim)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />}
+                                  <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">
+                                    {h.fundName}
+                                    {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
+                                  </p>
+                                </div>
+                                {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">Buy {formatINR(plannedBuy)}</span>}
+                                    {steadySIP > 0 && <span className="text-xs text-blue-400 font-semibold">SIP {formatINR(steadySIP)}/mo</span>}
+                                  </div>
+                                )}
+                              </div>
+                              {isPlanned ? (
+                                <p className="text-xs font-semibold text-violet-400 tabular-nums shrink-0">Target: {h.targetAllocationPct.toFixed(1)}%</p>
+                              ) : (
+                                <div className="text-right shrink-0">
+                                  <p className={`text-xs font-bold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                    {unrealUp ? '+' : ''}{formatINR(unrealizedPL)}
+                                  </p>
+                                  <p className={`text-xs font-semibold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                    {unrealUp ? '+' : ''}{h.plPct.toFixed(1)}%
+                                  </p>
                                 </div>
                               )}
                             </div>
                             {isPlanned ? (
-                              <p className="text-xs font-semibold text-violet-400 tabular-nums shrink-0">Target: {h.targetAllocationPct.toFixed(1)}%</p>
-                            ) : (
-                              <div className="text-right shrink-0">
-                                <p className={`text-xs font-bold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                  {unrealUp ? '+' : ''}{formatINR(unrealizedPL)}
-                                </p>
-                                <p className={`text-xs font-semibold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                  {unrealUp ? '+' : ''}{h.plPct.toFixed(1)}%
-                                </p>
+                              <div className="flex items-center justify-end mt-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } }) }}
+                                  className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 px-2 py-0.5 rounded bg-emerald-500/10"
+                                >
+                                  <span className="w-4 h-4 flex items-center justify-center rounded-full bg-emerald-500/20"><Plus size={10} strokeWidth={2.5} /></span> Buy
+                                </button>
                               </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
+                                  <div>
+                                    <span>{h.units.toFixed(2)} units</span>
+                                    <span className="mx-1">·</span>
+                                    <span>NAV ₹{h.currentNav.toFixed(2)} / ₹{h.avgNav.toFixed(2)}</span>
+                                  </div>
+                                  <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                  <div className="flex items-center gap-3 text-xs text-[var(--text-dim)] flex-wrap">
+                                    <span>Alloc: {h.currentAllocationPct.toFixed(1)}% / {h.targetAllocationPct.toFixed(1)}%</span>
+                                    {h.athNav > 0 && h.belowATHPct > 0 ? (
+                                      <span className="font-bold tabular-nums" style={ath}>ATH ↓{h.belowATHPct.toFixed(1)}%</span>
+                                    ) : h.athNav > 0 ? (
+                                      <span className="text-emerald-400/70 font-semibold text-[10px]">AT HIGH</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } }) }}
+                                      className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 px-2 py-0.5 rounded bg-emerald-500/10"
+                                    >
+                                      <span className="w-4 h-4 flex items-center justify-center rounded-full bg-emerald-500/20"><Plus size={10} strokeWidth={2.5} /></span> Buy
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } }) }}
+                                      className="flex items-center gap-1 text-[10px] font-semibold text-rose-400 hover:text-rose-300 px-2 py-0.5 rounded bg-rose-500/10"
+                                    >
+                                      <span className="w-4 h-4 flex items-center justify-center rounded-full bg-rose-500/20"><Minus size={10} strokeWidth={2.5} /></span> Sell
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
                             )}
                           </div>
-                          {isPlanned ? null : (
-                            <>
-                              <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
-                                <div>
-                                  <span>{h.units.toFixed(2)} units</span>
-                                  <span className="mx-1">·</span>
-                                  <span>NAV ₹{h.currentNav.toFixed(2)} / ₹{h.avgNav.toFixed(2)}</span>
+                          {/* Expanded: Per-fund transactions (mobile) */}
+                          {isExpanded && !isPlanned && (
+                            <div className="bg-[var(--bg-inset)] border-l-2 border-l-violet-500/40 px-4 pb-3">
+                              <div className="flex items-center justify-between py-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Transactions ({fundTxns.length})</p>
+                              </div>
+                              {fundTxns.length === 0 ? (
+                                <p className="py-4 text-xs text-[var(--text-dim)] text-center">No transactions recorded</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {visibleTxns.map((t, idx) => {
+                                    const days = daysSince(t.date)
+                                    const isBuy = t.type === 'BUY'
+                                    const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
+                                    const glUp = hasGL && t.gainLoss >= 0
+                                    return (
+                                      <div key={t.transactionId || `txn-${idx}`} className="flex items-center justify-between text-xs bg-[var(--bg-card)] rounded-lg px-3 py-2">
+                                        <div>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-[var(--text-secondary)]">{(parseDate(t.date) || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                                            <span className={`text-[10px] font-semibold px-1 py-0.5 rounded ${isBuy ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>
+                                              {t.transactionType || t.type}
+                                            </span>
+                                            <span className="text-[var(--text-dim)]">{days}d</span>
+                                          </div>
+                                          <p className="text-[var(--text-dim)] mt-0.5">{Number(t.units).toFixed(3)} units @ ₹{Number(t.price).toFixed(2)}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <div className="text-right">
+                                            <p className="font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.totalAmount)}</p>
+                                            {hasGL && (
+                                              <p className={`font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                                {glUp ? '+' : ''}{formatINR(t.gainLoss)}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <TxnActionMenu
+                                            txn={t}
+                                            isOpen={txnMenuOpen === t.transactionId}
+                                            onToggle={() => setTxnMenuOpen(txnMenuOpen === t.transactionId ? null : t.transactionId)}
+                                            onEdit={() => { setTxnMenuOpen(null); setModal({ editTxn: t }) }}
+                                            onDelete={() => { setTxnMenuOpen(null); handleDeleteTransaction(t.transactionId) }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                  {fundTxns.length > visibleLimit && (
+                                    <button
+                                      onClick={() => showMoreTxns(h._key)}
+                                      className="w-full py-1.5 text-xs font-semibold text-violet-400 hover:text-violet-300 text-center"
+                                    >
+                                      Show More ({fundTxns.length - visibleLimit} remaining)
+                                    </button>
+                                  )}
                                 </div>
-                                <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-dim)] flex-wrap">
-                                <span>Alloc: {h.currentAllocationPct.toFixed(1)}% / {h.targetAllocationPct.toFixed(1)}%</span>
-                                {h.athNav > 0 && h.belowATHPct > 0 ? (
-                                  <span className="font-semibold tabular-nums" style={ath}>ATH ↓{h.belowATHPct.toFixed(1)}%</span>
-                                ) : h.athNav > 0 ? (
-                                  <span className="text-emerald-400/70 font-semibold text-[10px]">AT HIGH</span>
-                                ) : null}
-                              </div>
-                            </>
+                              )}
+                            </div>
                           )}
                         </div>
                       )
                     })}
                   </div>
+                </div>
+                  )
+                })}
                 </div>
               ) : (
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
@@ -685,6 +1062,26 @@ export default function MutualFundsPage() {
           {/* ── Transactions Tab ── */}
           {subTab === 'transactions' && (
             <>
+              {/* Fund filter */}
+              {txnFundNames.length > 1 && (
+                <div className="flex items-center gap-2 px-1">
+                  <Filter size={12} className="text-[var(--text-dim)]" />
+                  <select
+                    value={txnFundFilter}
+                    onChange={(e) => setTxnFundFilter(e.target.value)}
+                    className="text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg px-3 py-1.5 max-w-[350px] truncate"
+                  >
+                    <option value="all">All Funds ({allFilteredTxns.length})</option>
+                    {txnFundNames.map((name) => (
+                      <option key={name} value={name}>{name} ({allFilteredTxns.filter((t) => t.fundName === name).length})</option>
+                    ))}
+                  </select>
+                  {txnFundFilter !== 'all' && (
+                    <button onClick={() => setTxnFundFilter('all')} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] underline">Clear</button>
+                  )}
+                </div>
+              )}
+
               {transactions.length > 0 ? (
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
                   <div className="hidden sm:block overflow-x-auto">
@@ -698,6 +1095,7 @@ export default function MutualFundsPage() {
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">NAV</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Amount</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Gain/Loss</th>
+                          <th className="w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -714,7 +1112,7 @@ export default function MutualFundsPage() {
                             SWITCH: { bg: 'bg-amber-500/15', text: 'text-amber-400' },
                           }[t.transactionType] || { bg: 'bg-gray-500/15', text: 'text-[var(--text-muted)]' }
                           return (
-                            <tr key={t.transactionId || `txn-${idx}`} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                            <tr key={t.transactionId || `txn-${idx}`} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors group">
                               <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{t.date}</td>
                               <td className="py-2.5 px-3">
                                 <div className="flex items-center gap-1.5">
@@ -742,6 +1140,15 @@ export default function MutualFundsPage() {
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 )}
                               </td>
+                              <td className="py-2.5 px-1">
+                                <TxnActionMenu
+                                  txn={t}
+                                  isOpen={txnMenuOpen === t.transactionId}
+                                  onToggle={() => setTxnMenuOpen(txnMenuOpen === t.transactionId ? null : t.transactionId)}
+                                  onEdit={() => { setTxnMenuOpen(null); setModal({ editTxn: t }) }}
+                                  onDelete={() => { setTxnMenuOpen(null); handleDeleteTransaction(t.transactionId) }}
+                                />
+                              </td>
                             </tr>
                           )
                         })}
@@ -764,7 +1171,16 @@ export default function MutualFundsPage() {
                               </span>
                               <span className="text-xs font-semibold text-[var(--text-dim)]">{t.transactionType}</span>
                             </div>
-                            <p className="text-xs text-[var(--text-dim)]">{t.date}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs text-[var(--text-dim)]">{t.date}</p>
+                              <TxnActionMenu
+                                txn={t}
+                                isOpen={txnMenuOpen === t.transactionId}
+                                onToggle={() => setTxnMenuOpen(txnMenuOpen === t.transactionId ? null : t.transactionId)}
+                                onEdit={() => { setTxnMenuOpen(null); setModal({ editTxn: t }) }}
+                                onDelete={() => { setTxnMenuOpen(null); handleDeleteTransaction(t.transactionId) }}
+                              />
+                            </div>
                           </div>
                           <p className="text-xs text-[var(--text-primary)] truncate mb-1">{t.fundName}</p>
                           <div className="flex items-center justify-between text-xs">
@@ -787,10 +1203,16 @@ export default function MutualFundsPage() {
               ) : (
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
                   <List size={28} className="text-[var(--text-dim)]" />
-                  <p className="text-sm text-[var(--text-muted)]">No transactions yet</p>
-                  <button onClick={() => setModal({ invest: selectedPortfolioId !== 'all' ? selectedPortfolioId : undefined })} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
-                    Make your first investment
-                  </button>
+                  <p className="text-sm text-[var(--text-muted)]">{txnFundFilter !== 'all' ? 'No transactions for this fund' : 'No transactions yet'}</p>
+                  {txnFundFilter !== 'all' ? (
+                    <button onClick={() => setTxnFundFilter('all')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
+                      Show all transactions
+                    </button>
+                  ) : (
+                    <button onClick={() => setModal({ invest: selectedPortfolioId !== 'all' ? selectedPortfolioId : undefined })} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+                      Make your first investment
+                    </button>
+                  )}
                 </div>
               )}
             </>
@@ -810,7 +1232,10 @@ export default function MutualFundsPage() {
 
       <Modal open={!!modal?.invest} onClose={() => setModal(null)} title="Invest in Mutual Fund" wide>
         <MFInvestForm
-          portfolioId={typeof modal?.invest === 'string' ? modal.invest : undefined}
+          key={modal?.invest?.fundCode || modal?.invest?.portfolioId || modal?.invest}
+          portfolioId={typeof modal?.invest === 'object' ? modal.invest.portfolioId : typeof modal?.invest === 'string' ? modal.invest : undefined}
+          fundCode={typeof modal?.invest === 'object' ? modal.invest.fundCode : undefined}
+          fundName={typeof modal?.invest === 'object' ? modal.invest.fundName : undefined}
           onSave={handleInvest}
           onCancel={() => setModal(null)}
         />
@@ -818,7 +1243,9 @@ export default function MutualFundsPage() {
 
       <Modal open={!!modal?.redeem} onClose={() => setModal(null)} title="Redeem Mutual Fund" wide>
         <MFRedeemForm
-          portfolioId={typeof modal?.redeem === 'string' ? modal.redeem : undefined}
+          key={modal?.redeem?.fundCode || modal?.redeem?.portfolioId || modal?.redeem}
+          portfolioId={typeof modal?.redeem === 'object' ? modal.redeem.portfolioId : typeof modal?.redeem === 'string' ? modal.redeem : undefined}
+          fundCode={typeof modal?.redeem === 'object' ? modal.redeem.fundCode : undefined}
           onSave={handleRedeem}
           onCancel={() => setModal(null)}
         />
@@ -849,6 +1276,16 @@ export default function MutualFundsPage() {
       <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Buy Opportunities" wide>
         {modal === 'buyOpp' && <MFBuyOpportunities />}
       </Modal>
+
+      <Modal open={!!modal?.editTxn} onClose={() => setModal(null)} title="Edit Transaction">
+        {modal?.editTxn && (
+          <EditTxnForm
+            txn={modal.editTxn}
+            onSave={handleEditTransaction}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
     </div>
   )
 }
@@ -868,6 +1305,153 @@ function StatCard({ label, value, sub, positive, bold }) {
           {sub}
         </p>
       )}
+    </div>
+  )
+}
+
+/* ── Transaction Action Menu (3-dot dropdown) ── */
+function TxnActionMenu({ txn, isOpen, onToggle, onEdit, onDelete }) {
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) onToggle()
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [isOpen, onToggle])
+
+  if (!txn.transactionId) return null
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggle() }}
+        className="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Actions"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-dropdown)] border border-[var(--border)] rounded-lg shadow-xl py-1 min-w-[120px]">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit() }}
+            className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] flex items-center gap-2 transition-colors"
+          >
+            <Pencil size={12} /> Edit
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className="w-full text-left px-3 py-2 text-xs text-[var(--accent-rose)] hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
+          >
+            <Trash2 size={12} /> Delete
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Edit Transaction Form ── */
+function EditTxnForm({ txn, onSave, onCancel }) {
+  const [date, setDate] = useState(() => {
+    const parsed = parseDate(txn.date)
+    return parsed ? parsed.toISOString().split('T')[0] : ''
+  })
+  const [units, setUnits] = useState(String(txn.units || ''))
+  const [price, setPrice] = useState(String(txn.price || ''))
+  const [notes, setNotes] = useState(txn.notes || '')
+  const [saving, setSaving] = useState(false)
+
+  const totalAmount = (Number(units) || 0) * (Number(price) || 0)
+
+  async function handleSubmit() {
+    if (!units || Number(units) <= 0) return
+    if (!price || Number(price) <= 0) return
+    setSaving(true)
+    try {
+      await onSave({
+        transactionId: txn.transactionId,
+        date,
+        units,
+        price,
+        notes,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
+        <p className="text-xs text-[var(--text-dim)]">{txn.fundName}</p>
+        <p className="text-xs text-[var(--text-muted)]">
+          {txn.type} · {txn.transactionType} · {txn.transactionId}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Date</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Units</label>
+          <input
+            type="number"
+            value={units}
+            onChange={(e) => setUnits(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">NAV (price)</label>
+          <input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+          />
+        </div>
+      </div>
+
+      {totalAmount > 0 && (
+        <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
+          <p className="text-xs text-[var(--text-dim)]">Total Amount</p>
+          <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(totalAmount)}</p>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Notes</label>
+        <input
+          type="text"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Optional notes..."
+          className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+        />
+      </div>
+
+      <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--border-light)]">
+        <button onClick={onCancel} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={saving || !units || Number(units) <= 0 || !price || Number(price) <= 0}
+          className="px-4 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving...' : 'Update Transaction'}
+        </button>
+      </div>
     </div>
   )
 }

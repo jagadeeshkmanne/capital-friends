@@ -81,7 +81,11 @@ export default function SellStockForm({ portfolioId, onSave, onCancel }) {
     try { await onSave(form) } finally { setSaving(false) }
   }
 
-  const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))
+  const portfolioOptions = activePortfolios.map((p) => {
+    const name = p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName
+    const label = p.ownerName ? `${name} (${p.ownerName})` : name
+    return { value: p.portfolioId, label }
+  })
   const holdingOptions = holdings.map((h) => ({ value: h.symbol, label: `${h.symbol} — ${h.quantity} shares` }))
 
   return (

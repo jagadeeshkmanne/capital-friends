@@ -61,7 +61,11 @@ export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
     try { await onSave(form) } finally { setSaving(false) }
   }
 
-  const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))
+  const portfolioOptions = activePortfolios.map((p) => {
+    const name = p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName
+    const label = p.ownerName ? `${name} (${p.ownerName})` : name
+    return { value: p.portfolioId, label }
+  })
 
   return (
     <div className="space-y-4">

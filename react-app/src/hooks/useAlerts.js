@@ -17,7 +17,8 @@ export default function useAlerts() {
 
   // ── Investment Signals ──
   const investmentSignals = useMemo(() => {
-    let buyOppCount = 0
+    let buyCount = 0
+    let strongBuyCount = 0
     let rebalanceCount = 0
     const activeMF = filterOwner((mfPortfolios || []).filter((p) => p.status !== 'Inactive'), 'ownerId')
 
@@ -27,7 +28,8 @@ export default function useAlerts() {
       const threshold = (p.rebalanceThreshold || 0.05) * 100
 
       pHoldings.forEach((h) => {
-        if (h.athNav > 0 && h.belowATHPct >= 5) buyOppCount++
+        if (h.athNav > 0 && h.belowATHPct >= 10) strongBuyCount++
+        else if (h.athNav > 0 && h.belowATHPct >= 5) buyCount++
         if (h.targetAllocationPct > 0 && pValue > 0) {
           const currentPct = (h.currentValue / pValue) * 100
           if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalanceCount++
@@ -35,7 +37,8 @@ export default function useAlerts() {
       })
     })
 
-    return { buyOppCount, rebalanceCount }
+    const buyOppCount = buyCount + strongBuyCount
+    return { buyOppCount, buyCount, strongBuyCount, rebalanceCount }
   }, [selectedMember, mfPortfolios, mfHoldings])
 
   // ── Critical Alerts ──

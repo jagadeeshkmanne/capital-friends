@@ -718,9 +718,12 @@ function updatePortfolio(data) {
     isRequired(data.portfolioId, 'Portfolio ID');
     isRequired(data.portfolioName, 'Portfolio Name');
     isRequired(data.investmentAccount, 'Investment Account');
-    isRequired(data.initialInvestment, 'Initial Investment');
-    isRequired(data.sipTarget, 'SIP Target');
-    isRequired(data.rebalanceThreshold, 'Rebalance Threshold');
+
+    // Normalize portfolio name — ensure PFL- prefix (same as processAddPortfolio)
+    let portfolioName = data.portfolioName.trim();
+    if (!portfolioName.startsWith('PFL-')) {
+      portfolioName = 'PFL-' + portfolioName;
+    }
 
     // Get sheet
     const sheet = getSheet(CONFIG.portfolioMetadataSheet);
@@ -730,18 +733,30 @@ function updatePortfolio(data) {
 
     // Find portfolio row (Portfolio ID is in Column A)
     const lastRow = sheet.getLastRow();
-    const portfolioIds = sheet.getRange(3, 1, lastRow - 2, 1).getValues(); // Column A
+    const dataRange = sheet.getRange(3, 1, lastRow - 2, 2).getValues(); // Columns A-B
     let rowIndex = -1;
+    let oldPortfolioName = '';
 
-    for (let i = 0; i < portfolioIds.length; i++) {
-      if (portfolioIds[i][0] === data.portfolioId) {
+    for (let i = 0; i < dataRange.length; i++) {
+      if (dataRange[i][0] === data.portfolioId) {
         rowIndex = i + 3; // +3 because of credit row + header row + 0-index
+        oldPortfolioName = dataRange[i][1]; // Current name in Column B
         break;
       }
     }
 
     if (rowIndex === -1) {
       throw new Error('Portfolio not found');
+    }
+
+    // Rename sheet tab if portfolio name changed
+    if (oldPortfolioName && oldPortfolioName !== portfolioName) {
+      const spreadsheet = getSpreadsheet();
+      const oldSheet = spreadsheet.getSheetByName(oldPortfolioName);
+      if (oldSheet) {
+        oldSheet.setName(portfolioName);
+        log('Renamed sheet tab: ' + oldPortfolioName + ' → ' + portfolioName);
+      }
     }
 
     // Get existing formulas (columns E, I, J-O are formulas - don't overwrite them)
@@ -760,7 +775,7 @@ function updatePortfolio(data) {
     // Update portfolio — all 16 columns A-P, preserving formula columns
     sheet.getRange(rowIndex, 1, 1, 16).setValues([[
       data.portfolioId,                   // Column A: Portfolio ID
-      data.portfolioName,                 // Column B: Portfolio Name
+      portfolioName,                      // Column B: Portfolio Name (with PFL- prefix)
       data.investmentAccount,             // Column C: Investment Account
       parseFloat(data.initialInvestment), // Column D: Initial Investment
       totalInvestmentFormula,             // Column E: Total Investment (formula)
@@ -777,11 +792,11 @@ function updatePortfolio(data) {
       data.status || 'Active'             // Column P: Status
     ]]);
 
-    log(`Portfolio updated: ${data.portfolioId} - ${data.portfolioName}`);
+    log(`Portfolio updated: ${data.portfolioId} - ${portfolioName}`);
 
     return {
       success: true,
-      message: `Portfolio "${data.portfolioName}" updated successfully!`
+      message: `Portfolio "${portfolioName}" updated successfully!`
     };
 
   } catch (error) {
@@ -1481,11 +1496,50 @@ function calculatePlanningData(portfolioSheet, portfolioName, allocationData) {
 }
 
 /**
+ * ONE-TIME FIX: Repair portfolio names in AllPortfolios metadata to match actual sheet tab names.
+ * Fixes cases where metadata says "Long Term Hybrid" but sheet is "PFL-Long Term Hybrid".
+ */
+function repairPortfolioNames() {
+  try {
+    const spreadsheet = getSpreadsheet();
+    const sheet = getSheet(CONFIG.portfolioMetadataSheet);
+    if (!sheet) return { success: false, message: 'AllPortfolios not found' };
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 4) return { success: true, message: 'No portfolios to repair' };
+
+    const data = sheet.getRange(4, 1, lastRow - 3, 2).getValues(); // A-B from row 4
+    let fixed = 0;
+
+    for (let i = 0; i < data.length; i++) {
+      const portfolioName = data[i][1];
+      if (!portfolioName) continue;
+
+      // Check if sheet exists with current name
+      if (spreadsheet.getSheetByName(portfolioName)) continue;
+
+      // Try with PFL- prefix
+      if (!portfolioName.startsWith('PFL-') && spreadsheet.getSheetByName('PFL-' + portfolioName)) {
+        const correctName = 'PFL-' + portfolioName;
+        sheet.getRange(i + 4, 2).setValue(correctName);
+        log('Repaired: ' + portfolioName + ' → ' + correctName);
+        fixed++;
+      }
+    }
+
+    return { success: true, message: fixed + ' portfolio names repaired' };
+  } catch (error) {
+    log('Error repairing portfolio names: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
+
+/**
  * Activate portfolio sheet (helper for View Portfolio Sheet button)
  */
 function activatePortfolioSheet(portfolioName) {
   try {
-    const sheet = getSheet(portfolioName);
+    const sheet = getPortfolioSheet(portfolioName);
     if (sheet) {
       sheet.activate();
     }
@@ -1522,7 +1576,11 @@ function fixAllPortfolioSheetFormulas() {
     portfolios.forEach(portfolio => {
       try {
         const portfolioName = portfolio.portfolioName;
-        const portfolioSheet = spreadsheet.getSheetByName(portfolioName);
+        let portfolioSheet = spreadsheet.getSheetByName(portfolioName);
+        // Fallback: try with PFL- prefix
+        if (!portfolioSheet && !portfolioName.startsWith('PFL-')) {
+          portfolioSheet = spreadsheet.getSheetByName('PFL-' + portfolioName);
+        }
 
         if (!portfolioSheet) {
           errors.push(`Sheet "${portfolioName}" not found`);

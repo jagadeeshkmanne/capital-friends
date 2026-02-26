@@ -59,7 +59,7 @@ const DIALOG_TITLES = { buyopp: 'Buying Opportunities', rebalance: 'Rebalance Al
 export default function Header({ onMenuClick }) {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
-  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList } = useData()
+  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, refreshData, isRefreshing } = useData()
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
 
@@ -78,7 +78,7 @@ export default function Header({ onMenuClick }) {
   const cardsRef = useRef(null)
 
   const notifCount = criticalAlerts.length + upcomingReminders.length
-  const { buyOppCount, rebalanceCount } = investmentSignals
+  const { buyOppCount, buyCount, strongBuyCount, rebalanceCount } = investmentSignals
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -208,8 +208,9 @@ export default function Header({ onMenuClick }) {
                 }`}
               >
                 <TrendingDown size={13} strokeWidth={2.5} />
-                <span className="hidden sm:inline">Buying Opportunities</span>
-                <span className="text-[11px] bg-emerald-500/30 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
+                <span className="hidden sm:inline">{strongBuyCount > 0 ? 'Buy Opportunities' : 'Buying Opportunities'}</span>
+                {strongBuyCount > 0 && <span className="text-[11px] bg-emerald-500/30 px-1.5 py-0.5 rounded-full">{strongBuyCount} Strong</span>}
+                {buyCount > 0 && <span className="text-[11px] bg-emerald-500/20 px-1.5 py-0.5 rounded-full">{buyCount} Buy</span>}
               </button>
             )}
 
@@ -228,6 +229,16 @@ export default function Header({ onMenuClick }) {
                 <span className="text-[11px] bg-violet-500/30 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
               </button>
             )}
+
+            {/* Sync / Refresh data */}
+            <button
+              onClick={() => refreshData(true)}
+              disabled={isRefreshing}
+              className={`p-2 rounded-lg transition-colors ${isRefreshing ? 'text-blue-400 cursor-not-allowed' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
+              title="Sync data from Google Sheets"
+            >
+              <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
 
             {/* Mask toggle */}
             <button onClick={toggleMask} className={`p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>

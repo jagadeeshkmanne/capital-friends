@@ -5,6 +5,15 @@
  * Handles all mutual fund transactions: Add Existing Holdings, Invest (SIP/Lumpsum), Redeem, Switch
  */
 
+/** Get portfolio sheet by name, with PFL- prefix fallback */
+function getPortfolioSheet(portfolioName) {
+  var sheet = getSheet(portfolioName);
+  if (!sheet && portfolioName && !portfolioName.startsWith('PFL-')) {
+    sheet = getSheet('PFL-' + portfolioName);
+  }
+  return sheet;
+}
+
 /**
  * Process Add Existing Holdings transaction (BUY + INITIAL)
  * This is used to track existing investments that were made before using this system
@@ -73,8 +82,8 @@ function processInvestment(formData, transactionType) {
 
     const portfolioName = portfolio.portfolioName;
 
-    // Get portfolio sheet using the portfolio NAME (not ID), as sheet is named after portfolio name
-    const portfolioSheet = getSheet(portfolioName);
+    // Get portfolio sheet (with PFL- prefix fallback)
+    const portfolioSheet = getPortfolioSheet(portfolioName);
     if (!portfolioSheet) {
       throw new Error(`Portfolio sheet "${portfolioName}" not found`);
     }
@@ -213,8 +222,8 @@ function processRedeem(formData) {
 
     const portfolioName = portfolio.portfolioName;
 
-    // Get portfolio sheet using the portfolio NAME (not ID), as sheet is named after portfolio name
-    const portfolioSheet = getSheet(portfolioName);
+    // Get portfolio sheet (with PFL- prefix fallback)
+    const portfolioSheet = getPortfolioSheet(portfolioName);
     if (!portfolioSheet) {
       throw new Error(`Portfolio sheet "${portfolioName}" not found`);
     }
@@ -351,8 +360,8 @@ function processSwitchFunds(formData) {
 
     const portfolioName = portfolio.portfolioName;
 
-    // Get portfolio sheet using the portfolio NAME (not ID), as sheet is named after portfolio name
-    const portfolioSheet = getSheet(portfolioName);
+    // Get portfolio sheet (with PFL- prefix fallback)
+    const portfolioSheet = getPortfolioSheet(portfolioName);
     if (!portfolioSheet) {
       throw new Error(`Portfolio sheet "${portfolioName}" not found`);
     }
@@ -877,131 +886,83 @@ function getBaseFundName(fullName) {
 }
 
 /**
- * Get all funds in a portfolio
+ * Get all funds in a portfolio.
+ * Reads ONLY the portfolio sheet — no external lookups.
+ * ATH data comes from sheet columns R/S (VLOOKUP formulas).
+ *
+ * @param {string} portfolioId - Portfolio ID
+ * @param {Array} [portfoliosList] - Optional pre-fetched portfolios (avoids re-read)
  */
-function getPortfolioFunds(portfolioId) {
+function getPortfolioFunds(portfolioId, portfoliosList) {
   try {
-    log(`Getting funds for portfolio: ${portfolioId}`);
+    log('Getting funds for portfolio: ' + portfolioId);
 
-    // Get the portfolio name from the metadata
-    const portfolios = getAllPortfolios();
-    const portfolio = portfolios.find(p => p.portfolioId === portfolioId);
+    var portfolios = portfoliosList || getAllPortfolios();
+    var portfolio = null;
+    for (var p = 0; p < portfolios.length; p++) {
+      if (portfolios[p].portfolioId === portfolioId) { portfolio = portfolios[p]; break; }
+    }
     if (!portfolio) {
-      log(`Portfolio ID not found in metadata: ${portfolioId}`);
+      log('Portfolio ID not found in metadata: ' + portfolioId);
       return [];
     }
 
-    const portfolioName = portfolio.portfolioName;
-    log(`Portfolio name: ${portfolioName}`);
+    var portfolioName = portfolio.portfolioName;
+    log('Portfolio name: ' + portfolioName);
 
-    const portfolioSheet = getSheet(portfolioName);
+    var portfolioSheet = getPortfolioSheet(portfolioName);
     if (!portfolioSheet) {
-      log(`Portfolio sheet not found: ${portfolioName}`);
+      log('Portfolio sheet not found: ' + portfolioName);
       return [];
     }
 
-    const lastRow = portfolioSheet.getLastRow();
-    log(`Portfolio sheet last row: ${lastRow}`);
+    var lastRow = portfolioSheet.getLastRow();
+    log('Portfolio sheet last row: ' + lastRow);
 
     if (lastRow <= 3) {
       log('No funds in portfolio yet (lastRow <= 3)');
-      return []; // No funds yet (only watermark, group headers, column headers)
+      return [];
     }
 
-    // Portfolio sheet structure: Row 1=Watermark, Row 2=Group headers, Row 3=Column headers, Row 4+=Data
-    // Columns A-P (16 original) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH = 19 cols
-    // A=Scheme Code, B=Fund, C=Units, D=Avg NAV ₹, E=Current NAV ₹, F=Investment ₹,
-    // G=Current Allocation %, H=Current Value ₹, I=Target Allocation %, J=Target Value ₹,
-    // K=Ongoing SIP ₹, L=Rebalance SIP ₹, M=Target Lumpsum ₹, N=Rebalance Lumpsum ₹, O=Buy/Sell ₹, P=P&L ₹
-    // Q=Portfolio ID (hidden), R=ATH NAV, S=% Below ATH
-    const maxCol = Math.min(portfolioSheet.getLastColumn(), 19);
-    const data = portfolioSheet.getRange(4, 1, lastRow - 3, maxCol).getValues();
+    // Portfolio sheet: Row 1=Watermark, Row 2=Group headers, Row 3=Column headers, Row 4+=Data
+    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH = 19 cols max
+    var maxCol = Math.min(portfolioSheet.getLastColumn(), 19);
+    var data = portfolioSheet.getRange(4, 1, lastRow - 3, maxCol).getValues();
 
-    // Build NAV date lookup from MutualFundData (column E = Date)
-    var navDateMap = {};
-    try {
-      var mfSheet = getSheet(CONFIG.mutualFundDataSheet);
-      if (mfSheet && mfSheet.getLastRow() > 1) {
-        var mfData = mfSheet.getRange(2, 1, mfSheet.getLastRow() - 1, 5).getValues(); // A-E
-        for (var j = 0; j < mfData.length; j++) {
-          if (mfData[j][0]) {
-            navDateMap[String(mfData[j][0])] = mfData[j][4]; // fundCode → date
-          }
-        }
-      }
-    } catch (e) {
-      log('Warning: Could not load NAV dates: ' + e.message);
-    }
-
-    // Build ATH lookup from MF_ATH_Data sheet (fallback for broken VLOOKUPs)
-    // MF_ATH_Data: A=Scheme Code, B=Fund Name, C=ATH NAV, D=ATH Date, E=Last Checked, F=Current NAV, G=% Below ATH
-    var athMap = {};
-    try {
-      var athSheet = getSheet(CONFIG.mfATHDataSheet);
-      if (athSheet && athSheet.getLastRow() > 1) {
-        var athData = athSheet.getRange(1, 1, athSheet.getLastRow(), 7).getValues();
-        for (var a = 0; a < athData.length; a++) {
-          if (athData[a][0] && athData[a][2]) {
-            athMap[String(athData[a][0]).trim()] = {
-              athNav: parseFloat(athData[a][2]) || 0,
-              belowATHPct: parseFloat(athData[a][6]) || 0
-            };
-          }
-        }
-      }
-    } catch (e) {
-      log('Warning: Could not load ATH data: ' + e.message);
-    }
-
-    const funds = [];
-
-    data.forEach((row, index) => {
-      if (row[0]) {  // If Fund Code exists (Column A)
-        var navDate = navDateMap[String(row[0])];
-        var navDateStr = '';
-        if (navDate) {
-          try {
-            navDateStr = navDate instanceof Date ? navDate.toLocaleDateString('en-IN') : String(navDate);
-          } catch (e) { navDateStr = String(navDate); }
-        }
-
-        // ATH: try sheet columns R/S first, fall back to MF_ATH_Data lookup
-        var sheetATH = maxCol >= 18 ? (parseFloat(row[17]) || 0) : 0;
-        var sheetBelowATH = maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0;
-        var athEntry = athMap[String(row[0]).trim()];
-        var athNav = sheetATH > 0 ? sheetATH : (athEntry ? athEntry.athNav : 0);
-        var belowATHPct = sheetBelowATH > 0 ? sheetBelowATH : (athEntry ? athEntry.belowATHPct : 0);
-
+    var funds = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      if (row[0]) {
         funds.push({
-          fundCode: row[0],                         // Column A: Scheme Code
-          fundName: row[1],                         // Column B: Fund
-          units: parseFloat(row[2]) || 0,           // Column C: Units
-          avgNav: parseFloat(row[3]) || 0,          // Column D: Avg NAV ₹
-          currentNav: parseFloat(row[4]) || 0,      // Column E: Current NAV ₹
-          investment: parseFloat(row[5]) || 0,      // Column F: Investment ₹
-          currentAllocationPct: parseFloat(row[6]) || 0, // Column G: Current Allocation %
-          currentValue: parseFloat(row[7]) || 0,    // Column H: Current Value ₹
-          targetAllocationPct: parseFloat(row[8]) || 0,  // Column I: Target Allocation %
-          targetValue: parseFloat(row[9]) || 0,     // Column J: Target Value ₹
-          ongoingSIP: parseFloat(row[10]) || 0,     // Column K: Ongoing SIP ₹
-          rebalanceSIP: parseFloat(row[11]) || 0,   // Column L: Rebalance SIP ₹
-          targetLumpsum: parseFloat(row[12]) || 0,  // Column M: Target Lumpsum ₹
-          rebalanceLumpsum: parseFloat(row[13]) || 0, // Column N: Rebalance Lumpsum ₹
-          buySell: parseFloat(row[14]) || 0,        // Column O: Buy/Sell ₹
-          pl: parseFloat(row[15]) || 0,             // Column P: P&L ₹
-          athNav: athNav,                           // ATH NAV (sheet R or MF_ATH_Data fallback)
-          belowATHPct: belowATHPct,                 // % Below ATH (sheet S or MF_ATH_Data fallback)
-          navDate: navDateStr,                      // NAV Date from MutualFundData
-          portfolioId: portfolioId                  // Pass through for reference
+          fundCode: row[0],
+          fundName: row[1],
+          units: parseFloat(row[2]) || 0,
+          avgNav: parseFloat(row[3]) || 0,
+          currentNav: parseFloat(row[4]) || 0,
+          investment: parseFloat(row[5]) || 0,
+          currentAllocationPct: parseFloat(row[6]) || 0,
+          currentValue: parseFloat(row[7]) || 0,
+          targetAllocationPct: parseFloat(row[8]) || 0,
+          targetValue: parseFloat(row[9]) || 0,
+          ongoingSIP: parseFloat(row[10]) || 0,
+          rebalanceSIP: parseFloat(row[11]) || 0,
+          targetLumpsum: parseFloat(row[12]) || 0,
+          rebalanceLumpsum: parseFloat(row[13]) || 0,
+          buySell: parseFloat(row[14]) || 0,
+          pl: parseFloat(row[15]) || 0,
+          athNav: maxCol >= 18 ? (parseFloat(row[17]) || 0) : 0,
+          belowATHPct: maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0,
+          navDate: '',
+          portfolioId: portfolioId
         });
       }
-    });
+    }
 
-    log(`Found ${funds.length} funds in portfolio`);
+    log('Found ' + funds.length + ' funds in portfolio');
     return funds;
 
   } catch (error) {
-    log(`Error getting portfolio funds: ${error.toString()}`);
+    log('Error getting portfolio funds: ' + error.toString());
     return [];
   }
 }
@@ -1297,6 +1258,125 @@ function calculateTotalAllocation(portfolioSheet) {
   } catch (error) {
     log(`Error calculating total allocation: ${error.toString()}`);
     return 0;
+  }
+}
+
+/**
+ * Delete a transaction from TransactionHistory by transactionId.
+ * @param {string} transactionId - e.g. "TXN-042"
+ */
+function deleteTransaction(transactionId) {
+  try {
+    if (!transactionId) throw new Error('Transaction ID is required');
+
+    var sheet = getSheet(CONFIG.transactionHistorySheet);
+    if (!sheet) throw new Error('TransactionHistory sheet not found');
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 3) throw new Error('No transactions found');
+
+    // Column N (14) = Transaction ID.  Row 1=Watermark, Row 2=Headers, Row 3+=Data
+    var ids = sheet.getRange(3, 14, lastRow - 2, 1).getValues();
+    var rowIndex = -1;
+    for (var i = 0; i < ids.length; i++) {
+      if (ids[i][0] === transactionId) {
+        rowIndex = i + 3; // sheet row (1-indexed, offset by header rows)
+        break;
+      }
+    }
+
+    if (rowIndex === -1) throw new Error('Transaction not found: ' + transactionId);
+
+    sheet.deleteRow(rowIndex);
+    log('Deleted transaction ' + transactionId + ' at row ' + rowIndex);
+
+    return { success: true, message: 'Transaction deleted' };
+
+  } catch (error) {
+    log('Error in deleteTransaction: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Edit a transaction in TransactionHistory by transactionId.
+ * Only allows editing: date, units, price (recalculates totalAmount), notes.
+ * @param {Object} params - { transactionId, date, units, price, notes }
+ */
+function editTransaction(params) {
+  try {
+    if (!params.transactionId) throw new Error('Transaction ID is required');
+
+    var sheet = getSheet(CONFIG.transactionHistorySheet);
+    if (!sheet) throw new Error('TransactionHistory sheet not found');
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 3) throw new Error('No transactions found');
+
+    // Find the row
+    var ids = sheet.getRange(3, 14, lastRow - 2, 1).getValues();
+    var rowIndex = -1;
+    for (var i = 0; i < ids.length; i++) {
+      if (ids[i][0] === params.transactionId) {
+        rowIndex = i + 3;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) throw new Error('Transaction not found: ' + params.transactionId);
+
+    // Read current row data for fields we won't change
+    var rowData = sheet.getRange(rowIndex, 1, 1, 14).getValues()[0];
+    // Columns: A=Date(0), B=PortfolioId(1), C=Portfolio(2), D=FundCode(3), E=Fund(4),
+    //          F=Type(5), G=TxnType(6), H=Units(7), I=Price(8), J=Amount(9),
+    //          K=Notes(10), L=Timestamp(11), M=GainLoss(12), N=TxnId(13)
+
+    var newDate = params.date ? new Date(params.date) : rowData[0];
+    var newUnits = params.units !== undefined ? parseFloat(params.units) : parseFloat(rowData[7]) || 0;
+    var newPrice = params.price !== undefined ? parseFloat(params.price) : parseFloat(rowData[8]) || 0;
+    var newNotes = params.notes !== undefined ? params.notes : (rowData[10] || '');
+    var newAmount = newUnits * newPrice;
+
+    if (newUnits <= 0) throw new Error('Units must be greater than 0');
+    if (newPrice <= 0) throw new Error('Price must be greater than 0');
+
+    // Recalculate gain/loss for SELL transactions
+    var gainLoss = parseFloat(rowData[12]) || 0;
+    if (rowData[5] === 'SELL') {
+      // We need the avg buy price — recalculate from portfolio
+      // For simplicity, we just scale the gain/loss proportionally
+      // Original: gainLoss = (sellPrice - avgBuy) * units
+      // We only know the change in price/units
+      var origUnits = parseFloat(rowData[7]) || 0;
+      var origPrice = parseFloat(rowData[8]) || 0;
+      if (origUnits > 0 && origPrice > 0) {
+        var avgBuyPrice = origPrice - (gainLoss / origUnits);
+        gainLoss = (newPrice - avgBuyPrice) * newUnits;
+      }
+    }
+
+    // Update the row
+    sheet.getRange(rowIndex, 1).setValue(newDate);     // A: Date
+    sheet.getRange(rowIndex, 8).setValue(newUnits);     // H: Units
+    sheet.getRange(rowIndex, 9).setValue(newPrice);     // I: Price
+    sheet.getRange(rowIndex, 10).setValue(newAmount);   // J: Total Amount
+    sheet.getRange(rowIndex, 11).setValue(newNotes);    // K: Notes
+    sheet.getRange(rowIndex, 13).setValue(gainLoss);    // M: Gain/Loss
+
+    // Re-apply number formats
+    var indianCurrencyFormat = '₹#,##,##0.00';
+    sheet.getRange(rowIndex, 8).setNumberFormat('#,##0.0000');
+    sheet.getRange(rowIndex, 9).setNumberFormat(indianCurrencyFormat);
+    sheet.getRange(rowIndex, 10).setNumberFormat(indianCurrencyFormat);
+    sheet.getRange(rowIndex, 13).setNumberFormat(indianCurrencyFormat);
+
+    log('Edited transaction ' + params.transactionId + ' at row ' + rowIndex);
+
+    return { success: true, message: 'Transaction updated' };
+
+  } catch (error) {
+    log('Error in editTransaction: ' + error.toString());
+    return { success: false, message: error.message };
   }
 }
 

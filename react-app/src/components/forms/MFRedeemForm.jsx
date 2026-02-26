@@ -4,7 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
-export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
+export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, onSave, onCancel }) {
   const { mfPortfolios, mfHoldings } = useData()
   const { selectedMember } = useFamily()
 
@@ -13,13 +13,19 @@ export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [mfPortfolios, selectedMember])
 
+  // Resolve initial fund details from holdings
+  const initialHolding = useMemo(() => {
+    if (!portfolioId || !initialFundCode) return null
+    return mfHoldings.find((h) => h.portfolioId === portfolioId && h.schemeCode === initialFundCode)
+  }, [mfHoldings, portfolioId, initialFundCode])
+
   const [form, setForm] = useState({
     portfolioId: portfolioId || '',
-    fundCode: '',
-    fundName: '',
+    fundCode: initialFundCode || '',
+    fundName: initialHolding?.fundName || '',
     date: new Date().toISOString().split('T')[0],
     units: '',
-    price: '',
+    price: initialHolding?.currentNav > 0 ? String(initialHolding.currentNav) : '',
     notes: '',
   })
   const [errors, setErrors] = useState({})
@@ -69,8 +75,12 @@ export default function MFRedeemForm({ portfolioId, onSave, onCancel }) {
     try { await onSave(form) } finally { setSaving(false) }
   }
 
-  const portfolioOptions = activePortfolios.map((p) => ({ value: p.portfolioId, label: `${p.portfolioName} (${p.ownerName})` }))
-  const holdingOptions = holdings.map((h) => ({ value: h.schemeCode, label: `${h.fundName}` }))
+  const portfolioOptions = activePortfolios.map((p) => {
+    const name = p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName
+    const label = p.ownerName ? `${name} (${p.ownerName})` : name
+    return { value: p.portfolioId, label }
+  })
+  const holdingOptions = holdings.map((h) => ({ value: h.schemeCode, label: `${h.fundName} — ${h.units.toFixed(0)} units · ${formatINR(h.currentValue)}` }))
 
   return (
     <div className="space-y-4">

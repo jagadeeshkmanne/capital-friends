@@ -517,6 +517,16 @@ export function DataProvider({ children }) {
     await refreshMF()
   }, [refreshMF])
 
+  const deleteMFTransaction = useCallback(async (transactionId) => {
+    await api.deleteMFTransaction(transactionId)
+    await refreshMF()
+  }, [refreshMF])
+
+  const editMFTransaction = useCallback(async (data) => {
+    await api.editMFTransaction(data)
+    await refreshMF()
+  }, [refreshMF])
+
   // ── Filtered helpers ──
   const activeMembers = (members || []).filter((m) => m.status === 'Active')
   const activeBanks = (banks || []).filter((b) => b.status === 'Active')
@@ -557,7 +567,7 @@ export function DataProvider({ children }) {
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-      investMF, redeemMF, switchMF, updateHoldingAllocations,
+      investMF, redeemMF, switchMF, updateHoldingAllocations, deleteMFTransaction, editMFTransaction,
       // Settings
       settings, updateSettings, refreshSettings,
       // Health Check
