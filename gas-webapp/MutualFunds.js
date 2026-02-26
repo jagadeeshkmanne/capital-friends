@@ -5,13 +5,9 @@
  * Handles all mutual fund transactions: Add Existing Holdings, Invest (SIP/Lumpsum), Redeem, Switch
  */
 
-/** Get portfolio sheet by name, with PFL- prefix fallback */
-function getPortfolioSheet(portfolioName) {
-  var sheet = getSheet(portfolioName);
-  if (!sheet && portfolioName && !portfolioName.startsWith('PFL-')) {
-    sheet = getSheet('PFL-' + portfolioName);
-  }
-  return sheet;
+/** Get portfolio sheet by portfolioId (sheet tab name = portfolioId) */
+function getPortfolioSheet(portfolioId) {
+  return getSheet(portfolioId);
 }
 
 /**
@@ -83,9 +79,9 @@ function processInvestment(formData, transactionType) {
     const portfolioName = portfolio.portfolioName;
 
     // Get portfolio sheet (with PFL- prefix fallback)
-    const portfolioSheet = getPortfolioSheet(portfolioName);
+    const portfolioSheet = getPortfolioSheet(portfolioId);
     if (!portfolioSheet) {
-      throw new Error(`Portfolio sheet "${portfolioName}" not found`);
+      throw new Error(`Portfolio sheet "${portfolioId}" not found`);
     }
 
     // Get fund name from MutualFundData
@@ -223,9 +219,9 @@ function processRedeem(formData) {
     const portfolioName = portfolio.portfolioName;
 
     // Get portfolio sheet (with PFL- prefix fallback)
-    const portfolioSheet = getPortfolioSheet(portfolioName);
+    const portfolioSheet = getPortfolioSheet(portfolioId);
     if (!portfolioSheet) {
-      throw new Error(`Portfolio sheet "${portfolioName}" not found`);
+      throw new Error(`Portfolio sheet "${portfolioId}" not found`);
     }
 
     // Get fund name from MutualFundData
@@ -361,9 +357,9 @@ function processSwitchFunds(formData) {
     const portfolioName = portfolio.portfolioName;
 
     // Get portfolio sheet (with PFL- prefix fallback)
-    const portfolioSheet = getPortfolioSheet(portfolioName);
+    const portfolioSheet = getPortfolioSheet(portfolioId);
     if (!portfolioSheet) {
-      throw new Error(`Portfolio sheet "${portfolioName}" not found`);
+      throw new Error(`Portfolio sheet "${portfolioId}" not found`);
     }
 
     // Get fund names from MutualFundData
@@ -695,8 +691,9 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
     // Get metadata sheet name and formulas for SIP and Lumpsum columns
     // AllPortfolios metadata: F=SIP Target (col 6), G=Lumpsum Target (col 7)
     const metadataSheetName = CONFIG.portfolioMetadataSheet;
-    const sipFormula = `IFERROR(VLOOKUP("${portfolioName}",${metadataSheetName}!$B:$F,5,FALSE),0)`;
-    const lumpsumFormula = `IFERROR(VLOOKUP("${portfolioName}",${metadataSheetName}!$B:$G,6,FALSE),0)`;
+    // All VLOOKUPs use $Q$1 (portfolioId) to lookup in AllPortfolios by column A (ID)
+    const sipFormula = `IFERROR(VLOOKUP($Q$1,${metadataSheetName}!$A:$F,6,FALSE),0)`;
+    const lumpsumFormula = `IFERROR(VLOOKUP($Q$1,${metadataSheetName}!$A:$G,7,FALSE),0)`;
     const thresholdFormula = `IFERROR(VLOOKUP($Q$1,${metadataSheetName}!$A:$H,8,FALSE),0.05)*100`;
 
     // NEW 16-column structure:
@@ -910,7 +907,7 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
     var portfolioName = portfolio.portfolioName;
     log('Portfolio name: ' + portfolioName);
 
-    var portfolioSheet = getPortfolioSheet(portfolioName);
+    var portfolioSheet = getPortfolioSheet(portfolioId);
     if (!portfolioSheet) {
       log('Portfolio sheet not found: ' + portfolioName);
       return [];

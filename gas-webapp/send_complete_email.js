@@ -1364,10 +1364,11 @@ function getPortfolioHoldings(portfolioId, portfolioName) {
   }
   try {
     const spreadsheet = getSpreadsheet();
-    const portfolioSheet = spreadsheet.getSheetByName(portfolioName);
+    // Sheet tab name = portfolioId
+    const portfolioSheet = spreadsheet.getSheetByName(portfolioId);
 
     if (!portfolioSheet) {
-      Logger.log(`Portfolio sheet not found: ${portfolioName}`);
+      Logger.log(`Portfolio sheet not found: ${portfolioId}`);
       return [];
     }
 

@@ -39,10 +39,8 @@ function processAddPortfolio(formData) {
     const spreadsheet = getSpreadsheet();
     log('Got spreadsheet');
 
-    // Check if portfolio already exists
-    if (spreadsheet.getSheetByName(portfolioName)) {
-      return { success: false, message: 'Portfolio "' + portfolioName + '" already exists' };
-    }
+    // Check if portfolio sheet already exists (by ID — sheet tabs use portfolioId)
+    // Note: duplicate display names are allowed (e.g., two kids can have "Long Term Core")
 
     // Add to metadata sheet
     const metadataSheet = spreadsheet.getSheetByName(CONFIG.portfolioMetadataSheet);
@@ -66,37 +64,23 @@ function processAddPortfolio(formData) {
     // New structure: A=Portfolio ID, B=Portfolio Name, C=Investment Account, D=Initial Investment, E=Total Investment,
     // F=SIP Target, G=Lumpsum Target, H=Rebalance Threshold, I=Current Value,
     // J=Unrealized P&L ₹, K=Unrealized P&L %, L=Realized P&L ₹, M=Realized P&L %, N=Total P&L ₹, O=Total P&L %, P=Status
-    const currentValueFormula = `=SUM('${portfolioName}'!$H$4:$H$1000)`;  // Column H = Current Value in portfolio sheet
+    // Current Value = sum from portfolio sheet (sheet tab = portfolioId)
+    const currentValueFormula = `=SUM('${portfolioId}'!$H$4:$H$1000)`;
 
     // Get row number for this portfolio (for formulas)
     const rowNum = metadataSheet.getLastRow() + 1;
 
-    // Total Investment = Smart calculation based on Original Investment field
-    //
-    // IF Original Investment (D) > 0:
-    //    User knows their original investment → Use it + new money (SIP/LUMPSUM) - withdrawals
-    //    Formula: D + BUY(SIP) + BUY(LUMPSUM) - SELL(WITHDRAWAL)
-    //
-    // IF Original Investment (D) = 0 or empty:
-    //    User doesn't know original amount → Auto-calculate from migrated holdings + new money - withdrawals
-    //    Formula: BUY(INITIAL) + BUY(SIP) + BUY(LUMPSUM) - SELL(WITHDRAWAL)
-    //
-    // This provides flexibility:
-    // - Users who remember original investment: Enter amount in D (e.g., ₹60L originally invested)
-    // - Users who migrated holdings: Leave D as 0, system calculates from INITIAL transactions
-    //
-    // EXCLUDES SWITCH transactions: Internal movements, not new money
-    const totalInvestmentFormula = `=IF(D${rowNum}>0,D${rowNum},SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"INITIAL"))+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"SIP")+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"LUMPSUM")-SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
+    // Total Investment — matches on TransactionHistory column B (portfolioId) using A{row} cell reference
+    // IF D > 0: user-entered original investment + SIP + LUMPSUM - WITHDRAWAL
+    // IF D = 0: auto-calculate from INITIAL + SIP + LUMPSUM - WITHDRAWAL
+    // EXCLUDES SWITCH transactions: internal movements, not new money
+    const totalInvestmentFormula = `=IF(D${rowNum}>0,D${rowNum},SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"INITIAL"))+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"SIP")+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"LUMPSUM")-SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
 
-    // Total P&L ₹ = Current Value - Total Investment (portfolio-level calculation)
-    // This is the PRIMARY formula - same as before we added Unrealized/Realized split
     const totalPLAmountFormula = `=I${rowNum}-E${rowNum}`;
-
-    // Total P&L % = Total P&L / Total Investment
     const totalPLPercentFormula = `=IF(E${rowNum}=0,0,N${rowNum}/E${rowNum})`;
 
-    // Realized P&L ₹ = Sum of WITHDRAWAL transaction Gain/Loss only (actual money taken out)
-    const realizedPLAmountFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
+    // Realized P&L — matches on TransactionHistory column B (portfolioId)
+    const realizedPLAmountFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
 
     // Realized P&L % = Realized P&L / Total Investment
     const realizedPLPercentFormula = `=IF(E${rowNum}=0,0,L${rowNum}/E${rowNum})`;
@@ -167,19 +151,18 @@ function createPortfolioSheet(portfolioName, portfolioId) {
   let portfolioSheet;
 
   if (portfoliosSheet) {
-    // Insert after AllPortfolios sheet
+    // Insert after AllPortfolios sheet — use portfolioId as sheet tab name (unique, never changes)
     const portfoliosIndex = portfoliosSheet.getIndex();
-    portfolioSheet = spreadsheet.insertSheet(portfolioName, portfoliosIndex);
+    portfolioSheet = spreadsheet.insertSheet(portfolioId, portfoliosIndex);
   } else {
-    // If AllPortfolios sheet doesn't exist, just insert normally
-    portfolioSheet = spreadsheet.insertSheet(portfolioName);
+    portfolioSheet = spreadsheet.insertSheet(portfolioId);
   }
 
   const metadataSheetName = CONFIG.portfolioMetadataSheet;
 
-  // Helper formulas - AllPortfolios metadata: F=SIP Target (col 6), G=Lumpsum Target (col 7)
-  const sipFormula = `IFERROR(VLOOKUP("${portfolioName}", ${metadataSheetName}!$B:$F, 5, FALSE), 0)`;
-  const lumpsumFormula = `IFERROR(VLOOKUP("${portfolioName}", ${metadataSheetName}!$B:$G, 6, FALSE), 0)`;
+  // Helper formulas — all use $Q$1 (portfolioId) to lookup in AllPortfolios by column A (ID)
+  const sipFormula = `IFERROR(VLOOKUP($Q$1, ${metadataSheetName}!$A:$F, 6, FALSE), 0)`;
+  const lumpsumFormula = `IFERROR(VLOOKUP($Q$1, ${metadataSheetName}!$A:$G, 7, FALSE), 0)`;
   const thresholdFormula = `IFERROR(VLOOKUP($Q$1,${metadataSheetName}!$A:$H,8,FALSE),0.05)*100`;
   const totalInvestmentFormula = `SUMIF($A:$A,"*",$E:$E)`;  // Sum all fund investments in portfolio
 
@@ -598,8 +581,8 @@ function addPortfolioSummarySection(sheet, portfolioId, portfolioName) {
   // Row 58: Realized P&L Value
   const realizedValuesRow = summaryStartRow + 6;
   sheet.getRange(realizedValuesRow, 1).setValue('Total Realized Gain/Loss:');
-  // Sum all Gain/Loss from TransactionHistory where Portfolio Name matches and Type = SELL
-  sheet.getRange(realizedValuesRow, 6).setFormula(`=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"SELL")`)
+  // Sum all Gain/Loss from TransactionHistory where Portfolio ID matches and Type = SELL
+  sheet.getRange(realizedValuesRow, 6).setFormula(`=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,$Q$1,TransactionHistory!$F:$F,"SELL")`)
     .setNumberFormat(indianCurrencyFormat)
     .setFontWeight('bold');
 
@@ -749,15 +732,8 @@ function updatePortfolio(data) {
       throw new Error('Portfolio not found');
     }
 
-    // Rename sheet tab if portfolio name changed
-    if (oldPortfolioName && oldPortfolioName !== portfolioName) {
-      const spreadsheet = getSpreadsheet();
-      const oldSheet = spreadsheet.getSheetByName(oldPortfolioName);
-      if (oldSheet) {
-        oldSheet.setName(portfolioName);
-        log('Renamed sheet tab: ' + oldPortfolioName + ' → ' + portfolioName);
-      }
-    }
+    // Sheet tab name = portfolioId (never changes), so no rename logic needed.
+    // Just update the display name in column B and other editable fields.
 
     // Get existing formulas (columns E, I, J-O are formulas - don't overwrite them)
     const totalInvestmentFormula = sheet.getRange(rowIndex, 5).getFormula();   // E
@@ -962,23 +938,24 @@ function updateExistingPortfolioPLFormulas() {
 
     // Process each portfolio (starting from row 4, first data row after headers)
     for (let rowNum = 4; rowNum <= lastRow; rowNum++) {
-      const portfolioName = metadataSheet.getRange(rowNum, 2).getValue();
+      const portfolioId = metadataSheet.getRange(rowNum, 1).getValue();
 
-      if (!portfolioName || portfolioName === '') continue;
+      if (!portfolioId || portfolioId === '') continue;
 
-      // Update Total Investment formula (Column E) - SMART CALCULATION
-      // If Original Investment (D) > 0: Use it, else auto-calculate from INITIAL transactions
-      const totalInvestmentFormula = `=IF(D${rowNum}>0,D${rowNum},SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"INITIAL"))+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"SIP")+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"LUMPSUM")-SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
+      // Update Total Investment formula (Column E) — matches on TransactionHistory column B (portfolioId)
+      const totalInvestmentFormula = `=IF(D${rowNum}>0,D${rowNum},SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"INITIAL"))+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"SIP")+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"LUMPSUM")-SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
       metadataSheet.getRange(rowNum, 5).setFormula(totalInvestmentFormula);
 
-      // Update Total P&L formula (Column N) - PRIMARY FORMULA
-      // Total P&L = Current Value - Total Investment
+      // Update Current Value formula (Column I) — references portfolio sheet by portfolioId
+      const currentValueFormula = `=SUM('${portfolioId}'!$H$4:$H$1000)`;
+      metadataSheet.getRange(rowNum, 9).setFormula(currentValueFormula);
+
+      // Update Total P&L formula (Column N)
       const totalPLFormula = `=I${rowNum}-E${rowNum}`;
       metadataSheet.getRange(rowNum, 14).setFormula(totalPLFormula);
 
-      // Update Realized P&L formula (Column L)
-      // Realized P&L = Only WITHDRAWAL transaction gains (money actually taken out)
-      const realizedFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$C:$C,"${portfolioName}",TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
+      // Update Realized P&L formula (Column L) — matches on TransactionHistory column B (portfolioId)
+      const realizedFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
       metadataSheet.getRange(rowNum, 12).setFormula(realizedFormula);
 
       // Update Unrealized P&L formula (Column J)
@@ -1004,18 +981,18 @@ function updateExistingPortfolioPLFormulas() {
 
 /**
  * Get portfolio rebalance plan data
- * @param {string} portfolioName - Portfolio name
+ * @param {string} portfolioId - Portfolio ID
  * @returns {Object} - Portfolio data with funds and allocations
  */
-function getPortfolioRebalancePlanData(portfolioName) {
+function getPortfolioRebalancePlanData(portfolioId) {
   try {
-    log(`Getting rebalance plan data for portfolio: ${portfolioName}`);
+    log(`Getting rebalance plan data for portfolio: ${portfolioId}`);
 
     const spreadsheet = getSpreadsheet();
-    const portfolioSheet = spreadsheet.getSheetByName(portfolioName);
+    const portfolioSheet = spreadsheet.getSheetByName(portfolioId);
 
     if (!portfolioSheet) {
-      throw new Error(`Portfolio sheet "${portfolioName}" not found`);
+      throw new Error(`Portfolio sheet "${portfolioId}" not found`);
     }
 
     // Get portfolio data (rows 4 onwards, hidden row 1 = watermark, row 2 = group headers, row 3 = column headers)
@@ -1158,22 +1135,21 @@ function showPortfolioRebalancePlanDialog() {
  */
 function savePortfolioAllocation(allocationData) {
   try {
+    const portfolioId = allocationData.portfolioId;
     const portfolioName = allocationData.portfolioName;
     const spreadsheet = getSpreadsheet();
-    const portfolioSheet = spreadsheet.getSheetByName(portfolioName);
+    // Find sheet by portfolioId (sheet tab name = portfolioId)
+    const portfolioSheet = spreadsheet.getSheetByName(portfolioId);
 
     if (!portfolioSheet) {
-      throw new Error(`Portfolio "${portfolioName}" not found`);
+      throw new Error(`Portfolio sheet "${portfolioId}" not found`);
     }
 
-    log(`Saving allocation for portfolio: ${portfolioName}`);
+    log(`Saving allocation for portfolio: ${portfolioId} (${portfolioName})`);
 
     let updateCount = 0;
     let addCount = 0;
     let deleteCount = 0;
-
-    // Get portfolio ID from cell Q1
-    const portfolioId = portfolioSheet.getRange('Q1').getValue();
 
     // Build map of existing funds: schemeCode → row number
     const data = portfolioSheet.getDataRange().getValues();
@@ -1321,7 +1297,7 @@ function addFundRowToPortfolio(sheet, row, portfolioId, schemeCode, targetPercen
 
   // Column G: Current Allocation % (formula - Current Value / Portfolio Total × 100)
   sheet.getRange(row, 7).setFormula(
-    `=IF(H${row}=0,"",H${row}/SUM($H$4:$H$1000)*100)`
+    `=IF(A${row}="","",ROUND(IFERROR(H${row}/SUM($H$4:$H$1000)*100,0),2))`
   );
 
   // Column H: Current Value ₹ (formula - Units × Current NAV)
@@ -1537,9 +1513,9 @@ function repairPortfolioNames() {
 /**
  * Activate portfolio sheet (helper for View Portfolio Sheet button)
  */
-function activatePortfolioSheet(portfolioName) {
+function activatePortfolioSheet(portfolioId) {
   try {
-    const sheet = getPortfolioSheet(portfolioName);
+    const sheet = getPortfolioSheet(portfolioId);
     if (sheet) {
       sheet.activate();
     }
@@ -1575,19 +1551,16 @@ function fixAllPortfolioSheetFormulas() {
 
     portfolios.forEach(portfolio => {
       try {
-        const portfolioName = portfolio.portfolioName;
-        let portfolioSheet = spreadsheet.getSheetByName(portfolioName);
-        // Fallback: try with PFL- prefix
-        if (!portfolioSheet && !portfolioName.startsWith('PFL-')) {
-          portfolioSheet = spreadsheet.getSheetByName('PFL-' + portfolioName);
-        }
+        const portfolioId = portfolio.portfolioId;
+        // Sheet tab name = portfolioId
+        let portfolioSheet = spreadsheet.getSheetByName(portfolioId);
 
         if (!portfolioSheet) {
-          errors.push(`Sheet "${portfolioName}" not found`);
+          errors.push(`Sheet "${portfolioId}" not found`);
           return;
         }
 
-        log(`Fixing portfolio: ${portfolioName}`);
+        log(`Fixing portfolio: ${portfolioId}`);
 
         // Get all data rows (starting from row 4)
         const data = portfolioSheet.getDataRange().getValues();
