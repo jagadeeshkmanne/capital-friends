@@ -15,13 +15,6 @@ const PRIORITIES = [
   { value: 'Low', label: 'Low' },
 ]
 
-const STATUSES = [
-  { value: 'On Track', label: 'On Track' },
-  { value: 'Needs Attention', label: 'Needs Attention' },
-  { value: 'Achieved', label: 'Achieved' },
-  { value: 'Paused', label: 'Paused' },
-]
-
 // Default inflation & CAGR per goal type (India-specific)
 const TYPE_DEFAULTS = {
   'Retirement':      { inflation: 6,  cagr: 12 },
@@ -74,7 +67,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
         inflation: inflation.toString(),
         cagr: cagr.toString(),
         priority: initial.priority || 'Medium',
-        status: initial.status || 'On Track',
         notes: initial.notes || '',
         // Retirement / Emergency specific
         monthlyExpenses: (initial.monthlyExpenses || '').toString(),
@@ -93,7 +85,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
       inflation: '6',
       cagr: '12',
       priority: 'Medium',
-      status: 'On Track',
       notes: '',
       monthlyExpenses: '',
       emergencyMonths: '6',
@@ -245,7 +236,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
         targetAmount: calc.inflatedTarget,
         targetDate: form.targetDate,
         priority: form.priority,
-        status: form.status,
         notes: form.notes,
         expectedInflation: (Number(form.inflation) || 0) / 100,
         expectedCAGR: (Number(form.cagr) || 0) / 100,
@@ -320,14 +310,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
           <InflatedInfo calc={calc} inflation={form.inflation} isRetirement={isRetirement} isEmergency={isEmergency} />
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Priority">
-            <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
-          </FormField>
-          <FormField label="Status">
-            <FormSelect value={form.status} onChange={(v) => set('status', v)} options={STATUSES} />
-          </FormField>
-        </div>
+        <FormField label="Priority">
+          <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
+        </FormField>
         <FormField label="Notes">
           <FormTextarea value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." rows={2} />
         </FormField>

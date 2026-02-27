@@ -53,16 +53,29 @@ function getAllGoals() {
       Logger.log('Processing row ' + (index + 3) + ': Goal ID = ' + row[0]);
 
       // Serialize dates to ISO strings for proper client-side JSON handling
+      // Handle both Date objects AND string dates (in case editGoal wrote a string)
       let targetDate, createdDate;
       try {
-        targetDate = row[5] && row[5] instanceof Date ? row[5].toISOString() : new Date().toISOString();
+        if (row[5] instanceof Date) {
+          targetDate = row[5].toISOString();
+        } else if (row[5]) {
+          targetDate = new Date(row[5]).toISOString();
+        } else {
+          targetDate = new Date().toISOString();
+        }
       } catch (e) {
         Logger.log('Error parsing targetDate for row ' + (index + 3) + ': ' + e);
         targetDate = new Date().toISOString();
       }
 
       try {
-        createdDate = row[11] && row[11] instanceof Date ? row[11].toISOString() : new Date().toISOString();
+        if (row[11] instanceof Date) {
+          createdDate = row[11].toISOString();
+        } else if (row[11]) {
+          createdDate = new Date(row[11]).toISOString();
+        } else {
+          createdDate = new Date().toISOString();
+        }
       } catch (e) {
         Logger.log('Error parsing createdDate for row ' + (index + 3) + ': ' + e);
         createdDate = new Date().toISOString();
@@ -295,13 +308,15 @@ function addGoal(goalData) {
     const newRow = lastDataRow + 1;
 
     // Prepare row data - static values only (formulas set separately)
+    // IMPORTANT: targetDate must be a Date object, not a string — strings cause #VALUE! in formulas
+    const targetDate = goalData.targetDate ? new Date(goalData.targetDate) : new Date();
     const rowData = [
       goalId,                                    // A: Goal ID
       goalData.goalType || '',                   // B: Goal Type
       goalData.goalName || '',                   // C: Goal Name
       goalData.familyMember || 'Self',           // D: Family Member
       inflationAdjustedTarget,                   // E: Target Amount (inflated future value)
-      goalData.targetDate || new Date(),         // F: Target Date
+      targetDate,                                // F: Target Date (must be Date object)
       0,                                         // G: placeholder (formula below)
       0,                                         // H: placeholder (formula below)
       0,                                         // I: placeholder (formula below)
@@ -377,13 +392,15 @@ function editGoal(goalId, goalData) {
 
     // Write static columns only (A-F, L-U) — skip formula columns G,H,I,J,K,N
     // A-F: Core goal data
+    // IMPORTANT: targetDate must be a Date object, not a string — strings cause #VALUE! in formulas
+    const targetDate = goalData.targetDate ? new Date(goalData.targetDate) : new Date();
     sheet.getRange(rowIndex, 1, 1, 6).setValues([[
       goalId,                                    // A: Goal ID (unchanged)
       goalData.goalType || '',                   // B: Goal Type
       goalData.goalName || '',                   // C: Goal Name
       goalData.familyMember || 'Self',           // D: Family Member
       inflationAdjustedTarget,                   // E: Target Amount
-      goalData.targetDate || new Date()          // F: Target Date
+      targetDate                                 // F: Target Date (must be Date object)
     ]]);
 
     // L-M: Metadata
