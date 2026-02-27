@@ -953,30 +953,7 @@ function determineGoalStatus(currentAllocated, targetAmount, yearsToGo, expected
   }
 }
 
-/**
- * Fix goal dates stored as text in column F. Converts to proper Date objects
- * using local-timezone constructor. Run via: _currentUserSpreadsheetId = 'ID'; fixGoalDates()
- */
-function fixGoalDates() {
-  const sheet = getSheet('Goals');
-  if (!sheet) { Logger.log('Goals sheet not found'); return; }
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 3) { Logger.log('No goal data'); return; }
-  const range = sheet.getRange(3, 6, lastRow - 2, 1);
-  const values = range.getValues();
-  let fixed = 0;
-  for (let i = 0; i < values.length; i++) {
-    const val = values[i][0];
-    if (!val) continue;
-    if (val instanceof Date) { Logger.log('Row ' + (i+3) + ': already Date'); continue; }
-    const parsed = parseSheetDate(val);
-    values[i][0] = parsed;
-    fixed++;
-    Logger.log('Row ' + (i+3) + ': "' + val + '" → ' + parsed);
-  }
-  if (fixed > 0) { range.setValues(values); Logger.log('Fixed ' + fixed + ' date(s)'); }
-  else { Logger.log('No dates needed fixing'); }
-}
+
 
 // ============================================================================
 // HELPER FUNCTIONS
