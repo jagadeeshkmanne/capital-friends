@@ -56,10 +56,13 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
         todaysCost = initial.targetAmount / Math.pow(1 + inflationRate, yearsToGo)
       }
 
+      // Look up memberId from familyMemberName (backend only stores the name, not the ID)
+      const matchedMember = activeMembers.find((m) => m.memberName === initial.familyMemberName)
+
       return {
         goalType: initial.goalType || '',
         goalName: initial.goalName || '',
-        familyMemberId: initial.familyMemberId || '',
+        familyMemberId: matchedMember?.memberId || '',
         todaysCost: Math.round(todaysCost).toString(),
         targetDate: initial.targetDate || '',
         lumpsum: (initial.lumpsumInvested || 0).toString(),
