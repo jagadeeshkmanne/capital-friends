@@ -8,7 +8,7 @@ import {
   Eye, LogIn, FileSpreadsheet, ClipboardCheck,
 } from 'lucide-react'
 
-const LOGO = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/main/logo.png'
+const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
 
 export default function LandingPage() {
   const { isAuthenticated, loading, error, signIn } = useAuth()
@@ -43,7 +43,7 @@ export default function LandingPage() {
   }, [isAuthenticated, navigate])
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#080d1a]"><img src="/logo-small.png" alt="" className="h-16 w-16 animate-pulse" /></div>
+    return <div className="min-h-screen flex items-center justify-center bg-[#080d1a]"><img src={LOGO_ICON} alt="" className="h-16 w-auto animate-pulse" /></div>
   }
 
   const features = [
@@ -92,7 +92,13 @@ export default function LandingPage() {
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 bg-[#0a0f1f]/95 backdrop-blur-sm border-b border-white/[0.06]">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
-          <img src={LOGO} alt="Capital Friends" className="h-12" />
+          <div className="flex items-center gap-2">
+            <img src={LOGO_ICON} alt="CF" className="h-12 w-auto" />
+            <span className="flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              <span className="font-bold text-white">Capital</span>
+              <span className="font-extrabold text-emerald-400">Friends</span>
+            </span>
+          </div>
           <button onClick={signIn} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-600 text-white text-sm font-semibold hover:from-violet-500 hover:to-cyan-500 transition-all cursor-pointer">
             <GI s={14} /> Sign In
           </button>
@@ -327,7 +333,10 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/[0.04] px-5 sm:px-8 lg:px-16 py-5 flex items-center justify-between">
-        <img src={LOGO} alt="" className="h-5 opacity-30" />
+        <div className="flex items-center gap-1.5 opacity-30">
+          <img src={LOGO_ICON} alt="" className="h-5 w-auto" />
+          <span className="text-xs font-bold text-white" style={{ fontFamily: "'Poppins', sans-serif" }}>Capital<span class="text-emerald-400">Friends</span></span>
+        </div>
         <p className="text-xs text-slate-600">Your data. Your Google Drive. Your control.</p>
       </footer>
     </div>

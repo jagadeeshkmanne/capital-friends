@@ -27,10 +27,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-6 text-center">
         {/* Logo */}
         <div>
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl font-bold text-white">CF</span>
-          </div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Capital Friends</h1>
+          <img src={`${import.meta.env.BASE_URL}logo-new.png`} alt="Capital Friends" className="h-16 w-auto mx-auto mb-4" />
+          <h1 className="text-xl tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}><span className="font-bold text-[var(--text-primary)]">Capital</span> <span className="font-extrabold text-emerald-400">Friends</span></h1>
           <p className="text-xs text-[var(--text-dim)] mt-1">Family Portfolio Management</p>
         </div>
 

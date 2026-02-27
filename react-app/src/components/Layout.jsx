@@ -18,7 +18,7 @@ export default function Layout() {
     return (
       <div className="flex h-dvh items-center justify-center bg-[var(--bg-base)]">
         <div className="flex flex-col items-center gap-4 text-center px-6">
-          <img src="/logo-small.png" alt="Capital Friends" className="h-16 w-16 opacity-50" />
+          <img src={`${import.meta.env.BASE_URL}logo-new.png`} alt="Capital Friends" className="h-16 w-auto opacity-50" />
           <p className="text-rose-400 text-sm font-medium">{error}</p>
           <button
             onClick={() => window.location.reload()}
