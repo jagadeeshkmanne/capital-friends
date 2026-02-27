@@ -162,21 +162,14 @@ export default function GoalsPage() {
         await deleteGoal(deletedGoalId)
         setModal(null)
 
-        // Check if deleted goal shared any portfolios with other goals
+        // Check if allocations were redistributed to remaining goals
         if (goalMappings.length > 0) {
-          const sharedNames = goalMappings
-            .filter((m) => {
-              // Is this portfolio also linked to another goal?
-              return (goalPortfolioMappings || []).some((o) => o.portfolioId === m.portfolioId && o.goalId !== deletedGoalId)
-            })
-            .map((m) => {
-              const inv = allInvestments.find((it) => it.id === m.portfolioId)
-              return `${inv?.name || m.portfolioId} (${m.allocationPct}% freed)`
-            })
-
-          if (sharedNames.length > 0) {
-            showToast(`Goal deleted. ${sharedNames.join(', ')} — consider updating remaining goals' allocations`, 'warning', 6000)
-            setShowAllocMgr(true) // Auto-open allocation manager
+          const hadShared = goalMappings.some((m) =>
+            (goalPortfolioMappings || []).some((o) => o.portfolioId === m.portfolioId && o.goalId !== deletedGoalId)
+          )
+          if (hadShared) {
+            showToast('Goal deleted — shared allocations redistributed to remaining goals', 'success', 5000)
+            setShowAllocMgr(true)
           } else {
             showToast('Goal deleted')
           }

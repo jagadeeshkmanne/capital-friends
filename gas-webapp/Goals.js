@@ -560,17 +560,21 @@ function deleteGoal(goalId) {
       return { success: false, error: 'Goal not found' };
     }
 
+    // Redistribute freed allocations to remaining goals BEFORE deleting
+    const redistributed = redistributeFreedAllocations(goalId);
+
     // Delete the row
     sheet.deleteRow(rowIndex);
 
-    // Also delete any portfolio mappings for this goal
+    // Delete the goal's own mappings (after redistribution)
     deleteGoalPortfolioMappings(goalId);
 
     log(`Goal deleted: ${goalId}`);
 
     return {
       success: true,
-      message: 'Goal deleted successfully!'
+      message: 'Goal deleted successfully!',
+      redistributed: redistributed
     };
 
   } catch (error) {
@@ -580,6 +584,78 @@ function deleteGoal(goalId) {
       error: error.message
     };
   }
+}
+
+/**
+ * When a goal is deleted, redistribute its freed allocation % proportionally
+ * to remaining goals that share the same portfolios.
+ *
+ * Example: Portfolio has Goal A (25%), Goal B (25%), Goal C (50%).
+ * Delete Goal A → freed 25%. Remaining ratio B:C = 25:50 = 1:2.
+ * B gets 25*(25/75)=8.33, C gets 25*(50/75)=16.67.
+ * New: B=33.33→33%, C=66.67→67%. Total=100%.
+ */
+function redistributeFreedAllocations(deletedGoalId) {
+  const sheet = getSheet('GoalPortfolioMapping');
+  if (!sheet || sheet.getLastRow() < 3) return [];
+
+  const numCols = Math.min(sheet.getLastColumn(), 7);
+  const allData = sheet.getRange(3, 1, sheet.getLastRow() - 2, numCols).getValues();
+
+  // Find which portfolios the deleted goal is linked to and their allocation
+  const deletedMappings = [];
+  allData.forEach((row, i) => {
+    if (row[1] === deletedGoalId && row[0]) {
+      deletedMappings.push({ portfolioId: row[3], pct: (row[5] || 0) * 100 }); // Convert decimal to %
+    }
+  });
+
+  if (deletedMappings.length === 0) return [];
+
+  const results = [];
+
+  deletedMappings.forEach(dm => {
+    // Find remaining goals linked to this same portfolio
+    const remaining = [];
+    allData.forEach((row, i) => {
+      if (row[1] !== deletedGoalId && row[0] && row[3] === dm.portfolioId) {
+        remaining.push({ rowIdx: i, goalId: row[1], pct: (row[5] || 0) * 100 });
+      }
+    });
+
+    if (remaining.length === 0) return; // No other goals share this portfolio
+
+    // Redistribute proportionally, fixing rounding so total is exact
+    const remainingTotal = remaining.reduce((s, r) => s + r.pct, 0);
+    if (remainingTotal <= 0) return;
+
+    // Calculate new percentages (precise)
+    const newPcts = remaining.map(r => ({
+      ...r,
+      newPctExact: r.pct + dm.pct * (r.pct / remainingTotal)
+    }));
+
+    // Round all but last, give remainder to last to ensure total is exact
+    let allocated = 0;
+    newPcts.forEach((r, i) => {
+      let newPct;
+      if (i === newPcts.length - 1) {
+        // Last one gets the remainder to avoid rounding drift
+        newPct = Math.min(Math.round(remainingTotal + dm.pct) - allocated, 100);
+      } else {
+        newPct = Math.min(Math.round(r.newPctExact), 100);
+      }
+      allocated += newPct;
+      sheet.getRange(r.rowIdx + 3, 6).setValue(newPct / 100); // Store as decimal
+      results.push({ goalId: r.goalId, portfolioId: dm.portfolioId, oldPct: Math.round(r.pct), newPct: newPct });
+    });
+  });
+
+  if (results.length > 0) {
+    log('Redistributed allocations: ' + JSON.stringify(results));
+  }
+
+  return results;
 }
 
 // ============================================================================
