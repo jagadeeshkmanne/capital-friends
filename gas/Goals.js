@@ -568,7 +568,9 @@ function deleteGoal(goalId) {
 // ============================================================================
 
 /**
- * Get all portfolio mappings for a goal
+ * Get goal portfolio mappings.
+ * If goalId is provided, returns mappings for that goal only.
+ * If goalId is omitted, returns ALL mappings.
  */
 function getGoalPortfolioMappings(goalId) {
   const sheet = getSheet('GoalPortfolioMapping');
@@ -576,27 +578,64 @@ function getGoalPortfolioMappings(goalId) {
     return [];
   }
 
-  const data = sheet.getRange(3, 1, sheet.getLastRow() - 2, 6).getValues();
+  const numCols = Math.min(sheet.getLastColumn(), 7); // 7 cols if Investment Type exists, else 6
+  const data = sheet.getRange(3, 1, sheet.getLastRow() - 2, numCols).getValues();
   const mappings = [];
 
   data.forEach(row => {
-    if (row[1] === goalId) { // Column B: Goal ID
-      mappings.push({
-        mappingId: row[0],
-        goalId: row[1],
-        goalName: row[2],
-        portfolioId: row[3],
-        portfolioName: row[4],
-        allocationPct: row[5]               // React: allocationPct
-      });
-    }
+    if (!row[0]) return; // Skip empty rows
+    if (goalId && row[1] !== goalId) return; // Filter by goalId if provided
+
+    mappings.push({
+      mappingId: row[0],
+      goalId: row[1],
+      goalName: row[2],
+      portfolioId: row[3],
+      portfolioName: row[4],
+      allocationPct: Math.round((row[5] || 0) * 100), // Convert decimal → integer (0.80 → 80)
+      investmentType: (numCols >= 7 && row[6]) ? row[6] : 'MF' // Column G, default to MF
+    });
   });
 
   return mappings;
 }
 
 /**
- * Map portfolios to goal
+ * Infer investment type from ID prefix
+ */
+function inferInvestmentType(id) {
+  if (!id) return 'MF';
+  if (id.startsWith('PFL-STK-')) return 'Stock';
+  if (id.startsWith('INV-')) return 'Other';
+  return 'MF';
+}
+
+/**
+ * Resolve investment display name by looking up from the correct sheet
+ */
+function resolveInvestmentName(investmentId, investmentType) {
+  try {
+    if (investmentType === 'Stock') {
+      const portfolios = getAllStockPortfolios();
+      const p = portfolios.find(p => p.portfolioId === investmentId);
+      return p ? p.portfolioName : investmentId;
+    }
+    if (investmentType === 'Other') {
+      const investments = getAllInvestments();
+      const inv = investments.find(i => i.investmentId === investmentId);
+      return inv ? inv.investmentName : investmentId;
+    }
+    // MF portfolio
+    const portfolios = getAllPortfolios();
+    const p = portfolios.find(p => p.portfolioId === investmentId);
+    return p ? p.portfolioName : investmentId;
+  } catch (e) {
+    return investmentId;
+  }
+}
+
+/**
+ * Map portfolios/investments to goal
  */
 function mapPortfoliosToGoal(goalId, portfolioMappings) {
   try {
@@ -624,35 +663,38 @@ function mapPortfoliosToGoal(goalId, portfolioMappings) {
     // Add new mappings
     portfolioMappings.forEach(mapping => {
       const mappingId = generateMappingId(sheet.getLastRow());
+      const type = mapping.investmentType || inferInvestmentType(mapping.portfolioId);
+      const name = mapping.portfolioName || resolveInvestmentName(mapping.portfolioId, type);
 
       const rowData = [
         mappingId,
         goalId,
         goalName,
         mapping.portfolioId,
-        mapping.portfolioName,
-        (mapping.allocationPct || mapping.allocationPercent) / 100 // Convert to decimal
+        name,
+        (mapping.allocationPct || mapping.allocationPercent) / 100, // Convert to decimal
+        type // Column G: Investment Type (MF/Stock/Other)
       ];
 
       sheet.appendRow(rowData);
 
       // Format the new row
       const newRow = sheet.getLastRow();
-      applyDataRowFormatting(sheet, newRow, newRow, 6);
+      applyDataRowFormatting(sheet, newRow, newRow, 7);
     });
 
     // No need to recalculate — Goals column I has a live SUMPRODUCT formula
     // that auto-updates when GoalPortfolioMapping changes
 
-    log(`Portfolios mapped to goal: ${goalId}`);
+    log(`Investments mapped to goal: ${goalId}`);
 
     return {
       success: true,
-      message: 'Portfolios mapped successfully!'
+      message: 'Investments mapped successfully!'
     };
 
   } catch (error) {
-    log('Error mapping portfolios to goal: ' + error.message);
+    log('Error mapping investments to goal: ' + error.message);
     return {
       success: false,
       error: error.message
@@ -887,10 +929,11 @@ function calculateYearsToGo(targetDate) {
  * @param {number} row - Row number to set formulas on
  */
 function setGoalFormulas(sheet, row) {
-  // I: Current Allocated — SUMPRODUCT across GoalPortfolioMapping × AllPortfolios
-  // Looks up each mapped portfolio's current value and multiplies by allocation %
+  // I: Current Allocated — 3-way SUMPRODUCT across MF, Stock, and Other investments
+  // Each term filters by Investment Type (col G) and looks up currentValue from the correct sheet
+  // MF: AllPortfolios col I (data row 4+), Stock: StockPortfolios col F (data row 3+), Other: OtherInvestments col I (data row 3+)
   const currentAllocatedFormula =
-    `=IFERROR(SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0)),0)`;
+    `=IFERROR(SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="MF")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0))+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Stock")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(StockPortfolios!F$3:F$200,MATCH(GoalPortfolioMapping!D$3:D$200,StockPortfolios!A$3:A$200,0)),0))+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Other")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(OtherInvestments!I$3:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,OtherInvestments!A$3:A$200,0)),0)),0)`;
 
   // J: Gap Amount = Target - Current Allocated
   const gapFormula = `=IF(A${row}="","",MAX(0,E${row}-I${row}))`;

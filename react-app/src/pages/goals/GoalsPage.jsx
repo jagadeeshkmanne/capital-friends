@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy } from 'lucide-react'
+import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import Modal from '../../components/Modal'
 import GoalForm from '../../components/forms/GoalForm'
 import GoalPortfolioMapping from '../../components/forms/GoalPortfolioMapping'
@@ -32,8 +33,9 @@ const barColor = {
 
 export default function GoalsPage() {
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, mfHoldings } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
 
   const [modal, setModal] = useState(null)
   const [mappingGoal, setMappingGoal] = useState(null)
@@ -53,6 +55,55 @@ export default function GoalsPage() {
   const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0
   const needsAttention = filtered.filter((g) => g.status === 'Needs Attention').length
   const achieved = filtered.filter((g) => g.status === 'Achieved').length
+
+  // Equity categories for de-risking analysis
+  const EQUITY_CATS = new Set(['Equity', 'ELSS', 'Index'])
+
+  // De-risking alerts: goals approaching deadline with high equity exposure
+  const deRiskAlerts = useMemo(() => {
+    if (!filtered.length || !goalPortfolioMappings?.length || !mfHoldings?.length) return []
+    const now = new Date()
+    const alerts = []
+
+    for (const g of filtered) {
+      if (g.status === 'Achieved') continue
+      const diff = new Date(g.targetDate) - now
+      const yearsLeft = diff / (365.25 * 24 * 60 * 60 * 1000)
+      if (yearsLeft > 3 || yearsLeft <= 0) continue // Only alert for goals < 3 years away
+
+      // Get linked portfolios
+      const mappings = goalPortfolioMappings.filter((m) => m.goalId === g.goalId)
+      if (!mappings.length) continue
+
+      // Calculate weighted equity exposure
+      let totalValue = 0, equityValue = 0
+      for (const m of mappings) {
+        const holdings = mfHoldings.filter((h) => h.portfolioId === m.portfolioId && h.units > 0)
+        for (const h of holdings) {
+          const val = h.currentValue * (m.allocationPct / 100)
+          totalValue += val
+          if (EQUITY_CATS.has(h.category)) equityValue += val
+          else if (h.category === 'Hybrid') equityValue += val * 0.65 // Assume ~65% equity in hybrids
+        }
+      }
+
+      const equityPct = totalValue > 0 ? (equityValue / totalValue) * 100 : 0
+      // Recommended max equity: 30% if < 1 year, 50% if 1-2 years, 70% if 2-3 years
+      const maxEquity = yearsLeft < 1 ? 30 : yearsLeft < 2 ? 50 : 70
+
+      if (equityPct > maxEquity) {
+        alerts.push({
+          goalId: g.goalId,
+          goalName: g.goalName,
+          yearsLeft: yearsLeft.toFixed(1),
+          equityPct: Math.round(equityPct),
+          maxEquity,
+          excessPct: Math.round(equityPct - maxEquity),
+        })
+      }
+    }
+    return alerts
+  }, [filtered, goalPortfolioMappings, mfHoldings])
 
   // Detect newly achieved goals
   useEffect(() => {
@@ -88,7 +139,7 @@ export default function GoalsPage() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Delete this goal?')) {
+    if (modal?.edit && await confirm('Delete this goal?', { title: 'Delete Goal', confirmLabel: 'Delete' })) {
       showBlockUI('Deleting...')
       try {
         await deleteGoal(modal.edit.goalId)
@@ -171,6 +222,33 @@ export default function GoalsPage() {
                 <p className="text-xs text-[var(--text-secondary)]">{showCelebration.goalName} — Congratulations!</p>
               </div>
               <button onClick={() => setShowCelebration(null)} className="ml-auto text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)] relative z-10">Dismiss</button>
+            </div>
+          )}
+
+          {/* De-risking Alerts */}
+          {deRiskAlerts.length > 0 && (
+            <div className="bg-[var(--bg-card)] rounded-xl border border-amber-500/20 p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldAlert size={14} className="text-amber-400" />
+                <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">De-risking Alerts</p>
+              </div>
+              <p className="text-xs text-[var(--text-dim)] mb-2">
+                These goals are approaching their deadline with high equity exposure. Consider moving funds to debt/liquid for capital protection.
+              </p>
+              <div className="space-y-1.5">
+                {deRiskAlerts.map((a) => (
+                  <div key={a.goalId} className="flex items-center justify-between bg-amber-500/5 rounded-lg px-3 py-2">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">{a.goalName}</p>
+                      <p className="text-[10px] text-[var(--text-dim)]">{a.yearsLeft} yrs left</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-amber-400">{a.equityPct}% equity</p>
+                      <p className="text-[10px] text-[var(--text-dim)]">Recommended max {a.maxEquity}%</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -259,15 +337,15 @@ export default function GoalsPage() {
                           </span>
                         </td>
                         <td className="py-2.5 px-2">
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                            <button onClick={() => setWithdrawalGoal(g)} className="p-1 rounded text-[var(--text-dim)] hover:text-emerald-400 transition-colors" title="Withdrawal plan">
-                              <ArrowDownCircle size={12} />
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setMappingGoal(g)} className="p-1.5 rounded-md text-violet-400 hover:bg-violet-500/15 transition-colors" title="Link portfolios">
+                              <Link2 size={13} />
                             </button>
-                            <button onClick={() => setMappingGoal(g)} className="p-1 rounded text-[var(--text-dim)] hover:text-violet-400 transition-colors" title="Link portfolios">
-                              <Link2 size={12} />
+                            <button onClick={() => setWithdrawalGoal(g)} className="p-1.5 rounded-md text-[var(--text-dim)] hover:text-emerald-400 hover:bg-emerald-500/15 transition-colors" title="Withdrawal plan">
+                              <ArrowDownCircle size={13} />
                             </button>
-                            <button onClick={() => setModal({ edit: g })} className="p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-                              <Pencil size={12} />
+                            <button onClick={() => setModal({ edit: g })} className="p-1.5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors" title="Edit goal">
+                              <Pencil size={13} />
                             </button>
                           </div>
                         </td>

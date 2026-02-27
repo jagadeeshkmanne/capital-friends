@@ -369,6 +369,45 @@ function updateInsurancePolicy(policyId, policyData) {
 }
 
 /**
+ * Delete an insurance policy
+ * @param {string} policyId - Policy ID to delete
+ * @returns {Object} Success/error response
+ */
+function deleteInsurancePolicy(policyId) {
+  try {
+    if (!policyId) {
+      return { success: false, error: 'Policy ID is required' };
+    }
+
+    const policy = getInsurancePolicyById(policyId);
+    if (!policy) {
+      return { success: false, error: 'Policy not found: ' + policyId };
+    }
+
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('Insurance');
+    if (!sheet) {
+      return { success: false, error: 'Insurance sheet not found' };
+    }
+
+    sheet.deleteRow(policy.rowIndex);
+    log('Insurance policy deleted: ' + policyId);
+
+    return {
+      success: true,
+      message: 'Insurance policy deleted successfully!'
+    };
+
+  } catch (error) {
+    Logger.log('ERROR in deleteInsurancePolicy: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
  * Format date for HTML input (YYYY-MM-DD)
  * @param {Date|string} date - Date object or string
  * @returns {string} Formatted date string

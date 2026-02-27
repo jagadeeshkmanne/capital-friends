@@ -18,14 +18,14 @@ function getAllFundsFromPortfolios() {
     log(`getAllFundsFromPortfolios: Found ${portfolios.length} portfolios`);
 
     portfolios.forEach(portfolio => {
-      const sheet = spreadsheet.getSheetByName(portfolio.portfolioName);
+      const sheet = spreadsheet.getSheetByName(portfolio.portfolioId);
       if (!sheet) {
-        log(`Portfolio sheet not found: ${portfolio.portfolioName}`);
+        log(`Portfolio sheet not found: ${portfolio.portfolioId}`);
         return;
       }
 
       const data = sheet.getDataRange().getValues();
-      log(`Processing portfolio: ${portfolio.portfolioName} (${data.length} rows)`);
+      log(`Processing portfolio: ${portfolio.portfolioId} (${data.length} rows)`);
 
       // Find header row (should be row 3)
       let headerRowIndex = 2; // Row 3 (0-indexed)
@@ -48,7 +48,7 @@ function getAllFundsFromPortfolios() {
       }
 
       if (codeIndex === -1 || fundNameIndex === -1) {
-        log(`Could not find Scheme Code or Fund columns in ${portfolio.portfolioName}`);
+        log(`Could not find Scheme Code or Fund columns in ${portfolio.portfolioId}`);
         log(`  Headers in row 3: ${headerRow.join(', ')}`);
         return;
       }
@@ -67,7 +67,7 @@ function getAllFundsFromPortfolios() {
           fundCount++;
         }
       }
-      log(`  Added ${fundCount} funds from ${portfolio.portfolioName}`);
+      log(`  Added ${fundCount} funds from ${portfolio.portfolioId}`);
     });
 
     const funds = Array.from(fundsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -238,56 +238,6 @@ function processAssetAllocation(allocation) {
       success: false,
       message: 'Error: ' + error.message
     };
-  }
-}
-
-/**
- * Setup AssetAllocations Sheet
- * Stores fund-level asset allocation and market cap data as JSON
- */
-function setupAssetAllocationsSheet() {
-  try {
-    const spreadsheet = getSpreadsheet();
-    let sheet = spreadsheet.getSheetByName(CONFIG.assetAllocationsSheet);
-
-    if (sheet) {
-      log('AssetAllocations sheet already exists');
-      return sheet;
-    }
-
-    sheet = spreadsheet.insertSheet(CONFIG.assetAllocationsSheet);
-
-    // Add developer credit (Row 1)
-    addDeveloperCredit(sheet, 3);
-
-    // Add headers (Row 2)
-    sheet.appendRow([
-      'Fund Code',
-      'Fund Name',
-      'Asset Allocation JSON',
-      'Equity Allocation JSON'
-    ]);
-
-    formatHeaderRow(sheet, sheet.getRange('A2:D2'), 40);
-
-    // Set column widths
-    sheet.setColumnWidth(1, 120);  // Fund Code
-    sheet.setColumnWidth(2, 300);  // Fund Name
-    sheet.setColumnWidth(3, 400);  // Asset Allocation JSON
-    sheet.setColumnWidth(4, 400);  // Equity Allocation JSON
-
-    // Apply standard formatting
-    applyStandardFormatting(sheet);
-
-    // Set tab color (Purple for asset allocations)
-    sheet.setTabColor('#a78bfa');
-
-    log('AssetAllocations sheet created successfully');
-    return sheet;
-
-  } catch (error) {
-    log(`Error in setupAssetAllocationsSheet: ${error.toString()}`);
-    throw error;
   }
 }
 

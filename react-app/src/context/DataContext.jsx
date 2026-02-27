@@ -41,6 +41,7 @@ export function DataProvider({ children }) {
   const [goalList, setGoals] = useState(null)
   const [reminderList, setReminders] = useState(null)
   const [goalPortfolioMappings, setGoalPortfolioMappings] = useState(null)
+  const [assetAllocations, setAssetAllocations] = useState(null)
   const [settings, setSettings] = useState(null)
   // Health check: session cache for instant same-tab checks, IDB for persistence
   const [healthCheckCompleted, setHealthCheckCompleted] = useState(
@@ -68,6 +69,7 @@ export function DataProvider({ children }) {
     if ('goals' in data) setGoals(data.goals || [])
     if ('reminders' in data) setReminders(data.reminders || [])
     if ('goalPortfolioMappings' in data) setGoalPortfolioMappings(data.goalPortfolioMappings || [])
+    if ('assetAllocations' in data) setAssetAllocations(data.assetAllocations || [])
     if ('settings' in data) setSettings(data.settings || {})
   }, [])
 
@@ -89,6 +91,7 @@ export function DataProvider({ children }) {
       goals: data.goals || [],
       reminders: data.reminders || [],
       goalPortfolioMappings: data.goalPortfolioMappings || [],
+      assetAllocations: data.assetAllocations || [],
     })
   }, [])
 
@@ -527,6 +530,31 @@ export function DataProvider({ children }) {
     await refreshMF()
   }, [refreshMF])
 
+  // ── Asset Allocation ──
+  const updateAssetAllocation = useCallback(async (data) => {
+    const result = await api.saveAssetAllocation(data)
+    // Optimistically update local state
+    setAssetAllocations(prev => {
+      const list = prev || []
+      const idx = list.findIndex(a => a.fundCode === data.fundCode)
+      const assetAlloc = {}
+      if (data.equity) assetAlloc.Equity = data.equity
+      if (data.debt) assetAlloc.Debt = data.debt
+      if (data.cash) assetAlloc.Cash = data.cash
+      if (data.realEstate) assetAlloc['Real Estate'] = data.realEstate
+      if (data.commodities) assetAlloc.Commodities = data.commodities
+      const equityAlloc = {}
+      if (data.largeCap) equityAlloc.Large = data.largeCap
+      if (data.midCap) equityAlloc.Mid = data.midCap
+      if (data.smallCap) equityAlloc.Small = data.smallCap
+      if (data.microCap) equityAlloc.Micro = data.microCap
+      const entry = { fundCode: data.fundCode, fundName: data.fundName, assetAllocation: assetAlloc, equityAllocation: equityAlloc }
+      if (idx >= 0) { const next = [...list]; next[idx] = entry; return next }
+      return [...list, entry]
+    })
+    return result
+  }, [])
+
   // ── Filtered helpers ──
   const activeMembers = (members || []).filter((m) => m.status === 'Active')
   const activeBanks = (banks || []).filter((b) => b.status === 'Active')
@@ -557,7 +585,7 @@ export function DataProvider({ children }) {
       // Reminders
       reminderList, addReminder, updateReminder, deleteReminder,
       // Goal-Portfolio Mappings
-      goalPortfolioMappings, updateGoalMappings,
+      goalPortfolioMappings, updateGoalMappings, assetAllocations, updateAssetAllocation,
       // Stock data
       stockPortfolios, stockHoldings, stockTransactions,
       // Stock CRUD

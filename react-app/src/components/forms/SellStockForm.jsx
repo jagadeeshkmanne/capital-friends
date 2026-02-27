@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
-import { FormField, FormInput, FormSelect, FormActions } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
 export default function SellStockForm({ portfolioId, onSave, onCancel }) {
   const { stockPortfolios, stockHoldings } = useData()
@@ -113,7 +113,7 @@ export default function SellStockForm({ portfolioId, onSave, onCancel }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Sale Date" required error={errors.date}>
-          <FormInput type="date" value={form.date} onChange={(v) => set('date', v)} />
+          <FormDateInput value={form.date} onChange={(v) => set('date', v)} />
         </FormField>
         <FormField label="Quantity to Sell" required error={errors.quantity}>
           <FormInput type="number" value={form.quantity} onChange={(v) => set('quantity', v)} placeholder={availableQty ? `Max: ${availableQty}` : ''} />

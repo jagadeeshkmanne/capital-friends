@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Pencil, Users } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import MemberForm from '../../components/forms/MemberForm'
@@ -27,6 +28,7 @@ const relationBadge = {
 export default function Family() {
   const { members, addMember, updateMember, deleteMember } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const { mv } = useMask()
   const [modal, setModal] = useState(null)
 
@@ -49,7 +51,7 @@ export default function Family() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this family member?')) {
+    if (modal?.edit && await confirm('Deactivate this family member?', { title: 'Deactivate Member', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteMember(modal.edit.memberId)
@@ -111,7 +113,7 @@ export default function Family() {
                             {m.memberName.charAt(0)}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-[var(--text-primary)]">{m.memberName}</p>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">{mv(m.memberName, 'name')}</p>
                             {dfEntries.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-0.5">
                                 {dfEntries.slice(0, 3).map(([k, v]) => (
@@ -159,7 +161,7 @@ export default function Family() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{m.memberName}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{mv(m.memberName, 'name')}</p>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${relationBadge[m.relationship] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                           {m.relationship}
                         </span>

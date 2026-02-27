@@ -3,6 +3,7 @@ import { Plus, Pencil, Bell, BellOff } from 'lucide-react'
 import { useFamily } from '../context/FamilyContext'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 import Modal from '../components/Modal'
 import ReminderForm from '../components/forms/ReminderForm'
 
@@ -31,6 +32,7 @@ export default function RemindersPage() {
   const { selectedMember, member } = useFamily()
   const { reminderList, addReminder, updateReminder, deleteReminder } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const [modal, setModal] = useState(null)
 
   const filtered = useMemo(() => {
@@ -64,7 +66,7 @@ export default function RemindersPage() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Delete this reminder?')) {
+    if (modal?.edit && await confirm('Delete this reminder?', { title: 'Delete Reminder', confirmLabel: 'Delete' })) {
       showBlockUI('Deleting...')
       try {
         await deleteReminder(modal.edit.reminderId)

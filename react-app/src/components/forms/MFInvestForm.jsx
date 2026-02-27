@@ -4,7 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
-import { Search, Plus } from 'lucide-react'
+import { Search, ChevronDown } from 'lucide-react'
 
 const INVEST_TYPES = [
   { value: 'INITIAL', label: 'Add Existing Holdings' },
@@ -143,35 +143,41 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
             </button>
           </div>
         ) : (
-          /* Fund picker: dropdown for existing + search for new */
-          <div className="space-y-2">
+          /* Fund picker: portfolio funds list + search for new */
+          <div className="space-y-3">
             {portfolioHoldings.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => {
-                  const h = portfolioHoldings.find((h) => h.schemeCode === e.target.value)
-                  if (h) selectExistingFund(h)
-                }}
-                className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
-              >
-                <option value="" disabled>Select from portfolio funds...</option>
-                {portfolioHoldings.map((h) => (
-                  <option key={h.holdingId} value={h.schemeCode}>
-                    {h.fundName}{h.units > 0 ? ` — ${h.units.toFixed(0)} units · ${formatINR(h.currentValue)}` : ' (Planned)'}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Portfolio Funds</p>
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-inset)] overflow-hidden max-h-44 overflow-y-auto">
+                  {portfolioHoldings.map((h) => (
+                    <button
+                      key={h.holdingId}
+                      type="button"
+                      onClick={() => selectExistingFund(h)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)] border-b border-[var(--border-light)] last:border-b-0 transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[var(--text-primary)] truncate group-hover:text-white transition-colors">{h.fundName}</p>
+                        <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
+                          {h.units > 0 ? `${h.units.toFixed(0)} units · ${formatINR(h.currentValue)}` : 'Planned'}
+                        </p>
+                      </div>
+                      <ChevronDown size={12} className="text-[var(--text-dim)] -rotate-90 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
             <div>
               {portfolioHoldings.length > 0 && (
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 flex items-center gap-1">
-                  <Plus size={10} /> Add New Fund
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5 flex items-center gap-1">
+                  <Search size={10} /> Or search new fund
                 </p>
               )}
               <FundSearchInput
                 value={null}
                 onSelect={selectFund}
-                placeholder="Search fund by name, code, or category..."
+                placeholder="Search fund by name or code..."
               />
             </div>
           </div>

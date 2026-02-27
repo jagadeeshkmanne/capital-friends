@@ -903,83 +903,6 @@ function applyPLConditionalFormatting(sheet, row) {
 }
 
 /**
- * Update P&L formulas for existing portfolios
- *
- * WHAT THIS FIXES:
- * 1. Total Investment: Smart calculation based on Original Investment field
- *    - If Original Investment > 0: Use it + SIP + LUMPSUM - WITHDRAWAL
- *    - If Original Investment = 0: Auto-calculate from INITIAL + SIP + LUMPSUM - WITHDRAWAL
- *
- * 2. P&L Formulas:
- *    - Total P&L = Current Value - Total Investment
- *    - Realized P&L = WITHDRAWAL gains only
- *    - Unrealized P&L = Total P&L - Realized P&L
- *
- * 3. Transaction Handling:
- *    - SWITCH transactions excluded from Total Investment (internal movements)
- *    - WITHDRAWAL gains tracked in Realized P&L
- */
-function updateExistingPortfolioPLFormulas() {
-  try {
-    log('Starting updateExistingPortfolioPLFormulas...');
-
-    const metadataSheet = getSheet(CONFIG.portfolioMetadataSheet);
-    if (!metadataSheet) {
-      throw new Error('AllPortfolios sheet not found');
-    }
-
-    const lastRow = metadataSheet.getLastRow();
-    if (lastRow <= 3) {
-      log('No portfolios found to update');
-      return { success: true, message: 'No portfolios found to update' };
-    }
-
-    let updatedCount = 0;
-
-    // Process each portfolio (starting from row 4, first data row after headers)
-    for (let rowNum = 4; rowNum <= lastRow; rowNum++) {
-      const portfolioId = metadataSheet.getRange(rowNum, 1).getValue();
-
-      if (!portfolioId || portfolioId === '') continue;
-
-      // Update Total Investment formula (Column E) — matches on TransactionHistory column B (portfolioId)
-      const totalInvestmentFormula = `=IF(D${rowNum}>0,D${rowNum},SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"INITIAL"))+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"SIP")+SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"BUY",TransactionHistory!$G:$G,"LUMPSUM")-SUMIFS(TransactionHistory!$J:$J,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
-      metadataSheet.getRange(rowNum, 5).setFormula(totalInvestmentFormula);
-
-      // Update Current Value formula (Column I) — references portfolio sheet by portfolioId
-      const currentValueFormula = `=SUM('${portfolioId}'!$H$4:$H$1000)`;
-      metadataSheet.getRange(rowNum, 9).setFormula(currentValueFormula);
-
-      // Update Total P&L formula (Column N)
-      const totalPLFormula = `=I${rowNum}-E${rowNum}`;
-      metadataSheet.getRange(rowNum, 14).setFormula(totalPLFormula);
-
-      // Update Realized P&L formula (Column L) — matches on TransactionHistory column B (portfolioId)
-      const realizedFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
-      metadataSheet.getRange(rowNum, 12).setFormula(realizedFormula);
-
-      // Update Unrealized P&L formula (Column J)
-      // Unrealized P&L = Total P&L - Realized P&L
-      const unrealizedFormula = `=N${rowNum}-L${rowNum}`;
-      metadataSheet.getRange(rowNum, 10).setFormula(unrealizedFormula);
-
-      updatedCount++;
-      log(`Updated formulas for portfolio: ${portfolioName}`);
-    }
-
-    SpreadsheetApp.flush(); // Ensure all formulas are updated
-
-    const message = `Updated formulas for ${updatedCount} portfolio(s). Smart Total Investment calculation, Fixed P&L formulas, Proper transaction handling.`;
-    log(message);
-    return { success: true, message: message };
-
-  } catch (error) {
-    log('Error updating portfolio formulas: ' + error.toString());
-    return { success: false, message: 'Error: ' + error.message };
-  }
-}
-
-/**
  * Get portfolio rebalance plan data
  * @param {string} portfolioId - Portfolio ID
  * @returns {Object} - Portfolio data with funds and allocations
@@ -999,7 +922,7 @@ function getPortfolioRebalancePlanData(portfolioId) {
     const lastRow = portfolioSheet.getLastRow();
     if (lastRow < 4) {
       return {
-        portfolioName: portfolioName,
+        portfolioId: portfolioId,
         funds: []
       };
     }
@@ -1029,10 +952,10 @@ function getPortfolioRebalancePlanData(portfolioId) {
       });
     });
 
-    log(`Retrieved ${funds.length} funds for portfolio ${portfolioName}`);
+    log(`Retrieved ${funds.length} funds for portfolio ${portfolioId}`);
 
     return {
-      portfolioName: portfolioName,
+      portfolioId: portfolioId,
       funds: funds
     };
 
@@ -1210,8 +1133,13 @@ function savePortfolioAllocation(allocationData) {
       const existing = existingFundsMap.get(fund.schemeCode.toString());
 
       if (!existing) {
-        // Fund is NEW - create row with formulas
-        const newRow = portfolioSheet.getLastRow() + 1;
+        // Fund is NEW - find first empty row in column A (scheme code) starting from row 4
+        const colA = portfolioSheet.getRange('A4:A1000').getValues();
+        let newRow = 4;
+        for (let r = 0; r < colA.length; r++) {
+          if (!colA[r][0]) { newRow = r + 4; break; }
+          newRow = r + 5; // After last occupied row
+        }
         addFundRowToPortfolio(portfolioSheet, newRow, portfolioId, fund.schemeCode, fund.targetPercent);
         log(`Added new fund: ${fund.fundName} with target ${fund.targetPercent}%`);
         addCount++;
@@ -1472,45 +1400,6 @@ function calculatePlanningData(portfolioSheet, portfolioName, allocationData) {
 }
 
 /**
- * ONE-TIME FIX: Repair portfolio names in AllPortfolios metadata to match actual sheet tab names.
- * Fixes cases where metadata says "Long Term Hybrid" but sheet is "PFL-Long Term Hybrid".
- */
-function repairPortfolioNames() {
-  try {
-    const spreadsheet = getSpreadsheet();
-    const sheet = getSheet(CONFIG.portfolioMetadataSheet);
-    if (!sheet) return { success: false, message: 'AllPortfolios not found' };
-
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 4) return { success: true, message: 'No portfolios to repair' };
-
-    const data = sheet.getRange(4, 1, lastRow - 3, 2).getValues(); // A-B from row 4
-    let fixed = 0;
-
-    for (let i = 0; i < data.length; i++) {
-      const portfolioName = data[i][1];
-      if (!portfolioName) continue;
-
-      // Check if sheet exists with current name
-      if (spreadsheet.getSheetByName(portfolioName)) continue;
-
-      // Try with PFL- prefix
-      if (!portfolioName.startsWith('PFL-') && spreadsheet.getSheetByName('PFL-' + portfolioName)) {
-        const correctName = 'PFL-' + portfolioName;
-        sheet.getRange(i + 4, 2).setValue(correctName);
-        log('Repaired: ' + portfolioName + ' → ' + correctName);
-        fixed++;
-      }
-    }
-
-    return { success: true, message: fixed + ' portfolio names repaired' };
-  } catch (error) {
-    log('Error repairing portfolio names: ' + error.toString());
-    return { success: false, message: error.message };
-  }
-}
-
-/**
  * Activate portfolio sheet (helper for View Portfolio Sheet button)
  */
 function activatePortfolioSheet(portfolioId) {
@@ -1521,139 +1410,6 @@ function activatePortfolioSheet(portfolioId) {
     }
   } catch (error) {
     log('Error activating portfolio sheet: ' + error.toString());
-  }
-}
-
-/**
- * ONE-TIME FIX: Update all portfolio sheet formulas
- * Fixes:
- * 1. Fund Name formula - change from TransactionHistory to MutualFundData lookup
- * 2. Percentage formatting - change from '0.00%' to '0.00'
- * 3. Incomplete SUM ranges - add :$H$1000
- * 4. VLOOKUP column indices - fix SIP/Lumpsum column references
- *
- * This should be run ONCE after the code update to fix existing portfolios
- */
-function fixAllPortfolioSheetFormulas() {
-  try {
-    log('Starting fixAllPortfolioSheetFormulas...');
-
-    const spreadsheet = getSpreadsheet();
-    const portfolios = getAllPortfolios();
-
-    if (portfolios.length === 0) {
-      log('No portfolios found');
-      return { success: true, message: 'No portfolios found' };
-    }
-
-    let fixedCount = 0;
-    const errors = [];
-
-    portfolios.forEach(portfolio => {
-      try {
-        const portfolioId = portfolio.portfolioId;
-        // Sheet tab name = portfolioId
-        let portfolioSheet = spreadsheet.getSheetByName(portfolioId);
-
-        if (!portfolioSheet) {
-          errors.push(`Sheet "${portfolioId}" not found`);
-          return;
-        }
-
-        log(`Fixing portfolio: ${portfolioId}`);
-
-        // Get all data rows (starting from row 4)
-        const data = portfolioSheet.getDataRange().getValues();
-
-        for (let i = 3; i < data.length; i++) { // Start from row 4 (index 3)
-          const schemeCode = data[i][0]; // Column A
-          if (!schemeCode) continue; // Skip empty rows
-
-          const row = i + 1; // Convert to 1-based row number
-
-          // Fix 1: Fund Name formula - use MutualFundData instead of TransactionHistory
-          portfolioSheet.getRange(row, 2).setFormula(
-            `=IF(A${row}="","",IFERROR(VLOOKUP(A${row},MutualFundData!$A:$B,2,FALSE),"Fund not found"))`
-          );
-
-          // Fix 2: Current Allocation % - fix SUM range
-          portfolioSheet.getRange(row, 7).setFormula(
-            `=IF(A${row}="","",ROUND(IFERROR(H${row}/SUM($H$4:$H$1000)*100,0),2))`
-          );
-
-          // Fix 3: Target Value - fix SUM range
-          portfolioSheet.getRange(row, 10).setFormula(
-            `=IF(OR(A${row}="",I${row}=""),"",I${row}/100*SUM($H$4:$H$1000))`
-          );
-
-          // Fix 4: Ongoing SIP - fix VLOOKUP
-          portfolioSheet.getRange(row, 11).setFormula(
-            `=IF(OR(A${row}="",I${row}=""),"",I${row}/100*IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,6,FALSE),0))`
-          );
-
-          // Fix 5: Rebalance SIP - gap-based (matches React logic)
-          const tgSP = `SUMPRODUCT(IF(A$4:A$1000<>"",IF(J$4:J$1000-H$4:H$1000>0,J$4:J$1000-H$4:H$1000,0),0))`;
-          const sipVL = `IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,6,FALSE),0)`;
-          portfolioSheet.getRange(row, 12).setFormula(
-            `=IF(OR(A${row}="",I${row}=""),"",IF(${tgSP}=0,I${row}/100*${sipVL},IF(J${row}-H${row}>0,(J${row}-H${row})/${tgSP}*${sipVL},0)))`
-          );
-
-          // Fix 6: Target Lumpsum - fix VLOOKUP
-          portfolioSheet.getRange(row, 13).setFormula(
-            `=IF(OR(A${row}="",I${row}=""),"",I${row}/100*IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,7,FALSE),0))`
-          );
-
-          // Fix 7: Rebalance Lumpsum - fix VLOOKUP, SUM range + add threshold gate
-          portfolioSheet.getRange(row, 14).setFormula(
-            `=IF(OR(A${row}="",I${row}="",IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,7,FALSE),0)=0),"",IF(ABS(G${row}-I${row})>IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$H,8,FALSE),0.05)*100,MAX(0,I${row}/100*(SUM($H$4:$H$1000)+IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,7,FALSE),0))-H${row}),I${row}/100*IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,7,FALSE),0)))`
-          );
-
-          // Fix 8: Buy/Sell - add threshold gate
-          portfolioSheet.getRange(row, 15).setFormula(
-            `=IF(OR(A${row}="",I${row}=""),"",IF(ABS(G${row}-I${row})>IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$H,8,FALSE),0.05)*100,J${row}-H${row},0))`
-          );
-
-          // Fix 9: Percentage formatting - change from '0.00%' to '0.00'
-          portfolioSheet.getRange(row, 7).setNumberFormat('0.00');  // Current %
-          portfolioSheet.getRange(row, 9).setNumberFormat('0.00');  // Target %
-
-          // Fix 10: ATH NAV ₹ (column R = 18)
-          portfolioSheet.getRange(row, 18).setFormula(
-            `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$C,3,FALSE),""))`
-          );
-          portfolioSheet.getRange(row, 18).setNumberFormat('₹#,##0.00');
-
-          // Fix 11: % Below ATH (column S = 19)
-          portfolioSheet.getRange(row, 19).setFormula(
-            `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
-          );
-          portfolioSheet.getRange(row, 19).setNumberFormat('0.00');
-        }
-
-        fixedCount++;
-        log(`Fixed portfolio: ${portfolioName}`);
-
-      } catch (error) {
-        errors.push(`${portfolio.portfolioName}: ${error.message}`);
-        log(`Error fixing ${portfolio.portfolioName}: ${error.toString()}`);
-      }
-    });
-
-    SpreadsheetApp.flush(); // Ensure all changes are written
-
-    let message = `Successfully fixed ${fixedCount} portfolio sheet(s). `;
-    message += 'Fixed: Fund Name formulas, Percentage formatting, SUM ranges, SIP/Lumpsum VLOOKUP formulas, Rebalance threshold gate (L, N, O columns), ATH NAV and % Below ATH columns (R, S).';
-
-    if (errors.length > 0) {
-      message += ' Errors: ' + errors.join('; ');
-    }
-
-    log(message);
-    return { success: errors.length === 0, message: message };
-
-  } catch (error) {
-    log('Error in fixAllPortfolioSheetFormulas: ' + error.toString());
-    return { success: false, message: 'Error: ' + error.message };
   }
 }
 

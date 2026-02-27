@@ -4,6 +4,7 @@ import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
@@ -21,6 +22,7 @@ export default function StocksPage() {
   } = useData()
 
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const { mv } = useMask()
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
@@ -94,7 +96,7 @@ export default function StocksPage() {
   // Dropdown label
   const dropdownLabel = selectedPortfolioId === 'all'
     ? `All Portfolios (${portfolios.length})`
-    : `${selectedPortfolio?.portfolioName} — ${selectedPortfolio?.ownerName}`
+    : `${selectedPortfolio?.portfolioName} — ${mv(selectedPortfolio?.ownerName, 'name')}`
 
   // Handlers
   async function handleSavePortfolio(data) {
@@ -112,7 +114,7 @@ export default function StocksPage() {
   }
 
   async function handleDeletePortfolio() {
-    if (modal?.editPortfolio && confirm('Deactivate this portfolio?')) {
+    if (modal?.editPortfolio && await confirm('Deactivate this portfolio?', { title: 'Deactivate Portfolio', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteStockPortfolio(modal.editPortfolio.portfolioId)
@@ -202,7 +204,7 @@ export default function StocksPage() {
                               <p className={`text-sm ${selectedPortfolioId === p.portfolioId ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                                 {p.portfolioName}
                               </p>
-                              <p className="text-xs text-[var(--text-dim)]">{p.ownerName} · {p.platform}</p>
+                              <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.current)}</p>

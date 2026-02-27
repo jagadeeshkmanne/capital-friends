@@ -166,20 +166,26 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
           <div className="border-t border-[var(--border-light)] pt-3">
             <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-1">Add New Fund</p>
             <p className="text-xs text-[var(--text-dim)] mb-2">Set target % to see how much to invest. After buying, use Invest to record the transaction.</p>
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <FundSearchInput value={newFund} onSelect={(f) => setNewFund(f.schemeCode ? f : null)} placeholder="Search fund to add..." />
+            <div className="space-y-2">
+              <FundSearchInput value={newFund} onSelect={(f) => setNewFund(f.schemeCode ? f : null)} placeholder="Search fund to add..." />
+              <div className="flex items-center gap-2">
+                <div className="w-28">
+                  <input
+                    type="number"
+                    value={newTarget}
+                    onChange={(e) => setNewTarget(e.target.value)}
+                    placeholder="Target %"
+                    className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] text-center focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={addNewFund}
+                  disabled={!newFund}
+                  className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} /> Add
+                </button>
               </div>
-              <div className="w-24">
-                <FormInput type="number" value={newTarget} onChange={setNewTarget} placeholder="Target %" style={{ textAlign: 'center' }} />
-              </div>
-              <button
-                onClick={addNewFund}
-                disabled={!newFund}
-                className="shrink-0 flex items-center gap-1 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Plus size={14} /> Add
-              </button>
             </div>
           </div>
         </div>

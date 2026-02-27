@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, ChevronLeft, Target, DollarSign, CheckCircle2, TrendingUp, AlertTriangle } from 'lucide-react'
-import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 
@@ -127,7 +127,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
     const cagrRate = (Number(form.cagr) || 0) / 100
     const monthlyRate = cagrRate / 12
     const lumpsum = Number(form.lumpsum) || 0
-    const sip = Number(form.monthlySIP) || 0
     const monthlyExp = Number(form.monthlyExpenses) || 0
     const emoMonths = Number(form.emergencyMonths) || 6
 
@@ -142,12 +141,10 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
     let inflatedTarget = 0
 
     if (isRetirement) {
-      // 25x annual expenses rule
       const annualExp = monthlyExp * 12
       todaysCost = annualExp * 25
       inflatedTarget = todaysCost * Math.pow(1 + inflationRate, yearsToGo)
     } else if (isEmergency) {
-      // No inflation for emergency fund
       todaysCost = monthlyExp * emoMonths
       inflatedTarget = todaysCost
     } else {
@@ -159,21 +156,12 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
 
     inflatedTarget = Math.round(inflatedTarget)
 
-    // FV of lumpsum
+    // FV of lumpsum investment
     const fvLumpsum = lumpsum > 0 && months > 0
       ? lumpsum * Math.pow(1 + monthlyRate, months)
       : lumpsum
 
-    // FV of SIP
-    const fvSIP = sip > 0 && monthlyRate > 0 && months > 0
-      ? sip * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)
-      : sip * months
-
-    const projectedValue = Math.round(fvLumpsum + fvSIP)
-    const totalInvested = Math.round(lumpsum + sip * months)
-    const totalReturns = projectedValue - totalInvested
-
-    // Required SIP to reach target
+    // Required SIP to reach target (after accounting for lumpsum growth)
     let requiredSIP = 0
     if (inflatedTarget > 0 && months > 0) {
       const remaining = inflatedTarget - fvLumpsum
@@ -185,18 +173,22 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
       requiredSIP = Math.max(0, Math.ceil(requiredSIP))
     }
 
-    const isOnTrack = inflatedTarget > 0 && projectedValue >= inflatedTarget
-    const pctOfTarget = inflatedTarget > 0 ? (projectedValue / inflatedTarget) * 100 : 0
+    // Projection: what happens if you follow the required SIP
+    const fvRequiredSIP = requiredSIP > 0 && monthlyRate > 0 && months > 0
+      ? requiredSIP * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)
+      : requiredSIP * months
+    const planTotalInvested = Math.round(lumpsum + requiredSIP * months)
+    const planReturns = Math.round(inflatedTarget - planTotalInvested)
+    const lumpsumCoversGoal = lumpsum > 0 && fvLumpsum >= inflatedTarget
 
     return {
       todaysCost, inflatedTarget, yearsToGo, months,
-      fvLumpsum: Math.round(fvLumpsum), fvSIP: Math.round(fvSIP),
-      projectedValue, totalInvested, totalReturns,
-      requiredSIP, isOnTrack, pctOfTarget,
+      fvLumpsum: Math.round(fvLumpsum),
+      requiredSIP, fvRequiredSIP: Math.round(fvRequiredSIP),
+      planTotalInvested, planReturns, lumpsumCoversGoal,
       hasTarget: inflatedTarget > 0,
-      hasInputs: lumpsum > 0 || sip > 0,
     }
-  }, [form.todaysCost, form.targetDate, form.lumpsum, form.monthlySIP,
+  }, [form.todaysCost, form.targetDate, form.lumpsum,
       form.inflation, form.cagr, form.monthlyExpenses, form.emergencyMonths,
       isRetirement, isEmergency])
 
@@ -257,7 +249,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
         notes: form.notes,
         expectedInflation: (Number(form.inflation) || 0) / 100,
         expectedCAGR: (Number(form.cagr) || 0) / 100,
-        monthlyInvestment: Number(form.monthlySIP) || 0,
+        monthlyInvestment: calc.requiredSIP || 0,
         lumpsumInvested: Number(form.lumpsum) || 0,
         monthlyExpenses: (isRetirement || isEmergency) ? Number(form.monthlyExpenses) || 0 : undefined,
         emergencyMonths: isEmergency ? Number(form.emergencyMonths) || 6 : undefined,
@@ -289,7 +281,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
             <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
           </FormField>
           <FormField label="Target Date" required error={errors.targetDate}>
-            <FormInput type="date" value={form.targetDate} onChange={(v) => set('targetDate', v)} />
+            <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
           </FormField>
         </div>
 
@@ -311,18 +303,15 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
           </FormField>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <FormField label="Inflation %">
             <FormInput type="number" value={form.inflation} onChange={(v) => set('inflation', v)} placeholder="6" />
           </FormField>
           <FormField label="Expected CAGR %">
             <FormInput type="number" value={form.cagr} onChange={(v) => set('cagr', v)} placeholder="12" />
           </FormField>
-          <FormField label="Lumpsum">
+          <FormField label="Lumpsum Invested">
             <FormInput type="number" value={form.lumpsum} onChange={(v) => set('lumpsum', v)} placeholder="0" />
-          </FormField>
-          <FormField label="Monthly SIP">
-            <FormInput type="number" value={form.monthlySIP} onChange={(v) => set('monthlySIP', v)} placeholder="0" />
           </FormField>
         </div>
 
@@ -422,14 +411,12 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
              'Set your target and investment plan'}
           </p>
 
-          {/* Target Date — always first */}
-          <FormField label="Target Date" required error={errors.targetDate}>
-            <FormInput type="date" value={form.targetDate} onChange={(v) => set('targetDate', v)} />
-          </FormField>
-
-          {/* Type-specific primary fields */}
+          {/* Target Date + Type-specific primary fields */}
           {(isRetirement || isEmergency) ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Target Date" required error={errors.targetDate}>
+                <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
+              </FormField>
               <FormField label="Monthly Expenses (Today)" required error={errors.monthlyExpenses}>
                 <FormInput type="number" value={form.monthlyExpenses} onChange={(v) => set('monthlyExpenses', v)} placeholder="e.g., 50000" />
               </FormField>
@@ -447,9 +434,14 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
               )}
             </div>
           ) : (
-            <FormField label="Today's Cost" required error={errors.todaysCost}>
-              <FormInput type="number" value={form.todaysCost} onChange={(v) => set('todaysCost', v)} placeholder="e.g., 1000000" />
-            </FormField>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Target Date" required error={errors.targetDate}>
+                <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
+              </FormField>
+              <FormField label="Today's Cost" required error={errors.todaysCost}>
+                <FormInput type="number" value={form.todaysCost} onChange={(v) => set('todaysCost', v)} placeholder="e.g., 1000000" />
+              </FormField>
+            </div>
           )}
 
           {/* Inflation & CAGR */}
@@ -467,19 +459,14 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
             <InflatedInfo calc={calc} inflation={form.inflation} isRetirement={isRetirement} isEmergency={isEmergency} />
           )}
 
-          {/* Investment inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Lumpsum Investment (Optional)">
-              <FormInput type="number" value={form.lumpsum} onChange={(v) => set('lumpsum', v)} placeholder="0" />
-            </FormField>
-            <FormField label="Monthly SIP">
-              <FormInput type="number" value={form.monthlySIP} onChange={(v) => set('monthlySIP', v)} placeholder="0" />
-            </FormField>
-          </div>
+          {/* Lumpsum investment */}
+          <FormField label="Lumpsum You Plan to Invest (Optional)">
+            <FormInput type="number" value={form.lumpsum} onChange={(v) => set('lumpsum', v)} placeholder="e.g., 500000" />
+          </FormField>
 
-          {/* Live Projection Panel */}
+          {/* Required SIP Panel */}
           {calc.hasTarget && calc.months > 0 && (
-            <ProjectionPanel calc={calc} sip={form.monthlySIP} lumpsum={form.lumpsum} />
+            <ProjectionPanel calc={calc} lumpsum={form.lumpsum} />
           )}
 
           <FormField label="Notes">
@@ -518,15 +505,15 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
 
             <div className="border-t border-[var(--border-light)] pt-3 space-y-2">
               <ReviewRow label="Lumpsum" value={formatINR(Number(form.lumpsum) || 0)} />
-              <ReviewRow label="Monthly SIP" value={`${formatINR(Number(form.monthlySIP) || 0)}/mo`} color="emerald" />
+              <ReviewRow label="Required SIP" value={`${formatINR(calc.requiredSIP)}/mo`} color="emerald" />
               <ReviewRow label="Target Date" value={form.targetDate} />
               <ReviewRow label="Time Remaining" value={calc.yearsToGo > 0 ? `${calc.yearsToGo.toFixed(1)} years` : '—'} />
             </div>
           </div>
 
           {/* Projection summary */}
-          {calc.hasTarget && calc.months > 0 && calc.hasInputs && (
-            <ProjectionPanel calc={calc} sip={form.monthlySIP} lumpsum={form.lumpsum} compact />
+          {calc.hasTarget && calc.months > 0 && (
+            <ProjectionPanel calc={calc} lumpsum={form.lumpsum} compact />
           )}
         </div>
       )}
@@ -593,80 +580,64 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
   )
 }
 
-function ProjectionPanel({ calc, sip, lumpsum, compact }) {
-  const sipNum = Number(sip) || 0
+function ProjectionPanel({ calc, lumpsum, compact }) {
   const lsNum = Number(lumpsum) || 0
 
-  return (
-    <div className={`rounded-lg border p-3 space-y-2 ${
-      calc.isOnTrack
-        ? 'bg-emerald-500/5 border-emerald-500/20'
-        : 'bg-amber-500/5 border-amber-500/20'
-    }`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          {calc.isOnTrack
-            ? <CheckCircle2 size={12} className="text-emerald-400" />
-            : <AlertTriangle size={12} className="text-amber-400" />
-          }
-          <p className={`text-[10px] font-bold uppercase tracking-wider ${calc.isOnTrack ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {calc.isOnTrack ? 'On Track' : 'SIP May Be Insufficient'}
-          </p>
+  if (compact) {
+    return (
+      <div className="rounded-lg border p-3 bg-violet-500/5 border-violet-500/15">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[var(--text-dim)]">Required Monthly SIP</span>
+          <span className="text-sm font-bold text-violet-400 tabular-nums">
+            {calc.lumpsumCoversGoal ? '₹0' : formatINR(calc.requiredSIP)}/mo
+          </span>
         </div>
-        <p className="text-[10px] text-[var(--text-dim)]">@{((Number(sip) ? 0 : 0) || 0) + ''}CAGR assumed</p>
+        {calc.lumpsumCoversGoal && (
+          <p className="text-[10px] text-emerald-400 mt-1">Lumpsum alone covers this goal!</p>
+        )}
       </div>
+    )
+  }
 
-      {/* Required SIP */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--text-dim)]">Required Monthly SIP</span>
-        <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}/mo</span>
-      </div>
+  return (
+    <div className="rounded-lg border p-3 space-y-2 bg-violet-500/5 border-violet-500/15">
+      {calc.lumpsumCoversGoal ? (
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 size={12} className="text-emerald-400" />
+          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Lumpsum Covers Goal</p>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-violet-400">Required Monthly SIP</p>
+          <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}/mo</p>
+        </div>
+      )}
 
-      {!compact && calc.hasInputs && (
-        <>
-          {/* Projected Value */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[var(--text-dim)]">Projected Value</span>
-            <span className={`text-sm font-bold tabular-nums ${calc.isOnTrack ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {formatINR(calc.projectedValue)}
-            </span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden">
-              <div className={`h-full rounded-full ${calc.isOnTrack ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                style={{ width: `${Math.min(calc.pctOfTarget, 100)}%` }} />
-            </div>
-            <span className="text-xs font-bold tabular-nums text-[var(--text-primary)]">
-              {Math.round(calc.pctOfTarget)}%
-            </span>
-          </div>
-
-          {/* Breakdown */}
-          <div className="border-t border-[var(--border-light)] pt-2 space-y-1">
-            {lsNum > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[var(--text-dim)]">Lumpsum {formatINR(lsNum)} grows to</span>
-                <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">{formatINR(calc.fvLumpsum)}</span>
-              </div>
-            )}
-            {sipNum > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[var(--text-dim)]">SIP {formatINR(sipNum)}/mo x {calc.months} mo</span>
-                <span className="text-[11px] font-semibold text-blue-400 tabular-nums">{formatINR(calc.fvSIP)}</span>
-              </div>
-            )}
+      {calc.planTotalInvested > 0 && (
+        <div className="border-t border-[var(--border-light)] pt-2 space-y-1">
+          {lsNum > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[var(--text-dim)]">Total Invested</span>
-              <span className="text-[11px] font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(calc.totalInvested)}</span>
+              <span className="text-[11px] text-[var(--text-dim)]">Lumpsum {formatINR(lsNum)} grows to</span>
+              <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">{formatINR(calc.fvLumpsum)}</span>
             </div>
+          )}
+          {calc.requiredSIP > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-[var(--text-dim)]">SIP {formatINR(calc.requiredSIP)}/mo x {calc.months} months</span>
+              <span className="text-[11px] font-semibold text-blue-400 tabular-nums">{formatINR(calc.fvRequiredSIP)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-[var(--text-dim)]">Total You Invest</span>
+            <span className="text-[11px] font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(calc.planTotalInvested)}</span>
+          </div>
+          {calc.planReturns > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-[var(--text-dim)]">Wealth Created</span>
-              <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">+{formatINR(calc.totalReturns)}</span>
+              <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">+{formatINR(calc.planReturns)}</span>
             </div>
-          </div>
-        </>
+          )}
+        </div>
       )}
     </div>
   )

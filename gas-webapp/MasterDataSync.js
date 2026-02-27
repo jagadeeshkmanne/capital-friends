@@ -345,13 +345,16 @@ function autoRefreshMasterDataIfStale() {
 // ============================================================================
 
 /**
- * Install a daily trigger for the current user.
- * Runs at 6:30 AM IST every day (after master DB updates at 6 AM).
+ * Install data sync triggers for the current user.
+ * Runs 4 times daily: 6 AM, 9 AM, 12 PM, 3 PM.
+ * This ensures NAV data is always fresh throughout the trading day.
  * The trigger runs as the user who installed it — so it has access
  * to their spreadsheet automatically.
+ *
+ * Email is handled separately by sendScheduledDailyEmail trigger (Triggers.js).
  */
 function installDailyTriggerForUser() {
-  // Remove any existing daily triggers to avoid duplicates
+  // Remove any existing sync triggers to avoid duplicates
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
     if (triggers[i].getHandlerFunction() === 'dailyUserSync') {
@@ -359,23 +362,22 @@ function installDailyTriggerForUser() {
     }
   }
 
-  // Create daily trigger at 6:30 AM
-  ScriptApp.newTrigger('dailyUserSync')
-    .timeBased()
-    .atHour(6)
-    .nearMinute(30)
-    .everyDays(1)
-    .create();
+  // Create 4 daily sync triggers: 6 AM, 9 AM, 12 PM, 3 PM
+  var syncHours = [6, 9, 12, 15];
+  for (var h = 0; h < syncHours.length; h++) {
+    ScriptApp.newTrigger('dailyUserSync')
+      .timeBased()
+      .atHour(syncHours[h])
+      .nearMinute(0)
+      .everyDays(1)
+      .create();
+  }
 }
 
 /**
- * Daily sync handler — runs automatically via time-driven trigger.
+ * Data sync handler — runs automatically via time-driven trigger (4x daily).
  * When triggered, Session.getEffectiveUser() returns the user who installed it.
- * This function:
- * 1. Looks up the user's spreadsheet from registry
- * 2. Sets the spreadsheet context
- * 3. Refreshes master data (MF NAVs, ATH, stocks)
- * 4. (Future) Sends email alerts
+ * This function ONLY syncs data — email is handled by a separate trigger.
  */
 function dailyUserSync() {
   try {
@@ -385,7 +387,7 @@ function dailyUserSync() {
       return;
     }
 
-    log('Daily sync started for: ' + email);
+    log('Data sync started for: ' + email);
 
     // Look up user in registry
     var userRecord = findUserByEmail(email);
@@ -397,24 +399,9 @@ function dailyUserSync() {
     // Set spreadsheet context
     _currentUserSpreadsheetId = userRecord.spreadsheetId;
 
-    // Refresh master data
+    // Refresh master data (MF NAVs, ATH, Stocks)
     var result = refreshAllMasterData();
-    log('Daily sync complete for ' + email + ': ' + JSON.stringify(result));
-
-    // Send email report if configured
-    try {
-      var emailConfigured = getSetting('EmailConfigured');
-      if (emailConfigured && emailConfigured.toString().toUpperCase() === 'TRUE') {
-        var emailResult = sendCompleteWealthReportEmail();
-        if (emailResult && emailResult.success) {
-          log('Daily email sent for ' + email + ' to: ' + emailResult.recipients.join(', '));
-        } else {
-          log('Daily email failed for ' + email + ': ' + (emailResult ? emailResult.error : 'Unknown error'));
-        }
-      }
-    } catch (emailErr) {
-      log('Email error for ' + email + ': ' + emailErr.toString());
-    }
+    log('Data sync complete for ' + email + ': ' + JSON.stringify(result));
 
   } catch (e) {
     log('dailyUserSync error: ' + e.toString());

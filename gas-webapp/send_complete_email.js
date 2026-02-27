@@ -295,56 +295,6 @@ function sendCompleteWealthReportEmail(customRecipients) {
 }
 
 /**
- * Test function to diagnose data retrieval issues
- */
-function testEmailReportData() {
-  try {
-    Logger.log('Testing email report data generation...');
-
-    // Test 1: Check if getFamilyWealthData is accessible
-    Logger.log('Test 1: Checking if getFamilyWealthData exists...');
-    if (typeof getFamilyWealthData === 'function') {
-      Logger.log('✓ getFamilyWealthData is accessible');
-
-      // Test 2: Try calling it
-      Logger.log('Test 2: Calling getFamilyWealthData()...');
-      const familyData = getFamilyWealthData();
-      Logger.log('Family data result: ' + JSON.stringify(familyData));
-
-      if (familyData.success) {
-        Logger.log('✓ getFamilyWealthData succeeded');
-        Logger.log('Members count: ' + (familyData.data.members ? familyData.data.members.length : 0));
-      } else {
-        Logger.log('✗ getFamilyWealthData failed: ' + familyData.error);
-      }
-    } else {
-      Logger.log('✗ getFamilyWealthData is NOT accessible - using dummy data');
-    }
-
-    // Test 3: Get report data
-    Logger.log('Test 3: Getting email report data...');
-    const reportData = getEmailReportData();
-    Logger.log('Report data members: ' + (reportData.familyMembers ? reportData.familyMembers.length : 0));
-
-    if (reportData.familyMembers && reportData.familyMembers.length > 0) {
-      Logger.log('✓ Found ' + reportData.familyMembers.length + ' family members');
-      reportData.familyMembers.forEach((member, i) => {
-        Logger.log(`  Member ${i+1}: ${member.memberName} - ${member.portfolios ? member.portfolios.length : 0} portfolios`);
-      });
-    } else {
-      Logger.log('✗ No family members found - email will be empty');
-    }
-
-    SpreadsheetApp.getUi().alert('Test Complete', 'Check the execution log (View > Logs) for details', SpreadsheetApp.getUi().ButtonSet.OK);
-
-  } catch (error) {
-    Logger.log('ERROR in test: ' + error.toString());
-    Logger.log('Stack: ' + error.stack);
-    SpreadsheetApp.getUi().alert('Test Error', error.message, SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-
-/**
  * Get email report data from Google Sheets
  * Returns all data needed for the email report
  */

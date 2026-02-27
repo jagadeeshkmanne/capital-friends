@@ -3,6 +3,7 @@ import { Plus, Pencil, Briefcase } from 'lucide-react'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import InvestmentAccountForm from '../../components/forms/InvestmentAccountForm'
@@ -21,6 +22,7 @@ export default function InvestmentAccountsPage() {
   const { selectedMember, member } = useFamily()
   const { investmentAccounts, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
@@ -51,7 +53,7 @@ export default function InvestmentAccountsPage() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this investment account?')) {
+    if (modal?.edit && await confirm('Deactivate this investment account?', { title: 'Deactivate Account', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteInvestmentAccount(modal.edit.accountId)
@@ -114,7 +116,7 @@ export default function InvestmentAccountsPage() {
                         <p className="text-sm font-medium text-[var(--text-primary)]">{a.accountName}</p>
                       </td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{a.platformBroker}</td>
-                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{a.memberName}</td>}
+                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{mv(a.memberName, 'name')}</td>}
                       <td className="py-2.5 px-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${typeBadge[a.accountType] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                           {a.accountType}
@@ -143,7 +145,7 @@ export default function InvestmentAccountsPage() {
                       {a.accountType}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)]">{a.platformBroker}{!member ? ` · ${a.memberName}` : ''}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{a.platformBroker}{!member ? ` · ${mv(a.memberName, 'name')}` : ''}</p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-[var(--text-dim)]">Client: {mv(a.accountClientId, 'clientId')}</p>
                     <p className="text-xs text-[var(--text-dim)]">{a.bankAccountName}</p>

@@ -3,6 +3,7 @@ import { Plus, Pencil, Landmark } from 'lucide-react'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import BankAccountForm from '../../components/forms/BankAccountForm'
@@ -21,6 +22,7 @@ export default function BankAccountsPage() {
   const { selectedMember, member } = useFamily()
   const { banks, addBankAccount, updateBankAccount, deleteBankAccount } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
@@ -50,7 +52,7 @@ export default function BankAccountsPage() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this bank account?')) {
+    if (modal?.edit && await confirm('Deactivate this bank account?', { title: 'Deactivate Account', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteBankAccount(modal.edit.accountId)
@@ -112,7 +114,7 @@ export default function BankAccountsPage() {
                         <p className="text-sm font-medium text-[var(--text-primary)]">{a.accountName}</p>
                       </td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{a.bankName}</td>
-                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{a.memberName}</td>}
+                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{mv(a.memberName, 'name')}</td>}
                       <td className="py-2.5 px-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${typeBadge[a.accountType] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                           {a.accountType}
@@ -141,7 +143,7 @@ export default function BankAccountsPage() {
                       {a.accountType}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)]">{a.bankName}{!member ? ` · ${a.memberName}` : ''}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{a.bankName}{!member ? ` · ${mv(a.memberName, 'name')}` : ''}</p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-[var(--text-dim)] tabular-nums">{mv(a.accountNumber, 'account')}</p>
                     <p className="text-xs text-[var(--text-dim)]">{a.branchName}</p>

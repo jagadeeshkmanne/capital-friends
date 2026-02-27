@@ -19,9 +19,9 @@
 // ============================================================================
 
 var WEBAPP_CONFIG = {
-  // Template spreadsheet ID (clean template with all sheets set up)
-  // Must be shared as "Anyone with the link" (Viewer) so users can copy it
-  templateSpreadsheetId: '1k_GFpn0ZVRNfxBpgFzCU1zvux7apw9axIP5vIn5NR74'
+  // No template needed — createNewUser() creates a fresh spreadsheet
+  // and runs createAllSheets() to build all sheets from code.
+  // This ensures sheet structures are always in sync with the latest code.
 };
 
 // ============================================================================
@@ -177,8 +177,14 @@ function routeAction(action, params, userRecord) {
       return deletePortfolio(params.portfolioId);
 
     // ── MF Holdings / Funds ──
-    case 'portfolio:holdings':
-      return getPortfolioFunds(params.portfolioId);
+    case 'portfolio:holdings': {
+      var holdings = getPortfolioFunds(params.portfolioId);
+      var catMap = buildFundCategoryMap();
+      for (var ci = 0; ci < holdings.length; ci++) {
+        holdings[ci].category = catMap[holdings[ci].fundCode] || 'Other';
+      }
+      return holdings;
+    }
 
     case 'mf:invest':
       return processInvestment(params, params.transactionType || 'LUMPSUM');
@@ -194,6 +200,7 @@ function routeAction(action, params, userRecord) {
       if (!portfolio) throw new Error('Portfolio not found: ' + params.portfolioId);
       var allocs = params.allocations || [];
       return savePortfolioAllocation({
+        portfolioId: params.portfolioId,
         portfolioName: portfolio.portfolioName,
         fundsToUpdate: allocs.filter(function(a) { return !a.isNew; }).map(function(a) {
           return { schemeCode: a.schemeCode, fundName: a.fundName, targetPercent: a.targetAllocationPct };
@@ -203,6 +210,9 @@ function routeAction(action, params, userRecord) {
         })
       });
     }
+
+    case 'asset-allocation:save':
+      return processAssetAllocation(params);
 
     case 'funds:search':
       return searchFunds(params.query);
@@ -237,7 +247,7 @@ function routeAction(action, params, userRecord) {
       return addInsurancePolicy(params);
 
     case 'insurance:update':
-      return updateInsurancePolicy(params);
+      return updateInsurancePolicy(params.policyId, params);
 
     case 'insurance:delete':
       return deleteInsurancePolicy(params.policyId);
@@ -379,6 +389,9 @@ function routeAction(action, params, userRecord) {
  * Also auto-refreshes master data (MF NAVs, ATH, stocks) if stale (>24h).
  */
 function loadAllData() {
+  // Reset error collector for this load
+  _safeCallErrors = [];
+
   // Auto-refresh master data if stale (runs in background, transparent to user)
   var refreshResult = null;
   try {
@@ -403,6 +416,7 @@ function loadAllData() {
     stockHoldings: safeCall(getAllStockHoldingsData),
     stockTransactions: safeCall(getAllStockTransactionsData),
     reminders: safeCall(getAllReminders),
+    assetAllocations: safeCall(getAllAssetAllocationsData),
     _masterDataRefreshed: refreshResult !== null,
     _errors: _safeCallErrors
   };
@@ -426,11 +440,27 @@ function safeCall(fn) {
 }
 
 /**
+ * Build a map of schemeCode → category from MutualFundData sheet
+ */
+function buildFundCategoryMap() {
+  var sheet = getSheet(CONFIG.mutualFundDataSheet);
+  if (!sheet || sheet.getLastRow() < 2) return {};
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues(); // A=SchemeCode, B=Name, C=Category
+  var map = {};
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0]) map[data[i][0].toString()] = data[i][2] || 'Other';
+  }
+  return map;
+}
+
+/**
  * Get all MF holdings across all portfolios
  */
 function getAllMFHoldings() {
   var portfolios = getAllPortfolios();
   log('getAllMFHoldings: found ' + portfolios.length + ' portfolios');
+
+  var categoryMap = buildFundCategoryMap();
 
   var allHoldings = [];
   for (var i = 0; i < portfolios.length; i++) {
@@ -441,6 +471,9 @@ function getAllMFHoldings() {
         var holdings = getPortfolioFunds(p.portfolioId, portfolios);
         log('  -> holdings: ' + (holdings ? holdings.length : 'null'));
         if (holdings && holdings.length) {
+          for (var j = 0; j < holdings.length; j++) {
+            holdings[j].category = categoryMap[holdings[j].fundCode] || 'Other';
+          }
           allHoldings = allHoldings.concat(holdings);
         }
       } catch (e) {
@@ -450,6 +483,30 @@ function getAllMFHoldings() {
   }
   log('getAllMFHoldings: returning ' + allHoldings.length + ' total holdings');
   return allHoldings;
+}
+
+/**
+ * Get all asset allocation data from AssetAllocations sheet
+ * Returns array of { fundCode, fundName, assetAllocation, equityAllocation }
+ */
+function getAllAssetAllocationsData() {
+  var sheet = getSheet(CONFIG.assetAllocationsSheet);
+  if (!sheet || sheet.getLastRow() < 3) return [];
+  var data = sheet.getRange(3, 1, sheet.getLastRow() - 2, 4).getValues();
+  var allocations = [];
+  for (var i = 0; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    var assetAlloc = null, equityAlloc = null;
+    try { if (data[i][2]) assetAlloc = JSON.parse(data[i][2]); } catch (e) {}
+    try { if (data[i][3]) equityAlloc = JSON.parse(data[i][3]); } catch (e) {}
+    allocations.push({
+      fundCode: data[i][0].toString(),
+      fundName: data[i][1] || '',
+      assetAllocation: assetAlloc,
+      equityAllocation: equityAlloc
+    });
+  }
+  return allocations;
 }
 
 /**
@@ -764,244 +821,6 @@ function requireOwner(userRecord) {
   if (userRecord.role !== 'owner') {
     throw new Error('Only the family owner can perform this action.');
   }
-}
-
-// ============================================================================
-// ADMIN UTILITIES (run from Script Editor by deployer)
-// ============================================================================
-
-/**
- * Set up the template spreadsheet with all sheets.
- * Run this once after creating a blank template spreadsheet.
- * Must be run by the deployer (who owns the template).
- */
-function setupTemplateSpreadsheet() {
-  _currentUserSpreadsheetId = WEBAPP_CONFIG.templateSpreadsheetId;
-  log('Setting up template spreadsheet: ' + WEBAPP_CONFIG.templateSpreadsheetId);
-  var results = createAllSheets();
-  log('Template setup complete: ' + JSON.stringify(results));
-}
-
-/**
- * List all registered users in Script Properties.
- * Run from Script Editor → View > Logs to see output.
- */
-function listAllUsers() {
-  var props = PropertiesService.getScriptProperties();
-  var all = props.getProperties();
-  var users = [];
-
-  for (var key in all) {
-    if (key.indexOf('user:') === 0) {
-      try {
-        var record = JSON.parse(all[key]);
-        var email = key.substring(5);
-        users.push({
-          email: email,
-          displayName: record.displayName,
-          role: record.role,
-          status: record.status,
-          spreadsheetId: record.spreadsheetId,
-          createdDate: record.createdDate,
-          lastLogin: record.lastLogin
-        });
-        Logger.log('User: ' + email + ' | Role: ' + record.role + ' | Status: ' + record.status + ' | Sheet: ' + record.spreadsheetId);
-      } catch (e) {
-        Logger.log('Malformed entry: ' + key);
-      }
-    }
-  }
-
-  Logger.log('Total users: ' + users.length);
-  return users;
-}
-
-/**
- * Test triggers for the deployer's own account.
- * Shows all triggers installed on the project.
- * Run from Script Editor → View > Logs.
- */
-function testMyTriggers() {
-  var triggers = ScriptApp.getProjectTriggers();
-  Logger.log('=== TRIGGER CHECK ===');
-  Logger.log('Total triggers: ' + triggers.length);
-
-  var hasDailySync = false;
-
-  for (var i = 0; i < triggers.length; i++) {
-    var t = triggers[i];
-    var info = {
-      handler: t.getHandlerFunction(),
-      eventType: t.getEventType().toString(),
-      triggerSource: t.getTriggerSource().toString(),
-      id: t.getUniqueId()
-    };
-    Logger.log('Trigger ' + (i + 1) + ': ' + JSON.stringify(info));
-
-    if (t.getHandlerFunction() === 'dailyUserSync') {
-      hasDailySync = true;
-    }
-  }
-
-  Logger.log('Has dailyUserSync trigger: ' + hasDailySync);
-
-  if (!hasDailySync) {
-    Logger.log('⚠ No dailyUserSync trigger found! Data will NOT auto-refresh.');
-    Logger.log('Run testInstallDailyTrigger() to install it.');
-  } else {
-    Logger.log('✓ dailyUserSync trigger is active. Data will refresh daily at ~6:30 AM.');
-  }
-
-  return { total: triggers.length, hasDailySync: hasDailySync };
-}
-
-/**
- * Install the daily trigger for the deployer (for testing).
- * Run this if testMyTriggers() shows no dailyUserSync trigger.
- */
-function testInstallDailyTrigger() {
-  installDailyTriggerForUser();
-  Logger.log('Daily trigger installed. Run testMyTriggers() to verify.');
-}
-
-/**
- * Test data refresh for a specific user by email.
- * Simulates what dailyUserSync() does for that user.
- * Run from Script Editor → View > Logs.
- *
- * @param {string} email - The user's email address
- */
-function testRefreshForUser(email) {
-  if (!email) {
-    // Default to deployer's email
-    email = Session.getEffectiveUser().getEmail();
-  }
-
-  Logger.log('=== TEST REFRESH FOR: ' + email + ' ===');
-
-  // Look up user
-  var userRecord = findUserByEmail(email);
-  if (!userRecord) {
-    Logger.log('ERROR: User not found in registry: ' + email);
-    Logger.log('Run listAllUsers() to see all registered users.');
-    return { success: false, error: 'User not found' };
-  }
-
-  Logger.log('User found: ' + userRecord.displayName + ' | Role: ' + userRecord.role + ' | Sheet: ' + userRecord.spreadsheetId);
-
-  // Set context
-  _currentUserSpreadsheetId = userRecord.spreadsheetId;
-
-  // Check freshness
-  var stale = isMasterDataStale();
-  Logger.log('Data stale: ' + stale);
-
-  // Check current data counts BEFORE refresh
-  var beforeCounts = getDataCounts();
-  Logger.log('BEFORE refresh — MF: ' + beforeCounts.mf + ' | ATH: ' + beforeCounts.ath + ' | Stocks: ' + beforeCounts.stocks);
-
-  // Refresh
-  Logger.log('Refreshing all master data...');
-  var result = refreshAllMasterData();
-  Logger.log('Refresh result: ' + JSON.stringify(result));
-
-  // Check counts AFTER refresh
-  var afterCounts = getDataCounts();
-  Logger.log('AFTER refresh — MF: ' + afterCounts.mf + ' | ATH: ' + afterCounts.ath + ' | Stocks: ' + afterCounts.stocks);
-
-  Logger.log('=== TEST COMPLETE ===');
-  return {
-    success: true,
-    user: email,
-    spreadsheetId: userRecord.spreadsheetId,
-    wasStale: stale,
-    before: beforeCounts,
-    after: afterCounts,
-    refreshResult: result
-  };
-}
-
-/**
- * Helper: Get current row counts for master data sheets.
- */
-function getDataCounts() {
-  var ss = getSpreadsheet();
-  var counts = { mf: 0, ath: 0, stocks: 0 };
-
-  var mfSheet = ss.getSheetByName(CONFIG.mutualFundDataSheet);
-  if (mfSheet) counts.mf = Math.max(0, mfSheet.getLastRow() - 1);
-
-  var athSheet = ss.getSheetByName(CONFIG.mfATHDataSheet);
-  if (athSheet) counts.ath = Math.max(0, athSheet.getLastRow() - 1);
-
-  var stockSheet = ss.getSheetByName(CONFIG.stockMasterDataSheet);
-  if (stockSheet) counts.stocks = Math.max(0, stockSheet.getLastRow() - 1);
-
-  return counts;
-}
-
-/**
- * Full end-to-end test: signup → triggers → data refresh.
- * Run from Script Editor → View > Logs.
- */
-function testFullFlow() {
-  var email = Session.getEffectiveUser().getEmail();
-  Logger.log('=== FULL FLOW TEST ===');
-  Logger.log('Running as: ' + email);
-
-  // Step 1: Check user registry
-  Logger.log('\n--- Step 1: User Registry ---');
-  var user = findUserByEmail(email);
-  if (user) {
-    Logger.log('✓ User registered: ' + user.displayName + ' (' + user.role + ')');
-    Logger.log('  Spreadsheet: ' + user.spreadsheetId);
-    Logger.log('  Status: ' + user.status);
-    Logger.log('  Last login: ' + user.lastLogin);
-  } else {
-    Logger.log('✗ User NOT registered. Sign in via the app first.');
-    return { success: false, error: 'Not registered' };
-  }
-
-  // Step 2: Check triggers
-  Logger.log('\n--- Step 2: Triggers ---');
-  var triggerResult = testMyTriggers();
-
-  // Step 3: Check spreadsheet access
-  Logger.log('\n--- Step 3: Spreadsheet Access ---');
-  _currentUserSpreadsheetId = user.spreadsheetId;
-  try {
-    var ss = getSpreadsheet();
-    Logger.log('✓ Can access spreadsheet: ' + ss.getName());
-    var sheets = ss.getSheets();
-    Logger.log('  Total sheets: ' + sheets.length);
-    Logger.log('  Sheet names: ' + sheets.map(function(s) { return s.getName(); }).join(', '));
-  } catch (e) {
-    Logger.log('✗ Cannot access spreadsheet: ' + e.message);
-    return { success: false, error: 'Spreadsheet access failed' };
-  }
-
-  // Step 4: Check data freshness & counts
-  Logger.log('\n--- Step 4: Data Status ---');
-  var stale = isMasterDataStale();
-  Logger.log('Data stale: ' + stale);
-  var counts = getDataCounts();
-  Logger.log('MF records: ' + counts.mf);
-  Logger.log('ATH records: ' + counts.ath);
-  Logger.log('Stock records: ' + counts.stocks);
-
-  // Step 5: Test refresh (only if stale or data is missing)
-  if (stale || counts.mf === 0) {
-    Logger.log('\n--- Step 5: Data Refresh ---');
-    var refreshResult = refreshAllMasterData();
-    Logger.log('Refresh result: ' + JSON.stringify(refreshResult));
-    var afterCounts = getDataCounts();
-    Logger.log('After refresh — MF: ' + afterCounts.mf + ' | ATH: ' + afterCounts.ath + ' | Stocks: ' + afterCounts.stocks);
-  } else {
-    Logger.log('\n--- Step 5: Skipped (data is fresh) ---');
-  }
-
-  Logger.log('\n=== FULL FLOW TEST COMPLETE ===');
-  return { success: true, user: email, triggers: triggerResult, dataCounts: counts, stale: stale };
 }
 
 // ============================================================================

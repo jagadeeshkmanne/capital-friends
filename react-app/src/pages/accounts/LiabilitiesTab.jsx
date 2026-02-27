@@ -4,6 +4,7 @@ import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import Modal from '../../components/Modal'
 import LiabilityForm from '../../components/forms/LiabilityForm'
 import PageLoading from '../../components/PageLoading'
@@ -21,6 +22,7 @@ export default function LiabilitiesTab() {
   const { selectedMember, member } = useFamily()
   const { liabilityList, addLiability, updateLiability, deleteLiability } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
 
   const [modal, setModal] = useState(null)
 
@@ -50,7 +52,7 @@ export default function LiabilitiesTab() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this liability?')) {
+    if (modal?.edit && await confirm('Deactivate this liability?', { title: 'Deactivate Liability', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteLiability(modal.edit.liabilityId)

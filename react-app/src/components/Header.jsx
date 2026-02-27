@@ -370,7 +370,7 @@ export default function Header({ onMenuClick }) {
                             {m.memberName.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate text-[var(--text-primary)]">{m.memberName}</p>
+                            <p className="text-sm font-semibold truncate text-[var(--text-primary)]">{mv(m.memberName, 'name')}</p>
                             <p className="text-[11px] text-[var(--text-muted)]">{m.relationship || 'Family member'}</p>
                           </div>
                           {isSelected && <Check size={16} className="text-emerald-400 shrink-0" />}

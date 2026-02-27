@@ -4,6 +4,7 @@ import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import Modal from '../../components/Modal'
 import OtherInvestmentForm from '../../components/forms/OtherInvestmentForm'
 import PageLoading from '../../components/PageLoading'
@@ -20,6 +21,7 @@ export default function OtherInvestmentsTab() {
   const { selectedMember, member } = useFamily()
   const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
 
   const [modal, setModal] = useState(null)
 
@@ -62,7 +64,7 @@ export default function OtherInvestmentsTab() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this investment?')) {
+    if (modal?.edit && await confirm('Deactivate this investment?', { title: 'Deactivate Investment', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteOtherInvestment(modal.edit.investmentId)

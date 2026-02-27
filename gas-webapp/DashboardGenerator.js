@@ -237,7 +237,7 @@ function getPortfoliosData() {
     const account = getInvestmentAccountById(portfolio.investmentAccountId);
     const member = account ? getFamilyMemberById(account.memberId) : null;
     const summary = getPortfolioSummary(portfolio.portfolioId);
-    const funds = getPortfolioFunds(portfolio.portfolioId, portfolio.rebalanceThreshold);
+    const funds = getDashboardPortfolioFunds(portfolio.portfolioId, portfolio.rebalanceThreshold);
 
     result.push({
       memberName: member ? member.memberName : '',
@@ -287,7 +287,7 @@ function getPortfolioCapAllocation(portfolioId) {
 /**
  * Get portfolio funds with rebalancing info
  */
-function getPortfolioFunds(portfolioId, rebalanceThreshold) {
+function getDashboardPortfolioFunds(portfolioId, rebalanceThreshold) {
   const sheet = getSheet(CONFIG.mutualFundsSheet);
   if (!sheet) return [];
 

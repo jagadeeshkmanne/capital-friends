@@ -388,14 +388,68 @@ function fetchFromAMFI() {
  */
 function categorizeScheme(schemeName) {
   var name = schemeName.toLowerCase();
-  if (name.includes('equity') || name.includes('stock')) return 'Equity';
-  if (name.includes('debt') || name.includes('bond')) return 'Debt';
-  if (name.includes('hybrid') || name.includes('balanced')) return 'Hybrid';
-  if (name.includes('liquid') || name.includes('money market')) return 'Liquid';
-  if (name.includes('gilt')) return 'Gilt';
+
+  // Commodity: Gold, Silver, Precious Metal (check early — many are also ETFs)
+  if (name.includes('gold') || name.includes('silver') || name.includes('precious metal') ||
+      name.includes('commodity') || name.includes('commodit')) return 'Commodity';
+
+  // ELSS
   if (name.includes('elss') || name.includes('tax saver')) return 'ELSS';
-  if (name.includes('index') || name.includes('etf')) return 'Index';
-  if (name.includes('fof') || name.includes('fund of funds')) return 'FoF';
+
+  // Liquid / Money Market / Overnight
+  if (name.includes('liquid') || name.includes('money market') || name.includes('overnight')) return 'Liquid';
+
+  // Gilt / Government Securities
+  if (name.includes('gilt') || name.includes('government securities') || name.includes('govt securities') ||
+      name.includes('g-sec') || name.includes('gsec') || name.includes('constant maturity')) return 'Gilt';
+
+  // Debt (check before Equity — "banking & psu" is debt, not equity via 'banking')
+  if (name.includes('debt') || name.includes('bond') || name.includes('income fund') ||
+      name.includes('credit risk') || name.includes('corporate bond') || name.includes('banking & psu') ||
+      name.includes('short duration') || name.includes('medium duration') || name.includes('long duration') ||
+      name.includes('ultra short') || name.includes('low duration') || name.includes('dynamic bond') ||
+      name.includes('floater') || name.includes('floating rate') || name.includes('fixed maturity') ||
+      name.includes('short term') || name.includes('medium term') || name.includes('long term bond') ||
+      name.includes('corporate debt') || name.includes('credit') || name.includes('accrual') ||
+      name.includes('savings fund') || name.includes('ultra short duration')) return 'Debt';
+
+  // Multi-Asset (separate from Hybrid — has equity+debt+commodity)
+  if (name.includes('multi asset')) return 'Multi-Asset';
+
+  // Hybrid / Balanced / Arbitrage
+  if (name.includes('hybrid') || name.includes('balanced') || name.includes('dynamic asset') ||
+      name.includes('arbitrage') ||
+      name.includes('retirement') || name.includes('children') || name.includes('solution') ||
+      name.includes('child care') || name.includes('pension')) return 'Hybrid';
+
+  // Equity (broad — includes sectoral, thematic)
+  if (name.includes('equity') || name.includes('stock') || name.includes('flexi cap') ||
+      name.includes('large cap') || name.includes('mid cap') || name.includes('small cap') ||
+      name.includes('multi cap') || name.includes('focused') || name.includes('contra') ||
+      name.includes('value fund') || name.includes('dividend yield') || name.includes('thematic') ||
+      name.includes('sectoral') || name.includes('consumption') || name.includes('infrastructure') ||
+      name.includes('pharma') || name.includes('healthcare') || name.includes('technology') ||
+      name.includes('fmcg') || name.includes('banking fund') || name.includes('mnc') ||
+      name.includes('opportunities fund') || name.includes('growth fund') ||
+      name.includes('midcap') || name.includes('smallcap') || name.includes('largecap') ||
+      name.includes('flexicap') || name.includes('multicap') ||
+      name.includes('large & mid') || name.includes('large and mid')) return 'Equity';
+
+  // Index / ETF
+  if (name.includes('index') || name.includes('etf') || name.includes('nifty') ||
+      name.includes('sensex') || name.includes('bse') || name.includes('s&p')) return 'Index';
+
+  // FoF — try to sub-classify based on underlying fund name
+  if (name.includes('fof') || name.includes('fund of funds') || name.includes('fund of fund')) {
+    if (name.includes('equity') || name.includes('aggressive')) return 'Equity';
+    if (name.includes('debt') || name.includes('bond') || name.includes('income')) return 'Debt';
+    if (name.includes('gold') || name.includes('silver')) return 'Commodity';
+    return 'Hybrid'; // default FoF to Hybrid (most are multi-asset / balanced)
+  }
+
+  // Aggressive/Conservative without explicit hybrid/equity — likely hybrid
+  if (name.includes('aggressive') || name.includes('conservative')) return 'Hybrid';
+
   return 'Other';
 }
 

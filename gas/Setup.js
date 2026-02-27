@@ -1599,7 +1599,8 @@ function setupGoalsSheet() {
 
 /**
  * Setup GoalPortfolioMapping Sheet
- * Structure: 6 columns (A-F) for linking goals to portfolios with allocation percentages
+ * Structure: 7 columns (A-G) for linking goals to investments with allocation percentages
+ * Supports MF portfolios, Stock portfolios, and Other Investments (EPF, NPS, PPF, etc.)
  */
 function setupGoalPortfolioMappingSheet() {
   const spreadsheet = getSpreadsheet();
@@ -1609,9 +1610,10 @@ function setupGoalPortfolioMappingSheet() {
     'Mapping ID',           // A: GPM-001
     'Goal ID',              // B: GOAL-001
     'Goal Name',            // C: For display
-    'Portfolio ID',         // D: PFL-MF-001
+    'Portfolio ID',         // D: PFL-MF-001, PFL-STK-001, or INV-001
     'Portfolio Name',       // E: For display
-    'Allocation %'          // F: Percentage (e.g., 80%)
+    'Allocation %',         // F: Percentage (e.g., 80%)
+    'Investment Type'       // G: MF, Stock, or Other
   ];
 
   // Add developer credit (Row 1)
@@ -1630,6 +1632,7 @@ function setupGoalPortfolioMappingSheet() {
   sheet.setColumnWidth(4, 130);  // Portfolio ID
   sheet.setColumnWidth(5, 220);  // Portfolio Name
   sheet.setColumnWidth(6, 110);  // Allocation %
+  sheet.setColumnWidth(7, 120);  // Investment Type
 
   // Freeze header rows
   sheet.setFrozenRows(2);

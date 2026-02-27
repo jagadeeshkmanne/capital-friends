@@ -69,8 +69,9 @@ export function FormInput({ value, onChange, placeholder, type = 'text', sensiti
 }
 
 export function FormDateInput({ value, onChange, ...props }) {
-  // Convert YYYY-MM-DD string to Date object for react-datepicker
-  const dateValue = value ? new Date(value + 'T00:00:00') : null
+  // Convert date string to Date object for react-datepicker
+  // Handles both YYYY-MM-DD and ISO strings (2045-12-31T00:00:00.000Z)
+  const dateValue = value ? new Date(value.length > 10 ? value : value + 'T00:00:00') : null
 
   function handleChange(date) {
     if (!date) { onChange(''); return }

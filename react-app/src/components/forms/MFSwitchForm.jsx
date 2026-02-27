@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
-import { FormField, FormInput, FormSelect, FormActions } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
 
 export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
@@ -156,7 +156,7 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Switch Date" required error={errors.date}>
-          <FormInput type="date" value={form.date} onChange={(v) => set('date', v)} />
+          <FormDateInput value={form.date} onChange={(v) => set('date', v)} />
         </FormField>
         <FormField label="Units to Switch" required error={errors.units}>
           <FormInput type="number" value={form.units} onChange={(v) => set('units', v)} placeholder={fromHolding ? `Max: ${fromHolding.units.toFixed(2)}` : ''} />

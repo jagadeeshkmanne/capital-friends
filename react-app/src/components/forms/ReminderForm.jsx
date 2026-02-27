@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 import { useData } from '../../context/DataContext'
 
 const TYPES = [
@@ -80,7 +80,7 @@ export default function ReminderForm({ initial, onSave, onDelete, onCancel }) {
           <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Select member..." />
         </FormField>
         <FormField label="Due Date" required error={errors.dueDate}>
-          <FormInput type="date" value={form.dueDate} onChange={(v) => set('dueDate', v)} />
+          <FormDateInput value={form.dueDate} onChange={(v) => set('dueDate', v)} maxDate={null} />
         </FormField>
       </div>
 

@@ -513,7 +513,7 @@ function setupInsuranceSheet() {
   // Set tab color (Blue for insurance)
   sheet.setTabColor('#3b82f6');
 
-  log('Insurance sheet created with 12 columns (Policy Number now mandatory)');
+  log('Insurance sheet created with 13 columns (A-M)');
   return sheet;
 }
 
@@ -1137,17 +1137,24 @@ function formatAllDataRows() {
     { name: CONFIG.investmentAccountsSheet, cols: 15 },
     { name: CONFIG.otherInvestmentsSheet, cols: 14 },  // ✅ Updated: 14 columns (added Family Member Name)
     { name: CONFIG.liabilitiesSheet, cols: 11 },       // ✅ Updated: 11 columns (added Family Member Name)
-    { name: CONFIG.insuranceSheet, cols: 11 },
+    { name: CONFIG.insuranceSheet, cols: 13 },
     // ✅ REMOVED: CONFIG.loansSheet - unified into Liabilities
     { name: CONFIG.portfolioMetadataSheet, cols: 16 },
     { name: CONFIG.assetAllocationsSheet, cols: 4 },
     { name: CONFIG.mutualFundDataSheet, cols: 8 },
-    { name: CONFIG.transactionHistorySheet, cols: 13 },
+    { name: CONFIG.transactionHistorySheet, cols: 14 },
     // Stock sheets
     { name: CONFIG.stockPortfoliosSheet, cols: 14 },
     { name: CONFIG.stockTransactionsSheet, cols: 16 },
     { name: CONFIG.stockHoldingsSheet, cols: 15 },
-    { name: CONFIG.settingsSheet, cols: 3 }
+    { name: CONFIG.settingsSheet, cols: 3 },
+    // Additional sheets
+    { name: CONFIG.goalsSheet, cols: 21 },
+    { name: CONFIG.goalPortfolioMappingSheet, cols: 7 },
+    { name: CONFIG.remindersSheet, cols: 16 },
+    { name: CONFIG.investmentTypesSheet, cols: 6 },
+    { name: CONFIG.liabilityTypesSheet, cols: 5 },
+    { name: CONFIG.mfATHDataSheet, cols: 7 }
   ];
 
   sheetsToFormat.forEach(item => {
@@ -1593,7 +1600,8 @@ function setupGoalsSheet() {
 
 /**
  * Setup GoalPortfolioMapping Sheet
- * Structure: 6 columns (A-F) for linking goals to portfolios with allocation percentages
+ * Structure: 7 columns (A-G) for linking goals to investments with allocation percentages
+ * Supports MF portfolios, Stock portfolios, and Other Investments (EPF, NPS, PPF, etc.)
  */
 function setupGoalPortfolioMappingSheet() {
   const spreadsheet = getSpreadsheet();
@@ -1603,9 +1611,10 @@ function setupGoalPortfolioMappingSheet() {
     'Mapping ID',           // A: GPM-001
     'Goal ID',              // B: GOAL-001
     'Goal Name',            // C: For display
-    'Portfolio ID',         // D: PFL-MF-001
+    'Portfolio ID',         // D: PFL-MF-001, PFL-STK-001, or INV-001
     'Portfolio Name',       // E: For display
-    'Allocation %'          // F: Percentage (e.g., 80%)
+    'Allocation %',         // F: Percentage (e.g., 80%)
+    'Investment Type'       // G: MF, Stock, or Other
   ];
 
   // Add developer credit (Row 1)
@@ -1624,6 +1633,7 @@ function setupGoalPortfolioMappingSheet() {
   sheet.setColumnWidth(4, 130);  // Portfolio ID
   sheet.setColumnWidth(5, 220);  // Portfolio Name
   sheet.setColumnWidth(6, 110);  // Allocation %
+  sheet.setColumnWidth(7, 120);  // Investment Type
 
   // Freeze header rows
   sheet.setFrozenRows(2);

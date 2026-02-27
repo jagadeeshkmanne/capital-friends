@@ -85,24 +85,42 @@ function getOrCreateUser(email, name) {
 
 /**
  * Create a new user with their own spreadsheet.
- * With Execution API, makeCopy() runs as the user → spreadsheet goes to THEIR Drive.
+ * Creates a fresh spreadsheet in the user's Drive and sets up all sheets.
+ * No template needed — createAllSheets() builds everything from code.
+ * With Execution API, create() runs as the user → spreadsheet goes to THEIR Drive.
  */
 function createNewUser(email, name) {
   email = email.toLowerCase();
 
-  // Copy template spreadsheet (runs as the user → created in user's Drive)
-  var templateFile = DriveApp.getFileById(WEBAPP_CONFIG.templateSpreadsheetId);
-  var newFile = templateFile.makeCopy('Capital Friends - ' + name);
-  var spreadsheetId = newFile.getId();
+  // Create a fresh spreadsheet in the user's Drive (no template needed)
+  var spreadsheet = SpreadsheetApp.create('Capital Friends - ' + name);
+  var spreadsheetId = spreadsheet.getId();
 
-  // Run createAllSheets() on the new spreadsheet to ensure all sheets exist
+  // Delete the default "Sheet1" that comes with every new spreadsheet
   try {
-    _currentUserSpreadsheetId = spreadsheetId;
+    var defaultSheet = spreadsheet.getSheetByName('Sheet1');
+    if (defaultSheet && spreadsheet.getSheets().length > 0) {
+      // Can't delete the only sheet — createAllSheets will add sheets first
+      // We'll delete it after setup
+    }
+  } catch (e) {
+    // Ignore — will be cleaned up after setup
+  }
+
+  // Create all required sheets from code (always latest structure)
+  _currentUserSpreadsheetId = spreadsheetId;
+  try {
     createAllSheets();
     log('All sheets created for new user: ' + email);
+
+    // Now delete the default "Sheet1" if it still exists
+    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var sheet1 = ss.getSheetByName('Sheet1');
+    if (sheet1 && ss.getSheets().length > 1) {
+      ss.deleteSheet(sheet1);
+    }
   } catch (e) {
     log('Warning: createAllSheets failed for ' + email + ': ' + e.toString());
-    // Continue anyway — template copy should have the sheets
   }
 
   // Save user record in Script Properties

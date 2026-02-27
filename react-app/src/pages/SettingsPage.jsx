@@ -352,7 +352,7 @@ function MemberEmailToggle({ member, onToggle }) {
           <span className="text-[10px] font-bold text-violet-600">{member.memberName?.charAt(0)?.toUpperCase()}</span>
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{member.memberName}</p>
+          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{mv(member.memberName, 'name')}</p>
           {member.email && <p className="text-[10px] text-[var(--text-dim)] truncate">{mv(member.email, 'email')}</p>}
         </div>
       </div>

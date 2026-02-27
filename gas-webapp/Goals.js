@@ -568,7 +568,9 @@ function deleteGoal(goalId) {
 // ============================================================================
 
 /**
- * Get all portfolio mappings for a goal
+ * Get goal portfolio mappings.
+ * If goalId is provided, returns mappings for that goal only.
+ * If goalId is omitted, returns ALL mappings (used by loadAllData and mappings-list route).
  */
 function getGoalPortfolioMappings(goalId) {
   const sheet = getSheet('GoalPortfolioMapping');
@@ -576,27 +578,64 @@ function getGoalPortfolioMappings(goalId) {
     return [];
   }
 
-  const data = sheet.getRange(3, 1, sheet.getLastRow() - 2, 6).getValues();
+  const numCols = Math.min(sheet.getLastColumn(), 7); // 7 cols if Investment Type exists, else 6
+  const data = sheet.getRange(3, 1, sheet.getLastRow() - 2, numCols).getValues();
   const mappings = [];
 
   data.forEach(row => {
-    if (row[1] === goalId) { // Column B: Goal ID
-      mappings.push({
-        mappingId: row[0],
-        goalId: row[1],
-        goalName: row[2],
-        portfolioId: row[3],
-        portfolioName: row[4],
-        allocationPct: row[5]               // React: allocationPct
-      });
-    }
+    if (!row[0]) return; // Skip empty rows
+    if (goalId && row[1] !== goalId) return; // Filter by goalId if provided
+
+    mappings.push({
+      mappingId: row[0],
+      goalId: row[1],
+      goalName: row[2],
+      portfolioId: row[3],
+      portfolioName: row[4],
+      allocationPct: Math.round((row[5] || 0) * 100), // Convert decimal → integer for React (0.80 → 80)
+      investmentType: (numCols >= 7 && row[6]) ? row[6] : 'MF' // Column G, default to MF
+    });
   });
 
   return mappings;
 }
 
 /**
- * Map portfolios to goal
+ * Infer investment type from ID prefix
+ */
+function inferInvestmentType(id) {
+  if (!id) return 'MF';
+  if (id.startsWith('PFL-STK-')) return 'Stock';
+  if (id.startsWith('INV-')) return 'Other';
+  return 'MF';
+}
+
+/**
+ * Resolve investment display name by looking up from the correct sheet
+ */
+function resolveInvestmentName(investmentId, investmentType) {
+  try {
+    if (investmentType === 'Stock') {
+      const portfolios = getAllStockPortfolios();
+      const p = portfolios.find(p => p.portfolioId === investmentId);
+      return p ? p.portfolioName : investmentId;
+    }
+    if (investmentType === 'Other') {
+      const investments = getAllInvestments();
+      const inv = investments.find(i => i.investmentId === investmentId);
+      return inv ? inv.investmentName : investmentId;
+    }
+    // MF portfolio
+    const portfolios = getAllPortfolios();
+    const p = portfolios.find(p => p.portfolioId === investmentId);
+    return p ? p.portfolioName : investmentId;
+  } catch (e) {
+    return investmentId;
+  }
+}
+
+/**
+ * Map portfolios/investments to goal
  */
 function mapPortfoliosToGoal(goalId, portfolioMappings) {
   try {
@@ -624,35 +663,38 @@ function mapPortfoliosToGoal(goalId, portfolioMappings) {
     // Add new mappings
     portfolioMappings.forEach(mapping => {
       const mappingId = generateMappingId(sheet.getLastRow());
+      const type = mapping.investmentType || inferInvestmentType(mapping.portfolioId);
+      const name = mapping.portfolioName || resolveInvestmentName(mapping.portfolioId, type);
 
       const rowData = [
         mappingId,
         goalId,
         goalName,
         mapping.portfolioId,
-        mapping.portfolioName,
-        (mapping.allocationPct || mapping.allocationPercent) / 100 // Convert to decimal
+        name,
+        (mapping.allocationPct || mapping.allocationPercent) / 100, // Convert to decimal
+        type // Column G: Investment Type (MF/Stock/Other)
       ];
 
       sheet.appendRow(rowData);
 
       // Format the new row
       const newRow = sheet.getLastRow();
-      applyDataRowFormatting(sheet, newRow, newRow, 6);
+      applyDataRowFormatting(sheet, newRow, newRow, 7);
     });
 
     // No need to recalculate — Goals column I has a live SUMPRODUCT formula
     // that auto-updates when GoalPortfolioMapping changes
 
-    log(`Portfolios mapped to goal: ${goalId}`);
+    log(`Investments mapped to goal: ${goalId}`);
 
     return {
       success: true,
-      message: 'Portfolios mapped successfully!'
+      message: 'Investments mapped successfully!'
     };
 
   } catch (error) {
-    log('Error mapping portfolios to goal: ' + error.message);
+    log('Error mapping investments to goal: ' + error.message);
     return {
       success: false,
       error: error.message
@@ -684,106 +726,6 @@ function deleteGoalPortfolioMappings(goalId) {
   });
 
   log(`Deleted ${rowsToDelete.length} portfolio mappings for goal ${goalId}`);
-}
-
-/**
- * Recalculate goal's current allocated amount based on portfolio mappings
- */
-function recalculateGoalAllocations(goalId) {
-  const mappings = getGoalPortfolioMappings(goalId);
-  let totalAllocated = 0;
-
-  mappings.forEach(mapping => {
-    // Get portfolio current value from AllPortfolios sheet
-    const portfolio = getPortfolioById(mapping.portfolioId);
-    if (portfolio && portfolio.currentValue) {
-      const allocatedAmount = portfolio.currentValue * (mapping.allocationPct || mapping.allocationPercent);
-      totalAllocated += allocatedAmount;
-    }
-  });
-
-  // Update Goals sheet with new allocated amount
-  const goalsSheet = getSheet('Goals');
-  if (!goalsSheet) return;
-
-  const data = goalsSheet.getRange(3, 1, goalsSheet.getLastRow() - 2, 1).getValues();
-  let rowIndex = -1;
-
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === goalId) {
-      rowIndex = i + 3;
-      break;
-    }
-  }
-
-  if (rowIndex !== -1) {
-    // NEW STRUCTURE: Update Column I: Current Allocated
-    goalsSheet.getRange(rowIndex, 9).setValue(totalAllocated);
-
-    // Recalculate dependent columns
-    const inflationAdjustedTarget = goalsSheet.getRange(rowIndex, 5).getValue(); // Column E: Target Amount
-    const gapAmount = inflationAdjustedTarget - totalAllocated;
-    const progressPercent = totalAllocated / inflationAdjustedTarget;
-
-    goalsSheet.getRange(rowIndex, 10).setValue(gapAmount); // Column J: Gap Amount
-    goalsSheet.getRange(rowIndex, 11).setValue(progressPercent); // Column K: Progress %
-
-    // Recalculate SIP and Lumpsum needed
-    const targetDate = goalsSheet.getRange(rowIndex, 6).getValue(); // Column F: Target Date
-    const expectedCAGR = goalsSheet.getRange(rowIndex, 18).getValue(); // Column R: Expected CAGR (hidden)
-    const yearsToGo = calculateYearsToGo(targetDate);
-
-    const monthlySIPNeeded = calculateMonthlySIP(
-      inflationAdjustedTarget,
-      yearsToGo,
-      expectedCAGR,
-      totalAllocated
-    );
-
-    const lumpsumNeeded = calculateLumpsumNeeded(
-      inflationAdjustedTarget,
-      yearsToGo,
-      expectedCAGR,
-      totalAllocated
-    );
-
-    goalsSheet.getRange(rowIndex, 7).setValue(monthlySIPNeeded); // Column G: Monthly SIP Needed
-    goalsSheet.getRange(rowIndex, 8).setValue(lumpsumNeeded); // Column H: Lumpsum Needed
-
-    // Update status
-    const status = determineGoalStatus(totalAllocated, inflationAdjustedTarget, yearsToGo, expectedCAGR);
-    goalsSheet.getRange(rowIndex, 14).setValue(status); // Column N: Status
-
-    log(`Recalculated allocations for goal ${goalId}: ₹${totalAllocated.toFixed(2)}`);
-  }
-}
-
-/**
- * Get portfolio by ID from AllPortfolios sheet
- */
-function getPortfolioById(portfolioId) {
-  const sheet = getSheet('AllPortfolios');
-  if (!sheet || sheet.getLastRow() < 4) {
-    return null;
-  }
-
-  const data = sheet.getRange(4, 1, sheet.getLastRow() - 3, 16).getValues();
-
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === portfolioId) {
-      return {
-        portfolioId: data[i][0],
-        portfolioName: data[i][1],
-        investmentAccount: data[i][2],
-        originalInvestment: data[i][3],
-        totalInvestment: data[i][4],
-        currentValue: data[i][8], // Column I
-        status: data[i][15]
-      };
-    }
-  }
-
-  return null;
 }
 
 /**
@@ -834,34 +776,6 @@ function getPortfoliosForGoalMapping(selectedFamilyMembers) {
   return portfolios;
 }
 
-/**
- * Get all investment accounts
- */
-function getAllInvestmentAccounts() {
-  const sheet = getSheet('InvestmentAccounts');
-  if (!sheet || sheet.getLastRow() < 3) {
-    return [];
-  }
-
-  const data = sheet.getRange(3, 1, sheet.getLastRow() - 2, 15).getValues();
-  const accounts = [];
-
-  data.forEach(row => {
-    if (row[0]) {
-      accounts.push({
-        recordId: row[0],
-        accountName: row[1],
-        memberId: row[2],
-        memberName: row[3],
-        accountType: row[6],
-        status: row[12]
-      });
-    }
-  });
-
-  return accounts;
-}
-
 // ============================================================================
 // CALCULATION FUNCTIONS
 // ============================================================================
@@ -887,10 +801,11 @@ function calculateYearsToGo(targetDate) {
  * @param {number} row - Row number to set formulas on
  */
 function setGoalFormulas(sheet, row) {
-  // I: Current Allocated — SUMPRODUCT across GoalPortfolioMapping × AllPortfolios
-  // Looks up each mapped portfolio's current value and multiplies by allocation %
+  // I: Current Allocated — 3-way SUMPRODUCT across MF, Stock, and Other investments
+  // Each term filters by Investment Type (col G) and looks up currentValue from the correct sheet
+  // MF: AllPortfolios col I (data row 4+), Stock: StockPortfolios col F (data row 3+), Other: OtherInvestments col I (data row 3+)
   const currentAllocatedFormula =
-    `=IFERROR(SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0)),0)`;
+    `=IFERROR(SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="MF")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0))+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Stock")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(StockPortfolios!F$3:F$200,MATCH(GoalPortfolioMapping!D$3:D$200,StockPortfolios!A$3:A$200,0)),0))+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Other")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(OtherInvestments!I$3:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,OtherInvestments!A$3:A$200,0)),0)),0)`;
 
   // J: Gap Amount = Target - Current Allocated
   const gapFormula = `=IF(A${row}="","",MAX(0,E${row}-I${row}))`;
@@ -1042,134 +957,6 @@ function getGoalTypes() {
     'Business Start',
     'Custom'
   ];
-}
-
-// ============================================================================
-// DEBUG / TEST FUNCTIONS
-// ============================================================================
-
-/**
- * Test function to debug goal loading issues
- * Run this from Apps Script editor to see what's happening
- */
-function testGetAllGoals() {
-  Logger.log('=== Testing getAllGoals() ===');
-
-  const sheet = getSheet('Goals');
-  if (!sheet) {
-    Logger.log('ERROR: Goals sheet not found!');
-    return;
-  }
-
-  Logger.log('Goals sheet found: ' + sheet.getName());
-
-  // Check what's in column A
-  const dataRange = sheet.getRange('A3:A').getValues();
-  Logger.log('Data range length: ' + dataRange.length);
-
-  let lastDataRow = 2;
-  for (let i = 0; i < dataRange.length; i++) {
-    if (dataRange[i][0]) {
-      Logger.log('Row ' + (i + 3) + ' has Goal ID: ' + dataRange[i][0]);
-      lastDataRow = i + 3;
-    }
-  }
-
-  Logger.log('Last data row: ' + lastDataRow);
-
-  const goals = getAllGoals();
-  Logger.log('Number of goals found: ' + goals.length);
-
-  if (goals.length > 0) {
-    Logger.log('First goal: ' + JSON.stringify(goals[0]));
-  }
-
-  const goalsWithMappings = getAllGoalsWithMappings();
-  Logger.log('Goals with mappings: ' + goalsWithMappings.length);
-
-  return {
-    sheetFound: !!sheet,
-    lastDataRow: lastDataRow,
-    goalsCount: goals.length,
-    goals: goals
-  };
-}
-
-/**
- * Get portfolio details for withdrawal planning
- */
-function getPortfolioDetailsForWithdrawal(portfolioIds) {
-  const portfolios = [];
-  const allPortfoliosSheet = getSheet('AllPortfolios');
-  const mutualFundsSheet = getSheet('MutualFunds');
-
-  if (!allPortfoliosSheet || !mutualFundsSheet) return [];
-
-  portfolioIds.forEach(portfolioId => {
-    // Get portfolio info from AllPortfolios
-    const portfolioData = allPortfoliosSheet.getRange(4, 1, allPortfoliosSheet.getLastRow() - 3, 16).getValues();
-    const portfolioRow = portfolioData.find(row => row[0] === portfolioId);
-
-    if (!portfolioRow) return;
-
-    const portfolioName = portfolioRow[1];
-    const accountName = portfolioRow[2];
-
-    // Get funds in this portfolio from MutualFunds sheet
-    const fundsData = mutualFundsSheet.getRange(4, 1, mutualFundsSheet.getLastRow() - 3, 30).getValues();
-    const portfolioFunds = fundsData.filter(row => row[2] === portfolioId && row[29] === 'Active');
-
-    const funds = portfolioFunds.map(fund => ({
-      fundId: fund[0],
-      fundName: fund[3],
-      currentValue: fund[14] || 0,
-      units: fund[12] || 0,
-      currentNAV: fund[13] || 0,
-      targetAllocation: fund[21] || 0 // Column V - Target Allocation %
-    }));
-
-    // Get target allocation from FundAllocation sheet
-    const targetAllocation = getTargetAllocationForPortfolio(portfolioId);
-
-    // Get owner info from InvestmentAccounts
-    const investmentAccounts = getAllInvestmentAccounts();
-    const account = investmentAccounts.find(a => a.accountName === accountName);
-
-    portfolios.push({
-      portfolioId: portfolioId,
-      portfolioName: portfolioName,
-      ownerName: account ? account.memberName : 'Unknown',
-      funds: funds,
-      targetAllocation: targetAllocation
-    });
-  });
-
-  return portfolios;
-}
-
-/**
- * Get target allocation for a portfolio from FundAllocation sheet
- */
-function getTargetAllocationForPortfolio(portfolioId) {
-  const fundAllocationSheet = getSheet('FundAllocation');
-  if (!fundAllocationSheet || fundAllocationSheet.getLastRow() < 4) {
-    return null;
-  }
-
-  const data = fundAllocationSheet.getRange(4, 1, fundAllocationSheet.getLastRow() - 3, 10).getValues();
-  const allocations = [];
-
-  data.forEach(row => {
-    if (row[0] && row[1] === portfolioId && row[9] === 'Active') {
-      allocations.push({
-        fundId: row[2], // Fund ID
-        fundName: row[3], // Fund Name
-        targetPercent: (row[4] || 0) / 100 // Target Allocation % (convert to decimal)
-      });
-    }
-  });
-
-  return allocations.length > 0 ? allocations : null;
 }
 
 /**

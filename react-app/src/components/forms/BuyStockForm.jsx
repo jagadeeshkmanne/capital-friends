@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
-import { FormField, FormInput, FormSelect, FormActions } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
 export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
   const { stockPortfolios } = useData()
@@ -82,13 +82,10 @@ export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
         </FormField>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField label="Purchase Date" required error={errors.date}>
-          <FormInput type="date" value={form.date} onChange={(v) => set('date', v)} />
+          <FormDateInput value={form.date} onChange={(v) => set('date', v)} />
         </FormField>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Quantity (Shares)" required error={errors.quantity}>
           <FormInput type="number" value={form.quantity} onChange={(v) => set('quantity', v)} placeholder="e.g., 100" />
         </FormField>

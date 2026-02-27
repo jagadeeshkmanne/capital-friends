@@ -88,13 +88,18 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
         </FormField>
       </div>
 
-      <div className="flex items-end gap-3">
-        <div className="w-32">
-          <FormField label="Rebalance Threshold (%)">
-            <FormInput type="number" value={form.rebalanceThreshold} onChange={(v) => set('rebalanceThreshold', v)} placeholder="5" />
-          </FormField>
+      <div className="flex items-center gap-3">
+        <label className="text-xs font-semibold text-[var(--text-muted)] whitespace-nowrap">Rebalance Threshold</label>
+        <div className="w-20 shrink-0">
+          <input
+            type="number"
+            value={form.rebalanceThreshold}
+            onChange={(e) => set('rebalanceThreshold', e.target.value)}
+            placeholder="5"
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] text-center focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
+          />
         </div>
-        <p className="text-[10px] text-[var(--text-dim)] pb-2.5 leading-relaxed">Rebalance triggers when allocation drifts beyond this %</p>
+        <span className="text-xs text-[var(--text-dim)]">%</span>
       </div>
 
       {!isEdit && (

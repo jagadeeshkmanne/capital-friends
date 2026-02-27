@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useCallback, Children } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, ChevronDown, Wallet, TrendingUp, TrendingDown, BarChart3, Building2, Landmark, AlertCircle, RefreshCw } from 'lucide-react'
 import { useData } from '../../context/DataContext'
@@ -9,6 +9,39 @@ import { formatINR } from '../../data/familyData'
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]' }
 function plPrefix(val) { return val >= 0 ? '+' : '' }
 
+// Infer asset category from fund name (client-side fallback)
+function inferCategory(name) {
+  if (!name) return 'Other'
+  const n = name.toLowerCase()
+  if (n.includes('gold') || n.includes('silver') || n.includes('commodity')) return 'Commodity'
+  if (n.includes('liquid') || n.includes('money market') || n.includes('overnight')) return 'Liquid'
+  if (n.includes('gilt') || n.includes('government securities') || n.includes('constant maturity')) return 'Gilt'
+  if (n.includes('elss') || n.includes('tax saver')) return 'ELSS'
+  if (n.includes('debt') || n.includes('bond') || n.includes('income fund') || n.includes('corporate bond') ||
+      n.includes('banking & psu') || n.includes('short duration') || n.includes('medium duration') ||
+      n.includes('long duration') || n.includes('short term') || n.includes('medium term') ||
+      n.includes('floater') || n.includes('floating rate') || n.includes('credit') ||
+      n.includes('accrual') || n.includes('savings fund') || n.includes('ultra short')) return 'Debt'
+  if (n.includes('multi asset')) return 'Multi-Asset'
+  if (n.includes('hybrid') || n.includes('balanced') || n.includes('dynamic asset') ||
+      n.includes('arbitrage') || n.includes('retirement') ||
+      n.includes('children') || n.includes('pension')) return 'Hybrid'
+  if (n.includes('equity') || n.includes('flexi cap') || n.includes('large cap') || n.includes('mid cap') ||
+      n.includes('small cap') || n.includes('multi cap') || n.includes('focused') || n.includes('contra') ||
+      n.includes('value fund') || n.includes('thematic') || n.includes('sectoral') ||
+      n.includes('consumption') || n.includes('infrastructure') || n.includes('pharma') ||
+      n.includes('healthcare') || n.includes('technology') || n.includes('fmcg') ||
+      n.includes('mnc') || n.includes('opportunities fund') || n.includes('midcap') ||
+      n.includes('smallcap') || n.includes('largecap') || n.includes('large & mid')) return 'Equity'
+  if (n.includes('index') || n.includes('etf') || n.includes('nifty') || n.includes('sensex')) return 'Index'
+  if (n.includes('fund of fund') || n.includes('fof')) return 'Hybrid'
+  if (n.includes('aggressive') || n.includes('conservative')) return 'Hybrid'
+  return 'Other'
+}
+
+const ASSET_CLASS_COLORS = { Equity: 'bg-violet-500', Debt: 'bg-sky-500', Commodities: 'bg-yellow-500', Hybrid: 'bg-indigo-400', Cash: 'bg-teal-400', Other: 'bg-slate-400' }
+function assetClassColor(name) { return ASSET_CLASS_COLORS[name] || 'bg-slate-400' }
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { selectedMember } = useFamily()
@@ -18,6 +51,7 @@ export default function Dashboard() {
     otherInvList, liabilityList,
     banks, insurancePolicies,
     reminderList, goalList,
+    assetAllocations,
   } = useData()
 
   // Filter by selected member
@@ -103,6 +137,64 @@ export default function Dashboard() {
       })
     })
 
+    // Asset class breakdown (Equity/Debt/Gold/Hybrid/etc.)
+    // Uses detailed AssetAllocations when available, falls back to basic fund category
+    const allocMap = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
+      }
+    }
+
+    const assetClasses = { Equity: 0, Debt: 0, Hybrid: 0, Commodities: 0, Cash: 0, Other: 0 }
+
+    // MF holdings — use detailed allocation if available, else basic category
+    activeMFHoldings.forEach((h) => {
+      const detailed = allocMap[h.fundCode]
+      if (detailed) {
+        // Detailed breakdown: { Equity: 75, Debt: 20, Cash: 5 }
+        for (const [cls, pct] of Object.entries(detailed)) {
+          const key = cls === 'Commodities' ? 'Commodities' : cls === 'Real Estate' ? 'Other' : cls
+          if (key in assetClasses) assetClasses[key] += h.currentValue * (pct / 100)
+          else assetClasses.Other += h.currentValue * (pct / 100)
+        }
+      } else {
+        // Use server category, but if 'Other' or missing, infer from fund name
+        let cat = h.category
+        if (!cat || cat === 'Other') cat = inferCategory(h.fundName)
+        if (cat === 'Equity' || cat === 'ELSS' || cat === 'Index') assetClasses.Equity += h.currentValue
+        else if (cat === 'Debt' || cat === 'Gilt') assetClasses.Debt += h.currentValue
+        else if (cat === 'Liquid') assetClasses.Cash += h.currentValue
+        else if (cat === 'Commodity') assetClasses.Commodities += h.currentValue
+        else if (cat === 'Multi-Asset') {
+          assetClasses.Equity += h.currentValue * 0.50
+          assetClasses.Debt += h.currentValue * 0.30
+          assetClasses.Commodities += h.currentValue * 0.20
+        } else if (cat === 'Hybrid' || cat === 'FoF') {
+          assetClasses.Equity += h.currentValue * 0.65
+          assetClasses.Debt += h.currentValue * 0.35
+        } else assetClasses.Other += h.currentValue
+      }
+    })
+
+    // Stocks → all equity
+    assetClasses.Equity += stkCurrentValue
+
+    // Other investments — categorize by type
+    activeOther.forEach((inv) => {
+      const t = (inv.investmentType || '').toLowerCase()
+      if (t.includes('gold') || t.includes('silver') || t.includes('commodity')) assetClasses.Commodities += inv.currentValue
+      else if (t.includes('fd') || t.includes('fixed') || t.includes('bond') || t.includes('ppf') || t.includes('epf') || t.includes('nps') || t.includes('rd') || t.includes('nsc') || t.includes('ssy')) assetClasses.Debt += inv.currentValue
+      else if (t.includes('real estate') || t.includes('property')) assetClasses.Other += inv.currentValue
+      else assetClasses.Other += inv.currentValue
+    })
+
+    // Filter out zero-value classes and build sorted list
+    const assetClassList = Object.entries(assetClasses)
+      .filter(([, val]) => val > 0)
+      .sort(([, a], [, b]) => b - a)
+      .map(([cls, val]) => ({ name: cls, value: val, pct: totalAssets > 0 ? (val / totalAssets) * 100 : 0 }))
+
     return {
       mfCurrentValue, mfInvested, mfPL, mfCount: activeMFPortfolios.length, mfPortfolioDetails,
       stkCurrentValue, stkInvested, stkPL, stkCount: activeStockPortfolios.length, stkPortfolioDetails,
@@ -112,8 +204,9 @@ export default function Dashboard() {
       bankCount: activeBankAccounts.length,
       totalAssets, totalInvested, totalPL, netWorth,
       buyOppCount, rebalanceCount,
+      assetClassList,
     }
-  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, insurancePolicies])
+  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, insurancePolicies, assetAllocations])
 
   // ── Action Items (computed from real data) ──
   const actionItems = useMemo(() => {
@@ -291,28 +384,45 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Asset allocation bar */}
-        {data.totalAssets > 0 && (
-          <div className="mt-3 h-2 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
-            {data.mfCurrentValue > 0 && (
-              <div className="bg-violet-500 h-full" style={{ width: `${(data.mfCurrentValue / data.totalAssets) * 100}%` }} />
-            )}
-            {data.stkCurrentValue > 0 && (
-              <div className="bg-blue-500 h-full" style={{ width: `${(data.stkCurrentValue / data.totalAssets) * 100}%` }} />
-            )}
-            {data.otherCurrentValue > 0 && (
-              <div className="bg-emerald-500 h-full" style={{ width: `${(data.otherCurrentValue / data.totalAssets) * 100}%` }} />
-            )}
-          </div>
-        )}
-        {data.totalAssets > 0 && (
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-[var(--text-dim)]">
-            {data.mfCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500" />MF {((data.mfCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
-            {data.stkCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Stocks {((data.stkCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
-            {data.otherCurrentValue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Other {((data.otherCurrentValue / data.totalAssets) * 100).toFixed(0)}%</span>}
-          </div>
-        )}
       </div>
+
+      {/* Allocation Carousel — Product Type + Asset Class */}
+      {data.totalAssets > 0 && (
+        <BreakdownCarousel>
+          {/* Slide 1: Product Allocation */}
+          <BreakdownSlide title="By Product">
+            <div className="h-2.5 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
+              {data.mfCurrentValue > 0 && <div className="bg-violet-500 h-full" style={{ width: `${(data.mfCurrentValue / data.totalAssets) * 100}%` }} />}
+              {data.stkCurrentValue > 0 && <div className="bg-blue-500 h-full" style={{ width: `${(data.stkCurrentValue / data.totalAssets) * 100}%` }} />}
+              {data.otherCurrentValue > 0 && <div className="bg-emerald-500 h-full" style={{ width: `${(data.otherCurrentValue / data.totalAssets) * 100}%` }} />}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+              {data.mfCurrentValue > 0 && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><span className="w-1.5 h-1.5 rounded-full bg-violet-500" />MF {((data.mfCurrentValue / data.totalAssets) * 100).toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(data.mfCurrentValue)}</span></span>}
+              {data.stkCurrentValue > 0 && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" />Stocks {((data.stkCurrentValue / data.totalAssets) * 100).toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(data.stkCurrentValue)}</span></span>}
+              {data.otherCurrentValue > 0 && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Other {((data.otherCurrentValue / data.totalAssets) * 100).toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(data.otherCurrentValue)}</span></span>}
+            </div>
+          </BreakdownSlide>
+
+          {/* Slide 2: Asset Class */}
+          {data.assetClassList.length > 1 && (
+            <BreakdownSlide title="By Asset Class">
+              <div className="h-2.5 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
+                {data.assetClassList.map((c) => (
+                  <div key={c.name} className={`h-full ${assetClassColor(c.name)}`} style={{ width: `${c.pct}%` }} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+                {data.assetClassList.map((c) => (
+                  <span key={c.name} className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+                    <span className={`w-1.5 h-1.5 rounded-full ${assetClassColor(c.name)}`} />
+                    {c.name} {c.pct.toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(c.value)}</span>
+                  </span>
+                ))}
+              </div>
+            </BreakdownSlide>
+          )}
+        </BreakdownCarousel>
+      )}
 
       {/* Investment Alerts */}
       {(data.buyOppCount > 0 || data.rebalanceCount > 0) && (
@@ -521,6 +631,58 @@ function AssetCard({ icon, iconColor, label, value, invested, pl, count, countLa
         <p className="text-xs text-[var(--text-dim)] mt-0.5">EMI: {formatINR(emi)}/mo</p>
       )}
       <p className="text-xs text-[var(--text-dim)] mt-1">{count} {countLabel}</p>
+    </div>
+  )
+}
+
+/* ── Breakdown Carousel — horizontal snap scroll ── */
+function BreakdownCarousel({ children }) {
+  const scrollRef = useRef(null)
+  const [active, setActive] = useState(0)
+  const slides = Children.toArray(children).filter(Boolean)
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const idx = Math.round(el.scrollLeft / el.offsetWidth)
+    setActive(idx)
+  }, [])
+
+  if (slides.length === 0) return null
+
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+      >
+        {slides.map((slide, i) => (
+          <div key={i} className="w-full shrink-0 snap-start p-4">
+            {slide}
+          </div>
+        ))}
+      </div>
+      {slides.length > 1 && (
+        <div className="flex justify-center gap-1.5 pb-3 -mt-1">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => scrollRef.current?.scrollTo({ left: i * scrollRef.current.offsetWidth, behavior: 'smooth' })}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === active ? 'bg-violet-400' : 'bg-[var(--border-light)]'}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BreakdownSlide({ title, children }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">{title}</p>
+      {children}
     </div>
   )
 }

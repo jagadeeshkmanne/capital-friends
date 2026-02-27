@@ -4,6 +4,7 @@ import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import InsuranceForm from '../../components/forms/InsuranceForm'
@@ -23,6 +24,7 @@ export default function InsurancePage() {
   const { selectedMember, member } = useFamily()
   const { insurancePolicies, addInsurance, updateInsurance, deleteInsurance } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
@@ -54,7 +56,7 @@ export default function InsurancePage() {
   }
 
   async function handleDelete() {
-    if (modal?.edit && confirm('Deactivate this insurance policy?')) {
+    if (modal?.edit && await confirm('Deactivate this insurance policy?', { title: 'Deactivate Policy', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteInsurance(modal.edit.policyId)

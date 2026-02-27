@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronUp, ArrowDownCircle, Repeat2, Settings2, RefreshCw, MoreVertical, Trash2, Filter } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronUp, ArrowDownCircle, Repeat2, Settings2, RefreshCw, MoreVertical, Trash2, Filter, PieChart, Save, Check } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
-import Modal from '../../components/Modal'
+import Modal, { FormDateInput } from '../../components/Modal'
 import MFPortfolioForm from '../../components/forms/MFPortfolioForm'
 import MFInvestForm from '../../components/forms/MFInvestForm'
 import MFRedeemForm from '../../components/forms/MFRedeemForm'
@@ -17,6 +19,40 @@ import PageLoading from '../../components/PageLoading'
 
 // Strip PFL- prefix for display
 const displayName = (name) => name?.replace(/^PFL-/, '') || name
+
+// Infer asset category from fund name (client-side fallback when server category is missing)
+function inferCategory(name) {
+  if (!name) return 'Other'
+  const n = name.toLowerCase()
+  if (n.includes('gold') || n.includes('silver') || n.includes('commodity')) return 'Commodity'
+  if (n.includes('liquid') || n.includes('money market') || n.includes('overnight')) return 'Liquid'
+  if (n.includes('gilt') || n.includes('government securities') || n.includes('constant maturity')) return 'Gilt'
+  if (n.includes('elss') || n.includes('tax saver')) return 'ELSS'
+  if (n.includes('debt') || n.includes('bond') || n.includes('income fund') || n.includes('corporate bond') ||
+      n.includes('banking & psu') || n.includes('short duration') || n.includes('medium duration') ||
+      n.includes('long duration') || n.includes('short term') || n.includes('medium term') ||
+      n.includes('floater') || n.includes('floating rate') || n.includes('credit') ||
+      n.includes('accrual') || n.includes('savings fund') || n.includes('ultra short')) return 'Debt'
+  if (n.includes('multi asset')) return 'Multi-Asset'
+  if (n.includes('hybrid') || n.includes('balanced') || n.includes('dynamic asset') ||
+      n.includes('arbitrage') || n.includes('retirement') ||
+      n.includes('children') || n.includes('pension')) return 'Hybrid'
+  if (n.includes('equity') || n.includes('flexi cap') || n.includes('large cap') || n.includes('mid cap') ||
+      n.includes('small cap') || n.includes('multi cap') || n.includes('focused') || n.includes('contra') ||
+      n.includes('value fund') || n.includes('thematic') || n.includes('sectoral') ||
+      n.includes('consumption') || n.includes('infrastructure') || n.includes('pharma') ||
+      n.includes('healthcare') || n.includes('technology') || n.includes('fmcg') ||
+      n.includes('mnc') || n.includes('opportunities fund') || n.includes('midcap') ||
+      n.includes('smallcap') || n.includes('largecap') || n.includes('large & mid')) return 'Equity'
+  if (n.includes('index') || n.includes('etf') || n.includes('nifty') || n.includes('sensex')) return 'Index'
+  if (n.includes('fund of fund') || n.includes('fof')) return 'Hybrid'
+  if (n.includes('aggressive') || n.includes('conservative')) return 'Hybrid'
+  return 'Other'
+}
+
+// Asset class & market cap colors
+const ASSET_CLS_COLOR = { Equity: 'bg-violet-500', Debt: 'bg-sky-500', Commodities: 'bg-yellow-500', Cash: 'bg-teal-400', Hybrid: 'bg-indigo-400', Other: 'bg-slate-400' }
+const CAP_COLOR = { 'Large Cap': 'bg-blue-500', 'Mid Cap': 'bg-amber-500', 'Small Cap': 'bg-rose-500' }
 
 // Parse date string (handles dd/MM/yyyy from GAS, ISO, and Date objects)
 function parseDate(d) {
@@ -47,9 +83,11 @@ export default function MutualFundsPage() {
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
     investMF, redeemMF, switchMF, updateHoldingAllocations,
     deleteMFTransaction, editMFTransaction,
+    assetAllocations, updateAssetAllocation,
   } = useData()
 
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const confirm = useConfirm()
   const { mv } = useMask()
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
@@ -218,6 +256,98 @@ export default function MutualFundsPage() {
     return { buyOpp, rebalance }
   }, [selectedPortfolioId, portfolioIndicators])
 
+  // Asset class & market cap breakdown for selected portfolio(s)
+  const breakdown = useMemo(() => {
+    if (!holdings.length) return null
+
+    // Build allocation lookup from assetAllocations data
+    const allocMap = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        allocMap[a.fundCode] = { asset: a.assetAllocation, equity: a.equityAllocation }
+      }
+    }
+
+    const asset = { Equity: 0, Debt: 0, Commodities: 0, Cash: 0, Other: 0 }
+    const cap = { Large: 0, Mid: 0, Small: 0 }
+    let totalValue = 0
+    let hasDetailedAlloc = false
+
+    for (const h of holdings) {
+      if (h.units <= 0) continue
+      totalValue += h.currentValue
+      const alloc = allocMap[h.fundCode || h.schemeCode]
+
+      if (alloc?.asset) {
+        // Detailed: AssetAllocations sheet data
+        hasDetailedAlloc = true
+        for (const [cls, pct] of Object.entries(alloc.asset)) {
+          const val = h.currentValue * (pct / 100)
+          if (cls === 'Equity') asset.Equity += val
+          else if (cls === 'Debt') asset.Debt += val
+          else if (cls === 'Cash') asset.Cash += val
+          else if (cls === 'Commodities' || cls === 'Gold') asset.Commodities += val
+          else asset.Other += val
+        }
+        // Market cap from equity allocation
+        if (alloc.equity) {
+          for (const [sz, pct] of Object.entries(alloc.equity)) {
+            const eqVal = h.currentValue * ((alloc.asset.Equity || 0) / 100) * (pct / 100)
+            if (sz === 'Large') cap.Large += eqVal
+            else if (sz === 'Mid') cap.Mid += eqVal
+            else if (sz === 'Small' || sz === 'Micro') cap.Small += eqVal
+          }
+        }
+      } else {
+        // Fallback: basic category
+        // Use server category, but if it's 'Other' or missing, infer from fund name
+        let cat = h.category
+        if (!cat || cat === 'Other') cat = inferCategory(h.fundName)
+        if (cat === 'Equity' || cat === 'ELSS' || cat === 'Index') asset.Equity += h.currentValue
+        else if (cat === 'Debt' || cat === 'Gilt') asset.Debt += h.currentValue
+        else if (cat === 'Liquid') asset.Cash += h.currentValue
+        else if (cat === 'Commodity') asset.Commodities += h.currentValue
+        else if (cat === 'Multi-Asset') {
+          asset.Equity += h.currentValue * 0.50
+          asset.Debt += h.currentValue * 0.30
+          asset.Commodities += h.currentValue * 0.20
+        } else if (cat === 'Hybrid' || cat === 'FoF') {
+          asset.Equity += h.currentValue * 0.65
+          asset.Debt += h.currentValue * 0.35
+        } else asset.Other += h.currentValue
+      }
+    }
+
+    if (totalValue === 0) return null
+
+    const assetList = Object.entries(asset)
+      .filter(([, v]) => v > 0)
+      .sort(([, a], [, b]) => b - a)
+      .map(([name, value]) => ({ name, value, pct: (value / totalValue) * 100 }))
+
+    const capTotal = cap.Large + cap.Mid + cap.Small
+    const capList = capTotal > 0
+      ? Object.entries(cap)
+          .filter(([, v]) => v > 0)
+          .sort(([, a], [, b]) => b - a)
+          .map(([name, value]) => ({ name: name + ' Cap', value, pct: (value / capTotal) * 100 }))
+      : []
+
+    return { assetList, capList, hasDetailedAlloc }
+  }, [holdings, assetAllocations])
+
+  // Unique funds across selected holdings for Allocations tab
+  const uniqueFunds = useMemo(() => {
+    if (!holdings.length) return []
+    const map = {}
+    holdings.forEach(h => {
+      if (!h.fundCode && !h.schemeCode) return
+      const code = (h.fundCode || h.schemeCode).toString()
+      if (!map[code]) map[code] = { fundCode: code, fundName: h.fundName || '' }
+    })
+    return Object.values(map).sort((a, b) => a.fundName.localeCompare(b.fundName))
+  }, [holdings])
+
   // Loading state — after all hooks
   if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading mutual funds" cards={5} />
 
@@ -225,7 +355,7 @@ export default function MutualFundsPage() {
 
   const dropdownLabel = selectedPortfolioId === 'all'
     ? `All Portfolios (${portfolios.length})`
-    : `${displayName(selectedPortfolio?.portfolioName)} — ${selectedPortfolio?.ownerName}`
+    : `${displayName(selectedPortfolio?.portfolioName)} — ${mv(selectedPortfolio?.ownerName, 'name')}`
 
   // Handlers
   async function handleSavePortfolio(data) {
@@ -243,7 +373,7 @@ export default function MutualFundsPage() {
   }
 
   async function handleDeletePortfolio() {
-    if (modal?.editPortfolio && confirm('Deactivate this portfolio?')) {
+    if (modal?.editPortfolio && await confirm('Deactivate this portfolio?', { title: 'Deactivate Portfolio', confirmLabel: 'Deactivate' })) {
       showBlockUI('Deactivating...')
       try {
         await deleteMFPortfolio(modal.editPortfolio.portfolioId)
@@ -298,7 +428,7 @@ export default function MutualFundsPage() {
   }
 
   async function handleDeleteTransaction(transactionId) {
-    if (!confirm('Delete this transaction? This will recalculate your holdings.')) return
+    if (!await confirm('Delete this transaction? This will recalculate your holdings.', { title: 'Delete Transaction', confirmLabel: 'Delete' })) return
     showBlockUI('Deleting...')
     try {
       await deleteMFTransaction(transactionId)
@@ -366,7 +496,7 @@ export default function MutualFundsPage() {
               {dropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-40 bg-[var(--bg-dropdown)] border border-[var(--border)] rounded-lg shadow-xl min-w-[300px] py-1 overflow-hidden">
+                  <div className="absolute left-0 top-full mt-1 z-40 bg-[var(--bg-dropdown)] border border-white/10 rounded-lg shadow-2xl min-w-[300px] py-1 overflow-hidden">
                     <button
                       onClick={() => { setSelectedPortfolioId('all'); setDropdownOpen(false); setSubTab('holdings') }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${selectedPortfolioId === 'all' ? 'bg-[var(--sidebar-active-bg)] text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
@@ -392,7 +522,7 @@ export default function MutualFundsPage() {
                                 {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
-                              <p className="text-xs text-[var(--text-dim)]">{p.ownerName} · {p.platform} · {p.fundCount} funds</p>
+                              <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
                             </div>
                             <div className="text-right">
                               <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.currentValue)}</p>
@@ -489,6 +619,56 @@ export default function MutualFundsPage() {
             <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
           </div>
 
+          {/* ── Asset Class & Market Cap Breakdown ── */}
+          {breakdown && breakdown.assetList.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Asset Class */}
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Asset Allocation</p>
+                <div className="h-2.5 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
+                  {breakdown.assetList.map((c) => (
+                    <div key={c.name} className={`h-full ${ASSET_CLS_COLOR[c.name] || 'bg-slate-400'}`} style={{ width: `${c.pct}%` }} />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+                  {breakdown.assetList.map((c) => (
+                    <span key={c.name} className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+                      <span className={`w-1.5 h-1.5 rounded-full ${ASSET_CLS_COLOR[c.name] || 'bg-slate-400'}`} />
+                      {c.name} {c.pct.toFixed(0)}%
+                    </span>
+                  ))}
+                </div>
+                {!breakdown.hasDetailedAlloc && (
+                  <p className="text-[9px] text-[var(--text-dim)]/50 mt-1">Based on fund category. Add detailed allocations for accuracy.</p>
+                )}
+              </div>
+
+              {/* Market Cap */}
+              {breakdown.capList.length > 0 ? (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3">
+                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Market Cap Breakdown</p>
+                  <div className="h-2.5 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
+                    {breakdown.capList.map((c) => (
+                      <div key={c.name} className={`h-full ${CAP_COLOR[c.name] || 'bg-slate-400'}`} style={{ width: `${c.pct}%` }} />
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+                    {breakdown.capList.map((c) => (
+                      <span key={c.name} className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+                        <span className={`w-1.5 h-1.5 rounded-full ${CAP_COLOR[c.name] || 'bg-slate-400'}`} />
+                        {c.name} {c.pct.toFixed(0)}%
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3 flex items-center justify-center">
+                  <p className="text-[10px] text-[var(--text-dim)]">Add asset allocations per fund for market cap breakdown</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Sub-tabs + Actions ── */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
@@ -511,6 +691,16 @@ export default function MutualFundsPage() {
                 }`}
               >
                 <List size={12} /> Transactions ({transactions.length})
+              </button>
+              <button
+                onClick={() => setSubTab('allocations')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  subTab === 'allocations'
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <PieChart size={12} /> Allocations ({uniqueFunds.length})
               </button>
             </div>
 
@@ -562,7 +752,7 @@ export default function MutualFundsPage() {
                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold text-[var(--text-primary)]">{displayName(groupPortfolio.portfolioName)}</p>
-                        {groupPortfolio.ownerName && <span className="text-xs text-[var(--text-dim)]">({groupPortfolio.ownerName})</span>}
+                        {groupPortfolio.ownerName && <span className="text-xs text-[var(--text-dim)]">({mv(groupPortfolio.ownerName, 'name')})</span>}
                         <span className="text-xs text-[var(--text-dim)]">· {groupHoldings.filter(h => h.units > 0).length} funds</span>
                       </div>
                       <div className="flex items-center gap-4 text-xs tabular-nums">
@@ -1217,6 +1407,30 @@ export default function MutualFundsPage() {
               )}
             </>
           )}
+
+          {/* ── Allocations Tab ── */}
+          {subTab === 'allocations' && (
+            <>
+              {uniqueFunds.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--text-dim)] px-1">Configure asset class and market cap breakdown per fund for accurate portfolio analytics.</p>
+                  {uniqueFunds.map(fund => (
+                    <FundAllocationRow
+                      key={fund.fundCode}
+                      fund={fund}
+                      existing={assetAllocations?.find(a => a.fundCode === fund.fundCode)}
+                      onSave={updateAssetAllocation}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
+                  <PieChart size={28} className="text-[var(--text-dim)]" />
+                  <p className="text-sm text-[var(--text-muted)]">No funds to configure allocations for</p>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -1309,47 +1523,61 @@ function StatCard({ label, value, sub, positive, bold }) {
   )
 }
 
-/* ── Transaction Action Menu (3-dot dropdown) ── */
+/* ── Transaction Action Menu (3-dot dropdown via portal with backdrop) ── */
 function TxnActionMenu({ txn, isOpen, onToggle, onEdit, onDelete }) {
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    if (!isOpen) return
-    function handleClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) onToggle()
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [isOpen, onToggle])
+  const buttonRef = useRef(null)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
 
   if (!txn.transactionId) return null
 
+  function handleToggle(e) {
+    e.stopPropagation()
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    onToggle()
+  }
+
   return (
-    <div ref={menuRef} className="relative">
+    <>
       <button
-        onClick={(e) => { e.stopPropagation(); onToggle() }}
+        ref={buttonRef}
+        onClick={handleToggle}
         className="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
         title="Actions"
       >
         <MoreVertical size={14} />
       </button>
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-dropdown)] border border-[var(--border)] rounded-lg shadow-xl py-1 min-w-[120px]">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit() }}
-            className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] flex items-center gap-2 transition-colors"
+      {isOpen && createPortal(
+        <>
+          {/* Transparent backdrop to catch outside clicks */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            onClick={(e) => { e.stopPropagation(); onToggle() }}
+          />
+          {/* Menu */}
+          <div
+            style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
+            className="bg-[var(--bg-dropdown)] border border-white/10 rounded-lg shadow-2xl py-1 min-w-[120px] animate-fade-in"
           >
-            <Pencil size={12} /> Edit
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete() }}
-            className="w-full text-left px-3 py-2 text-xs text-[var(--accent-rose)] hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
-          >
-            <Trash2 size={12} /> Delete
-          </button>
-        </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit() }}
+              className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] flex items-center gap-2 transition-colors"
+            >
+              <Pencil size={12} /> Edit
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="w-full text-left px-3 py-2 text-xs text-[var(--accent-rose)] hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          </div>
+        </>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
 
@@ -1395,12 +1623,7 @@ function EditTxnForm({ txn, onSave, onCancel }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
-          />
+          <FormDateInput value={date} onChange={setDate} />
         </div>
         <div>
           <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Units</label>
@@ -1455,3 +1678,167 @@ function EditTxnForm({ txn, onSave, onCancel }) {
     </div>
   )
 }
+
+/* ── Fund Allocation Card ── */
+const ALLOC_COLORS = [
+  { key: 'Equity', color: 'bg-violet-500', label: 'Equity' },
+  { key: 'Debt', color: 'bg-sky-500', label: 'Debt' },
+  { key: 'Commodities', color: 'bg-yellow-500', label: 'Commodities' },
+  { key: 'Cash', color: 'bg-teal-400', label: 'Cash' },
+  { key: 'Real Estate', color: 'bg-slate-400', label: 'Other' },
+]
+const CAP_LABELS = [
+  { key: 'Large', color: 'bg-blue-500', label: 'Large' },
+  { key: 'Mid', color: 'bg-amber-500', label: 'Mid' },
+  { key: 'Small', color: 'bg-rose-500', label: 'Small' },
+]
+
+function FundAllocationRow({ fund, existing, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const [equity, setEquity] = useState(existing?.assetAllocation?.Equity || 0)
+  const [debt, setDebt] = useState(existing?.assetAllocation?.Debt || 0)
+  const [cash, setCash] = useState(existing?.assetAllocation?.Cash || 0)
+  const [commodities, setCommodities] = useState(existing?.assetAllocation?.Commodities || 0)
+  const [other, setOther] = useState(existing?.assetAllocation?.['Real Estate'] || 0)
+  const [largeCap, setLargeCap] = useState(existing?.equityAllocation?.Large || 0)
+  const [midCap, setMidCap] = useState(existing?.equityAllocation?.Mid || 0)
+  const [smallCap, setSmallCap] = useState(existing?.equityAllocation?.Small || 0)
+
+  const assetTotal = equity + debt + cash + commodities + other
+  const capTotal = largeCap + midCap + smallCap
+  const assetValid = assetTotal === 100 || assetTotal === 0
+  const capValid = capTotal === 100 || capTotal === 0 || equity === 0
+  const hasData = existing?.assetAllocation && Object.keys(existing.assetAllocation).length > 0
+  const hasCap = existing?.equityAllocation && Object.keys(existing.equityAllocation).length > 0
+
+  async function handleSave() {
+    if (!assetValid || !capValid) return
+    setSaving(true)
+    try {
+      await onSave({ fundCode: fund.fundCode, fundName: fund.fundName, equity, debt, cash, commodities, realEstate: other, largeCap, midCap, smallCap })
+      setSaved(true)
+      setEditing(false)
+      setTimeout(() => setSaved(false), 2000)
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{fund.fundName}</p>
+          <p className="text-[10px] text-[var(--text-dim)] tabular-nums mt-0.5">{fund.fundCode}</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 ml-3">
+          {saved && <Check size={14} className="text-emerald-400" />}
+          {!editing && (
+            <button onClick={() => setEditing(true)}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-md transition-colors">
+              <Pencil size={10} /> {hasData ? 'Edit' : 'Set'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Allocation bar + labels (always visible when data exists) */}
+      {hasData && !editing && (
+        <div className="px-4 pb-3">
+          <div className="h-2 rounded-full overflow-hidden bg-[var(--bg-inset)] flex mb-1.5">
+            {ALLOC_COLORS.map(({ key, color }) => {
+              const val = existing.assetAllocation[key] || 0
+              return val > 0 ? <div key={key} className={`h-full ${color}`} style={{ width: `${val}%` }} /> : null
+            })}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {ALLOC_COLORS.map(({ key, color, label }) => {
+              const val = existing.assetAllocation[key] || 0
+              return val > 0 ? (
+                <span key={key} className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] tabular-nums">
+                  <span className={`w-1.5 h-1.5 rounded-full ${color}`} />{val}% {label}
+                </span>
+              ) : null
+            })}
+            {hasCap && (
+              <span className="text-[11px] text-[var(--text-dim)] tabular-nums ml-1">
+                | {CAP_LABELS.map(({ key, label }) => {
+                  const val = existing.equityAllocation[key] || 0
+                  return val > 0 ? `${label[0]}${val}` : ''
+                }).filter(Boolean).join(' ')}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Not configured hint */}
+      {!hasData && !editing && (
+        <div className="px-4 pb-3">
+          <div className="h-2 rounded-full bg-[var(--bg-inset)] mb-1" />
+          <p className="text-[10px] text-[var(--text-dim)] italic">Not configured — click Set to add allocation data</p>
+        </div>
+      )}
+
+      {/* Edit form */}
+      {editing && (
+        <div className="px-4 pb-3 border-t border-[var(--border-light)] pt-3">
+          <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Asset Class %</p>
+          <div className="flex flex-wrap gap-2 mb-1">
+            {[
+              { label: 'Equity', val: equity, set: setEquity },
+              { label: 'Debt', val: debt, set: setDebt },
+              { label: 'Commodities', val: commodities, set: setCommodities },
+              { label: 'Cash', val: cash, set: setCash },
+              { label: 'Other', val: other, set: setOther },
+            ].map(f => (
+              <div key={f.label} className="w-20">
+                <label className="block text-[10px] text-[var(--text-dim)] mb-0.5">{f.label}</label>
+                <input type="number" min="0" max="100" value={f.val || ''} onChange={e => f.set(Number(e.target.value) || 0)}
+                  className="w-full px-1.5 py-1 text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-md tabular-nums text-center" />
+              </div>
+            ))}
+          </div>
+          <p className={`text-[10px] tabular-nums mb-2 ${assetValid ? 'text-[var(--text-dim)]' : 'text-[var(--accent-rose)] font-semibold'}`}>
+            Total: {assetTotal}% {!assetValid && '— must equal 100%'}
+          </p>
+
+          {equity > 0 && (
+            <>
+              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Equity Cap %</p>
+              <div className="flex flex-wrap gap-2 mb-1">
+                {[
+                  { label: 'Large', val: largeCap, set: setLargeCap },
+                  { label: 'Mid', val: midCap, set: setMidCap },
+                  { label: 'Small', val: smallCap, set: setSmallCap },
+                ].map(f => (
+                  <div key={f.label} className="w-20">
+                    <label className="block text-[10px] text-[var(--text-dim)] mb-0.5">{f.label}</label>
+                    <input type="number" min="0" max="100" value={f.val || ''} onChange={e => f.set(Number(e.target.value) || 0)}
+                      className="w-full px-1.5 py-1 text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-md tabular-nums text-center" />
+                  </div>
+                ))}
+              </div>
+              <p className={`text-[10px] tabular-nums mb-2 ${capValid ? 'text-[var(--text-dim)]' : 'text-[var(--accent-rose)] font-semibold'}`}>
+                Total: {capTotal}% {!capValid && '— must equal 100%'}
+              </p>
+            </>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving || !assetValid || !capValid}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <Save size={12} /> {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+

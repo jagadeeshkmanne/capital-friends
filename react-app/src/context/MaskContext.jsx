@@ -46,6 +46,11 @@ function maskPolicyNumber(val) {
   return '••••••' + val.slice(-4)
 }
 
+function maskName(val) {
+  if (!val || val.length < 2) return '•••'
+  return val.split(/\s+/).map((w) => w.charAt(0) + '•••').join(' ')
+}
+
 const MASK_FNS = {
   pan: maskPAN,
   aadhaar: maskAadhaar,
@@ -54,6 +59,7 @@ const MASK_FNS = {
   account: maskAccountNumber,
   clientId: maskClientId,
   policy: maskPolicyNumber,
+  name: maskName,
 }
 
 export function MaskProvider({ children }) {

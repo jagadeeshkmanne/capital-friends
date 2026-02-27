@@ -78,7 +78,7 @@ function getFamilyWealthData() {
     };
 
   } catch (error) {
-    logError('getFamilyWealthData', error);
+    log('ERROR getFamilyWealthData: ' + error.toString());
     return {
       success: false,
       error: error.message
@@ -229,7 +229,7 @@ function getPortfolioSummary(portfolioId) {
     };
 
   } catch (error) {
-    logError('getPortfolioSummary', error);
+    log('ERROR getPortfolioSummary: ' + error.toString());
     return {
       currentValue: 0,
       totalInvested: 0,
@@ -361,41 +361,6 @@ function getMemberLiabilitiesValue(memberId) {
 }
 
 /**
- * Get investment account by ID
- */
-function getInvestmentAccountById(accountId) {
-  const sheet = getSheet(CONFIG.investmentAccountsSheet);
-  if (!sheet) return null;
-
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 3; i <= sheet.getLastRow(); i++) {
-    const row = data[i - 1];
-    if (row[0] === accountId) {
-      return {
-        accountId: row[0],           // Column A
-        accountName: row[1],         // Column B
-        memberId: row[2],            // Column C
-        memberName: row[3],          // Column D
-        bankAccountId: row[4],       // Column E
-        bankAccountName: row[5],     // Column F
-        accountType: row[6],         // Column G
-        platformBroker: row[7],      // Column H
-        accountClientId: row[8],     // Column I - ADDED!
-        dematDpId: row[9],           // Column J - ADDED!
-        registeredEmail: row[10],    // Column K - ADDED!
-        registeredPhone: row[11],    // Column L - ADDED!
-        status: row[12],             // Column M
-        createdDate: row[13] ? row[13].toString() : '',  // Column N
-        lastUpdated: row[14] ? row[14].toString() : ''   // Column O
-      };
-    }
-  }
-
-  return null;
-}
-
-/**
  * Refresh dashboard with new family-centric layout
  */
 function refreshDashboard() {
@@ -423,7 +388,7 @@ function refreshDashboard() {
     return { success: true, message: 'Dashboard refreshed successfully!' };
 
   } catch (error) {
-    logError('refreshDashboard', error);
+    log('ERROR refreshDashboard: ' + error.toString());
     return { success: false, error: error.message };
   }
 }
@@ -821,7 +786,7 @@ function getRebalancingAlerts() {
     };
 
   } catch (error) {
-    logError('getRebalancingAlerts', error);
+    log('ERROR getRebalancingAlerts: ' + error.toString());
     return {
       success: false,
       alerts: [],
