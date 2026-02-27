@@ -308,15 +308,14 @@ function addGoal(goalData) {
     const newRow = lastDataRow + 1;
 
     // Prepare row data - static values only (formulas set separately)
-    // IMPORTANT: targetDate must be a local-timezone Date object — UTC dates may not work as sheet dates
-    const targetDate = parseSheetDate(goalData.targetDate);
+    // F (Target Date) written separately via setValue to ensure proper Date type
     const rowData = [
       goalId,                                    // A: Goal ID
       goalData.goalType || '',                   // B: Goal Type
       goalData.goalName || '',                   // C: Goal Name
       goalData.familyMember || 'Self',           // D: Family Member
       inflationAdjustedTarget,                   // E: Target Amount (inflated future value)
-      targetDate,                                // F: Target Date (local-timezone Date object)
+      '',                                        // F: placeholder (date set below)
       0,                                         // G: placeholder (formula below)
       0,                                         // H: placeholder (formula below)
       0,                                         // I: placeholder (formula below)
@@ -335,6 +334,8 @@ function addGoal(goalData) {
     ];
 
     sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+    // Write target date separately to ensure it's stored as a Date, not text
+    sheet.getRange(newRow, 6).setValue(parseSheetDate(goalData.targetDate));
 
     // Set LIVE FORMULAS for calculated columns (auto-update when portfolio values change)
     setGoalFormulas(sheet, newRow);
@@ -391,17 +392,17 @@ function editGoal(goalId, goalData) {
     const createdDate = sheet.getRange(rowIndex, 12).getValue();
 
     // Write static columns only (A-F, L-U) — skip formula columns G,H,I,J,K,N
-    // A-F: Core goal data
-    // IMPORTANT: targetDate must be a local-timezone Date object — UTC dates may not work as sheet dates
-    const targetDate = parseSheetDate(goalData.targetDate);
-    sheet.getRange(rowIndex, 1, 1, 6).setValues([[
+    // A-E: Core goal data (without date)
+    sheet.getRange(rowIndex, 1, 1, 5).setValues([[
       goalId,                                    // A: Goal ID (unchanged)
       goalData.goalType || '',                   // B: Goal Type
       goalData.goalName || '',                   // C: Goal Name
       goalData.familyMember || 'Self',           // D: Family Member
-      inflationAdjustedTarget,                   // E: Target Amount
-      targetDate                                 // F: Target Date (local-timezone Date object)
+      inflationAdjustedTarget                    // E: Target Amount
     ]]);
+    // F: Target Date — written separately via setValue to ensure proper Date type
+    // setValues with mixed types can serialize Dates as strings
+    sheet.getRange(rowIndex, 6).setValue(parseSheetDate(goalData.targetDate));
 
     // L-M: Metadata
     sheet.getRange(rowIndex, 12, 1, 2).setValues([[
@@ -950,6 +951,31 @@ function determineGoalStatus(currentAllocated, targetAmount, yearsToGo, expected
     // More than 30% behind - Critical
     return 'Critical';
   }
+}
+
+/**
+ * Fix goal dates stored as text in column F. Converts to proper Date objects
+ * using local-timezone constructor. Run via: _currentUserSpreadsheetId = 'ID'; fixGoalDates()
+ */
+function fixGoalDates() {
+  const sheet = getSheet('Goals');
+  if (!sheet) { Logger.log('Goals sheet not found'); return; }
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) { Logger.log('No goal data'); return; }
+  const range = sheet.getRange(3, 6, lastRow - 2, 1);
+  const values = range.getValues();
+  let fixed = 0;
+  for (let i = 0; i < values.length; i++) {
+    const val = values[i][0];
+    if (!val) continue;
+    if (val instanceof Date) { Logger.log('Row ' + (i+3) + ': already Date'); continue; }
+    const parsed = parseSheetDate(val);
+    values[i][0] = parsed;
+    fixed++;
+    Logger.log('Row ' + (i+3) + ': "' + val + '" → ' + parsed);
+  }
+  if (fixed > 0) { range.setValues(values); Logger.log('Fixed ' + fixed + ' date(s)'); }
+  else { Logger.log('No dates needed fixing'); }
 }
 
 // ============================================================================
