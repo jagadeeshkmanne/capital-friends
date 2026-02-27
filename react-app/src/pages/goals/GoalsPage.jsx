@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert } from 'lucide-react'
+import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, ChevronDown, ChevronRight, PieChart } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -13,6 +13,8 @@ import PageLoading from '../../components/PageLoading'
 
 const statusBadge = {
   'On Track': 'bg-blue-500/15 text-[var(--accent-blue)]',
+  Behind: 'bg-amber-500/15 text-[var(--accent-amber)]',
+  Critical: 'bg-rose-500/15 text-[var(--accent-rose)]',
   'Needs Attention': 'bg-amber-500/15 text-[var(--accent-amber)]',
   Achieved: 'bg-emerald-500/15 text-emerald-400',
   Paused: 'bg-slate-500/15 text-[var(--text-muted)]',
@@ -26,6 +28,8 @@ const priorityBadge = {
 
 const barColor = {
   'On Track': 'bg-blue-500',
+  Behind: 'bg-amber-500',
+  Critical: 'bg-rose-500',
   'Needs Attention': 'bg-amber-500',
   Achieved: 'bg-emerald-500',
   Paused: 'bg-slate-500',
@@ -33,7 +37,7 @@ const barColor = {
 
 export default function GoalsPage() {
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, mfHoldings, activeMembers } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, mfHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
 
@@ -41,6 +45,7 @@ export default function GoalsPage() {
   const [mappingGoal, setMappingGoal] = useState(null)
   const [withdrawalGoal, setWithdrawalGoal] = useState(null)
   const [showCelebration, setShowCelebration] = useState(null)
+  const [showAllocMgr, setShowAllocMgr] = useState(false)
   const prevAchievedRef = useRef(new Set())
 
   const filtered = useMemo(() => {
@@ -147,11 +152,37 @@ export default function GoalsPage() {
 
   async function handleDelete() {
     if (modal?.edit && await confirm('Delete this goal?', { title: 'Delete Goal', confirmLabel: 'Delete' })) {
+      // Capture shared portfolios BEFORE deleting so we can notify about freed allocations
+      const deletedGoalId = modal.edit.goalId
+      const deletedGoalName = modal.edit.goalName
+      const goalMappings = (goalPortfolioMappings || []).filter((m) => m.goalId === deletedGoalId)
+
       showBlockUI('Deleting...')
       try {
-        await deleteGoal(modal.edit.goalId)
-        showToast('Goal deleted')
+        await deleteGoal(deletedGoalId)
         setModal(null)
+
+        // Check if deleted goal shared any portfolios with other goals
+        if (goalMappings.length > 0) {
+          const sharedNames = goalMappings
+            .filter((m) => {
+              // Is this portfolio also linked to another goal?
+              return (goalPortfolioMappings || []).some((o) => o.portfolioId === m.portfolioId && o.goalId !== deletedGoalId)
+            })
+            .map((m) => {
+              const inv = allInvestments.find((it) => it.id === m.portfolioId)
+              return `${inv?.name || m.portfolioId} (${m.allocationPct}% freed)`
+            })
+
+          if (sharedNames.length > 0) {
+            showToast(`Goal deleted. ${sharedNames.join(', ')} — consider updating remaining goals' allocations`, 'warning', 6000)
+            setShowAllocMgr(true) // Auto-open allocation manager
+          } else {
+            showToast('Goal deleted')
+          }
+        } else {
+          showToast('Goal deleted')
+        }
       } catch (err) {
         showToast(err.message || 'Failed to delete goal', 'error')
       } finally {
@@ -159,6 +190,21 @@ export default function GoalsPage() {
       }
     }
   }
+
+  // Build allInvestments for delete-notification lookup (same as GoalPortfolioMapping)
+  const allInvestments = useMemo(() => {
+    const items = []
+    ;(mfPortfolios || []).filter((p) => p.status !== 'Inactive').forEach((p) => {
+      items.push({ id: p.portfolioId, name: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value: p.currentValue || 0 })
+    })
+    ;(stockPortfolios || []).filter((p) => p.status !== 'Inactive').forEach((p) => {
+      items.push({ id: p.portfolioId, name: p.portfolioName, value: p.currentValue || 0 })
+    })
+    ;(otherInvList || []).filter((i) => i.status === 'Active').forEach((i) => {
+      items.push({ id: i.investmentId, name: i.investmentName, value: i.currentValue || 0 })
+    })
+    return items
+  }, [mfPortfolios, stockPortfolios, otherInvList])
 
   function getProgress(g) {
     if (!g.targetAmount || g.targetAmount === 0) return 0
@@ -278,6 +324,18 @@ export default function GoalsPage() {
             </div>
           )}
 
+          {/* Allocation Manager */}
+          {(goalPortfolioMappings || []).length > 0 && (
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+              <button onClick={() => setShowAllocMgr((v) => !v)} className="w-full flex items-center gap-2 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors">
+                {showAllocMgr ? <ChevronDown size={14} className="text-[var(--text-dim)]" /> : <ChevronRight size={14} className="text-[var(--text-dim)]" />}
+                <PieChart size={14} className="text-violet-400" />
+                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Investment Allocation Manager</span>
+              </button>
+              {showAllocMgr && <AllocationManager mappings={goalPortfolioMappings} goals={filtered} mfPortfolios={mfPortfolios} stockPortfolios={stockPortfolios} otherInvList={otherInvList} />}
+            </div>
+          )}
+
           {/* Header with Add */}
           <div className="flex items-center justify-end gap-2 px-1">
             <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
@@ -345,9 +403,15 @@ export default function GoalsPage() {
                         </td>
                         <td className="py-2.5 px-2">
                           <div className="flex items-center gap-1">
-                            <button onClick={() => setMappingGoal(g)} className="p-1.5 rounded-md text-violet-400 hover:bg-violet-500/15 transition-colors" title="Link portfolios">
-                              <Link2 size={13} />
-                            </button>
+                            {(() => {
+                              const linked = (goalPortfolioMappings || []).filter((m) => m.goalId === g.goalId).length
+                              return (
+                                <button onClick={() => setMappingGoal(g)} className={`relative p-1.5 rounded-md transition-colors ${linked > 0 ? 'text-violet-400 hover:bg-violet-500/15' : 'text-amber-400 hover:bg-amber-500/15'}`} title={linked > 0 ? `${linked} investment(s) linked` : 'No investments linked — click to link'}>
+                                  <Link2 size={13} />
+                                  {linked === 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />}
+                                </button>
+                              )
+                            })()}
                             <button onClick={() => setWithdrawalGoal(g)} className="p-1.5 rounded-md text-[var(--text-dim)] hover:text-emerald-400 hover:bg-emerald-500/15 transition-colors" title="Withdrawal plan">
                               <ArrowDownCircle size={13} />
                             </button>
@@ -375,9 +439,12 @@ export default function GoalsPage() {
                         <p className="text-sm font-medium text-[var(--text-primary)]">{g.goalName}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-[var(--text-muted)]">{memberLabel(g)} · SIP {formatINR(g.monthlyInvestment)}/mo</span>
-                          {goalPortfolioMappings.filter((m) => m.goalId === g.goalId).length > 0 && (
-                            <span className="text-[10px] font-semibold text-violet-400 flex items-center gap-0.5"><Link2 size={9} />{goalPortfolioMappings.filter((m) => m.goalId === g.goalId).length}</span>
-                          )}
+                          {(() => {
+                            const linked = (goalPortfolioMappings || []).filter((m) => m.goalId === g.goalId).length
+                            return linked > 0
+                              ? <span className="text-[10px] font-semibold text-violet-400 flex items-center gap-0.5"><Link2 size={9} />{linked}</span>
+                              : <span className="text-[10px] font-semibold text-amber-400 flex items-center gap-0.5"><Link2 size={9} />Unlinked</span>
+                          })()}
                         </div>
                       </div>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
@@ -437,6 +504,93 @@ function StatCard({ label, value, sub, positive, bold }) {
         {value}
       </p>
       {sub && <p className="text-xs text-[var(--text-dim)] mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function AllocationManager({ mappings, goals, mfPortfolios, stockPortfolios, otherInvList }) {
+  // Build investment lookup
+  const investments = useMemo(() => {
+    const map = {}
+    ;(mfPortfolios || []).forEach((p) => {
+      map[p.portfolioId] = { name: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value: p.currentValue || 0, type: 'MF' }
+    })
+    ;(stockPortfolios || []).forEach((p) => {
+      map[p.portfolioId] = { name: p.portfolioName, value: p.currentValue || 0, type: 'Stock' }
+    })
+    ;(otherInvList || []).forEach((i) => {
+      map[i.investmentId] = { name: i.investmentName, value: i.currentValue || 0, type: 'Other' }
+    })
+    return map
+  }, [mfPortfolios, stockPortfolios, otherInvList])
+
+  // Group mappings by investment
+  const byInvestment = useMemo(() => {
+    const map = {}
+    ;(mappings || []).forEach((m) => {
+      if (!map[m.portfolioId]) map[m.portfolioId] = []
+      const goal = (goals || []).find((g) => g.goalId === m.goalId)
+      map[m.portfolioId].push({ goalId: m.goalId, goalName: goal?.goalName || m.goalId, pct: m.allocationPct })
+    })
+    return Object.entries(map).map(([id, goalAllocs]) => {
+      const inv = investments[id] || { name: id, value: 0, type: '?' }
+      const totalPct = goalAllocs.reduce((s, g) => s + g.pct, 0)
+      return { id, name: inv.name, value: inv.value, type: inv.type, goals: goalAllocs, totalPct, free: Math.max(0, 100 - totalPct) }
+    }).sort((a, b) => b.totalPct - a.totalPct)
+  }, [mappings, goals, investments])
+
+  if (byInvestment.length === 0) return null
+
+  const typeLabel = { MF: 'MF', Stock: 'Stock', Other: 'Other' }
+  const typeColor = { MF: 'text-blue-400', Stock: 'text-emerald-400', Other: 'text-amber-400' }
+
+  return (
+    <div className="px-4 pb-4 space-y-2">
+      <p className="text-[10px] text-[var(--text-dim)] mb-2">
+        Shows how each investment is split across goals. Total should not exceed 100%.
+      </p>
+      {byInvestment.map((inv) => (
+        <div key={inv.id} className={`rounded-lg border p-3 ${inv.totalPct > 100 ? 'border-rose-500/40 bg-rose-500/5' : 'border-[var(--border-light)] bg-[var(--bg-inset)]'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold ${typeColor[inv.type] || 'text-[var(--text-dim)]'}`}>{typeLabel[inv.type] || inv.type}</span>
+              <span className="text-xs font-medium text-[var(--text-primary)]">{inv.name}</span>
+              <span className="text-[10px] text-[var(--text-dim)]">{formatINR(inv.value)}</span>
+            </div>
+            <span className={`text-xs font-bold tabular-nums ${inv.totalPct > 100 ? 'text-rose-400' : inv.totalPct === 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {inv.totalPct}% allocated
+            </span>
+          </div>
+          {/* Stacked bar */}
+          <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden flex mb-1.5">
+            {inv.goals.map((g, i) => (
+              <div
+                key={i}
+                className={`h-full ${['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500'][i % 6]}`}
+                style={{ width: `${Math.min(g.pct, 100)}%` }}
+                title={`${g.goalName}: ${g.pct}%`}
+              />
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {inv.goals.map((g, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500'][i % 6]}`} />
+                <span className="text-[10px] text-[var(--text-secondary)]">{g.goalName}</span>
+                <span className="text-[10px] font-bold text-[var(--text-primary)] tabular-nums">{g.pct}%</span>
+              </div>
+            ))}
+            {inv.free > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)]" />
+                <span className="text-[10px] text-[var(--text-dim)]">Unallocated</span>
+                <span className="text-[10px] font-bold text-[var(--text-dim)] tabular-nums">{inv.free}%</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

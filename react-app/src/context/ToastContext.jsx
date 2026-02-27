@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
-import { CheckCircle2, XCircle, X } from 'lucide-react'
+import { CheckCircle2, XCircle, AlertTriangle, X } from 'lucide-react'
 
 const ToastContext = createContext()
 
@@ -8,10 +8,10 @@ export function ToastProvider({ children }) {
   const [blockUI, setBlockUI] = useState(null)
   const idRef = useRef(0)
 
-  const showToast = useCallback((message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success', duration = 3000) => {
     const id = ++idRef.current
     setToasts((prev) => [...prev, { id, message, type }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), duration)
   }, [])
 
   const dismiss = useCallback((id) => {
@@ -49,11 +49,13 @@ export function ToastProvider({ children }) {
               className={`pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-xl border text-sm font-medium animate-fade-in ${
                 t.type === 'error'
                   ? 'bg-rose-500/15 border-rose-500/30 text-[var(--accent-rose)]'
+                  : t.type === 'warning'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
                   : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
               }`}
               style={{ backdropFilter: 'blur(12px)' }}
             >
-              {t.type === 'error' ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+              {t.type === 'error' ? <XCircle size={16} /> : t.type === 'warning' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
               <span>{t.message}</span>
               <button onClick={() => dismiss(t.id)} className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
                 <X size={14} />
