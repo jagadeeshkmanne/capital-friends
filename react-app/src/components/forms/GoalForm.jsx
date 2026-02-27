@@ -277,7 +277,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
           </FormField>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Family Member" error={errors.familyMemberId}>
+          <FormField label="For" error={errors.familyMemberId}>
             <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
           </FormField>
           <FormField label="Target Date" required error={errors.targetDate}>
@@ -392,7 +392,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
             <FormInput value={form.goalName} onChange={(v) => set('goalName', v)} placeholder="e.g., Retirement Fund (2045)" />
           </FormField>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Family Member" error={errors.familyMemberId}>
+            <FormField label="For" error={errors.familyMemberId}>
               <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
             </FormField>
             <FormField label="Priority">
