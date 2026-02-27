@@ -140,7 +140,7 @@ function getAllGoalsWithMappings() {
         goalId: goal.goalId,
         goalType: goal.goalType,
         goalName: goal.goalName,
-        familyMember: goal.familyMember,
+        familyMemberName: goal.familyMemberName,
         targetAmount: Number(goal.targetAmount) || 0,
         targetDate: goal.targetDate || new Date().toISOString(),
         monthlyInvestment: Number(goal.monthlyInvestment) || 0,
@@ -157,6 +157,7 @@ function getAllGoalsWithMappings() {
         expectedCAGR: Number(goal.expectedCAGR) || 0.12,
         monthlyExpenses: goal.monthlyExpenses || null,
         emergencyMonths: goal.emergencyMonths || null,
+        lumpsumInvested: goal.lumpsumInvested || null,
         portfolioMappings: portfolioMappings
       };
     });
@@ -1139,6 +1140,67 @@ function showGoalWithdrawalPlanDialog() {
     .setWidth(700)
     .setHeight(650);
   SpreadsheetApp.getUi().showModalDialog(html, '💸 Goal Withdrawal Planning');
+}
+
+// ============================================================================
+// MIGRATION — GoalPortfolioMapping column G + Goal formulas
+// ============================================================================
+
+/**
+ * Migrate GoalPortfolioMapping sheet to 7-column format and refresh goal formulas.
+ * Safe to call multiple times — checks current state before acting.
+ * Called automatically from loadAllData() so existing users get upgraded transparently.
+ */
+function migrateGoalMappingSheet() {
+  try {
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('GoalPortfolioMapping');
+    if (!sheet) return { migrated: false, reason: 'Sheet not found' };
+
+    const lastCol = sheet.getLastColumn();
+
+    // Check if column G header already exists
+    if (lastCol >= 7) {
+      const header = sheet.getRange(2, 7).getValue();
+      if (header === 'Investment Type') {
+        return { migrated: false, reason: 'Already migrated' };
+      }
+    }
+
+    // Add column G header
+    sheet.getRange(2, 7).setValue('Investment Type');
+
+    // Backfill existing data rows with "MF" (all existing mappings are MF)
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 3) {
+      const numRows = lastRow - 2;
+      const values = [];
+      for (let i = 0; i < numRows; i++) {
+        values.push(['MF']);
+      }
+      sheet.getRange(3, 7, numRows, 1).setValues(values);
+    }
+
+    // Set column width
+    sheet.setColumnWidth(7, 120);
+
+    // Refresh goal formulas so column I uses the 3-way SUMPRODUCT
+    const goalsSheet = ss.getSheetByName('Goals');
+    if (goalsSheet) {
+      const goalData = goalsSheet.getRange('A3:A').getValues();
+      for (let i = 0; i < goalData.length; i++) {
+        if (goalData[i][0]) {
+          setGoalFormulas(goalsSheet, i + 3);
+        }
+      }
+    }
+
+    log('GoalPortfolioMapping migrated to 7-column format');
+    return { migrated: true, message: 'Migration complete' };
+  } catch (e) {
+    log('Migration error: ' + e.message);
+    return { migrated: false, error: e.message };
+  }
 }
 
 // ============================================================================

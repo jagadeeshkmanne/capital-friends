@@ -400,6 +400,13 @@ function loadAllData() {
     log('Auto-refresh failed (non-blocking): ' + e.message);
   }
 
+  // Migrate GoalPortfolioMapping to 7-column format if needed (transparent)
+  try {
+    migrateGoalMappingSheet();
+  } catch (e) {
+    log('Goal mapping migration (non-blocking): ' + e.message);
+  }
+
   return {
     members: safeCall(getAllFamilyMembers),
     bankAccounts: safeCall(getAllBankAccounts),
