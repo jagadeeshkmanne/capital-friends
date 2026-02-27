@@ -818,11 +818,26 @@ function calculateYearsToGo(targetDate) {
  * @param {number} row - Row number to set formulas on
  */
 function setGoalFormulas(sheet, row) {
-  // I: Current Allocated — 3-way SUMPRODUCT across MF, Stock, and Other investments
-  // Each term filters by Investment Type (col G) and looks up currentValue from the correct sheet
-  // MF: AllPortfolios col I (data row 4+), Stock: StockPortfolios col F (data row 3+), Other: OtherInvestments col I (data row 3+)
-  const currentAllocatedFormula =
-    `=IFERROR(SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="MF")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0))+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Stock")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(StockPortfolios!F$3:F$200,MATCH(GoalPortfolioMapping!D$3:D$200,StockPortfolios!A$3:A$200,0)),0))+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Other")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(OtherInvestments!I$3:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,OtherInvestments!A$3:A$200,0)),0)),0)`;
+  // I: Current Allocated — SUMPRODUCT across MF, Stock, and Other investments
+  // Only includes terms for sheets that actually exist (missing sheet refs cause #REF! that IFERROR can't catch)
+  const ss = sheet.getParent();
+
+  // MF term (AllPortfolios) — always exists
+  const mfTerm = `SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="MF")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0))`;
+
+  // Stock term — only if StockPortfolios sheet exists
+  const hasStocks = !!ss.getSheetByName('StockPortfolios');
+  const stockTerm = hasStocks
+    ? `+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Stock")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(StockPortfolios!F$3:F$200,MATCH(GoalPortfolioMapping!D$3:D$200,StockPortfolios!A$3:A$200,0)),0))`
+    : '';
+
+  // Other term — only if OtherInvestments sheet exists
+  const hasOther = !!ss.getSheetByName('OtherInvestments');
+  const otherTerm = hasOther
+    ? `+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Other")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(OtherInvestments!I$3:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,OtherInvestments!A$3:A$200,0)),0))`
+    : '';
+
+  const currentAllocatedFormula = `=IFERROR(${mfTerm}${stockTerm}${otherTerm},0)`;
 
   // J: Gap Amount = Target - Current Allocated
   const gapFormula = `=IF(A${row}="","",MAX(0,E${row}-I${row}))`;
