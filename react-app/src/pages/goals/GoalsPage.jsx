@@ -33,7 +33,7 @@ const barColor = {
 
 export default function GoalsPage() {
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, mfHoldings } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, mfHoldings, activeMembers } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
 
@@ -48,6 +48,13 @@ export default function GoalsPage() {
     const active = goalList.filter((g) => g.isActive !== false)
     return selectedMember === 'all' ? active : active.filter((g) => g.familyMemberId === selectedMember)
   }, [goalList, selectedMember])
+
+  // Lookup member name with relationship
+  function memberLabel(g) {
+    if (!g.familyMemberName || g.familyMemberName === 'Family') return g.familyMemberName || 'Family'
+    const m = (activeMembers || []).find((m) => m.memberName === g.familyMemberName)
+    return m?.relationship ? `${g.familyMemberName} (${m.relationship})` : g.familyMemberName
+  }
 
   const totalTarget = filtered.reduce((s, g) => s + (g.targetAmount || 0), 0)
   const totalCurrent = filtered.reduce((s, g) => s + (g.currentValue || 0), 0)
@@ -264,7 +271,7 @@ export default function GoalsPage() {
                   <div key={g.goalId} className="shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 min-w-[160px]">
                     <p className="text-xs font-semibold text-emerald-400">{g.goalName}</p>
                     <p className="text-sm font-bold text-[var(--text-primary)] mt-1">{formatINR(g.targetAmount)}</p>
-                    <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{g.familyMemberName}</p>
+                    <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{memberLabel(g)}</p>
                   </div>
                 ))}
               </div>
@@ -286,7 +293,7 @@ export default function GoalsPage() {
                 <thead>
                   <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                     <th className="text-left py-2.5 px-4 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Goal</th>
-                    {!member && <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Member</th>}
+                    {!member && <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">For</th>}
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                       <div>Amount</div>
                       <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Target</div>
@@ -314,7 +321,7 @@ export default function GoalsPage() {
                             {g.notes && <span className="text-xs text-[var(--text-dim)]">{g.notes}</span>}
                           </div>
                         </td>
-                        {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{g.familyMemberName}</td>}
+                        {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{memberLabel(g)}</td>}
                         <td className="py-2.5 px-3 text-right">
                           <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(g.currentValue)}</p>
                           <p className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(g.targetAmount)}</p>
@@ -367,7 +374,7 @@ export default function GoalsPage() {
                       <div>
                         <p className="text-sm font-medium text-[var(--text-primary)]">{g.goalName}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-[var(--text-muted)]">{g.familyMemberName} · SIP {formatINR(g.monthlyInvestment)}/mo</span>
+                          <span className="text-xs text-[var(--text-muted)]">{memberLabel(g)} · SIP {formatINR(g.monthlyInvestment)}/mo</span>
                           {goalPortfolioMappings.filter((m) => m.goalId === g.goalId).length > 0 && (
                             <span className="text-[10px] font-semibold text-violet-400 flex items-center gap-0.5"><Link2 size={9} />{goalPortfolioMappings.filter((m) => m.goalId === g.goalId).length}</span>
                           )}
