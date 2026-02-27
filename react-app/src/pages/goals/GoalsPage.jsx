@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, ChevronDown, ChevronRight, PieChart } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, ChevronDown, ChevronRight, PieChart, Save, X, Trash2, AlertTriangle } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -7,7 +7,6 @@ import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import Modal from '../../components/Modal'
 import GoalForm from '../../components/forms/GoalForm'
-import GoalPortfolioMapping from '../../components/forms/GoalPortfolioMapping'
 import GoalWithdrawalPlan from '../../components/forms/GoalWithdrawalPlan'
 import PageLoading from '../../components/PageLoading'
 
@@ -42,10 +41,9 @@ export default function GoalsPage() {
   const confirm = useConfirm()
 
   const [modal, setModal] = useState(null)
-  const [mappingGoal, setMappingGoal] = useState(null)
+  const [allocModal, setAllocModal] = useState(null) // null | { focusGoalId?: string }
   const [withdrawalGoal, setWithdrawalGoal] = useState(null)
   const [showCelebration, setShowCelebration] = useState(null)
-  const [showAllocMgr, setShowAllocMgr] = useState(false)
   const prevAchievedRef = useRef(new Set())
 
   const filtered = useMemo(() => {
@@ -64,6 +62,7 @@ export default function GoalsPage() {
   const totalTarget = filtered.reduce((s, g) => s + (g.targetAmount || 0), 0)
   const totalCurrent = filtered.reduce((s, g) => s + (g.currentValue || 0), 0)
   const totalSIP = filtered.reduce((s, g) => s + (g.monthlyInvestment || 0), 0)
+  const totalLumpsum = filtered.reduce((s, g) => s + (g.lumpsumNeeded || 0), 0)
   const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0
   const needsAttention = filtered.filter((g) => g.status === 'Needs Attention').length
   const achieved = filtered.filter((g) => g.status === 'Achieved').length
@@ -169,7 +168,7 @@ export default function GoalsPage() {
           )
           if (hadShared) {
             showToast('Goal deleted — shared allocations redistributed to remaining goals', 'success', 5000)
-            setShowAllocMgr(true)
+            setAllocModal({})
           } else {
             showToast('Goal deleted')
           }
@@ -224,7 +223,7 @@ export default function GoalsPage() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             <StatCard label="Goals" value={filtered.length} sub={achieved > 0 ? `${achieved} achieved` : undefined} />
             <StatCard label="Target" value={formatINR(totalTarget)} bold />
             <StatCard label="Current Value" value={formatINR(totalCurrent)} bold />
@@ -241,7 +240,8 @@ export default function GoalsPage() {
               positive={overallProgress >= 50}
               bold
             />
-            <StatCard label="Monthly SIP" value={formatINR(totalSIP)} sub={needsAttention > 0 ? `${needsAttention} need attention` : undefined} />
+            <StatCard label="Required SIP" value={formatINR(totalSIP)} sub={needsAttention > 0 ? `${needsAttention} need attention` : 'per month'} />
+            <StatCard label="Required Lumpsum" value={formatINR(totalLumpsum)} sub="one-time today" />
           </div>
 
           {/* Celebration banner */}
@@ -317,20 +317,11 @@ export default function GoalsPage() {
             </div>
           )}
 
-          {/* Allocation Manager */}
-          {(goalPortfolioMappings || []).length > 0 && (
-            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-              <button onClick={() => setShowAllocMgr((v) => !v)} className="w-full flex items-center gap-2 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors">
-                {showAllocMgr ? <ChevronDown size={14} className="text-[var(--text-dim)]" /> : <ChevronRight size={14} className="text-[var(--text-dim)]" />}
-                <PieChart size={14} className="text-violet-400" />
-                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Investment Allocation Manager</span>
-              </button>
-              {showAllocMgr && <AllocationManager mappings={goalPortfolioMappings} goals={filtered} mfPortfolios={mfPortfolios} stockPortfolios={stockPortfolios} otherInvList={otherInvList} />}
-            </div>
-          )}
-
-          {/* Header with Add */}
+          {/* Header with Add + Allocation Manager */}
           <div className="flex items-center justify-end gap-2 px-1">
+            <button onClick={() => setAllocModal({})} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
+              <PieChart size={14} /> Allocation Manager
+            </button>
             <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
               <Plus size={14} /> Add Goal
             </button>
@@ -350,7 +341,10 @@ export default function GoalsPage() {
                       <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Target</div>
                     </th>
                     <th className="text-center py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider min-w-[120px]">Progress</th>
-                    <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Monthly SIP</th>
+                    <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
+                      <div>Required SIP</div>
+                      <div className="text-[10px] font-medium text-[var(--text-dim)]">per month</div>
+                    </th>
                     <th className="text-center py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                       <div>Timeline</div>
                       <div className="text-[10px] font-medium text-[var(--text-dim)]">Years Left</div>
@@ -399,7 +393,7 @@ export default function GoalsPage() {
                             {(() => {
                               const linked = (goalPortfolioMappings || []).filter((m) => m.goalId === g.goalId).length
                               return (
-                                <button onClick={() => setMappingGoal(g)} className={`relative p-1.5 rounded-md transition-colors ${linked > 0 ? 'text-violet-400 hover:bg-violet-500/15' : 'text-amber-400 hover:bg-amber-500/15'}`} title={linked > 0 ? `${linked} investment(s) linked` : 'No investments linked — click to link'}>
+                                <button onClick={() => setAllocModal({ focusGoalId: g.goalId })} className={`relative p-1.5 rounded-md transition-colors ${linked > 0 ? 'text-violet-400 hover:bg-violet-500/15' : 'text-amber-400 hover:bg-amber-500/15'}`} title={linked > 0 ? `${linked} investment(s) linked` : 'No investments linked — click to link'}>
                                   <Link2 size={13} />
                                   {linked === 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />}
                                 </button>
@@ -471,9 +465,17 @@ export default function GoalsPage() {
         />
       </Modal>
 
-      <Modal open={!!mappingGoal} onClose={() => setMappingGoal(null)} title={`Link Portfolios — ${mappingGoal?.goalName || ''}`} wide>
-        {mappingGoal && (
-          <GoalPortfolioMapping goal={mappingGoal} onClose={() => setMappingGoal(null)} />
+      <Modal open={!!allocModal} onClose={() => setAllocModal(null)} title="Allocation Manager" wide>
+        {allocModal && (
+          <AllocationManager
+            mappings={goalPortfolioMappings}
+            goals={filtered}
+            allGoals={goalList}
+            mfPortfolios={mfPortfolios}
+            stockPortfolios={stockPortfolios}
+            otherInvList={otherInvList}
+            focusGoalId={allocModal.focusGoalId}
+          />
         )}
       </Modal>
 
@@ -501,89 +503,479 @@ function StatCard({ label, value, sub, positive, bold }) {
   )
 }
 
-function AllocationManager({ mappings, goals, mfPortfolios, stockPortfolios, otherInvList }) {
-  // Build investment lookup
+function AllocationManager({ mappings, goals, allGoals, mfPortfolios, stockPortfolios, otherInvList, focusGoalId }) {
+  const { updateGoalMappings } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+
+  function inferType(id) {
+    if (!id) return 'MF'
+    if (id.startsWith('PFL-STK-')) return 'Stock'
+    if (id.startsWith('INV-')) return 'Other'
+    return 'MF'
+  }
+
+  // === Shared data ===
   const investments = useMemo(() => {
     const map = {}
     ;(mfPortfolios || []).forEach((p) => {
-      map[p.portfolioId] = { name: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value: p.currentValue || 0, type: 'MF' }
+      map[p.portfolioId] = { name: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value: p.currentValue || 0, type: 'MF', owner: p.ownerName || '' }
     })
     ;(stockPortfolios || []).forEach((p) => {
-      map[p.portfolioId] = { name: p.portfolioName, value: p.currentValue || 0, type: 'Stock' }
+      map[p.portfolioId] = { name: p.portfolioName, value: p.currentValue || 0, type: 'Stock', owner: p.ownerName || '' }
     })
     ;(otherInvList || []).forEach((i) => {
-      map[i.investmentId] = { name: i.investmentName, value: i.currentValue || 0, type: 'Other' }
+      map[i.investmentId] = { name: i.investmentName, value: i.currentValue || 0, type: 'Other', owner: i.familyMemberName || '' }
     })
     return map
   }, [mfPortfolios, stockPortfolios, otherInvList])
 
-  // Group mappings by investment
+  const allInvestments = useMemo(() => {
+    const items = []
+    ;(mfPortfolios || []).filter((p) => p.status !== 'Inactive').forEach((p) => {
+      items.push({ id: p.portfolioId, name: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value: p.currentValue || 0, type: 'MF', owner: p.ownerName || '' })
+    })
+    ;(stockPortfolios || []).filter((p) => p.status !== 'Inactive').forEach((p) => {
+      items.push({ id: p.portfolioId, name: p.portfolioName, value: p.currentValue || 0, type: 'Stock', owner: p.ownerName || '' })
+    })
+    ;(otherInvList || []).filter((i) => i.status === 'Active').forEach((i) => {
+      items.push({ id: i.investmentId, name: i.investmentName, value: i.currentValue || 0, type: 'Other', owner: i.familyMemberName || '' })
+    })
+    return items
+  }, [mfPortfolios, stockPortfolios, otherInvList])
+
+  const mfItems = allInvestments.filter((it) => it.type === 'MF')
+  const stockItems = allInvestments.filter((it) => it.type === 'Stock')
+  const otherItems = allInvestments.filter((it) => it.type === 'Other')
+
+  // Group mappings by investment (for "By Investment" view)
   const byInvestment = useMemo(() => {
     const map = {}
     ;(mappings || []).forEach((m) => {
       if (!map[m.portfolioId]) map[m.portfolioId] = []
-      const goal = (goals || []).find((g) => g.goalId === m.goalId)
-      map[m.portfolioId].push({ goalId: m.goalId, goalName: goal?.goalName || m.goalId, pct: m.allocationPct })
+      const goal = (goals || []).find((g) => g.goalId === m.goalId) || (allGoals || []).find((g) => g.goalId === m.goalId)
+      map[m.portfolioId].push({ goalId: m.goalId, goalName: goal?.goalName || m.goalId, pct: m.allocationPct, investmentType: m.investmentType })
     })
     return Object.entries(map).map(([id, goalAllocs]) => {
       const inv = investments[id] || { name: id, value: 0, type: '?' }
       const totalPct = goalAllocs.reduce((s, g) => s + g.pct, 0)
       return { id, name: inv.name, value: inv.value, type: inv.type, goals: goalAllocs, totalPct, free: Math.max(0, 100 - totalPct) }
     }).sort((a, b) => b.totalPct - a.totalPct)
-  }, [mappings, goals, investments])
+  }, [mappings, goals, allGoals, investments])
 
-  if (byInvestment.length === 0) return null
+  // === View toggle ===
+  const [view, setView] = useState(focusGoalId ? 'goal' : 'investment')
+
+  // === BY INVESTMENT state ===
+  const [invEditing, setInvEditing] = useState(false)
+  const [invEdits, setInvEdits] = useState({})
+  const [invSaving, setInvSaving] = useState(false)
+  const invHasEdits = Object.keys(invEdits).length > 0
+
+  const getInvPct = useCallback((portfolioId, goalId, originalPct) => {
+    const key = `${portfolioId}:${goalId}`
+    return key in invEdits ? invEdits[key] : originalPct
+  }, [invEdits])
+
+  const invAllValid = useMemo(() => {
+    for (const inv of byInvestment) {
+      if (inv.goals.reduce((s, g) => s + getInvPct(inv.id, g.goalId, g.pct), 0) > 100) return false
+    }
+    return true
+  }, [byInvestment, getInvPct])
+
+  async function saveInvEdits() {
+    if (!invAllValid) return
+    setInvSaving(true)
+    showBlockUI('Saving allocations...')
+    try {
+      const affectedGoals = new Set()
+      for (const key of Object.keys(invEdits)) affectedGoals.add(key.split(':')[1])
+      for (const goalId of affectedGoals) {
+        const goalMappings = (mappings || [])
+          .filter((m) => m.goalId === goalId)
+          .map((m) => ({ portfolioId: m.portfolioId, allocationPct: `${m.portfolioId}:${goalId}` in invEdits ? invEdits[`${m.portfolioId}:${goalId}`] : m.allocationPct, investmentType: m.investmentType }))
+          .filter((m) => m.allocationPct > 0)
+        await updateGoalMappings(goalId, goalMappings)
+      }
+      showToast('Allocations updated')
+      setInvEdits({})
+      setInvEditing(false)
+    } catch (err) {
+      showToast(err.message || 'Failed to save', 'error')
+    } finally {
+      hideBlockUI()
+      setInvSaving(false)
+    }
+  }
+
+  // === BY GOAL state ===
+  const [expandedGoal, setExpandedGoal] = useState(focusGoalId || null)
+  const [localMappings, setLocalMappings] = useState(() => {
+    if (!focusGoalId) return []
+    return (mappings || []).filter((m) => m.goalId === focusGoalId).map((m) => ({
+      portfolioId: m.portfolioId, allocationPct: m.allocationPct, investmentType: m.investmentType || inferType(m.portfolioId),
+    }))
+  })
+  const [goalDirty, setGoalDirty] = useState(false)
+  const [goalSaving, setGoalSaving] = useState(false)
+
+  // Cross-goal allocation for the expanded goal
+  const otherGoalAllocs = useMemo(() => {
+    const map = {}
+    ;(mappings || []).forEach((m) => {
+      if (m.goalId === expandedGoal) return
+      if (!map[m.portfolioId]) map[m.portfolioId] = { total: 0, goals: [] }
+      map[m.portfolioId].total += m.allocationPct
+      const g = (goals || []).find((g2) => g2.goalId === m.goalId) || (allGoals || []).find((g2) => g2.goalId === m.goalId)
+      map[m.portfolioId].goals.push({ goalName: g?.goalName || m.goalId, pct: m.allocationPct })
+    })
+    return map
+  }, [mappings, expandedGoal, goals, allGoals])
+
+  const overAllocated = useMemo(() => {
+    const issues = []
+    for (const m of localMappings) {
+      const other = otherGoalAllocs[m.portfolioId]
+      const combined = (other?.total || 0) + (m.allocationPct || 0)
+      if (combined > 100) {
+        const item = allInvestments.find((it) => it.id === m.portfolioId)
+        issues.push({ name: item?.name || m.portfolioId, combined, excess: combined - 100 })
+      }
+    }
+    return issues
+  }, [localMappings, otherGoalAllocs, allInvestments])
+
+  const goalIsValid = overAllocated.length === 0
+
+  function expandGoal(goalId) {
+    const existing = (mappings || []).filter((m) => m.goalId === goalId).map((m) => ({
+      portfolioId: m.portfolioId, allocationPct: m.allocationPct, investmentType: m.investmentType || inferType(m.portfolioId),
+    }))
+    setLocalMappings(existing)
+    setExpandedGoal(goalId)
+    setGoalDirty(false)
+  }
+
+  function collapseGoal() {
+    setExpandedGoal(null)
+    setLocalMappings([])
+    setGoalDirty(false)
+  }
+
+  function toggleGoal(goalId) {
+    if (expandedGoal === goalId) collapseGoal()
+    else expandGoal(goalId)
+  }
+
+  function addLocalMapping() {
+    const used = new Set(localMappings.map((m) => m.portfolioId))
+    const available = allInvestments.find((item) => !used.has(item.id) && (otherGoalAllocs[item.id]?.total || 0) < 100)
+    if (!available) return
+    setLocalMappings((prev) => [...prev, { portfolioId: available.id, allocationPct: 0, investmentType: available.type }])
+    setGoalDirty(true)
+  }
+
+  function removeLocalMapping(idx) {
+    setLocalMappings((prev) => prev.filter((_, i) => i !== idx))
+    setGoalDirty(true)
+  }
+
+  function updateLocalMapping(idx, field, value) {
+    setLocalMappings((prev) => prev.map((m, i) => {
+      if (i !== idx) return m
+      if (field === 'allocationPct') {
+        const otherTotal = otherGoalAllocs[m.portfolioId]?.total || 0
+        const maxAllowed = Math.max(0, 100 - otherTotal)
+        return { ...m, allocationPct: Math.max(0, Math.min(maxAllowed, Number(value) || 0)) }
+      }
+      if (field === 'portfolioId') {
+        const item = allInvestments.find((it) => it.id === value)
+        const otherTotal = otherGoalAllocs[value]?.total || 0
+        const maxAllowed = Math.max(0, 100 - otherTotal)
+        return { ...m, portfolioId: value, investmentType: item?.type || inferType(value), allocationPct: Math.min(m.allocationPct, maxAllowed) }
+      }
+      return m
+    }))
+    setGoalDirty(true)
+  }
+
+  async function saveGoalMappings() {
+    if (!goalIsValid) return
+    setGoalSaving(true)
+    showBlockUI('Saving...')
+    try {
+      await updateGoalMappings(expandedGoal, localMappings.filter((m) => m.allocationPct > 0))
+      showToast('Allocation updated')
+      collapseGoal()
+    } catch (err) {
+      showToast(err.message || 'Failed to save', 'error')
+    } finally {
+      hideBlockUI()
+      setGoalSaving(false)
+    }
+  }
+
+  function switchView(v) {
+    if (invEditing) { setInvEdits({}); setInvEditing(false) }
+    if (goalDirty) collapseGoal()
+    setView(v)
+  }
 
   const typeLabel = { MF: 'MF', Stock: 'Stock', Other: 'Other' }
   const typeColor = { MF: 'text-blue-400', Stock: 'text-emerald-400', Other: 'text-amber-400' }
+  const barColors = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500']
 
   return (
-    <div className="px-4 pb-4 space-y-2">
-      <p className="text-[10px] text-[var(--text-dim)] mb-2">
-        Shows how each investment is split across goals. Total should not exceed 100%.
-      </p>
-      {byInvestment.map((inv) => (
-        <div key={inv.id} className={`rounded-lg border p-3 ${inv.totalPct > 100 ? 'border-rose-500/40 bg-rose-500/5' : 'border-[var(--border-light)] bg-[var(--bg-inset)]'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold ${typeColor[inv.type] || 'text-[var(--text-dim)]'}`}>{typeLabel[inv.type] || inv.type}</span>
-              <span className="text-xs font-medium text-[var(--text-primary)]">{inv.name}</span>
-              <span className="text-[10px] text-[var(--text-dim)]">{formatINR(inv.value)}</span>
-            </div>
-            <span className={`text-xs font-bold tabular-nums ${inv.totalPct > 100 ? 'text-rose-400' : inv.totalPct === 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {inv.totalPct}% allocated
-            </span>
-          </div>
-          {/* Stacked bar */}
-          <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden flex mb-1.5">
-            {inv.goals.map((g, i) => (
-              <div
-                key={i}
-                className={`h-full ${['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500'][i % 6]}`}
-                style={{ width: `${Math.min(g.pct, 100)}%` }}
-                title={`${g.goalName}: ${g.pct}%`}
-              />
-            ))}
-          </div>
-          {/* Legend */}
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {inv.goals.map((g, i) => (
-              <div key={i} className="flex items-center gap-1">
-                <span className={`w-2 h-2 rounded-full ${['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500'][i % 6]}`} />
-                <span className="text-[10px] text-[var(--text-secondary)]">{g.goalName}</span>
-                <span className="text-[10px] font-bold text-[var(--text-primary)] tabular-nums">{g.pct}%</span>
-              </div>
-            ))}
-            {inv.free > 0 && (
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)]" />
-                <span className="text-[10px] text-[var(--text-dim)]">Unallocated</span>
-                <span className="text-[10px] font-bold text-[var(--text-dim)] tabular-nums">{inv.free}%</span>
-              </div>
-            )}
-          </div>
+    <div className="space-y-3">
+      {/* Tab toggle + Edit controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 border border-[var(--border-light)]">
+          <button onClick={() => switchView('investment')}
+            className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-colors ${view === 'investment' ? 'bg-violet-500/20 text-violet-400' : 'text-[var(--text-dim)] hover:text-[var(--text-secondary)]'}`}>
+            By Investment
+          </button>
+          <button onClick={() => switchView('goal')}
+            className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-colors ${view === 'goal' ? 'bg-violet-500/20 text-violet-400' : 'text-[var(--text-dim)] hover:text-[var(--text-secondary)]'}`}>
+            By Goal
+          </button>
         </div>
-      ))}
+        {view === 'investment' && (
+          !invEditing ? (
+            byInvestment.length > 0 && <button onClick={() => setInvEditing(true)} className="flex items-center gap-1 text-[10px] font-semibold text-violet-400 hover:text-violet-300 transition-colors">
+              <Pencil size={10} /> Edit
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => { setInvEdits({}); setInvEditing(false) }} disabled={invSaving} className="flex items-center gap-1 text-[10px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                <X size={10} /> Cancel
+              </button>
+              <button onClick={saveInvEdits} disabled={!invHasEdits || !invAllValid || invSaving} className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Save size={10} /> Save
+              </button>
+            </div>
+          )
+        )}
+      </div>
+
+      {/* ═══ By Investment view ═══ */}
+      {view === 'investment' && (
+        byInvestment.length === 0 ? (
+          <div className="py-8 text-center">
+            <PieChart size={24} className="mx-auto mb-2 text-[var(--text-dim)]" />
+            <p className="text-xs text-[var(--text-muted)]">No investments linked to goals yet</p>
+            <button onClick={() => switchView('goal')} className="text-xs font-semibold text-violet-400 hover:text-violet-300 mt-2">
+              Switch to "By Goal" to start linking
+            </button>
+          </div>
+        ) : byInvestment.map((inv) => {
+          const editedTotal = inv.goals.reduce((s, g) => s + getInvPct(inv.id, g.goalId, g.pct), 0)
+          const editedFree = Math.max(0, 100 - editedTotal)
+          return (
+            <div key={inv.id} className={`rounded-lg border p-3 ${editedTotal > 100 ? 'border-rose-500/40 bg-rose-500/5' : 'border-[var(--border-light)] bg-[var(--bg-inset)]'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold ${typeColor[inv.type] || 'text-[var(--text-dim)]'}`}>{typeLabel[inv.type] || inv.type}</span>
+                  <span className="text-xs font-medium text-[var(--text-primary)]">{inv.name}</span>
+                  <span className="text-[10px] text-[var(--text-dim)]">{formatINR(inv.value)}</span>
+                </div>
+                <span className={`text-xs font-bold tabular-nums ${editedTotal > 100 ? 'text-rose-400' : editedTotal === 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {editedTotal}% allocated
+                </span>
+              </div>
+              <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden flex mb-1.5">
+                {inv.goals.map((g, i) => (
+                  <div key={i} className={`h-full ${barColors[i % 6]}`} style={{ width: `${Math.min(getInvPct(inv.id, g.goalId, g.pct), 100)}%` }} title={`${g.goalName}: ${getInvPct(inv.id, g.goalId, g.pct)}%`} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {inv.goals.map((g, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${barColors[i % 6]}`} />
+                    <span className="text-[10px] text-[var(--text-secondary)]">{g.goalName}</span>
+                    {invEditing ? (
+                      <>
+                        <input type="number" value={getInvPct(inv.id, g.goalId, g.pct)} onChange={(e) => setInvEdits((prev) => ({ ...prev, [`${inv.id}:${g.goalId}`]: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                          className="w-12 px-1 py-0.5 text-[10px] text-center font-bold bg-[var(--bg-input)] border border-[var(--border-input)] rounded text-[var(--text-primary)] focus:outline-none focus:border-violet-400 tabular-nums" min="0" max="100" />
+                        <span className="text-[10px] text-[var(--text-dim)]">%</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] font-bold text-[var(--text-primary)] tabular-nums">{g.pct}%</span>
+                    )}
+                  </div>
+                ))}
+                {editedFree > 0 && (
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)]" />
+                    <span className="text-[10px] text-[var(--text-dim)]">Unallocated</span>
+                    <span className="text-[10px] font-bold text-[var(--text-dim)] tabular-nums">{editedFree}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })
+      )}
+
+      {/* ═══ By Goal view ═══ */}
+      {view === 'goal' && (
+        <div className="space-y-2">
+          {goals.map((goal) => {
+            const isExpanded = expandedGoal === goal.goalId
+            const goalMaps = isExpanded ? localMappings : (mappings || []).filter((m) => m.goalId === goal.goalId)
+            const linkedValue = goalMaps.reduce((s, m) => {
+              const inv = investments[m.portfolioId]
+              return s + (inv ? (inv.value * m.allocationPct) / 100 : 0)
+            }, 0)
+            const progress = goal.targetAmount > 0 ? Math.min((linkedValue / goal.targetAmount) * 100, 100) : 0
+            const hasLinks = goalMaps.length > 0
+
+            return (
+              <div key={goal.goalId} className={`rounded-lg border bg-[var(--bg-inset)] overflow-hidden ${isExpanded ? 'border-violet-500/30' : 'border-[var(--border-light)]'}`}>
+                {/* Collapsed header */}
+                <button onClick={() => toggleGoal(goal.goalId)} className="w-full p-3 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors text-left">
+                  {isExpanded ? <ChevronDown size={12} className="text-violet-400 shrink-0" /> : <ChevronRight size={12} className="text-[var(--text-dim)] shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-medium text-[var(--text-primary)] truncate">{goal.goalName}</span>
+                      {goal.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${statusBadge[goal.status] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>{goal.status}</span>}
+                      {!hasLinks && <span className="text-[10px] font-semibold text-amber-400 shrink-0">Unlinked</span>}
+                    </div>
+                    {hasLinks ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-[var(--bg-card)] rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${progress >= 100 ? 'bg-emerald-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500'}`} style={{ width: `${progress}%` }} />
+                        </div>
+                        <span className="text-[10px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(linkedValue)} / {formatINR(goal.targetAmount)}</span>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-[var(--text-dim)]">Click to link investments</p>
+                    )}
+                  </div>
+                  {hasLinks && <span className="text-[10px] text-violet-400 font-semibold shrink-0">{goalMaps.length} linked</span>}
+                </button>
+
+                {/* Expanded — full CRUD */}
+                {isExpanded && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-[var(--border-light)]">
+                    {/* Summary */}
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-[10px] text-[var(--text-dim)]">Goal Target</span>
+                      <span className="text-xs font-bold text-[var(--text-primary)]">{formatINR(goal.targetAmount)}</span>
+                    </div>
+
+                    {/* Mapping rows */}
+                    {localMappings.map((m, idx) => {
+                      const item = allInvestments.find((it) => it.id === m.portfolioId)
+                      const other = otherGoalAllocs[m.portfolioId]
+                      const otherTotal = other?.total || 0
+                      const available = 100 - otherTotal
+                      const combined = otherTotal + (m.allocationPct || 0)
+                      return (
+                        <div key={idx} className={`bg-[var(--bg-card)] rounded-lg border p-2.5 space-y-1.5 ${combined > 100 ? 'border-rose-500/40' : 'border-[var(--border-light)]'}`}>
+                          <select value={m.portfolioId} onChange={(e) => updateLocalMapping(idx, 'portfolioId', e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--sidebar-active-text)]">
+                            {mfItems.length > 0 && (
+                              <optgroup label="MF Portfolios">
+                                {mfItems.map((p) => {
+                                  const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
+                                  const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
+                                  return (
+                                    <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
+                                      {p.name}{p.owner ? ` (${p.owner})` : ''} — {formatINR(p.value)}{fullyUsed ? ' (Fully allocated)' : ''}
+                                    </option>
+                                  )
+                                })}
+                              </optgroup>
+                            )}
+                            {stockItems.length > 0 && (
+                              <optgroup label="Stock Portfolios">
+                                {stockItems.map((p) => {
+                                  const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
+                                  const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
+                                  return (
+                                    <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
+                                      {p.name}{p.owner ? ` (${p.owner})` : ''} — {formatINR(p.value)}{fullyUsed ? ' (Fully allocated)' : ''}
+                                    </option>
+                                  )
+                                })}
+                              </optgroup>
+                            )}
+                            {otherItems.length > 0 && (
+                              <optgroup label="Other Investments">
+                                {otherItems.map((p) => {
+                                  const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
+                                  const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
+                                  return (
+                                    <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
+                                      {p.name}{p.owner ? ` (${p.owner})` : ''} — {formatINR(p.value)}{fullyUsed ? ' (Fully allocated)' : ''}
+                                    </option>
+                                  )
+                                })}
+                              </optgroup>
+                            )}
+                          </select>
+                          {otherTotal > 0 && (
+                            <div className={`text-[10px] px-2 py-1 rounded ${combined > 100 ? 'bg-rose-500/10 text-rose-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                              {other.goals.map((g) => `${g.goalName} (${g.pct}%)`).join(', ')} — <span className="font-bold">Available: {Math.max(0, available)}%</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-[var(--text-dim)]">Allocation</span>
+                              <input type="number" value={m.allocationPct} onChange={(e) => updateLocalMapping(idx, 'allocationPct', e.target.value)}
+                                className="w-16 px-2 py-1 text-xs text-center bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-[var(--text-primary)] focus:outline-none focus:border-[var(--sidebar-active-text)]" min="0" max={available} />
+                              <span className="text-xs text-[var(--text-dim)]">%</span>
+                              <button onClick={() => removeLocalMapping(idx)} className="p-1 text-[var(--text-dim)] hover:text-rose-400 rounded transition-colors ml-1">
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                            {item && <p className="text-[10px] text-[var(--text-dim)]">Contributes {formatINR((item.value * m.allocationPct) / 100)}</p>}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {/* Over-allocation warnings */}
+                    {overAllocated.length > 0 && (
+                      <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <AlertTriangle size={12} className="text-rose-400 shrink-0" />
+                          <span className="text-[10px] font-bold text-rose-400 uppercase">Over-allocated</span>
+                        </div>
+                        {overAllocated.map((o, i) => (
+                          <p key={i} className="text-[10px] text-rose-300">{o.name}: {o.combined}% total (exceeds by {o.excess}%)</p>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add button — hide if all investments are either linked here or fully allocated elsewhere */}
+                    {(() => {
+                      const used = new Set(localMappings.map((m) => m.portfolioId))
+                      const canAdd = allInvestments.some((item) => !used.has(item.id) && (otherGoalAllocs[item.id]?.total || 0) < 100)
+                      return canAdd && (
+                        <button onClick={addLocalMapping} className="flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors mt-1">
+                          <Plus size={14} /> Link Investment
+                        </button>
+                      )
+                    })()}
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-light)]">
+                      <button onClick={collapseGoal} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={saveGoalMappings} disabled={!goalDirty || !goalIsValid || goalSaving}
+                        className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
