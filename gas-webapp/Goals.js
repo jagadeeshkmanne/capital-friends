@@ -308,15 +308,15 @@ function addGoal(goalData) {
     const newRow = lastDataRow + 1;
 
     // Prepare row data - static values only (formulas set separately)
-    // IMPORTANT: targetDate must be a Date object, not a string — strings cause #VALUE! in formulas
-    const targetDate = goalData.targetDate ? new Date(goalData.targetDate) : new Date();
+    // IMPORTANT: targetDate must be a local-timezone Date object — UTC dates may not work as sheet dates
+    const targetDate = parseSheetDate(goalData.targetDate);
     const rowData = [
       goalId,                                    // A: Goal ID
       goalData.goalType || '',                   // B: Goal Type
       goalData.goalName || '',                   // C: Goal Name
       goalData.familyMember || 'Self',           // D: Family Member
       inflationAdjustedTarget,                   // E: Target Amount (inflated future value)
-      targetDate,                                // F: Target Date (must be Date object)
+      targetDate,                                // F: Target Date (local-timezone Date object)
       0,                                         // G: placeholder (formula below)
       0,                                         // H: placeholder (formula below)
       0,                                         // I: placeholder (formula below)
@@ -392,15 +392,15 @@ function editGoal(goalId, goalData) {
 
     // Write static columns only (A-F, L-U) — skip formula columns G,H,I,J,K,N
     // A-F: Core goal data
-    // IMPORTANT: targetDate must be a Date object, not a string — strings cause #VALUE! in formulas
-    const targetDate = goalData.targetDate ? new Date(goalData.targetDate) : new Date();
+    // IMPORTANT: targetDate must be a local-timezone Date object — UTC dates may not work as sheet dates
+    const targetDate = parseSheetDate(goalData.targetDate);
     sheet.getRange(rowIndex, 1, 1, 6).setValues([[
       goalId,                                    // A: Goal ID (unchanged)
       goalData.goalType || '',                   // B: Goal Type
       goalData.goalName || '',                   // C: Goal Name
       goalData.familyMember || 'Self',           // D: Family Member
       inflationAdjustedTarget,                   // E: Target Amount
-      targetDate                                 // F: Target Date (must be Date object)
+      targetDate                                 // F: Target Date (local-timezone Date object)
     ]]);
 
     // L-M: Metadata
@@ -955,6 +955,23 @@ function determineGoalStatus(currentAllocated, targetAmount, yearsToGo, expected
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * Parse a date string into a local-timezone Date object for Google Sheets.
+ * new Date("YYYY-MM-DD") creates UTC midnight which GAS may not write as a
+ * proper sheet date. Using new Date(year, month-1, day) creates local midnight.
+ */
+function parseSheetDate(dateStr) {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  // Take just YYYY-MM-DD from any format (ISO string, date string, etc.)
+  const str = String(dateStr).substring(0, 10);
+  const parts = str.split('-');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  }
+  return new Date(dateStr);
+}
 
 /**
  * Generate Goal ID
