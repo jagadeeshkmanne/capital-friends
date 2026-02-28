@@ -275,7 +275,7 @@ function fetchIndicesViaYahoo() {
 }
 
 /**
- * Fetch gold and silver prices in INR
+ * Fetch gold and silver prices in INR via Yahoo Finance futures
  */
 function fetchMetalPrices() {
   var results = [];
@@ -306,41 +306,38 @@ function fetchMetalPrices() {
     log('USD/INR fetch failed: ' + e.message);
   }
 
-  // Fetch gold/silver prices in USD
-  try {
-    var goldUrl = 'https://api.metalpriceapi.com/v1/latest?api_key=demo&base=USD&currencies=XAU,XAG';
-    var goldResp = UrlFetchApp.fetch(goldUrl, { muteHttpExceptions: true });
-    if (goldResp.getResponseCode() === 200) {
-      var goldJson = JSON.parse(goldResp.getContentText());
-      if (goldJson.rates) {
-        var goldOzUsd = goldJson.rates.USDXAU ? (1 / goldJson.rates.USDXAU) : 0;
-        var silverOzUsd = goldJson.rates.USDXAG ? (1 / goldJson.rates.USDXAG) : 0;
+  // Fetch gold & silver via Yahoo Finance futures (GC=F, SI=F)
+  var metals = [
+    { yahoo: 'GC=F', name: 'Gold (24K)', symbol: 'XAU', gramsPerOz: 31.1035 },
+    { yahoo: 'SI=F', name: 'Silver', symbol: 'XAG', gramsPerOz: 31.1035 },
+  ];
 
-        if (goldOzUsd > 0) {
-          var goldGramInr = (goldOzUsd * usdInr) / 31.1035;
-          results.push({
-            name: 'Gold (24K)',
-            symbol: 'XAU',
-            price: Math.round(goldGramInr),
-            unit: '₹/gram',
-            type: 'metal'
-          });
-        }
+  for (var i = 0; i < metals.length; i++) {
+    try {
+      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(metals[i].yahoo) + '?range=1d&interval=1d';
+      var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (resp.getResponseCode() === 200) {
+        var json = JSON.parse(resp.getContentText());
+        var meta = json.chart.result[0].meta;
+        var priceUsd = meta.regularMarketPrice || 0;
+        var prevClose = meta.chartPreviousClose || meta.previousClose || priceUsd;
+        var changePct = prevClose > 0 ? ((priceUsd - prevClose) / prevClose) * 100 : 0;
 
-        if (silverOzUsd > 0) {
-          var silverGramInr = (silverOzUsd * usdInr) / 31.1035;
+        if (priceUsd > 0) {
+          var pricePerGramInr = (priceUsd * usdInr) / metals[i].gramsPerOz;
           results.push({
-            name: 'Silver',
-            symbol: 'XAG',
-            price: Math.round(silverGramInr),
+            name: metals[i].name,
+            symbol: metals[i].symbol,
+            price: Math.round(pricePerGramInr),
+            changePct: Math.round(changePct * 100) / 100,
             unit: '₹/gram',
             type: 'metal'
           });
         }
       }
+    } catch (e) {
+      log('Yahoo metal fetch failed for ' + metals[i].yahoo + ': ' + e.message);
     }
-  } catch (e) {
-    log('Metal price API failed: ' + e.message);
   }
 
   return results;

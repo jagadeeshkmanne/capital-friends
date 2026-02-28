@@ -1,6 +1,7 @@
-import { useMemo, useState, useRef, useCallback, Children } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, ChevronDown, Wallet, TrendingUp, TrendingDown, BarChart3, Building2, Landmark, AlertCircle, RefreshCw } from 'lucide-react'
+import { ChevronRight, Wallet, TrendingUp, TrendingDown, BarChart3, Building2, Landmark, AlertCircle, RefreshCw, X } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useData } from '../../context/DataContext'
 import PageLoading from '../../components/PageLoading'
 import { useFamily } from '../../context/FamilyContext'
@@ -39,7 +40,10 @@ function inferCategory(name) {
   return 'Other'
 }
 
-const ASSET_CLASS_COLORS = { Equity: 'bg-violet-500', Debt: 'bg-sky-500', Commodities: 'bg-yellow-500', Hybrid: 'bg-indigo-400', Cash: 'bg-teal-400', Other: 'bg-slate-400' }
+const ASSET_CLASS_COLORS = { Equity: 'bg-violet-500', Debt: 'bg-sky-500', Gold: 'bg-amber-400', Commodities: 'bg-yellow-500', 'Real Estate': 'bg-orange-500', Hybrid: 'bg-indigo-400', Cash: 'bg-teal-400', Other: 'bg-slate-400' }
+const ASSET_CLASS_HEX = { Equity: '#8b5cf6', Debt: '#0ea5e9', Gold: '#fbbf24', Commodities: '#eab308', 'Real Estate': '#f97316', Hybrid: '#818cf8', Cash: '#2dd4bf', Other: '#94a3b8' }
+const PRODUCT_HEX = { 'Mutual Funds': '#8b5cf6', Stocks: '#3b82f6', Other: '#10b981' }
+const PRODUCT_BG = { 'Mutual Funds': 'bg-violet-500', Stocks: 'bg-blue-500', Other: 'bg-emerald-500' }
 function assetClassColor(name) { return ASSET_CLASS_COLORS[name] || 'bg-slate-400' }
 
 export default function Dashboard() {
@@ -146,20 +150,18 @@ export default function Dashboard() {
       }
     }
 
-    const assetClasses = { Equity: 0, Debt: 0, Hybrid: 0, Commodities: 0, Cash: 0, Other: 0 }
+    const assetClasses = { Equity: 0, Debt: 0, Gold: 0, Hybrid: 0, Commodities: 0, 'Real Estate': 0, Cash: 0, Other: 0 }
 
     // MF holdings — use detailed allocation if available, else basic category
     activeMFHoldings.forEach((h) => {
       const detailed = allocMap[h.fundCode]
       if (detailed) {
-        // Detailed breakdown: { Equity: 75, Debt: 20, Cash: 5 }
         for (const [cls, pct] of Object.entries(detailed)) {
-          const key = cls === 'Commodities' ? 'Commodities' : cls === 'Real Estate' ? 'Other' : cls
-          if (key in assetClasses) assetClasses[key] += h.currentValue * (pct / 100)
+          if (cls in assetClasses) assetClasses[cls] += h.currentValue * (pct / 100)
+          else if (cls === 'Gold') assetClasses.Gold += h.currentValue * (pct / 100)
           else assetClasses.Other += h.currentValue * (pct / 100)
         }
       } else {
-        // Use server category, but if 'Other' or missing, infer from fund name
         let cat = h.category
         if (!cat || cat === 'Other') cat = inferCategory(h.fundName)
         if (cat === 'Equity' || cat === 'ELSS' || cat === 'Index') assetClasses.Equity += h.currentValue
@@ -183,9 +185,10 @@ export default function Dashboard() {
     // Other investments — categorize by type
     activeOther.forEach((inv) => {
       const t = (inv.investmentType || '').toLowerCase()
-      if (t.includes('gold') || t.includes('silver') || t.includes('commodity')) assetClasses.Commodities += inv.currentValue
+      if (t.includes('gold')) assetClasses.Gold += inv.currentValue
+      else if (t.includes('silver') || t.includes('commodity')) assetClasses.Commodities += inv.currentValue
       else if (t.includes('fd') || t.includes('fixed') || t.includes('bond') || t.includes('ppf') || t.includes('epf') || t.includes('nps') || t.includes('rd') || t.includes('nsc') || t.includes('ssy')) assetClasses.Debt += inv.currentValue
-      else if (t.includes('real estate') || t.includes('property')) assetClasses.Other += inv.currentValue
+      else if (t.includes('real estate') || t.includes('property')) assetClasses['Real Estate'] += inv.currentValue
       else assetClasses.Other += inv.currentValue
     })
 
@@ -193,7 +196,13 @@ export default function Dashboard() {
     const assetClassList = Object.entries(assetClasses)
       .filter(([, val]) => val > 0)
       .sort(([, a], [, b]) => b - a)
-      .map(([cls, val]) => ({ name: cls, value: val, pct: totalAssets > 0 ? (val / totalAssets) * 100 : 0 }))
+      .map(([cls, val]) => ({ name: cls, value: val, pct: totalAssets > 0 ? (val / totalAssets) * 100 : 0, fill: ASSET_CLASS_HEX[cls] || '#94a3b8' }))
+
+    // Product type breakdown for donut
+    const productList = []
+    if (mfCurrentValue > 0) productList.push({ name: 'Mutual Funds', value: mfCurrentValue, pct: totalAssets > 0 ? (mfCurrentValue / totalAssets) * 100 : 0, fill: PRODUCT_HEX['Mutual Funds'] })
+    if (stkCurrentValue > 0) productList.push({ name: 'Stocks', value: stkCurrentValue, pct: totalAssets > 0 ? (stkCurrentValue / totalAssets) * 100 : 0, fill: PRODUCT_HEX.Stocks })
+    if (otherCurrentValue > 0) productList.push({ name: 'Other', value: otherCurrentValue, pct: totalAssets > 0 ? (otherCurrentValue / totalAssets) * 100 : 0, fill: PRODUCT_HEX.Other })
 
     return {
       mfCurrentValue, mfInvested, mfPL, mfCount: activeMFPortfolios.length, mfPortfolioDetails,
@@ -204,7 +213,7 @@ export default function Dashboard() {
       bankCount: activeBankAccounts.length,
       totalAssets, totalInvested, totalPL, netWorth,
       buyOppCount, rebalanceCount,
-      assetClassList,
+      assetClassList, productList,
     }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, insurancePolicies, assetAllocations])
 
@@ -266,116 +275,35 @@ export default function Dashboard() {
       .slice(0, 5)
   }, [selectedMember, reminderList])
 
-  if (members === null || mfPortfolios === null) return <PageLoading title="Loading dashboard" cards={4} />
+  const [showBreakdown, setShowBreakdown] = useState(false)
+
+  if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading dashboard" cards={4} />
 
   return (
     <div className="space-y-4">
-      {/* Net Worth Hero */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-        <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Net Worth</p>
-        <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</p>
-
-        {/* Full breakdown */}
-        <div className="mt-3 space-y-0.5">
-          {/* Investments */}
-          <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Investments</p>
-
-          {data.mfCurrentValue > 0 && (
-            <ExpandableRow
-              dot="bg-violet-500"
-              label="Mutual Funds"
-              value={formatINR(data.mfCurrentValue)}
-              items={data.mfPortfolioDetails}
-              renderItem={(p) => (
-                <div key={p.name} className="flex items-center justify-between">
-                  <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{p.name}</span>
-                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(p.value)}</span>
-                </div>
-              )}
-            />
-          )}
-
-          {data.stkCurrentValue > 0 && (
-            <ExpandableRow
-              dot="bg-blue-500"
-              label="Stocks"
-              value={formatINR(data.stkCurrentValue)}
-              items={data.stkPortfolioDetails}
-              renderItem={(p) => (
-                <div key={p.name} className="flex items-center justify-between">
-                  <span className="text-[11px] text-[var(--text-dim)] truncate mr-2">{p.name}</span>
-                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(p.value)}</span>
-                </div>
-              )}
-            />
-          )}
-
-          {data.otherCurrentValue > 0 && (
-            <ExpandableRow
-              dot="bg-emerald-500"
-              label="Other Investments"
-              value={formatINR(data.otherCurrentValue)}
-              items={data.otherDetails}
-              renderItem={(item) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="min-w-0 mr-2">
-                    <span className="text-[11px] text-[var(--text-dim)] truncate block">{item.name}</span>
-                    <span className="text-[10px] text-[var(--text-dim)]/60">{item.type}</span>
-                  </div>
-                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums shrink-0">{formatINR(item.value)}</span>
-                </div>
-              )}
-            />
-          )}
-
-          {data.totalAssets > 0 && (data.mfCurrentValue > 0) + (data.stkCurrentValue > 0) + (data.otherCurrentValue > 0) > 1 && (
-            <div className="flex items-center justify-between pl-2 pt-0.5">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">Total</span>
-              <span className="text-xs font-bold text-[var(--text-secondary)] tabular-nums">{formatINR(data.totalAssets)}</span>
-            </div>
-          )}
-
-          {/* Liabilities */}
-          {data.totalLiabilities > 0 && (
-            <>
-              <div className="pt-1.5">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Liabilities</p>
-              </div>
-              <ExpandableRow
-                dot="bg-rose-500"
-                label={data.liabilityCount === 1 ? (data.liabilityDetails[0]?.type || 'Loan') : `${data.liabilityCount} Loans`}
-                value={<span className="text-[var(--accent-rose)]">&minus;{formatINR(data.totalLiabilities)}</span>}
-                valueClass="text-[var(--accent-rose)]"
-                items={data.liabilityDetails}
-                renderItem={(l) => (
-                  <div key={l.name + l.type} className="flex items-center justify-between">
-                    <div className="min-w-0 mr-2">
-                      <span className="text-[11px] text-[var(--text-dim)] truncate block">{l.name}</span>
-                      {l.emi > 0 && <span className="text-[10px] text-[var(--text-dim)]/60">EMI {formatINR(l.emi)}/mo</span>}
-                    </div>
-                    <span className="text-[11px] text-[var(--accent-rose)] tabular-nums shrink-0">{formatINR(l.balance)}</span>
-                  </div>
-                )}
-              />
-              {data.totalEMI > 0 && (
-                <div className="flex items-center justify-between pl-2">
-                  <span className="text-[11px] text-[var(--text-dim)]">Total EMI</span>
-                  <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{formatINR(data.totalEMI)}/mo</span>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Net Worth line */}
-          <div className="border-t border-dashed border-[var(--border-light)] pt-1.5 mt-1 flex items-center justify-between">
-            <span className="text-xs font-bold text-[var(--text-primary)]">= Net Worth</span>
-            <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</span>
-          </div>
+      {/* Net Worth Hero — tap to open breakdown modal */}
+      <div
+        className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+        onClick={() => setShowBreakdown(true)}
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Net Worth</p>
+          <ChevronRight size={14} className="text-[var(--text-dim)]" />
         </div>
+        <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums mt-1">{formatINR(data.netWorth)}</p>
+
+        {/* Stacked bar */}
+        {data.totalAssets > 0 && (
+          <div className="flex h-1.5 rounded-full overflow-hidden bg-[var(--bg-inset)] mt-2">
+            {data.mfCurrentValue > 0 && <div className="bg-violet-500" style={{ width: `${(data.mfCurrentValue / data.totalAssets) * 100}%` }} />}
+            {data.stkCurrentValue > 0 && <div className="bg-blue-500" style={{ width: `${(data.stkCurrentValue / data.totalAssets) * 100}%` }} />}
+            {data.otherCurrentValue > 0 && <div className="bg-emerald-500" style={{ width: `${(data.otherCurrentValue / data.totalAssets) * 100}%` }} />}
+          </div>
+        )}
 
         {/* P&L */}
         {data.totalInvested > 0 && (
-          <div className="mt-3 flex items-center gap-2 text-xs">
+          <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
             <span className="text-[var(--text-dim)]">Invested {formatINR(data.totalInvested)}</span>
             <span className="text-[var(--text-dim)]">&rarr;</span>
             <span className={`font-semibold ${plColor(data.totalPL)}`}>
@@ -383,46 +311,142 @@ export default function Dashboard() {
             </span>
           </div>
         )}
-
       </div>
 
-      {/* Allocation Carousel — Product Type + Asset Class */}
-      {data.totalAssets > 0 && (
-        <BreakdownCarousel>
-          {/* Slide 1: Product Allocation */}
-          <BreakdownSlide title="By Product">
-            <div className="h-2.5 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
-              {data.mfCurrentValue > 0 && <div className="bg-violet-500 h-full" style={{ width: `${(data.mfCurrentValue / data.totalAssets) * 100}%` }} />}
-              {data.stkCurrentValue > 0 && <div className="bg-blue-500 h-full" style={{ width: `${(data.stkCurrentValue / data.totalAssets) * 100}%` }} />}
-              {data.otherCurrentValue > 0 && <div className="bg-emerald-500 h-full" style={{ width: `${(data.otherCurrentValue / data.totalAssets) * 100}%` }} />}
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-              {data.mfCurrentValue > 0 && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><span className="w-1.5 h-1.5 rounded-full bg-violet-500" />MF {((data.mfCurrentValue / data.totalAssets) * 100).toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(data.mfCurrentValue)}</span></span>}
-              {data.stkCurrentValue > 0 && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" />Stocks {((data.stkCurrentValue / data.totalAssets) * 100).toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(data.stkCurrentValue)}</span></span>}
-              {data.otherCurrentValue > 0 && <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Other {((data.otherCurrentValue / data.totalAssets) * 100).toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(data.otherCurrentValue)}</span></span>}
-            </div>
-          </BreakdownSlide>
+      {/* Net Worth Breakdown Modal */}
+      {showBreakdown && (() => {
+        // Build donut data: investments + liabilities
+        const donutData = []
+        if (data.mfCurrentValue > 0) donutData.push({ name: 'Mutual Funds', value: data.mfCurrentValue, fill: PRODUCT_HEX['Mutual Funds'] })
+        if (data.stkCurrentValue > 0) donutData.push({ name: 'Stocks', value: data.stkCurrentValue, fill: PRODUCT_HEX.Stocks })
+        if (data.otherCurrentValue > 0) donutData.push({ name: 'Other Inv.', value: data.otherCurrentValue, fill: PRODUCT_HEX.Other })
+        const donutTotal = donutData.reduce((s, d) => s + d.value, 0)
+        donutData.forEach(d => { d.pct = donutTotal > 0 ? (d.value / donutTotal) * 100 : 0 })
 
-          {/* Slide 2: Asset Class */}
-          {data.assetClassList.length > 1 && (
-            <BreakdownSlide title="By Asset Class">
-              <div className="h-2.5 rounded-full overflow-hidden bg-[var(--bg-inset)] flex">
-                {data.assetClassList.map((c) => (
-                  <div key={c.name} className={`h-full ${assetClassColor(c.name)}`} style={{ width: `${c.pct}%` }} />
-                ))}
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setShowBreakdown(false)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div
+              className="relative w-full max-w-md max-h-[90vh] bg-[var(--bg-card)] rounded-t-2xl sm:rounded-2xl border border-[var(--border)] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Close button */}
+              <button onClick={() => setShowBreakdown(false)} className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)]">
+                <X size={16} className="text-[var(--text-muted)]" />
+              </button>
+
+              {/* Hero: Large donut with net worth centered */}
+              <div className="pt-6 pb-4 px-4">
+                <div className="relative w-[200px] h-[200px] mx-auto">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={donutData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={3} stroke="none">
+                        {donutData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.[0]) return null
+                          const d = payload[0].payload
+                          return (
+                            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 shadow-lg text-xs">
+                              <span className="font-semibold text-[var(--text-primary)]">{d.name}</span>
+                              <span className="text-[var(--text-muted)] ml-1.5">{formatINR(d.value)}</span>
+                            </div>
+                          )
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center label */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Net Worth</p>
+                    <p className="text-lg font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</p>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="flex justify-center gap-4 mt-2">
+                  {donutData.map(d => (
+                    <span key={d.name} className="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                      {d.name} {d.pct.toFixed(0)}%
+                    </span>
+                  ))}
+                </div>
+
+                {/* Assets - Liabilities = Net Worth */}
+                <div className="mt-3 space-y-1 text-xs">
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-[var(--text-dim)]">Total Investments</span>
+                    <span className="font-semibold text-[var(--text-secondary)] tabular-nums">{formatINR(data.totalAssets)}</span>
+                  </div>
+                  {data.totalLiabilities > 0 && (
+                    <div className="flex items-center justify-between px-2">
+                      <span className="text-[var(--text-dim)]">Liabilities</span>
+                      <span className="font-semibold text-[var(--accent-rose)] tabular-nums">&minus;{formatINR(data.totalLiabilities)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between px-2 pt-1 border-t border-dashed border-[var(--border-light)]">
+                    <span className="font-bold text-[var(--text-primary)]">= Net Worth</span>
+                    <span className="font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-                {data.assetClassList.map((c) => (
-                  <span key={c.name} className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
-                    <span className={`w-1.5 h-1.5 rounded-full ${assetClassColor(c.name)}`} />
-                    {c.name} {c.pct.toFixed(0)}% <span className="text-[var(--text-dim)]/50 tabular-nums">{formatINR(c.value)}</span>
-                  </span>
-                ))}
+
+              {/* Breakdown cards */}
+              <div className="px-4 pb-4 space-y-2">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Investments</p>
+
+                {data.mfCurrentValue > 0 && (
+                  <BreakdownCard dot="bg-violet-500" label="Mutual Funds" value={data.mfCurrentValue}
+                    pct={data.totalAssets > 0 ? (data.mfCurrentValue / data.totalAssets) * 100 : 0}
+                    onClick={() => { setShowBreakdown(false); navigate('/investments/mutual-funds') }} />
+                )}
+                {data.stkCurrentValue > 0 && (
+                  <BreakdownCard dot="bg-blue-500" label="Stocks" value={data.stkCurrentValue}
+                    pct={data.totalAssets > 0 ? (data.stkCurrentValue / data.totalAssets) * 100 : 0}
+                    onClick={() => { setShowBreakdown(false); navigate('/investments/stocks') }} />
+                )}
+                {data.otherCurrentValue > 0 && (
+                  <BreakdownCard dot="bg-emerald-500" label="Other Investments" value={data.otherCurrentValue}
+                    pct={data.totalAssets > 0 ? (data.otherCurrentValue / data.totalAssets) * 100 : 0}
+                    onClick={() => { setShowBreakdown(false); navigate('/investments/other') }} />
+                )}
+
+                {/* Liabilities */}
+                {data.totalLiabilities > 0 && (
+                  <>
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider pt-1">Liabilities</p>
+                    <div
+                      className="bg-[var(--bg-inset)] rounded-xl border border-rose-500/20 p-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+                      onClick={() => { setShowBreakdown(false); navigate('/liabilities') }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-rose-500" />
+                          <span className="text-sm font-semibold text-[var(--text-primary)]">{data.liabilityCount} {data.liabilityCount === 1 ? 'Loan' : 'Loans'}</span>
+                        </div>
+                        <span className="text-sm font-bold text-[var(--accent-rose)] tabular-nums">&minus;{formatINR(data.totalLiabilities)}</span>
+                      </div>
+                      {data.totalEMI > 0 && (
+                        <div className="mt-1 pl-4 text-xs text-[var(--text-dim)]">EMI {formatINR(data.totalEMI)}/mo</div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Asset class breakdown */}
+                {data.assetClassList.length > 1 && (
+                  <>
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider pt-1">Asset Class Breakdown</p>
+                    <DashDonut title="" data={data.assetClassList} bgMap={ASSET_CLASS_COLORS} />
+                  </>
+                )}
               </div>
-            </BreakdownSlide>
-          )}
-        </BreakdownCarousel>
-      )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Investment Alerts */}
       {(data.buyOppCount > 0 || data.rebalanceCount > 0) && (
@@ -577,35 +601,25 @@ export default function Dashboard() {
   )
 }
 
-/* ── Expandable row — tap to slide open details ── */
-function ExpandableRow({ dot, label, value, items, renderItem }) {
-  const [open, setOpen] = useState(false)
-  const hasDetails = items && items.length > 1
-
+/* ── BreakdownCard — used in net worth modal ── */
+function BreakdownCard({ dot, label, value, pct, onClick }) {
   return (
-    <div className="pl-2">
-      <button
-        onClick={hasDetails ? () => setOpen(!open) : undefined}
-        className={`w-full flex items-center justify-between py-0.5 ${hasDetails ? 'cursor-pointer' : ''}`}
-      >
-        <span className="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
-          <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-          {label}
-          {hasDetails && (
-            <ChevronDown size={10} className={`text-[var(--text-dim)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-          )}
-        </span>
-        <span className="text-xs font-semibold text-[var(--text-secondary)] tabular-nums">{value}</span>
-      </button>
-
-      {/* Slide-open detail items */}
-      <div
-        className="overflow-hidden transition-all duration-200 ease-in-out"
-        style={{ maxHeight: open ? `${items.length * 40}px` : '0px', opacity: open ? 1 : 0 }}
-      >
-        <div className="pl-4 py-1 space-y-1 border-l border-[var(--border-light)] ml-0.5">
-          {items.map(renderItem)}
+    <div
+      className="bg-[var(--bg-inset)] rounded-xl border border-[var(--border-light)] p-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${dot}`} />
+          <span className="text-sm font-semibold text-[var(--text-primary)]">{label}</span>
         </div>
+        <div className="text-right">
+          <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(value)}</span>
+          <span className="text-[10px] text-[var(--text-dim)] tabular-nums ml-1">({pct.toFixed(0)}%)</span>
+        </div>
+      </div>
+      <div className="mt-2 h-1 rounded-full bg-[var(--border-light)] overflow-hidden">
+        <div className={`h-full rounded-full ${dot}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
     </div>
   )
@@ -635,54 +649,41 @@ function AssetCard({ icon, iconColor, label, value, invested, pl, count, countLa
   )
 }
 
-/* ── Breakdown Carousel — horizontal snap scroll ── */
-function BreakdownCarousel({ children }) {
-  const scrollRef = useRef(null)
-  const [active, setActive] = useState(0)
-  const slides = Children.toArray(children).filter(Boolean)
-
-  const handleScroll = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const idx = Math.round(el.scrollLeft / el.offsetWidth)
-    setActive(idx)
-  }, [])
-
-  if (slides.length === 0) return null
-
+/* ── DashDonut — Recharts donut chart for dashboard breakdowns ── */
+function DashDonut({ title, data, bgMap }) {
   return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
-      >
-        {slides.map((slide, i) => (
-          <div key={i} className="w-full shrink-0 snap-start p-4">
-            {slide}
-          </div>
+    <div className="rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-3">
+      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 text-center">{title}</p>
+      <div className="w-full h-[120px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="pct" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={48} paddingAngle={2} stroke="none">
+              {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
+            </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.[0]) return null
+                const d = payload[0].payload
+                return (
+                  <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2 py-1 shadow-lg text-xs">
+                    <span className="font-semibold text-[var(--text-primary)]">{d.name}</span>
+                    <span className="text-[var(--text-muted)] ml-1">{d.pct.toFixed(1)}%</span>
+                    {d.value > 0 && <span className="text-[var(--text-dim)] ml-1">({formatINR(d.value)})</span>}
+                  </div>
+                )
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5 mt-1">
+        {data.map(d => (
+          <span key={d.name} className="flex items-center gap-1 text-[10px] text-[var(--text-dim)]">
+            <span className={`w-1.5 h-1.5 rounded-full ${bgMap[d.name] || 'bg-slate-400'}`} />
+            {d.name} {d.pct.toFixed(0)}%
+          </span>
         ))}
       </div>
-      {slides.length > 1 && (
-        <div className="flex justify-center gap-1.5 pb-3 -mt-1">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => scrollRef.current?.scrollTo({ left: i * scrollRef.current.offsetWidth, behavior: 'smooth' })}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === active ? 'bg-violet-400' : 'bg-[var(--border-light)]'}`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function BreakdownSlide({ title, children }) {
-  return (
-    <div>
-      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">{title}</p>
-      {children}
     </div>
   )
 }

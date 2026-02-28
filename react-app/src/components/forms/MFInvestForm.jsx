@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
-import { formatINR } from '../../data/familyData'
+import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
 import { Search, ChevronDown } from 'lucide-react'
@@ -131,7 +131,10 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
           /* Selected fund display */
           <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{form.fundName}</p>
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{splitFundName(form.fundName).main}</p>
+                {splitFundName(form.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(form.fundName).plan}</p>}
+              </div>
               <p className="text-xs text-[var(--text-dim)]">{form.fundCode}{form.nav > 0 && <span className="ml-2 text-emerald-400">NAV: ₹{form.nav.toFixed(2)}</span>}</p>
             </div>
             <button
@@ -157,7 +160,10 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
                       className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)] border-b border-[var(--border-light)] last:border-b-0 transition-colors group"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-[var(--text-primary)] truncate group-hover:text-white transition-colors">{h.fundName}</p>
+                        <div>
+                          <p className="text-xs font-medium text-[var(--text-primary)] truncate group-hover:text-white transition-colors">{splitFundName(h.fundName).main}</p>
+                          {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                        </div>
                         <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
                           {h.units > 0 ? `${h.units.toFixed(0)} units · ${formatINR(h.currentValue)}` : 'Planned'}
                         </p>

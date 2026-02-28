@@ -283,11 +283,11 @@ function processEditLiability(data) {
     }
     // Otherwise, update investment link if changed
     else if (liability.linkedInvestmentId !== data.linkedInvestmentId) {
-      // Remove old link
+      // Remove old link (remove this liability from old investment's comma-separated list)
       if (liability.linkedInvestmentId) {
-        syncInvestmentLiabilityLink(liability.linkedInvestmentId, '');
+        removeInvestmentLiabilityLink(liability.linkedInvestmentId, data.liabilityId);
       }
-      // Add new link
+      // Add new link (add this liability to new investment's comma-separated list)
       if (data.linkedInvestmentId) {
         syncInvestmentLiabilityLink(data.linkedInvestmentId, data.liabilityId);
       }
@@ -325,9 +325,9 @@ function deleteLiability(liabilityId) {
       return { success: false, error: 'Liability not found.' };
     }
 
-    // Remove investment link if exists
+    // Remove investment link if exists (remove this liability from investment's comma-separated list)
     if (liability.linkedInvestmentId) {
-      syncInvestmentLiabilityLink(liability.linkedInvestmentId, '');
+      removeInvestmentLiabilityLink(liability.linkedInvestmentId, liability.liabilityId);
     }
 
     // Delete the row

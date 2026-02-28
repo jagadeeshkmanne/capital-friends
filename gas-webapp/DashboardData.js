@@ -628,6 +628,8 @@ function renderOtherInvestments(sheet, startRow, investments) {
 
 /**
  * Render rebalancing alerts
+ * Note: Rebalancing is now handled per-portfolio in the React app via MFRebalanceDialog.
+ * This section shows a placeholder in the dashboard sheet.
  */
 function renderRebalancingAlerts(sheet, startRow) {
   sheet.getRange(startRow, 1, 1, 7).merge();
@@ -636,44 +638,11 @@ function renderRebalancingAlerts(sheet, startRow) {
     .setFontWeight('bold').setFontSize(14);
   startRow++;
 
-  const alerts = getRebalancingAlerts();
-
-  if (alerts.success && alerts.alerts && alerts.alerts.length > 0) {
-    // Table headers
-    const headers = ['Portfolio', 'Asset Class', 'Target %', 'Current %', 'Deviation', 'Action', 'Priority'];
-    headers.forEach((header, index) => {
-      sheet.getRange(startRow, index + 1).setValue(header);
-    });
-    sheet.getRange(startRow, 1, 1, 7).setBackground('#111827').setFontColor('#e5e7eb')
-      .setFontWeight('bold').setFontSize(10);
-    startRow++;
-
-    // Alert rows
-    alerts.alerts.forEach(alert => {
-      sheet.getRange(startRow, 1).setValue(alert.portfolioName);
-      sheet.getRange(startRow, 2).setValue(alert.assetClass);
-      sheet.getRange(startRow, 3).setValue(alert.targetPercent / 100);
-      sheet.getRange(startRow, 4).setValue(alert.currentPercent / 100);
-      sheet.getRange(startRow, 5).setValue(alert.deviation / 100);
-      sheet.getRange(startRow, 6).setValue(alert.action);
-      sheet.getRange(startRow, 7).setValue(alert.priority);
-
-      sheet.getRange(startRow, 1, 1, 5).setBackground('#1f2937').setFontColor('#e5e7eb').setFontSize(9);
-      sheet.getRange(startRow, 3, 1, 3).setNumberFormat('0.00%');
-
-      sheet.getRange(startRow, 6).setBackground(alert.actionColor).setFontColor('#ffffff').setFontWeight('bold');
-      const priorityColor = alert.priority === 'HIGH' ? '#ef4444' : '#f59e0b';
-      sheet.getRange(startRow, 7).setBackground(priorityColor).setFontColor('#ffffff').setFontWeight('bold');
-
-      startRow++;
-    });
-  } else {
-    sheet.getRange(startRow, 1, 1, 7).merge();
-    sheet.getRange(startRow, 1).setValue('All portfolios are balanced ✅');
-    sheet.getRange(startRow, 1).setBackground('#d1fae5').setFontColor('#065f46')
-      .setHorizontalAlignment('center').setFontWeight('bold');
-    startRow++;
-  }
+  sheet.getRange(startRow, 1, 1, 7).merge();
+  sheet.getRange(startRow, 1).setValue('View rebalancing details per portfolio in the app');
+  sheet.getRange(startRow, 1).setBackground('#1f2937').setFontColor('#9ca3af')
+    .setHorizontalAlignment('center').setFontSize(9);
+  startRow++;
 
   return startRow;
 }
@@ -698,102 +667,6 @@ function formatDashboardSheetV2(sheet) {
   );
 }
 
-/**
- * Get rebalancing alerts for all portfolios
- */
-function getRebalancingAlerts() {
-  try {
-    const portfolios = getAllPortfolios();
-    if (!portfolios || portfolios.length === 0) {
-      return {
-        success: true,
-        alerts: [],
-        summary: 'No portfolios to analyze'
-      };
-    }
-
-    const alerts = [];
-
-    portfolios.forEach(portfolio => {
-      const portfolioId = portfolio.portfolioId;
-      const portfolioName = portfolio.portfolioName;
-      const rebalanceThreshold = portfolio.rebalanceThreshold || 0.05; // Default 5%
-
-      // Get asset allocation targets
-      const allocations = getAssetAllocationsForPortfolio(portfolioId);
-      if (!allocations || allocations.length === 0) {
-        return; // Skip if no allocations defined
-      }
-
-      // Get current holdings
-      const holdings = getCurrentHoldings(portfolioId);
-      if (!holdings || holdings.totalValue === 0) {
-        return; // Skip if no holdings
-      }
-
-      // Calculate current allocation percentages
-      const currentAllocation = {};
-      holdings.funds.forEach(fund => {
-        const assetClass = fund.assetClass || 'Other';
-        if (!currentAllocation[assetClass]) {
-          currentAllocation[assetClass] = 0;
-        }
-        currentAllocation[assetClass] += fund.currentValue;
-      });
-
-      // Convert to percentages
-      Object.keys(currentAllocation).forEach(assetClass => {
-        currentAllocation[assetClass] = (currentAllocation[assetClass] / holdings.totalValue) * 100;
-      });
-
-      // Compare with targets and generate alerts
-      allocations.forEach(allocation => {
-        const assetClass = allocation.assetClass;
-        const targetPercent = allocation.targetPercent || 0;
-        const currentPercent = currentAllocation[assetClass] || 0;
-        const deviation = currentPercent - targetPercent;
-        const deviationAbs = Math.abs(deviation);
-
-        // Alert if deviation exceeds threshold
-        if (deviationAbs > (rebalanceThreshold * 100)) {
-          const action = deviation > 0 ? 'REDUCE' : 'INCREASE';
-          const actionColor = deviation > 0 ? '#ef4444' : '#10b981';
-          const deviationAmount = (deviationAbs / 100) * holdings.totalValue;
-
-          alerts.push({
-            portfolioName: portfolioName,
-            assetClass: assetClass,
-            targetPercent: targetPercent,
-            currentPercent: currentPercent,
-            deviation: deviation,
-            deviationAbs: deviationAbs,
-            deviationAmount: deviationAmount,
-            action: action,
-            actionColor: actionColor,
-            priority: deviationAbs > 10 ? 'HIGH' : 'MEDIUM'
-          });
-        }
-      });
-    });
-
-    // Sort alerts by deviation (highest first)
-    alerts.sort((a, b) => b.deviationAbs - a.deviationAbs);
-
-    return {
-      success: true,
-      alerts: alerts,
-      summary: alerts.length > 0 ? `${alerts.length} rebalancing action(s) needed` : 'All portfolios are balanced'
-    };
-
-  } catch (error) {
-    log('ERROR getRebalancingAlerts: ' + error.toString());
-    return {
-      success: false,
-      alerts: [],
-      error: error.message
-    };
-  }
-}
 
 /**
  * Create Dashboard sheet during ONE-CLICK SETUP

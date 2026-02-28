@@ -169,9 +169,9 @@ export default function Family() {
                       <p className="text-xs text-[var(--text-muted)] truncate">{mv(m.email, 'email')}</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
                     <p className="text-xs text-[var(--text-dim)] tabular-nums">{mv(m.mobile, 'mobile')}</p>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <p className="text-xs text-[var(--text-dim)] font-mono">PAN: {mv(m.pan, 'pan') || '—'}</p>
                       {m.aadhar && <p className="text-xs text-[var(--text-dim)] font-mono">Aadhaar: {mv(m.aadhar, 'aadhaar')}</p>}
                     </div>

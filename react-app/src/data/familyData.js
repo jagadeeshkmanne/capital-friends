@@ -1,6 +1,18 @@
 /* ── Mock data (will come from Google Sheets API) ── */
 
+export function splitFundName(name) {
+  // Split at the plan-type suffix: "- Direct...", " - Regular...", "- Growth..."
+  // Handles both "Fund - Direct Plan" and "Fund- Direct Growth" formats
+  const match = name.match(/ ?-\s+(Direct|Regular|Growth)\b/i)
+  if (match) {
+    const keywordStart = match.index + match[0].length - match[1].length
+    return { main: name.slice(0, match.index).trim(), plan: name.slice(keywordStart) }
+  }
+  return { main: name, plan: '' }
+}
+
 export function formatINR(num) {
+  if (num < 0) return `-${formatINR(-num)}`
   if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`
   if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`
   if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K`

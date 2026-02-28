@@ -20,7 +20,7 @@ const typeBadge = {
 
 export default function LiabilitiesTab() {
   const { selectedMember, member } = useFamily()
-  const { liabilityList, addLiability, updateLiability, deleteLiability } = useData()
+  const { liabilityList, otherInvList, addLiability, updateLiability, deleteLiability } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
 
@@ -36,6 +36,12 @@ export default function LiabilitiesTab() {
   const totalOutstanding = filtered.reduce((s, l) => s + (l.outstandingBalance || 0), 0)
   const totalEMI = filtered.reduce((s, l) => s + (l.emiAmount || 0), 0)
   const activeCount = filtered.filter((l) => l.status === 'Active').length
+
+  const investmentMap = useMemo(() => {
+    const map = {}
+    if (otherInvList) otherInvList.forEach(i => { map[i.investmentId] = i })
+    return map
+  }, [otherInvList])
 
   async function handleSave(data) {
     showBlockUI('Saving...')
@@ -106,6 +112,7 @@ export default function LiabilitiesTab() {
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">EMI</th>
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Interest</th>
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Remaining</th>
+                    <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Linked Asset</th>
                     <th className="w-8 py-2.5 px-2"></th>
                   </tr>
                 </thead>
@@ -127,6 +134,16 @@ export default function LiabilitiesTab() {
                         {l.emiAmount > 0 && l.outstandingBalance > 0
                           ? `${Math.ceil(l.outstandingBalance / l.emiAmount)} mo`
                           : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {l.linkedInvestmentId && investmentMap[l.linkedInvestmentId] ? (
+                          <div>
+                            <p className="text-xs text-[var(--text-primary)]">{investmentMap[l.linkedInvestmentId].investmentName}</p>
+                            <p className="text-[10px] text-[var(--text-dim)]">{investmentMap[l.linkedInvestmentId].investmentType}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[var(--text-dim)]">—</span>
+                        )}
                       </td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: l })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
@@ -159,6 +176,12 @@ export default function LiabilitiesTab() {
                       )}
                     </div>
                   </div>
+                  {l.linkedInvestmentId && investmentMap[l.linkedInvestmentId] && (
+                    <div className="mt-1.5 flex items-center justify-between bg-blue-500/5 rounded px-2 py-1">
+                      <span className="text-xs text-[var(--text-dim)]">Linked</span>
+                      <span className="text-xs text-[var(--text-secondary)]">{investmentMap[l.linkedInvestmentId].investmentName}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

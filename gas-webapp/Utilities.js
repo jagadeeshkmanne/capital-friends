@@ -566,22 +566,54 @@ function syncInvestmentLiabilityLink(investmentId, liabilityId) {
 }
 
 /**
- * Update investment's linked liability ID
+ * Update investment's linked liability ID (ADD to comma-separated list)
  * @param {string} investmentId - Investment ID
- * @param {string} liabilityId - Liability ID to link (or "" to unlink)
+ * @param {string} liabilityId - Liability ID to add (or "" to clear all)
  */
 function updateInvestmentLiabilityLink(investmentId, liabilityId) {
   try {
-    const sheet = getSheet(CONFIG.otherInvestmentsSheet);
+    var sheet = getSheet(CONFIG.otherInvestmentsSheet);
     if (!sheet) return;
 
-    const investments = getAllInvestments();
-    const inv = investments.find(i => i.investmentId === investmentId);
-    if (inv) {
-      sheet.getRange(inv.rowIndex, 10).setValue(liabilityId || ''); // Column J: Linked Liability ID
+    var investments = getAllInvestments();
+    var inv = investments.find(function(i) { return i.investmentId === investmentId; });
+    if (!inv) return;
+
+    if (liabilityId) {
+      // Add to comma-separated list (avoid duplicates)
+      var existing = inv.linkedLiabilityId ? inv.linkedLiabilityId.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+      if (existing.indexOf(liabilityId) === -1) {
+        existing.push(liabilityId);
+      }
+      sheet.getRange(inv.rowIndex, 10).setValue(existing.join(','));
+    } else {
+      // Clear all — only used when unlinking everything
+      sheet.getRange(inv.rowIndex, 10).setValue('');
     }
   } catch (error) {
     Logger.log('Error in updateInvestmentLiabilityLink: ' + error.message);
+  }
+}
+
+/**
+ * Remove a specific liability from an investment's comma-separated list
+ * @param {string} investmentId - Investment ID
+ * @param {string} liabilityId - Liability ID to remove
+ */
+function removeInvestmentLiabilityLink(investmentId, liabilityId) {
+  try {
+    var sheet = getSheet(CONFIG.otherInvestmentsSheet);
+    if (!sheet) return;
+
+    var investments = getAllInvestments();
+    var inv = investments.find(function(i) { return i.investmentId === investmentId; });
+    if (!inv) return;
+
+    var existing = inv.linkedLiabilityId ? inv.linkedLiabilityId.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+    var filtered = existing.filter(function(id) { return id !== liabilityId; });
+    sheet.getRange(inv.rowIndex, 10).setValue(filtered.join(','));
+  } catch (error) {
+    Logger.log('Error in removeInvestmentLiabilityLink: ' + error.message);
   }
 }
 
@@ -611,33 +643,30 @@ function updateLiabilityInvestmentLink(liabilityId, investmentId) {
  * @returns {string} Suggested loan type
  */
 function getLoanTypeSuggestion(investmentType) {
-  const suggestions = {
-    'Real Estate': 'Home Loan',
-    'Gold': 'Gold Loan',
-    'Auto': 'Auto Loan',
-    'Education': 'Education Loan',
-    'Business': 'Business Loan'
+  var suggestions = {
+    'Real Estate': 'Home Loan'
   };
   return suggestions[investmentType] || 'Personal Loan';
 }
 
 /**
- * Unlink ALL investments from a liability
+ * Unlink ALL investments from a liability (handles comma-separated lists)
  * @param {string} liabilityId - Liability ID to unlink from all investments
  */
 function unlinkAllInvestmentsFromLiability(liabilityId) {
   try {
-    const sheet = getSheet(CONFIG.otherInvestmentsSheet);
+    var sheet = getSheet(CONFIG.otherInvestmentsSheet);
     if (!sheet) return;
 
-    const investments = getAllInvestments();
+    var investments = getAllInvestments();
 
-    // Find all investments linked to this liability
-    investments.forEach(inv => {
-      if (inv.linkedLiabilityId === liabilityId) {
-        // Clear the linked liability ID for this investment
-        sheet.getRange(inv.rowIndex, 10).setValue(''); // Column J: Linked Liability ID
-        Logger.log(`Unlinked investment ${inv.investmentId} from liability ${liabilityId}`);
+    investments.forEach(function(inv) {
+      if (!inv.linkedLiabilityId) return;
+      var ids = inv.linkedLiabilityId.split(',').map(function(s) { return s.trim(); });
+      if (ids.indexOf(liabilityId) !== -1) {
+        var filtered = ids.filter(function(id) { return id !== liabilityId; });
+        sheet.getRange(inv.rowIndex, 10).setValue(filtered.join(','));
+        Logger.log('Unlinked investment ' + inv.investmentId + ' from liability ' + liabilityId);
       }
     });
 

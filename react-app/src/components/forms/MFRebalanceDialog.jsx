@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
-import { formatINR } from '../../data/familyData'
+import { formatINR, splitFundName } from '../../data/familyData'
 import { Repeat, IndianRupee, ArrowUpDown } from 'lucide-react'
 import { FormField, FormInput } from '../Modal'
 
@@ -31,6 +31,39 @@ function NoTargetsMessage({ exitOnly }) {
   )
 }
 
+/* ──────────────────────────────────────────────
+   Reusable mobile card for a single fund row
+   ────────────────────────────────────────────── */
+function FundCard({ children, dimmed }) {
+  return (
+    <div className={`bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-3.5 py-3 space-y-2 ${dimmed ? 'opacity-50' : ''}`}>
+      {children}
+    </div>
+  )
+}
+
+function FundCardName({ fundName }) {
+  const { main, plan } = splitFundName(fundName)
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">{main}</p>
+      {plan && <p className="text-[9px] text-[var(--text-dim)]">{plan}</p>}
+    </div>
+  )
+}
+
+function FundCardRow({ label, value, valueClass }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] text-[var(--text-dim)]">{label}</span>
+      <span className={`text-[11px] tabular-nums font-medium ${valueClass || 'text-[var(--text-secondary)]'}`}>{value}</span>
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────
+   SIP Section
+   ────────────────────────────────────────────── */
 function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   const sipTarget = portfolio.sipTarget || 0
   const threshold = (portfolio.rebalanceThreshold || 0.05) * 100
@@ -40,7 +73,6 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
   if (sipTarget <= 0) return <p className="text-xs text-[var(--text-dim)] py-2">No SIP target set for this portfolio</p>
 
-  // Show ALL funds with targets — gap-based rebalance SIP
   const allFunds = holdings
     .filter((h) => h.targetAllocationPct > 0)
     .map((h) => {
@@ -48,24 +80,21 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
       const drift = Math.abs(currentPct - h.targetAllocationPct)
       const drifted = drift > threshold
       const targetValue = (h.targetAllocationPct / 100) * totalValue
-      const gap = targetValue - h.currentValue // positive = underweight, negative = overweight
+      const gap = targetValue - h.currentValue
       const normalSIP = (h.targetAllocationPct / 100) * sipTarget
       return { ...h, currentPct, drift, drifted, gap, normalSIP }
     })
 
-  // Only rebalance funds that exceed threshold
   const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0)
-  const driftedOverweight = allFunds.filter((h) => h.drifted && h.gap <= 0)
   const totalGap = driftedUnderweight.reduce((s, h) => s + h.gap, 0)
 
   const withSuggested = allFunds.map((h) => ({
     ...h,
     suggestedSIP: h.drifted && h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * sipTarget
-      : h.drifted && h.gap <= 0 ? 0 // overweight beyond threshold → ₹0
-      : h.normalSIP, // within threshold → keep normal SIP
+      : h.drifted && h.gap <= 0 ? 0
+      : h.normalSIP,
   }))
 
-  // Only show if there are funds drifted beyond threshold
   const hasDrift = allFunds.some((h) => h.drifted)
   if (!hasDrift) return <p className="text-xs text-[var(--text-dim)] py-2">SIPs are balanced (within {threshold.toFixed(0)}% threshold)</p>
 
@@ -74,7 +103,9 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
       <p className="text-xs text-[var(--text-dim)] px-1">
         Funds drifted &gt;{threshold.toFixed(0)}%: overweight → ₹0, underweight → extra SIP. Others keep normal SIP.
       </p>
-      <div className="overflow-x-auto">
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border-light)]">
@@ -91,7 +122,10 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
               const withinThreshold = !h.drifted
               return (
                 <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${withinThreshold ? 'opacity-50' : isOverweight ? 'opacity-60' : ''}`}>
-                  <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px] truncate">{h.fundName}</td>
+                  <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
+                    <p className="truncate">{splitFundName(h.fundName).main}</p>
+                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                  </td>
                   <td className="py-2 px-2 text-right tabular-nums">
                     <span className={isOverweight ? 'text-amber-400' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
                     <span className="text-[var(--text-dim)]"> / {h.targetAllocationPct.toFixed(1)}%</span>
@@ -119,10 +153,54 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
           </tfoot>
         </table>
       </div>
+
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-2">
+        {withSuggested.map((h) => {
+          const isOverweight = h.drifted && h.gap <= 0
+          const isUnderweight = h.drifted && h.gap > 0
+          const withinThreshold = !h.drifted
+          return (
+            <FundCard key={h.holdingId} dimmed={withinThreshold || isOverweight}>
+              <FundCardName fundName={h.fundName} />
+              <FundCardRow
+                label="Allocation"
+                value={<><span className={isOverweight ? 'text-amber-400' : isUnderweight ? 'text-blue-400' : ''}>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">/ {h.targetAllocationPct.toFixed(1)}%</span></>}
+              />
+              <div className="flex items-center justify-between pt-1 border-t border-[var(--border-light)]">
+                <div className="text-center flex-1">
+                  <p className="text-[9px] text-[var(--text-dim)] uppercase">Normal</p>
+                  <p className="text-xs text-[var(--text-muted)] tabular-nums">{fmt(h.normalSIP)}</p>
+                </div>
+                <div className="text-[var(--text-dim)] text-xs px-2">→</div>
+                <div className="text-center flex-1">
+                  <p className="text-[9px] text-[var(--text-dim)] uppercase">Rebalance</p>
+                  <p className={`text-xs font-semibold tabular-nums ${isOverweight ? 'text-amber-400/70' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}`}>
+                    {isOverweight ? '₹0' : fmt(h.suggestedSIP)}
+                  </p>
+                </div>
+              </div>
+            </FundCard>
+          )
+        })}
+
+        {/* Mobile total */}
+        <div className="flex items-center justify-between bg-[var(--bg-inset)] rounded-xl border border-[var(--border-light)] px-3.5 py-2.5">
+          <p className="text-xs font-bold text-[var(--text-primary)]">Total SIP</p>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[var(--text-muted)] tabular-nums">{fmt(sipTarget)}</span>
+            <span className="text-[var(--text-dim)]">→</span>
+            <span className="text-xs font-bold text-blue-400 tabular-nums">{fmt(sipTarget)}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
+/* ──────────────────────────────────────────────
+   Lumpsum Section
+   ────────────────────────────────────────────── */
 function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
   const [lumpsumInput, setLumpsumInput] = useState('')
   const threshold = (portfolio.rebalanceThreshold || 0.05) * 100
@@ -136,9 +214,6 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
     return { ...h, currentPct }
   })
 
-  // Calculate exact lumpsum to bring all underweight funds to target %
-  // Formula: I = (P_under/100 × T - CV_under) / (1 - P_under/100)
-  // This accounts for the total growing when you invest, so targets actually land on exact %
   const suggestedAmount = useMemo(() => {
     if (totalValue <= 0 || enriched.length === 0) return 0
     const underweight = enriched.filter((h) => {
@@ -155,17 +230,15 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
 
   const lumpsumAmount = Number(lumpsumInput) || portfolio.lumpsumTarget || suggestedAmount
 
-  // Distribute lumpsum — show ALL funds (overweight get ₹0)
   const distribution = useMemo(() => {
     const newTotal = lumpsumAmount > 0 ? totalValue + lumpsumAmount : totalValue
     const all = enriched.map((h) => {
       const targetVal = (h.targetAllocationPct / 100) * newTotal
       const invest = lumpsumAmount > 0 ? Math.max(0, targetVal - h.currentValue) : 0
       const newPct = newTotal > 0 ? ((h.currentValue + invest) / newTotal) * 100 : 0
-      const isOverweight = h.currentValue > targetVal + 1 // small tolerance
+      const isOverweight = h.currentValue > targetVal + 1
       return { ...h, invest, newPct, isOverweight }
     })
-    // Scale if total investment doesn't match lumpsum
     const totalRaw = all.reduce((s, h) => s + h.invest, 0)
     if (lumpsumAmount > 0 && totalRaw > 0 && Math.abs(totalRaw - lumpsumAmount) > 1) {
       const scale = lumpsumAmount / totalRaw
@@ -208,7 +281,6 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
         )}
       </div>
 
-      {/* Warning: partial amount */}
       {isPartial && (
         <p className="text-xs text-amber-400/80 px-1">
           Below minimum — distributes proportionally but won't fully rebalance. Need {formatINR(suggestedAmount)} for exact target %.
@@ -216,50 +288,86 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
       )}
 
       {distribution.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-light)]">
-                <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
-                <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Allocation</th>
-                <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Invest</th>
-              </tr>
-            </thead>
-            <tbody>
-              {distribution.map((h) => (
-                <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${h.invest === 0 ? 'opacity-50' : ''}`}>
-                  <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px] truncate">{h.fundName}</td>
-                  <td className="py-2 px-2 text-right tabular-nums">
-                    <span className={h.isOverweight ? 'text-amber-400' : h.invest > 0 ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
-                    <span className="text-[var(--text-dim)]"> → {h.newPct.toFixed(1)}%</span>
-                  </td>
-                  <td className="py-2 px-2 text-right font-semibold tabular-nums">
+        <>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border-light)]">
+                  <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
+                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Allocation</th>
+                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Invest</th>
+                </tr>
+              </thead>
+              <tbody>
+                {distribution.map((h) => (
+                  <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${h.invest === 0 ? 'opacity-50' : ''}`}>
+                    <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
+                      <p className="truncate">{splitFundName(h.fundName).main}</p>
+                      {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                    </td>
+                    <td className="py-2 px-2 text-right tabular-nums">
+                      <span className={h.isOverweight ? 'text-amber-400' : h.invest > 0 ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
+                      <span className="text-[var(--text-dim)]"> → {h.newPct.toFixed(1)}%</span>
+                    </td>
+                    <td className="py-2 px-2 text-right font-semibold tabular-nums">
+                      {h.isOverweight ? (
+                        <span className="text-amber-400/70 text-xs">Overweight</span>
+                      ) : h.invest > 0 ? (
+                        <span className="text-emerald-400">{fmt(h.invest)}</span>
+                      ) : (
+                        <span className="text-[var(--text-dim)] text-xs">Balanced</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {totalInvest > 0 && (
+                <tfoot>
+                  <tr className="border-t border-[var(--border)]">
+                    <td className="py-1.5 px-2 text-xs font-bold text-[var(--text-primary)]" colSpan={2}>Total</td>
+                    <td className="py-1.5 px-2 text-right text-xs font-bold text-emerald-400 tabular-nums">{formatINR(totalInvest)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2">
+            {distribution.map((h) => (
+              <FundCard key={h.holdingId} dimmed={h.invest === 0}>
+                <div className="flex items-start justify-between gap-2">
+                  <FundCardName fundName={h.fundName} />
+                  <div className="text-right shrink-0">
                     {h.isOverweight ? (
-                      <span className="text-amber-400/70 text-xs">Overweight</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
                     ) : h.invest > 0 ? (
-                      <span className="text-emerald-400">{fmt(h.invest)}</span>
+                      <p className="text-xs font-bold text-emerald-400 tabular-nums">{fmt(h.invest)}</p>
                     ) : (
-                      <span className="text-[var(--text-dim)] text-xs">Balanced</span>
+                      <span className="text-[10px] text-[var(--text-dim)]">Balanced</span>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                  </div>
+                </div>
+                <FundCardRow
+                  label="Allocation"
+                  value={<><span className={h.isOverweight ? 'text-amber-400' : h.invest > 0 ? 'text-blue-400' : ''}>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">→ {h.newPct.toFixed(1)}%</span></>}
+                />
+              </FundCard>
+            ))}
+
             {totalInvest > 0 && (
-              <tfoot>
-                <tr className="border-t border-[var(--border)]">
-                  <td className="py-1.5 px-2 text-xs font-bold text-[var(--text-primary)]" colSpan={2}>Total</td>
-                  <td className="py-1.5 px-2 text-right text-xs font-bold text-emerald-400 tabular-nums">{formatINR(totalInvest)}</td>
-                </tr>
-              </tfoot>
+              <div className="flex items-center justify-between bg-[var(--bg-inset)] rounded-xl border border-[var(--border-light)] px-3.5 py-2.5">
+                <p className="text-xs font-bold text-[var(--text-primary)]">Total Invest</p>
+                <span className="text-sm font-bold text-emerald-400 tabular-nums">{formatINR(totalInvest)}</span>
+              </div>
             )}
-          </table>
-        </div>
+          </div>
+        </>
       ) : (
         <p className="text-xs text-[var(--text-dim)] py-2 text-center">All funds balanced</p>
       )}
 
-      {/* Hint for overweight funds */}
       {hasOverweight && (
         <p className="text-xs text-[var(--text-dim)] px-1">
           Overweight funds can't be fixed by buying. Use <span className="font-semibold text-amber-400">Buy / Sell</span> tab to sell overweight and buy underweight.
@@ -269,6 +377,9 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
   )
 }
 
+/* ──────────────────────────────────────────────
+   Buy / Sell Section
+   ────────────────────────────────────────────── */
 function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
   const threshold = (portfolio.rebalanceThreshold || 0.05) * 100
   const hasTargets = holdings.some((h) => h.targetAllocationPct > 0)
@@ -276,7 +387,6 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
 
   if (!hasTargets && !hasExitCandidates) return <NoTargetsMessage />
 
-  // Include funds with target > 0 (normal drift) AND funds with target = 0 + units > 0 (exit/sell)
   const buySellData = holdings.filter((h) => h.targetAllocationPct > 0 || h.units > 0).map((h) => {
     const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
     const isExit = h.targetAllocationPct === 0 && h.units > 0
@@ -289,43 +399,76 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
   if (buySellData.length === 0) return <p className="text-xs text-[var(--text-dim)] py-2">Portfolio is balanced</p>
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--border-light)]">
-            <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
-            <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Drift</th>
-            <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {buySellData.map((h) => {
-            const isBuy = h.amount > 0
-            return (
-              <tr key={h.schemeCode || h.fundCode} className="border-b border-[var(--border-light)] last:border-0">
-                <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px] truncate">{h.fundName}</td>
-                <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">
-                  {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${h.targetAllocationPct.toFixed(1)}%`}
-                </td>
-                <td className="py-2 px-2 text-right">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
-                    {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
-                  </span>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border-light)]">
+              <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
+              <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Drift</th>
+              <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {buySellData.map((h) => {
+              const isBuy = h.amount > 0
+              return (
+                <tr key={h.schemeCode || h.fundCode} className="border-b border-[var(--border-light)] last:border-0">
+                  <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
+                    <p className="truncate">{splitFundName(h.fundName).main}</p>
+                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                  </td>
+                  <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">
+                    {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${h.targetAllocationPct.toFixed(1)}%`}
+                  </td>
+                  <td className="py-2 px-2 text-right">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
+                      {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-2">
+        {buySellData.map((h) => {
+          const isBuy = h.amount > 0
+          return (
+            <FundCard key={h.schemeCode || h.fundCode}>
+              <div className="flex items-start justify-between gap-2">
+                <FundCardName fundName={h.fundName} />
+                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
+                  {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
+                </span>
+              </div>
+              <FundCardRow
+                label="Drift"
+                value={h.isExit
+                  ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span>
+                  : <><span>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">→ {h.targetAllocationPct.toFixed(1)}%</span></>
+                }
+                valueClass={isBuy ? 'text-emerald-400' : 'text-amber-400'}
+              />
+            </FundCard>
+          )
+        })}
+      </div>
+    </>
   )
 }
 
+/* ──────────────────────────────────────────────
+   Main Rebalance Dialog
+   ────────────────────────────────────────────── */
 export default function MFRebalanceDialog() {
   const { mfHoldings, mfPortfolios } = useData()
   const [mode, setMode] = useState('buysell')
 
-  // All portfolios needing rebalance
   const portfolioGroups = useMemo(() => {
     return mfPortfolios
       .filter((p) => p.status !== 'Inactive')
@@ -364,15 +507,14 @@ export default function MFRebalanceDialog() {
     )
   }
 
-  // Only show SIP tab if at least one portfolio has a SIP target
   const anySIP = portfolioGroups.some((p) => (p.sipTarget || 0) >= 500)
   const availableModes = anySIP ? modes : modes.filter((m) => m.key !== 'sip')
   const effectiveMode = availableModes.some((m) => m.key === mode) ? mode : availableModes[0]?.key || 'buysell'
 
   return (
     <div className="space-y-4">
-      {/* Color-coded mode tabs */}
-      <div className="flex bg-[var(--bg-inset)] rounded-lg p-0.5">
+      {/* Mode tabs — desktop: inline pills, mobile: full-width stacked buttons */}
+      <div className="hidden sm:flex bg-[var(--bg-inset)] rounded-lg p-0.5">
         {availableModes.map(({ key, label, icon: MIcon, color, dimColor, activeBg }) => (
           <button key={key} onClick={() => setMode(key)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-colors ${
@@ -384,22 +526,53 @@ export default function MFRebalanceDialog() {
         ))}
       </div>
 
+      {/* Mobile: full-width vertical buttons */}
+      <div className="sm:hidden space-y-1.5">
+        {availableModes.map(({ key, label, icon: MIcon, color, dimColor, activeBg }) => (
+          <button key={key} onClick={() => setMode(key)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+              effectiveMode === key ? `${activeBg} ${color}` : `bg-[var(--bg-card)] border border-[var(--border)] ${dimColor}`
+            }`}
+          >
+            <MIcon size={16} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Per-portfolio sections */}
       {portfolioGroups.map((p, i) => (
         <div key={p.portfolioId} className="border border-[var(--border-light)] border-l-2 border-l-violet-500/50 rounded-lg overflow-hidden">
-          {/* Portfolio header */}
-          <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--bg-inset)]">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center">{i + 1}</span>
-              <p className="text-sm font-bold text-[var(--text-primary)]">{p.portfolioName}</p>
-              <span className="text-xs text-[var(--text-muted)]">{p.ownerName}</span>
-              {p.driftedCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
-              {p.exitCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
+          {/* Portfolio header — desktop: single row, mobile: stacked */}
+          <div className="px-3 py-2.5 bg-[var(--bg-inset)]">
+            {/* Desktop header */}
+            <div className="hidden sm:flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center">{i + 1}</span>
+                <p className="text-sm font-bold text-[var(--text-primary)]">{p.portfolioName}</p>
+                <span className="text-xs text-[var(--text-muted)]">{p.ownerName}</span>
+                {p.driftedCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
+                {p.exitCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
+              </div>
+              <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                <span className="font-semibold text-[var(--text-secondary)]">{formatINR(p.totalValue)}</span>
+                <span>Threshold: {((p.rebalanceThreshold || 0.05) * 100).toFixed(0)}%</span>
+                {p.sipTarget >= 100 && <span>SIP: {formatINR(p.sipTarget)}/mo</span>}
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-              <span className="font-semibold text-[var(--text-secondary)]">{formatINR(p.totalValue)}</span>
-              <span>Threshold: {((p.rebalanceThreshold || 0.05) * 100).toFixed(0)}%</span>
-              {p.sipTarget >= 100 && <span>SIP: {formatINR(p.sipTarget)}/mo</span>}
+
+            {/* Mobile header — stacked */}
+            <div className="sm:hidden space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center shrink-0">{i + 1}</span>
+                <p className="text-sm font-bold text-[var(--text-primary)] flex-1 min-w-0 truncate">{p.portfolioName}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap pl-7">
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)] tabular-nums">{formatINR(p.totalValue)}</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{p.ownerName}</span>
+                {p.driftedCount > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
+                {p.exitCount > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
+              </div>
             </div>
           </div>
 

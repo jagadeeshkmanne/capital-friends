@@ -3,6 +3,7 @@ import Fuse from 'fuse.js'
 import { getAllFunds } from '../../services/api'
 import { getWithMeta, put } from '../../services/idb'
 import { Search, X, Loader2 } from 'lucide-react'
+import { splitFundName } from '../../data/familyData'
 
 // Module-level fund cache — loaded once, shared across all instances
 let _fundsCache = null
@@ -102,7 +103,10 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
     return (
       <div className="flex items-center gap-2 bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-3 py-2">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-[var(--text-primary)] truncate">{value.fundName}</p>
+          <div>
+            <p className="text-xs font-medium text-[var(--text-primary)] truncate">{splitFundName(value.fundName).main}</p>
+            {splitFundName(value.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(value.fundName).plan}</p>}
+          </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-[var(--text-dim)]">{value.schemeCode}</span>
             {value.nav > 0 && (
@@ -144,7 +148,10 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
               onClick={() => handleSelect(fund)}
               className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-light)] last:border-0"
             >
-              <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{fund.fundName}</p>
+              <div>
+                <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{splitFundName(fund.fundName).main}</p>
+                {splitFundName(fund.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
+              </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-[var(--text-dim)]">{fund.fundCode || fund.schemeCode}</span>
                 {fund.nav > 0 && (

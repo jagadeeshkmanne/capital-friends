@@ -976,23 +976,25 @@ function setupAssetAllocationsSheet() {
   const sheet = spreadsheet.insertSheet(CONFIG.assetAllocationsSheet);
 
   // Add developer credit (Row 1)
-  addDeveloperCredit(sheet, 4);
+  addDeveloperCredit(sheet, 5);
 
   // Add headers (Row 2)
   sheet.appendRow([
     'Fund Code',
     'Fund Name',
     'Asset Allocation JSON',
-    'Equity Allocation JSON'
+    'Equity Allocation JSON',
+    'Geography Allocation JSON'
   ]);
 
-  formatHeaderRow(sheet, sheet.getRange('A2:D2'), 40);
+  formatHeaderRow(sheet, sheet.getRange('A2:E2'), 40);
 
   // Set column widths
   sheet.setColumnWidth(1, 120);  // Fund Code
   sheet.setColumnWidth(2, 300);  // Fund Name
   sheet.setColumnWidth(3, 400);  // Asset Allocation JSON
   sheet.setColumnWidth(4, 400);  // Equity Allocation JSON
+  sheet.setColumnWidth(5, 300);  // Geography Allocation JSON
 
   // Apply standard formatting
   applyStandardFormatting(sheet);

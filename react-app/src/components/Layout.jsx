@@ -1,14 +1,23 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
 import Header from './Header'
 import BottomNav from './BottomNav'
 import BrandedLoading from './BrandedLoading'
 import { useData } from '../context/DataContext'
+import { Heart, Check } from 'lucide-react'
+
+const UPI_ID = 'jagadeeshmanne.hdfc@kphdfc'
 
 export default function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const { loading, error } = useData()
+  const [upiCopied, setUpiCopied] = useState(false)
+
+  function copyUPI() {
+    navigator.clipboard.writeText(UPI_ID).then(() => {
+      setUpiCopied(true)
+      setTimeout(() => setUpiCopied(false), 2000)
+    })
+  }
 
   if (loading) {
     return <BrandedLoading />
@@ -34,16 +43,33 @@ export default function Layout() {
   return (
     <div className="flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">
       {/* Header spans full width — includes nav, ticker, NW breakdown */}
-      <Header onMenuClick={() => setSidebarOpen(true)} />
-
-      {/* Mobile sidebar overlay */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Header />
 
       {/* Content — full width, no sidebar on desktop */}
       <main className="flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
         <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
           <Outlet />
         </div>
+
+        {/* Desktop-only subtle footer */}
+        <footer className="hidden lg:block border-t border-[var(--border-light)] mt-4">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <p className="text-[11px] text-[var(--text-dim)]">
+              Capital Friends — Family Portfolio Manager
+            </p>
+            <button
+              onClick={copyUPI}
+              className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] hover:text-pink-400 transition-colors group"
+            >
+              <Heart size={12} className="text-pink-400/50 group-hover:text-pink-400 transition-colors" />
+              {upiCopied ? (
+                <span className="flex items-center gap-1 text-pink-400"><Check size={10} /> UPI Copied!</span>
+              ) : (
+                <span>Support the Developer</span>
+              )}
+            </button>
+          </div>
+        </footer>
       </main>
 
       <BottomNav />

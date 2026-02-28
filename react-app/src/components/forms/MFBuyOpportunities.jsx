@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useData } from '../../context/DataContext'
-import { formatINR } from '../../data/familyData'
+import { formatINR, splitFundName } from '../../data/familyData'
 
 function belowColor(pct) {
   if (pct >= 20) return 'bg-rose-500/20 text-[var(--accent-rose)]'
@@ -82,7 +82,10 @@ export default function MFBuyOpportunities() {
                   const signal = buySignal(h.belowATHPct)
                   return (
                   <tr key={h.holdingId} className="border-b border-[var(--border-light)] last:border-0">
-                    <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[200px] truncate">{h.fundName}</td>
+                    <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[200px]">
+                      <p className="truncate">{splitFundName(h.fundName).main}</p>
+                      {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                    </td>
                     <td className="py-2 px-2 text-center">
                       {signal ? (
                         <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${signal.cls}`}>{signal.label}</span>
@@ -112,7 +115,10 @@ export default function MFBuyOpportunities() {
               return (
               <div key={h.holdingId} className="px-3 py-2.5">
                 <div className="flex items-start justify-between mb-1">
-                  <p className="text-xs text-[var(--text-primary)] leading-tight flex-1 mr-2">{h.fundName}</p>
+                  <div className="flex-1 mr-2">
+                    <p className="text-xs text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
+                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                  </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {signal && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${signal.cls}`}>{signal.label}</span>}
                     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${belowColor(h.belowATHPct)}`}>

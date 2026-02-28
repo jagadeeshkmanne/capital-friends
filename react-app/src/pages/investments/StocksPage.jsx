@@ -242,7 +242,7 @@ export default function StocksPage() {
 
           {/* ── Portfolio Info (shown when specific portfolio selected) ── */}
           {selectedPortfolio && (
-            <div className="flex items-center gap-4 text-xs text-[var(--text-dim)] px-1">
+            <div className="flex items-center gap-4 text-xs text-[var(--text-dim)] px-1 flex-wrap">
               <span><span className="font-semibold">Platform:</span> {selectedPortfolio.platform}</span>
               <span><span className="font-semibold">Client ID:</span> {mv(selectedPortfolio.clientId, 'clientId')}</span>
               <span><span className="font-semibold">Stocks:</span> {selectedPortfolio.stockCount}</span>
@@ -408,15 +408,15 @@ export default function StocksPage() {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="text-[var(--text-dim)]">
+                          <div className="flex items-center justify-between text-xs gap-2">
+                            <div className="text-[var(--text-dim)] min-w-0 truncate">
                               <span>{h.quantity} shares</span>
                               <span className="mx-1">·</span>
                               <span>Avg {formatINR(h.avgBuyPrice)}</span>
                               <span className="mx-1">·</span>
                               <span>CMP {formatINR(h.currentPrice)}</span>
                             </div>
-                            <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
+                            <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(h.currentValue)}</p>
                           </div>
                         </div>
                       )

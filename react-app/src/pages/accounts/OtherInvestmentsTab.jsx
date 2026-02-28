@@ -45,8 +45,9 @@ export default function OtherInvestmentsTab() {
     return map
   }, [liabilityList])
   const linkedLoanTotal = filtered.reduce((s, i) => {
-    const loan = i.linkedLiabilityId ? liabilityMap[i.linkedLiabilityId] : null
-    return s + (loan?.outstandingBalance || 0)
+    if (!i.linkedLiabilityId) return s
+    const ids = i.linkedLiabilityId.split(',').map(x => x.trim()).filter(Boolean)
+    return s + ids.reduce((sum, id) => sum + (liabilityMap[id]?.outstandingBalance || 0), 0)
   }, 0)
 
   async function handleSave(data) {
@@ -134,7 +135,6 @@ export default function OtherInvestmentsTab() {
                   {filtered.map((i) => {
                     const pl = (i.currentValue || 0) - (i.investedAmount || 0)
                     const up = pl >= 0
-                    const loan = i.linkedLiabilityId ? liabilityMap[i.linkedLiabilityId] : null
                     return (
                       <tr key={i.investmentId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors group">
                         <td className="py-2.5 px-4">
@@ -155,14 +155,21 @@ export default function OtherInvestmentsTab() {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          {loan ? (
-                            <div>
-                              <p className="text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(loan.outstandingBalance)}</p>
-                              <p className="text-xs text-[var(--text-dim)]">{loan.liabilityType}</p>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-[var(--text-dim)]">—</span>
-                          )}
+                          {(() => {
+                            const ids = i.linkedLiabilityId ? i.linkedLiabilityId.split(',').map(x => x.trim()).filter(Boolean) : []
+                            const loans = ids.map(id => liabilityMap[id]).filter(Boolean)
+                            if (loans.length === 0) return <span className="text-xs text-[var(--text-dim)]">—</span>
+                            return (
+                              <div className="space-y-0.5">
+                                {loans.map(loan => (
+                                  <div key={loan.liabilityId}>
+                                    <p className="text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(loan.outstandingBalance)}</p>
+                                    <p className="text-[10px] text-[var(--text-dim)]">{loan.liabilityType}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="py-2.5 px-2">
                           <button onClick={() => setModal({ edit: i })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
@@ -181,7 +188,6 @@ export default function OtherInvestmentsTab() {
               {filtered.map((i) => {
                 const pl = (i.currentValue || 0) - (i.investedAmount || 0)
                 const up = pl >= 0
-                const loan = i.linkedLiabilityId ? liabilityMap[i.linkedLiabilityId] : null
                 return (
                   <div key={i.investmentId} onClick={() => setModal({ edit: i })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                     <div className="flex items-center justify-between mb-1">
@@ -207,12 +213,17 @@ export default function OtherInvestmentsTab() {
                         </p>
                       </div>
                     </div>
-                    {loan && (
-                      <div className="mt-1.5 flex items-center justify-between bg-rose-500/5 rounded px-2 py-1">
-                        <span className="text-xs text-[var(--text-dim)]">{loan.liabilityType}</span>
-                        <span className="text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(loan.outstandingBalance)}</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const ids = i.linkedLiabilityId ? i.linkedLiabilityId.split(',').map(x => x.trim()).filter(Boolean) : []
+                      const loans = ids.map(id => liabilityMap[id]).filter(Boolean)
+                      if (loans.length === 0) return null
+                      return loans.map(loan => (
+                        <div key={loan.liabilityId} className="mt-1.5 flex items-center justify-between bg-rose-500/5 rounded px-2 py-1">
+                          <span className="text-xs text-[var(--text-dim)]">{loan.liabilityType}</span>
+                          <span className="text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(loan.outstandingBalance)}</span>
+                        </div>
+                      ))
+                    })()}
                   </div>
                 )
               })}

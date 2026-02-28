@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
-import { formatINR } from '../../data/familyData'
+import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
 export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, onSave, onCancel }) {
@@ -94,7 +94,10 @@ export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, o
 
       {selectedHolding && (
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
-          <p className="text-xs text-[var(--text-dim)]">{selectedHolding.fundName}</p>
+          <div>
+            <p className="text-xs text-[var(--text-dim)]">{splitFundName(selectedHolding.fundName).main}</p>
+            {splitFundName(selectedHolding.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(selectedHolding.fundName).plan}</p>}
+          </div>
           <p className="text-xs text-[var(--text-muted)]">
             Available: <span className="font-semibold text-[var(--text-primary)]">{selectedHolding.units.toFixed(2)}</span> units
             @ ₹{selectedHolding.avgNav.toFixed(2)} avg | Current NAV: ₹{selectedHolding.currentNav.toFixed(2)}

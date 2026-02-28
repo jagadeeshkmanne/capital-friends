@@ -185,7 +185,7 @@ function getBankAccountsData() {
  * Get other investments data
  */
 function getOtherInvestmentsData() {
-  const investments = getAllOtherInvestments();
+  const investments = getAllInvestments();
   const result = [];
 
   investments.forEach(inv => {

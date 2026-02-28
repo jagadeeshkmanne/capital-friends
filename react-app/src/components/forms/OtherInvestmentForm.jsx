@@ -14,6 +14,7 @@ const INVESTMENT_TYPES = [
   { value: 'Physical Gold', category: 'Gold' },
   { value: 'Digital Gold', category: 'Gold' },
   { value: 'Real Estate', category: 'Property' },
+  { value: 'Vehicle', category: 'Property' },
   { value: 'Bonds', category: 'Debt' },
   { value: 'Physical Silver', category: 'Silver' },
   { value: 'Digital Silver', category: 'Silver' },
@@ -23,9 +24,7 @@ const INVESTMENT_TYPES = [
 
 const LOAN_SUGGESTIONS = {
   'Real Estate': 'Home Loan',
-  'Physical Gold': 'Gold Loan',
-  'Sovereign Gold Bond': 'Gold Loan',
-  'Fixed Deposit': 'Loan Against FD',
+  'Vehicle': 'Car Loan',
 }
 
 const TYPE_OPTIONS = INVESTMENT_TYPES.map((t) => ({ value: t.value, label: t.value }))
@@ -88,7 +87,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     familyMemberId: initial?.familyMemberId || '',
     investedAmount: initial?.investedAmount || '',
     currentValue: initial?.currentValue || '',
-    linkedLiabilityId: initial?.linkedLiabilityId || '',
+    linkedLiabilityIds: initial?.linkedLiabilityId ? initial.linkedLiabilityId.split(',').map(s => s.trim()).filter(Boolean) : [],
     status: initial?.status || 'Active',
     notes: initial?.notes || '',
   })
@@ -155,9 +154,12 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     if (!validate()) return
     const data = {
       ...form,
+      familyMember: form.familyMemberId, // GAS expects 'familyMember'
       investedAmount: Number(form.investedAmount) || 0,
       currentValue: Number(form.currentValue) || 0,
+      linkedLiabilityId: form.linkedLiabilityIds.join(','), // Convert array back to comma-separated for GAS
     }
+    delete data.linkedLiabilityIds // Don't send the array version
     // Include metal dynamic fields if applicable
     if (isMetalType(form.investmentType)) {
       data.dynamicFields = JSON.stringify({
@@ -168,8 +170,8 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     if (showQuickLoan && quickLoan.lenderName) {
       data.quickLoan = {
         liabilityType: LOAN_SUGGESTIONS[form.investmentType] || 'Personal Loan',
-        lenderName: quickLoan.lenderName,
-        outstandingBalance: Number(quickLoan.outstandingBalance) || 0,
+        lender: quickLoan.lenderName,       // GAS expects 'lender'
+        outstanding: Number(quickLoan.outstandingBalance) || 0, // GAS expects 'outstanding'
         emiAmount: Number(quickLoan.emiAmount) || 0,
         interestRate: Number(quickLoan.interestRate) || 0,
       }
@@ -179,18 +181,9 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   }
 
   // Liability options for linking
-  const activeLiabilities = liabilityList.filter((l) => l.status !== 'Inactive')
-  const liabilityOptions = [
-    { value: '', label: 'None' },
-    ...activeLiabilities.map((l) => ({
-      value: l.liabilityId,
-      label: `${l.liabilityType} — ${l.lenderName} (${formatINR(l.outstandingBalance)})`,
-    })),
-  ]
+  const activeLiabilities = (liabilityList || []).filter((l) => l.status !== 'Inactive')
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
-
-  const suggestedLoanType = LOAN_SUGGESTIONS[form.investmentType]
+  const memberOptions = (activeMembers || []).map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
 
   return (
     <div className="space-y-4">
@@ -258,46 +251,88 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
         </div>
       )}
 
-      {/* Linked Liability */}
-      <div className="border-t border-[var(--border-light)] pt-4">
-        <FormField label="Linked Loan / Liability">
-          <FormSelect value={form.linkedLiabilityId} onChange={(v) => { set('linkedLiabilityId', v); if (v) setShowQuickLoan(false) }} options={liabilityOptions} />
-        </FormField>
+      {/* Linked Loans */}
+      {(LOAN_SUGGESTIONS[form.investmentType]) && (
+        <div className="border-t border-[var(--border-light)] pt-4">
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Linked Loans</p>
 
-        {!form.linkedLiabilityId && !isEdit && (
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setShowQuickLoan(!showQuickLoan)}
-              className="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors"
-            >
-              {showQuickLoan ? '— Cancel quick loan' : `+ Create new loan${suggestedLoanType ? ` (${suggestedLoanType})` : ''}`}
-            </button>
-          </div>
-        )}
+          {/* Show already linked loans */}
+          {form.linkedLiabilityIds.length > 0 && (
+            <div className="space-y-1.5 mb-3">
+              {form.linkedLiabilityIds.map(id => {
+                const loan = activeLiabilities.find(l => l.liabilityId === id)
+                if (!loan) return null
+                return (
+                  <div key={id} className="flex items-center justify-between bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border)]">
+                    <div>
+                      <p className="text-xs font-medium text-[var(--text-primary)]">{loan.liabilityType} — {loan.lenderName}</p>
+                      <p className="text-xs text-[var(--accent-rose)] tabular-nums">{formatINR(loan.outstandingBalance)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => set('linkedLiabilityIds', form.linkedLiabilityIds.filter(x => x !== id))}
+                      className="text-xs text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors px-2 py-1"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
-        {showQuickLoan && (
-          <div className="mt-3 p-3 bg-[var(--bg-inset)] rounded-lg space-y-3">
-            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Quick Loan</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField label="Lender" required error={errors.qlLender}>
-                <FormInput value={quickLoan.lenderName} onChange={(v) => setQL('lenderName', v)} placeholder="e.g., HDFC Bank" />
-              </FormField>
-              <FormField label="Outstanding Balance" required error={errors.qlOutstanding}>
-                <FormInput type="number" value={quickLoan.outstandingBalance} onChange={(v) => setQL('outstandingBalance', v)} placeholder="e.g., 3500000" />
-              </FormField>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField label="EMI (monthly)">
-                <FormInput type="number" value={quickLoan.emiAmount} onChange={(v) => setQL('emiAmount', v)} placeholder="e.g., 32000" />
-              </FormField>
-              <FormField label="Interest Rate %">
-                <FormInput type="number" value={quickLoan.interestRate} onChange={(v) => setQL('interestRate', v)} placeholder="e.g., 8.5" />
-              </FormField>
+          {/* Add existing loan dropdown */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <FormSelect
+                value=""
+                onChange={(v) => { if (v && !form.linkedLiabilityIds.includes(v)) { set('linkedLiabilityIds', [...form.linkedLiabilityIds, v]); setShowQuickLoan(false) } }}
+                options={[
+                  { value: '', label: 'Link an existing loan...' },
+                  ...activeLiabilities
+                    .filter(l => !form.linkedLiabilityIds.includes(l.liabilityId))
+                    .map(l => ({ value: l.liabilityId, label: `${l.liabilityType} — ${l.lenderName} (${formatINR(l.outstandingBalance)})` }))
+                ]}
+              />
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Quick loan creation */}
+          {!isEdit && (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowQuickLoan(!showQuickLoan)}
+                className="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                {showQuickLoan ? '— Cancel quick loan' : `+ Create new loan (${LOAN_SUGGESTIONS[form.investmentType]})`}
+              </button>
+            </div>
+          )}
+
+          {showQuickLoan && (
+            <div className="mt-3 p-3 bg-[var(--bg-inset)] rounded-lg space-y-3">
+              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Quick Loan</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField label="Lender" required error={errors.qlLender}>
+                  <FormInput value={quickLoan.lenderName} onChange={(v) => setQL('lenderName', v)} placeholder="e.g., HDFC Bank" />
+                </FormField>
+                <FormField label="Outstanding Balance" required error={errors.qlOutstanding}>
+                  <FormInput type="number" value={quickLoan.outstandingBalance} onChange={(v) => setQL('outstandingBalance', v)} placeholder="e.g., 3500000" />
+                </FormField>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField label="EMI (monthly)">
+                  <FormInput type="number" value={quickLoan.emiAmount} onChange={(v) => setQL('emiAmount', v)} placeholder="e.g., 32000" />
+                </FormField>
+                <FormField label="Interest Rate %">
+                  <FormInput type="number" value={quickLoan.interestRate} onChange={(v) => setQL('interestRate', v)} placeholder="e.g., 8.5" />
+                </FormField>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {isEdit && (
         <FormField label="Status">

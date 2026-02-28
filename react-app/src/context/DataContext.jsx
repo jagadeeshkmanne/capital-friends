@@ -402,7 +402,8 @@ export function DataProvider({ children }) {
   const updateOtherInvestment = useCallback(async (id, data) => {
     await api.updateOtherInvestment({ investmentId: id, ...data })
     await refreshOtherInvestments()
-  }, [refreshOtherInvestments])
+    await refreshLiabilities() // linked liability may have changed
+  }, [refreshOtherInvestments, refreshLiabilities])
 
   const deleteOtherInvestment = useCallback(async (id) => {
     await api.deleteOtherInvestment(id)
@@ -543,12 +544,20 @@ export function DataProvider({ children }) {
       if (data.cash) assetAlloc.Cash = data.cash
       if (data.realEstate) assetAlloc['Real Estate'] = data.realEstate
       if (data.commodities) assetAlloc.Commodities = data.commodities
+      // Include custom asset fields
+      if (data.customAsset) Object.entries(data.customAsset).forEach(([k, v]) => { if (v > 0) assetAlloc[k] = v })
       const equityAlloc = {}
+      if (data.giantCap) equityAlloc.Giant = data.giantCap
       if (data.largeCap) equityAlloc.Large = data.largeCap
       if (data.midCap) equityAlloc.Mid = data.midCap
       if (data.smallCap) equityAlloc.Small = data.smallCap
       if (data.microCap) equityAlloc.Micro = data.microCap
-      const entry = { fundCode: data.fundCode, fundName: data.fundName, assetAllocation: assetAlloc, equityAllocation: equityAlloc }
+      if (data.customCap) Object.entries(data.customCap).forEach(([k, v]) => { if (v > 0) equityAlloc[k] = v })
+      const geoAlloc = {}
+      if (data.geoIndia) geoAlloc.India = data.geoIndia
+      if (data.geoGlobal) geoAlloc.Global = data.geoGlobal
+      if (data.customGeo) Object.entries(data.customGeo).forEach(([k, v]) => { if (v > 0) geoAlloc[k] = v })
+      const entry = { fundCode: data.fundCode, fundName: data.fundName, assetAllocation: assetAlloc, equityAllocation: equityAlloc, geoAllocation: geoAlloc }
       if (idx >= 0) { const next = [...list]; next[idx] = entry; return next }
       return [...list, entry]
     })

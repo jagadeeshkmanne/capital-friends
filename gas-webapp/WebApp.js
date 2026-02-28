@@ -499,18 +499,21 @@ function getAllMFHoldings() {
 function getAllAssetAllocationsData() {
   var sheet = getSheet(CONFIG.assetAllocationsSheet);
   if (!sheet || sheet.getLastRow() < 3) return [];
-  var data = sheet.getRange(3, 1, sheet.getLastRow() - 2, 4).getValues();
+  var cols = Math.max(sheet.getLastColumn(), 5);
+  var data = sheet.getRange(3, 1, sheet.getLastRow() - 2, cols).getValues();
   var allocations = [];
   for (var i = 0; i < data.length; i++) {
     if (!data[i][0]) continue;
-    var assetAlloc = null, equityAlloc = null;
+    var assetAlloc = null, equityAlloc = null, geoAlloc = null;
     try { if (data[i][2]) assetAlloc = JSON.parse(data[i][2]); } catch (e) {}
     try { if (data[i][3]) equityAlloc = JSON.parse(data[i][3]); } catch (e) {}
+    try { if (data[i][4]) geoAlloc = JSON.parse(data[i][4]); } catch (e) {}
     allocations.push({
       fundCode: data[i][0].toString(),
       fundName: data[i][1] || '',
       assetAllocation: assetAlloc,
-      equityAllocation: equityAlloc
+      equityAllocation: equityAlloc,
+      geoAllocation: geoAlloc
     });
   }
   return allocations;

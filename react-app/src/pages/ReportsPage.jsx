@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { FileText, Filter } from 'lucide-react'
-import { formatINR } from '../data/familyData'
+import { formatINR, splitFundName } from '../data/familyData'
 import { useFamily } from '../context/FamilyContext'
 import { useData } from '../context/DataContext'
 
@@ -137,7 +137,14 @@ export default function ReportsPage() {
                           </div>
                         </td>
                         <td className="py-2.5 px-3">
-                          <p className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[180px]">{t.fundName || t.companyName}</p>
+                          {t.fundName ? (
+                            <>
+                              <p className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[180px]">{splitFundName(t.fundName).main}</p>
+                              {splitFundName(t.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
+                            </>
+                          ) : (
+                            <p className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[180px]">{t.companyName}</p>
+                          )}
                           <p className="text-[10px] text-[var(--text-dim)]">{t.fundCode || t.symbol}</p>
                         </td>
                         <td className="py-2.5 px-3 text-xs text-[var(--text-muted)]">{t.portfolioName || ''}</td>
@@ -173,7 +180,16 @@ export default function ReportsPage() {
                 return (
                   <div key={t.transactionId} className="px-4 py-3">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate mr-2">{t.fundName || t.companyName}</p>
+                      <div className="flex-1 min-w-0 mr-2">
+                        {t.fundName ? (
+                          <>
+                            <p className="text-sm font-medium text-[var(--text-primary)] truncate">{splitFundName(t.fundName).main}</p>
+                            {splitFundName(t.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{t.companyName}</p>
+                        )}
+                      </div>
                       <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${typeBadge[t.type] || ''}`}>{t.type}</span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)]">{t.date} · {t.portfolioName}</p>

@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Menu, Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -72,9 +72,9 @@ const SECTION_HEX = {
   Alternative: '#a78bfa', Equity: '#10b981', Other: '#6b7280',
 }
 
-const DIALOG_TITLES = { buyopp: 'Buying Opportunities', rebalance: 'Rebalance Alerts' }
+const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alerts' }
 
-export default function Header({ onMenuClick }) {
+export default function Header() {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
   const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, refreshData, isRefreshing } = useData()
@@ -186,51 +186,46 @@ export default function Header({ onMenuClick }) {
       {/* ── Top Bar ── */}
       <div className="relative z-10 bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
-          {/* Left: hamburger (mobile) + logo */}
-          <div className="flex items-center gap-2">
-            <button onClick={onMenuClick} className="lg:hidden p-2 -ml-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-              <Menu size={20} />
-            </button>
-            <div className="flex items-center gap-2">
-              <img src={LOGO_ICON} alt="CF" className="h-11 sm:h-12 w-auto" />
-              <span className="hidden sm:flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                <span className="font-bold text-[var(--text-primary)]">Capital</span>
-                <span className="font-extrabold text-emerald-400">Friends</span>
-              </span>
-            </div>
-          </div>
+          {/* Left: logo (clickable → MF page) */}
+          <Link to="/investments/mutual-funds" className="flex items-center gap-2">
+            <img src={LOGO_ICON} alt="CF" className="h-9 sm:h-12 w-auto" />
+            <span className="hidden sm:flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              <span className="font-bold text-[var(--text-primary)]">Capital</span>
+              <span className="font-extrabold text-emerald-400">Friends</span>
+            </span>
+          </Link>
 
-          {/* Right: action pills + NW + theme + bell + avatar */}
-          <div className="flex items-center gap-2">
-            {/* Buying Opportunities pill — glowing */}
+          {/* Right: action pills (desktop) + icons + avatar */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Buying Opportunities pill — desktop only (mobile: in sidebar) */}
             {buyOppCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
-                className={`glow-emerald flex items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                className={`hidden sm:flex glow-emerald items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
                   dialogKey === 'buyopp'
                     ? 'bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-400/50'
                     : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
                 }`}
               >
                 <TrendingDown size={13} strokeWidth={2.5} />
-                <span className="hidden sm:inline">{strongBuyCount > 0 ? 'Buy Opportunities' : 'Buying Opportunities'}</span>
+                <span>{strongBuyCount > 0 ? 'Buy Opportunities' : 'Buying Opportunities'}</span>
                 {strongBuyCount > 0 && <span className="text-[11px] bg-emerald-500/30 px-1.5 py-0.5 rounded-full">{strongBuyCount} Strong</span>}
                 {buyCount > 0 && <span className="text-[11px] bg-emerald-500/20 px-1.5 py-0.5 rounded-full">{buyCount} Buy</span>}
               </button>
             )}
 
-            {/* Rebalance Alerts pill — glowing */}
+            {/* Rebalance Alerts pill — desktop only (mobile: in sidebar) */}
             {rebalanceCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
-                className={`glow-violet flex items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                className={`hidden sm:flex glow-violet items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
                   dialogKey === 'rebalance'
                     ? 'bg-violet-500/30 text-violet-300 ring-1 ring-violet-400/50'
                     : 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/25'
                 }`}
               >
                 <RefreshCw size={13} strokeWidth={2.5} />
-                <span className="hidden sm:inline">Rebalance Alerts</span>
+                <span>Rebalance Alerts</span>
                 <span className="text-[11px] bg-violet-500/30 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
               </button>
             )}
@@ -239,19 +234,19 @@ export default function Header({ onMenuClick }) {
             <button
               onClick={() => refreshData(true)}
               disabled={isRefreshing}
-              className={`p-2 rounded-lg transition-colors ${isRefreshing ? 'text-blue-400 cursor-not-allowed' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${isRefreshing ? 'text-blue-400 cursor-not-allowed' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
               title="Sync data from Google Sheets"
             >
-              <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
 
-            {/* Mask toggle */}
-            <button onClick={toggleMask} className={`p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>
+            {/* Mask toggle — desktop only, moved to avatar dropdown on mobile */}
+            <button onClick={toggleMask} className={`hidden sm:block p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>
               {masked ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
 
-            {/* Theme toggle */}
-            <button onClick={toggle} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+            {/* Theme toggle — desktop only, moved to avatar dropdown on mobile */}
+            <button onClick={toggle} className="hidden sm:block p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
@@ -384,6 +379,24 @@ export default function Header({ onMenuClick }) {
                     })}
                   </div>
 
+                  {/* Quick actions (mobile only — these icons are hidden from header on mobile) */}
+                  <div className="sm:hidden border-t border-[var(--border-light)] py-1.5">
+                    <button
+                      onClick={() => { toggleMask(); setDropdownOpen(false) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      {masked ? <EyeOff size={16} /> : <Eye size={16} />}
+                      <span className="text-sm font-medium">{masked ? 'Unmask Data' : 'Mask Data'}</span>
+                    </button>
+                    <button
+                      onClick={() => { toggle(); setDropdownOpen(false) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                      <span className="text-sm font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                    </button>
+                  </div>
+
                   {/* Settings + Sign out */}
                   <div className="border-t border-[var(--border-light)] py-1.5">
                     <Link
@@ -417,8 +430,8 @@ export default function Header({ onMenuClick }) {
       {/* ── Market Ticker ── */}
       <MarketTicker />
 
-      {/* ── Navigation Strip ── */}
-      <nav className="bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)]">
+      {/* ── Navigation Strip (desktop only — mobile uses sidebar + bottom nav) ── */}
+      <nav className="hidden lg:block bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center px-3 sm:px-4 py-1.5">
           {/* Nav links — scrollable */}
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0">
@@ -456,6 +469,40 @@ export default function Header({ onMenuClick }) {
         </div>
       </nav>
 
+      {/* ── Mobile Net Worth + Alert pills (since nav strip is hidden) ── */}
+      <div className="lg:hidden bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 py-1.5 flex items-center gap-2 justify-end">
+        {buyOppCount > 0 && (
+          <button
+            onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/12 border border-emerald-500/25 rounded-full"
+          >
+            <TrendingDown size={11} strokeWidth={2.5} />
+            <span>{buyOppCount}</span>
+          </button>
+        )}
+        {rebalanceCount > 0 && (
+          <button
+            onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-violet-400 bg-violet-500/12 border border-violet-500/25 rounded-full"
+          >
+            <RefreshCw size={11} strokeWidth={2.5} />
+            <span>{rebalanceCount}</span>
+          </button>
+        )}
+        <button
+          onClick={() => { setNwModalOpen(true); closeAll() }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+            nw.netWorth >= 0
+              ? 'bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15'
+              : 'bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/15'
+          }`}
+        >
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${nw.netWorth >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>Net Worth</span>
+          <span className={`text-sm font-extrabold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</span>
+          <ChevronRight size={12} className={nw.netWorth >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'} />
+        </button>
+      </div>
+
       {/* ── Net Worth Breakdown Modal ── */}
       {nwModalOpen && (() => {
         const donutData = nw.sections.map(sec => ({
@@ -465,10 +512,10 @@ export default function Header({ onMenuClick }) {
         }))
 
         return (
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center" onClick={() => setNwModalOpen(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-3" onClick={() => setNwModalOpen(false)}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div
-              className="relative w-full md:w-auto md:min-w-[720px] md:max-w-4xl max-h-[90vh] overflow-y-auto bg-[var(--bg-card)] rounded-t-2xl md:rounded-2xl border border-[var(--border)] shadow-2xl shadow-black/40"
+              className="relative w-full md:w-auto md:min-w-[720px] md:max-w-4xl max-h-[85vh] overflow-y-auto bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-2xl shadow-black/40"
               onClick={e => e.stopPropagation()}
             >
               {/* Close */}

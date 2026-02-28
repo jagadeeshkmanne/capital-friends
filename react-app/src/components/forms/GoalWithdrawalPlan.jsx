@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { ArrowDownCircle, AlertTriangle } from 'lucide-react'
 import { useData } from '../../context/DataContext'
-import { formatINR } from '../../data/familyData'
+import { formatINR, splitFundName } from '../../data/familyData'
 
 export default function GoalWithdrawalPlan({ goal, onClose }) {
   const { goalPortfolioMappings, mfPortfolios, mfHoldings } = useData()
@@ -115,7 +115,10 @@ export default function GoalWithdrawalPlan({ goal, onClose }) {
               <tbody>
                 {pd.fundWithdrawals.map((fw) => (
                   <tr key={fw.fundName} className="border-t border-[var(--border-light)]">
-                    <td className="py-1.5 text-[var(--text-secondary)] max-w-[180px] truncate">{fw.fundName}</td>
+                    <td className="py-1.5 text-[var(--text-secondary)] max-w-[180px]">
+                      <p className="truncate">{splitFundName(fw.fundName).main}</p>
+                      {splitFundName(fw.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fw.fundName).plan}</p>}
+                    </td>
                     <td className="py-1.5 text-right text-[var(--text-muted)] tabular-nums">{fw.withdrawUnits.toFixed(2)}</td>
                     <td className="py-1.5 text-right text-[var(--text-primary)] font-semibold tabular-nums">{formatINR(fw.withdrawValue)}</td>
                     <td className={`py-1.5 text-right tabular-nums font-semibold ${fw.taxableGain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(Math.abs(fw.taxableGain))}</td>

@@ -357,25 +357,29 @@ function logError(functionName, error) {
 function calculateFamilyAssetAllocation(familyData) {
   try {
     const assetTotals = { equity: 0, debt: 0, gold: 0, commodities: 0, realEstate: 0, crypto: 0, cash: 0, other: 0 };
+    const capTotals = { Giant: 0, Large: 0, Mid: 0, Small: 0, Micro: 0 };
+    const geoTotals = { India: 0, Global: 0 };
 
     // Get AssetAllocations sheet for mutual fund allocations
     const spreadsheet = getSpreadsheet();
     const assetAllocSheet = spreadsheet.getSheetByName(CONFIG.assetAllocationsSheet);
     let fundAllocations = {};
+    let fundCapAllocations = {};
+    let fundGeoAllocations = {};
 
     if (assetAllocSheet) {
       const allocData = assetAllocSheet.getDataRange().getValues();
       // Row 1 = Developer credit, Row 2 = Headers, Row 3+ = Data
-      // Columns: A=Fund Code, B=Fund Name, C=Asset Allocation JSON
+      // Columns: A=Fund Code, B=Fund Name, C=Asset Allocation JSON, D=Equity Allocation JSON, E=Geography JSON
       for (let i = 2; i < allocData.length; i++) {
         const fundCode = allocData[i][0] ? allocData[i][0].toString() : '';
         const assetJSON = allocData[i][2];
+        const capJSON = allocData[i][3];
+        const geoJSON = allocData[i][4];
         if (fundCode && assetJSON) {
-          try {
-            fundAllocations[fundCode] = JSON.parse(assetJSON);
-          } catch (e) {
-            Logger.log('Error parsing allocation for fund ' + fundCode);
-          }
+          try { fundAllocations[fundCode] = JSON.parse(assetJSON); } catch (e) {}
+          try { if (capJSON) fundCapAllocations[fundCode] = JSON.parse(capJSON); } catch (e) {}
+          try { if (geoJSON) fundGeoAllocations[fundCode] = JSON.parse(geoJSON); } catch (e) {}
         }
       }
     }
@@ -391,11 +395,31 @@ function calculateFamilyAssetAllocation(familyData) {
             const allocation = fundAllocations[holding.schemeCode];
             if (allocation) {
               // Apply fund allocation weighted by holding value
-              assetTotals.equity += (allocation.Equity || 0) * holding.currentValue / 100;
-              assetTotals.debt += (allocation.Debt || 0) * holding.currentValue / 100;
-              assetTotals.gold += (allocation.Gold || 0) * holding.currentValue / 100;
-              assetTotals.commodities += (allocation.Commodities || 0) * holding.currentValue / 100;
-              assetTotals.cash += (allocation.Cash || 0) * holding.currentValue / 100;
+              const val = holding.currentValue;
+              assetTotals.equity += (allocation.Equity || 0) * val / 100;
+              assetTotals.debt += (allocation.Debt || 0) * val / 100;
+              assetTotals.gold += (allocation.Gold || 0) * val / 100;
+              assetTotals.commodities += (allocation.Commodities || 0) * val / 100;
+              assetTotals.cash += (allocation.Cash || 0) * val / 100;
+
+              // Market cap aggregation
+              const capAlloc = fundCapAllocations[holding.schemeCode];
+              if (capAlloc) {
+                const eqBase = val * ((allocation.Equity || 0) / 100);
+                capTotals.Giant += (capAlloc.Giant || 0) * eqBase / 100;
+                capTotals.Large += (capAlloc.Large || 0) * eqBase / 100;
+                capTotals.Mid += (capAlloc.Mid || 0) * eqBase / 100;
+                capTotals.Small += (capAlloc.Small || 0) * eqBase / 100;
+                capTotals.Micro += (capAlloc.Micro || 0) * eqBase / 100;
+              }
+
+              // Geography aggregation
+              const geoAlloc = fundGeoAllocations[holding.schemeCode];
+              if (geoAlloc) {
+                const eqBase = val * ((allocation.Equity || 0) / 100);
+                geoTotals.India += (geoAlloc.India || 0) * eqBase / 100;
+                geoTotals.Global += (geoAlloc.Global || 0) * eqBase / 100;
+              }
             } else {
               // If no allocation data, assume it's an equity fund
               assetTotals.equity += holding.currentValue;
@@ -469,6 +493,24 @@ function calculateFamilyAssetAllocation(familyData) {
     const othersPct = 100 - (equityPct + debtPct + commoditiesPct + realEstatePct);
     const othersValue = assetTotals.crypto + assetTotals.cash + assetTotals.other;
 
+    // Market cap percentages (relative to equity total)
+    const capTotal = Object.values(capTotals).reduce((s, v) => s + v, 0);
+    const capBreakdown = {};
+    if (capTotal > 0) {
+      Object.entries(capTotals).forEach(([k, v]) => {
+        if (v > 0) capBreakdown[k] = { percentage: (v / capTotal) * 100, value: v, label: k };
+      });
+    }
+
+    // Geography percentages (relative to geo total)
+    const geoTotal = Object.values(geoTotals).reduce((s, v) => s + v, 0);
+    const geoBreakdown = {};
+    if (geoTotal > 0) {
+      Object.entries(geoTotals).forEach(([k, v]) => {
+        if (v > 0) geoBreakdown[k] = { percentage: (v / geoTotal) * 100, value: v, label: k };
+      });
+    }
+
     return {
       equity: {
         percentage: equityPct,
@@ -490,6 +532,8 @@ function calculateFamilyAssetAllocation(familyData) {
         value: assetTotals.realEstate,
         label: 'Real Estate'
       },
+      capBreakdown: capBreakdown,
+      geoBreakdown: geoBreakdown,
       crypto: {
         percentage: othersPct,
         value: othersValue,

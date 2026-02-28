@@ -36,7 +36,7 @@ const STEPS = [
 export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
   const isEdit = !!initial
   const { activeMembers } = useData()
-  const memberOptions = activeMembers.map((m) => ({
+  const memberOptions = (activeMembers || []).map((m) => ({
     value: m.memberId,
     label: m.relationship ? `${m.memberName} (${m.relationship})` : m.memberName,
   }))

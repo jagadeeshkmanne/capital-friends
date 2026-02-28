@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
-import { X, ChevronDown } from 'lucide-react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { X, ChevronDown, TrendingDown, RefreshCw } from 'lucide-react'
 import navigation from '../data/navigation'
+import useAlerts from '../hooks/useAlerts'
 
 export default function Sidebar({ open, onClose }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { investmentSignals } = useAlerts()
+  const { buyOppCount, rebalanceCount } = investmentSignals
 
   const initialOpen = navigation
     .filter((item) => item.children?.some((c) => location.pathname.startsWith(c.path)))
@@ -38,6 +42,32 @@ export default function Sidebar({ open, onClose }) {
           <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Menu</p>
           <button onClick={onClose} className="p-1.5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={16} /></button>
         </div>
+
+        {/* Alert pills (mobile only — these are hidden from header on mobile) */}
+        {(buyOppCount > 0 || rebalanceCount > 0) && (
+          <div className="px-3 py-2 border-b border-[var(--border)] space-y-1.5">
+            {buyOppCount > 0 && (
+              <button
+                onClick={() => { navigate('/investments/mutual-funds'); onClose() }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg hover:bg-emerald-500/15 transition-colors"
+              >
+                <TrendingDown size={14} />
+                <span className="flex-1 text-left">Buy Opportunities</span>
+                <span className="text-[11px] bg-emerald-500/25 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
+              </button>
+            )}
+            {rebalanceCount > 0 && (
+              <button
+                onClick={() => { navigate('/investments/mutual-funds'); onClose() }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-violet-400 bg-violet-500/10 rounded-lg hover:bg-violet-500/15 transition-colors"
+              >
+                <RefreshCw size={14} />
+                <span className="flex-1 text-left">Rebalance Alerts</span>
+                <span className="text-[11px] bg-violet-500/25 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Navigation links */}
         <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden">

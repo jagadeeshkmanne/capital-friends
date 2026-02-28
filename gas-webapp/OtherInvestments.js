@@ -280,17 +280,22 @@ function processEditInvestment(data) {
     // Format the row
     formatInvestmentRow(sheet, rowIndex);
 
-    // Update liability link if changed
-    if (investment.linkedLiabilityId !== data.linkedLiabilityId) {
-      // Remove old link
-      if (investment.linkedLiabilityId) {
-        syncInvestmentLiabilityLink(data.investmentId, '');
+    // Update liability links if changed (handles comma-separated multi-loan linking)
+    var oldIds = investment.linkedLiabilityId ? investment.linkedLiabilityId.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+    var newIds = data.linkedLiabilityId ? data.linkedLiabilityId.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+
+    // Find removed links
+    oldIds.forEach(function(oldId) {
+      if (newIds.indexOf(oldId) === -1) {
+        updateLiabilityInvestmentLink(oldId, ''); // Remove back-link
       }
-      // Add new link
-      if (data.linkedLiabilityId) {
-        syncInvestmentLiabilityLink(data.investmentId, data.linkedLiabilityId);
+    });
+    // Find added links
+    newIds.forEach(function(newId) {
+      if (oldIds.indexOf(newId) === -1) {
+        updateLiabilityInvestmentLink(newId, data.investmentId); // Add back-link
       }
-    }
+    });
 
     return {
       success: true,
@@ -324,9 +329,12 @@ function deleteInvestment(investmentId) {
       return { success: false, error: 'Investment not found.' };
     }
 
-    // Remove liability link if exists
+    // Remove liability links if exist (handles comma-separated multi-loan linking)
     if (investment.linkedLiabilityId) {
-      syncInvestmentLiabilityLink('', investment.linkedLiabilityId);
+      var linkedIds = investment.linkedLiabilityId.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+      linkedIds.forEach(function(liabilityId) {
+        updateLiabilityInvestmentLink(liabilityId, '');
+      });
     }
 
     // Delete the row

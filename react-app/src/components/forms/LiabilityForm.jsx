@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../../context/DataContext'
+import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 
 const LIABILITY_TYPES = [
@@ -14,7 +15,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
-  const { activeMembers } = useData()
+  const { activeMembers, otherInvList } = useData()
   const isEdit = !!initial
   const [form, setForm] = useState({
     liabilityType: initial?.liabilityType || '',
@@ -23,6 +24,7 @@ export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
     outstandingBalance: initial?.outstandingBalance || '',
     emiAmount: initial?.emiAmount || '',
     interestRate: initial?.interestRate || '',
+    linkedInvestmentId: initial?.linkedInvestmentId || '',
     status: initial?.status || 'Active',
     notes: initial?.notes || '',
   })
@@ -52,11 +54,21 @@ export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
         outstandingBalance: Number(form.outstandingBalance),
         emiAmount: Number(form.emiAmount) || 0,
         interestRate: Number(form.interestRate) || 0,
+        linkedInvestmentId: form.linkedInvestmentId || '',
       })
     } finally { setSaving(false) }
   }
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+
+  const activeInvestments = (otherInvList || []).filter(i => i.status !== 'Inactive')
+  const investmentOptions = [
+    { value: '', label: 'None' },
+    ...activeInvestments.map(i => ({
+      value: i.investmentId,
+      label: `${i.investmentName} (${i.investmentType} — ${formatINR(i.currentValue)})`,
+    })),
+  ]
 
   return (
     <div className="space-y-4">
@@ -86,6 +98,10 @@ export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
           <FormInput type="number" value={form.interestRate} onChange={(v) => set('interestRate', v)} placeholder="e.g., 8.5" step="0.01" />
         </FormField>
       </div>
+
+      <FormField label="Linked Investment">
+        <FormSelect value={form.linkedInvestmentId} onChange={(v) => set('linkedInvestmentId', v)} options={investmentOptions} placeholder="Link to an investment (optional)..." />
+      </FormField>
 
       {isEdit && (
         <FormField label="Status">

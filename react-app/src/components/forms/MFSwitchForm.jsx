@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
-import { formatINR } from '../../data/familyData'
+import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
 
@@ -119,7 +119,10 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
 
       {fromHolding && (
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
-          <p className="text-xs text-[var(--text-dim)]">{fromHolding.fundName}</p>
+          <div>
+            <p className="text-xs text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).main}</p>
+            {splitFundName(fromHolding.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).plan}</p>}
+          </div>
           <p className="text-xs text-[var(--text-muted)]">
             Available: <span className="font-semibold text-[var(--text-primary)]">{fromHolding.units.toFixed(2)}</span> units
             @ ₹{fromHolding.avgNav.toFixed(2)} avg | Current NAV: ₹{fromHolding.currentNav.toFixed(2)}
