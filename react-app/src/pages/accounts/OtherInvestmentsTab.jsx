@@ -34,9 +34,6 @@ export default function OtherInvestmentsTab() {
 
   const totalInvested = filtered.reduce((s, i) => s + (i.investedAmount || 0), 0)
   const totalCurrent = filtered.reduce((s, i) => s + (i.currentValue || 0), 0)
-  const totalPL = totalCurrent - totalInvested
-  const plUp = totalPL >= 0
-  const plPct = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0
 
   // Lookup linked liabilities
   const liabilityMap = useMemo(() => {
@@ -92,16 +89,9 @@ export default function OtherInvestmentsTab() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Invested" value={formatINR(totalInvested)} />
             <StatCard label="Current Value" value={formatINR(totalCurrent)} bold />
-            <StatCard
-              label="P&L"
-              value={`${plUp ? '+' : ''}${formatINR(Math.abs(totalPL))}`}
-              sub={`${plUp ? '+' : ''}${plPct.toFixed(1)}%`}
-              positive={plUp}
-              bold
-            />
             {linkedLoanTotal > 0 && (
               <StatCard label="Linked Loans" value={formatINR(linkedLoanTotal)} color="rose" />
             )}
@@ -150,9 +140,13 @@ export default function OtherInvestmentsTab() {
                         <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">{formatINR(i.investedAmount)}</td>
                         <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(i.currentValue)}</td>
                         <td className="py-2.5 px-3 text-right">
-                          <span className={`text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                            {up ? '+' : ''}{formatINR(pl)}
-                          </span>
+                          {i.investedAmount > 0 ? (
+                            <span className={`text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                              {up ? '+' : ''}{formatINR(pl)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-[var(--text-dim)]">—</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           {(() => {
@@ -208,9 +202,13 @@ export default function OtherInvestmentsTab() {
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-[var(--text-dim)]">P&L</p>
-                        <p className={`text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                          {up ? '+' : ''}{formatINR(pl)}
-                        </p>
+                        {i.investedAmount > 0 ? (
+                          <p className={`text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                            {up ? '+' : ''}{formatINR(pl)}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-[var(--text-dim)]">—</p>
+                        )}
                       </div>
                     </div>
                     {(() => {

@@ -22,15 +22,23 @@ const SECTION_META = {
   PPF: { label: 'PPF', color: 'bg-cyan-600', order: 3, route: '/investments/other' },
   EPF: { label: 'EPF', color: 'bg-cyan-500', order: 4, route: '/investments/other' },
   NPS: { label: 'NPS', color: 'bg-sky-500', order: 5, route: '/investments/other' },
+  'Fixed Deposit': { label: 'Fixed Deposit', color: 'bg-teal-500', order: 6, route: '/investments/other' },
   FD: { label: 'Fixed Deposit', color: 'bg-teal-500', order: 6, route: '/investments/other' },
   RD: { label: 'RD', color: 'bg-teal-400', order: 7, route: '/investments/other' },
   SSY: { label: 'SSY', color: 'bg-pink-400', order: 8, route: '/investments/other' },
   NSC: { label: 'NSC', color: 'bg-indigo-400', order: 9, route: '/investments/other' },
   Bonds: { label: 'Bonds', color: 'bg-cyan-400', order: 10, route: '/investments/other' },
   Debt: { label: 'Debt', color: 'bg-cyan-500', order: 11, route: '/investments/other' },
+  'Physical Gold': { label: 'Physical Gold', color: 'bg-amber-500', order: 12, route: '/investments/other' },
+  'Digital Gold': { label: 'Digital Gold', color: 'bg-amber-400', order: 12, route: '/investments/other' },
+  'Sovereign Gold Bond': { label: 'SGB', color: 'bg-amber-600', order: 12, route: '/investments/other' },
   Gold: { label: 'Gold', color: 'bg-amber-500', order: 12, route: '/investments/other' },
+  'Physical Silver': { label: 'Physical Silver', color: 'bg-slate-400', order: 13, route: '/investments/other' },
+  'Digital Silver': { label: 'Digital Silver', color: 'bg-slate-300', order: 13, route: '/investments/other' },
   Silver: { label: 'Silver', color: 'bg-slate-400', order: 13, route: '/investments/other' },
+  'Real Estate': { label: 'Real Estate', color: 'bg-orange-500', order: 14, route: '/investments/other' },
   Property: { label: 'Real Estate', color: 'bg-orange-500', order: 14, route: '/investments/other' },
+  Crypto: { label: 'Crypto', color: 'bg-violet-400', order: 15, route: '/investments/other' },
   Alternative: { label: 'Alternative', color: 'bg-violet-400', order: 15, route: '/investments/other' },
   Equity: { label: 'Equity', color: 'bg-emerald-500', order: 16, route: '/investments/other' },
   Other: { label: 'Other', color: 'bg-gray-500', order: 17, route: '/investments/other' },
@@ -66,10 +74,60 @@ const NAV_ITEMS = [
 
 const SECTION_HEX = {
   mf: '#8b5cf6', stocks: '#3b82f6',
-  PPF: '#0891b2', EPF: '#06b6d4', NPS: '#0ea5e9', FD: '#14b8a6', RD: '#2dd4bf',
+  PPF: '#14b8a6', EPF: '#f59e0b', NPS: '#ec4899',
+  'Fixed Deposit': '#06b6d4', FD: '#06b6d4', RD: '#2dd4bf',
   SSY: '#f472b6', NSC: '#818cf8', Bonds: '#22d3ee',
-  Debt: '#0ea5e9', Gold: '#fbbf24', Silver: '#94a3b8', Property: '#f97316',
-  Alternative: '#a78bfa', Equity: '#10b981', Other: '#6b7280',
+  Debt: '#0ea5e9',
+  'Physical Gold': '#fbbf24', 'Digital Gold': '#f59e0b', 'Sovereign Gold Bond': '#d97706', Gold: '#fbbf24',
+  'Physical Silver': '#94a3b8', 'Digital Silver': '#cbd5e1', Silver: '#94a3b8',
+  'Real Estate': '#f97316', Property: '#f97316',
+  Crypto: '#a78bfa', Alternative: '#a78bfa',
+  Equity: '#10b981', Other: '#6b7280',
+}
+
+// Generate a consistent color from any string key (for custom/unknown types)
+function hashColor(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  const hue = ((hash % 360) + 360) % 360
+  return `hsl(${hue}, 65%, 55%)`
+}
+function getSectionHex(key) {
+  return SECTION_HEX[key] || hashColor(key)
+}
+
+// Map section keys (non-MF) to broad asset classes
+const ASSET_CLASS_MAP = {
+  stocks: 'Equity',
+  PPF: 'Debt', EPF: 'Debt', NPS: 'Debt',
+  'Fixed Deposit': 'Debt', FD: 'Debt', RD: 'Debt', SSY: 'Debt', NSC: 'Debt', Bonds: 'Debt', Debt: 'Debt',
+  'Physical Gold': 'Gold', 'Digital Gold': 'Gold', 'Sovereign Gold Bond': 'Gold', Gold: 'Gold',
+  'Physical Silver': 'Gold', 'Digital Silver': 'Gold', Silver: 'Gold',
+  'Real Estate': 'Real Estate', Property: 'Real Estate',
+  Crypto: 'Alternative', Alternative: 'Alternative', Equity: 'Equity', Other: 'Other',
+}
+const ASSET_CLASS_HEX = {
+  Equity: '#8b5cf6', Debt: '#3b82f6', Gold: '#fbbf24', 'Real Estate': '#f97316', Cash: '#2dd4bf', Alternative: '#a78bfa', Other: '#6b7280',
+}
+
+// Infer MF asset category from fund name (same logic as MutualFundsPage)
+function inferMFCategory(name) {
+  if (!name) return 'Equity'
+  const n = name.toLowerCase()
+  if (n.includes('gold') || n.includes('silver') || n.includes('commodity')) return 'Gold'
+  if (n.includes('liquid') || n.includes('money market') || n.includes('overnight')) return 'Cash'
+  if (n.includes('gilt') || n.includes('government securities') || n.includes('constant maturity')) return 'Debt'
+  if (n.includes('debt') || n.includes('bond') || n.includes('income fund') || n.includes('corporate bond') ||
+      n.includes('banking & psu') || n.includes('short duration') || n.includes('medium duration') ||
+      n.includes('long duration') || n.includes('short term') || n.includes('medium term') ||
+      n.includes('floater') || n.includes('floating rate') || n.includes('credit') ||
+      n.includes('accrual') || n.includes('savings fund') || n.includes('ultra short')) return 'Debt'
+  if (n.includes('multi asset')) return 'Multi-Asset'
+  if (n.includes('hybrid') || n.includes('balanced') || n.includes('dynamic asset') ||
+      n.includes('arbitrage') || n.includes('retirement') || n.includes('aggressive') ||
+      n.includes('conservative') || n.includes('children') || n.includes('pension') ||
+      n.includes('fund of fund') || n.includes('fof')) return 'Hybrid'
+  return 'Equity'
 }
 
 const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alerts' }
@@ -77,7 +135,7 @@ const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alert
 export default function Header() {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
-  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, refreshData, isRefreshing } = useData()
+  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, assetAllocations, refreshData, isRefreshing } = useData()
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
 
@@ -139,27 +197,88 @@ export default function Header() {
 
     const activeOther = filterOwner((otherInvList || []).filter((i) => i.status === 'Active'), 'familyMemberId')
     activeOther.forEach((i) => {
-      // Group by investmentType for finer granularity (PPF, FD, Gold, etc.)
-      const type = i.investmentType || i.investmentCategory || 'Other'
+      // Group by investmentType — known types get own section, custom types also get own section (with dynamic color)
+      const type = i.investmentType || 'Other'
       addToSection(type, i.investmentName || type, i.currentValue, i.investedAmount || 0)
     })
 
     const sections = Object.entries(sectionMap)
       .map(([key, { items: sItems, invested }]) => {
-        const meta = SECTION_META[key] || SECTION_META.Other
+        const meta = SECTION_META[key] || { label: key, color: 'bg-gray-500', order: 50, route: '/investments/other' }
         const total = sItems.reduce((s, i) => s + i.value, 0)
         return { key, label: meta.label, color: meta.color, order: meta.order, route: meta.route, total, invested, items: sItems.sort((a, b) => b.value - a.value) }
       })
       .filter((s) => s.total > 0)
-      .sort((a, b) => a.order - b.order)
+      .sort((a, b) => b.total - a.total)
+
+    // Compute asset class allocation (Equity, Debt, Gold, Cash, Real Estate, etc.)
+    // For MFs: classify each fund individually using detailed allocation or fund name inference
+    const ac = { Equity: 0, Debt: 0, Gold: 0, Cash: 0, 'Real Estate': 0, Alternative: 0, Other: 0 }
+
+    // Build allocation lookup from Morningstar data
+    const allocLookup = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        allocLookup[a.fundCode] = a.assetAllocation
+      }
+    }
+
+    // Classify each MF holding individually
+    const allMFHoldings = (mfHoldings || []).filter((h) => h.units > 0)
+    const filteredMFHoldings = selectedMember === 'all' ? allMFHoldings :
+      allMFHoldings.filter((h) => {
+        const port = (mfPortfolios || []).find((p) => p.portfolioId === h.portfolioId)
+        return port && port.ownerId === selectedMember && port.status === 'Active'
+      })
+
+    filteredMFHoldings.forEach((h) => {
+      const detailed = allocLookup[h.fundCode || h.schemeCode]
+      if (detailed) {
+        // Use Morningstar allocation data
+        for (const [cls, pct] of Object.entries(detailed)) {
+          const val = h.currentValue * (pct / 100)
+          if (cls === 'Equity') ac.Equity += val
+          else if (cls === 'Debt') ac.Debt += val
+          else if (cls === 'Cash') ac.Cash += val
+          else if (cls === 'Commodities' || cls === 'Gold') ac.Gold += val
+          else if (cls === 'Real Estate') ac['Real Estate'] += val
+          else ac.Other += val
+        }
+      } else {
+        // Infer from fund name
+        const cat = inferMFCategory(h.fundName)
+        if (cat === 'Equity') ac.Equity += h.currentValue
+        else if (cat === 'Debt') ac.Debt += h.currentValue
+        else if (cat === 'Cash') ac.Cash += h.currentValue
+        else if (cat === 'Gold') ac.Gold += h.currentValue
+        else if (cat === 'Hybrid') { ac.Equity += h.currentValue * 0.65; ac.Debt += h.currentValue * 0.35 }
+        else if (cat === 'Multi-Asset') { ac.Equity += h.currentValue * 0.50; ac.Debt += h.currentValue * 0.30; ac.Gold += h.currentValue * 0.20 }
+        else ac.Equity += h.currentValue
+      }
+    })
+
+    // Add stocks → Equity
+    sections.filter((s) => s.key === 'stocks').forEach((s) => { ac.Equity += s.total })
+
+    // Add other investments by their section key
+    sections.filter((s) => s.key !== 'mf' && s.key !== 'stocks').forEach((s) => {
+      const cls = ASSET_CLASS_MAP[s.key] || 'Other'
+      if (cls in ac) ac[cls] += s.total
+      else ac.Other += s.total
+    })
+
+    const assetAllocation = Object.entries(ac)
+      .filter(([, v]) => v > 0)
+      .map(([cls, total]) => ({ cls, total, hex: ASSET_CLASS_HEX[cls] || '#6b7280' }))
+      .sort((a, b) => b.total - a.total)
 
     const activeLiab = filterOwner((liabilityList || []).filter((l) => l.status === 'Active'), 'familyMemberId')
     const liabilities = activeLiab.map((l) => ({ label: l.liabilityName || l.liabilityType || 'Loan', value: l.outstandingBalance }))
     const totalLiab = activeLiab.reduce((s, l) => s + l.outstandingBalance, 0)
     const totalInv = sections.reduce((s, sec) => s + sec.total, 0)
     const totalInvested = sections.reduce((s, sec) => s + sec.invested, 0)
-    return { netWorth: totalInv - totalLiab, totalInv, totalInvested, sections, totalLiab, liabilities }
-  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList])
+    return { netWorth: totalInv - totalLiab, totalInv, totalInvested, sections, totalLiab, liabilities, assetAllocation }
+  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, assetAllocations])
 
   function closeAll() {
     setDropdownOpen(false)
@@ -506,7 +625,7 @@ export default function Header() {
       {/* ── Net Worth Breakdown Modal ── */}
       {nwModalOpen && (() => {
         const donutData = nw.sections.map(sec => ({
-          name: sec.label, value: sec.total, fill: SECTION_HEX[sec.key] || '#6b7280',
+          name: sec.label, value: sec.total, fill: getSectionHex(sec.key),
           pct: nw.totalInv > 0 ? (sec.total / nw.totalInv) * 100 : 0,
           color: sec.color, route: sec.route,
         }))
@@ -519,8 +638,8 @@ export default function Header() {
               onClick={e => e.stopPropagation()}
             >
               {/* Close */}
-              <button onClick={() => setNwModalOpen(false)} className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)]">
-                <X size={16} className="text-[var(--text-muted)]" />
+              <button onClick={() => setNwModalOpen(false)} className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+                <X size={18} className="text-[var(--text-secondary)]" />
               </button>
 
               {/* Mobile: vertical, Desktop: horizontal */}
@@ -530,7 +649,7 @@ export default function Header() {
                   <div className="relative w-[200px] h-[200px] md:w-[280px] md:h-[280px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={donutData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" paddingAngle={3} stroke="none">
+                        <Pie data={donutData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" paddingAngle={3} stroke="none" isAnimationActive={false} activeShape={null}>
                           {donutData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                         </Pie>
                         <Tooltip content={({ active, payload }) => {
@@ -539,7 +658,7 @@ export default function Header() {
                           return (
                             <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 shadow-lg text-xs">
                               <span className="font-semibold text-[var(--text-primary)]">{d.name}</span>
-                              <span className="text-[var(--text-muted)] ml-1.5">{formatINR(d.value)}</span>
+                              <span className="text-[var(--text-muted)] ml-1.5">{formatINR(d.value)} ({d.pct.toFixed(1)}%)</span>
                             </div>
                           )
                         }} />
@@ -551,15 +670,38 @@ export default function Header() {
                       <p className="text-lg md:text-xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(nw.netWorth)}</p>
                     </div>
                   </div>
+
+                  {/* Asset Allocation */}
+                  {nw.assetAllocation.length > 0 && (
+                    <div className="w-full mt-4">
+                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider text-center mb-2">Asset Allocation</p>
+                      {/* Stacked bar */}
+                      <div className="flex h-2.5 rounded-full overflow-hidden">
+                        {nw.assetAllocation.map((a) => (
+                          <div key={a.cls} style={{ width: `${(a.total / nw.totalInv) * 100}%`, backgroundColor: a.hex }} title={`${a.cls}: ${((a.total / nw.totalInv) * 100).toFixed(1)}%`} />
+                        ))}
+                      </div>
+                      {/* Legend */}
+                      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
+                        {nw.assetAllocation.map((a) => (
+                          <div key={a.cls} className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: a.hex }} />
+                            <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{a.cls} {((a.total / nw.totalInv) * 100).toFixed(0)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] text-center mt-2">Approximate. MF splits are estimated from fund names. Add Morningstar data in Fund Breakdown for accuracy.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* RIGHT — Allocation breakdown */}
-                <div className="flex-1 min-w-0 px-3 md:px-5 pt-4 md:pt-6 pb-5 flex flex-col justify-center">
+                <div className="flex-1 min-w-0 px-3 md:px-5 pt-12 md:pt-10 pb-5 flex flex-col justify-center">
                   {/* Investment rows — color-tinted chips */}
                   <div className="space-y-2">
                     {nw.sections.map(sec => {
                       const pct = nw.totalInv > 0 ? (sec.total / nw.totalInv) * 100 : 0
-                      const hex = SECTION_HEX[sec.key] || '#6b7280'
+                      const hex = getSectionHex(sec.key)
                       return (
                         <Link
                           key={sec.key}
@@ -570,8 +712,8 @@ export default function Header() {
                         >
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hex }} />
                           <span className="text-[13px] font-medium text-[var(--text-primary)] flex-1 min-w-0 truncate">{sec.label}</span>
-                          <span className="text-[13px] font-bold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(sec.total)}</span>
-                          <span className="text-[10px] font-medium tabular-nums shrink-0 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${hex}20`, color: hex }}>{pct.toFixed(0)}%</span>
+                          <span className="text-[13px] font-bold text-[var(--text-primary)] tabular-nums shrink-0 w-[80px] text-right">{formatINR(sec.total)}</span>
+                          <span className="text-[10px] font-medium tabular-nums shrink-0 w-[40px] text-center py-0.5 rounded-full" style={{ backgroundColor: `${hex}20`, color: hex }}>{pct.toFixed(0)}%</span>
                         </Link>
                       )
                     })}

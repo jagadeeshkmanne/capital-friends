@@ -37,9 +37,25 @@ export default function LiabilitiesTab() {
   const totalEMI = filtered.reduce((s, l) => s + (l.emiAmount || 0), 0)
   const activeCount = filtered.filter((l) => l.status === 'Active').length
 
+  // Map investmentId → investment for direct linkedInvestmentId lookup
   const investmentMap = useMemo(() => {
     const map = {}
     if (otherInvList) otherInvList.forEach(i => { map[i.investmentId] = i })
+    return map
+  }, [otherInvList])
+
+  // Reverse map: liabilityId → investment (for when link is stored on the investment side)
+  const reverseLinkedMap = useMemo(() => {
+    const map = {}
+    if (otherInvList) {
+      otherInvList.forEach(i => {
+        if (i.linkedLiabilityId) {
+          i.linkedLiabilityId.split(',').map(s => s.trim()).filter(Boolean).forEach(lid => {
+            map[lid] = i
+          })
+        }
+      })
+    }
     return map
   }, [otherInvList])
 
@@ -136,14 +152,16 @@ export default function LiabilitiesTab() {
                           : '—'}
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        {l.linkedInvestmentId && investmentMap[l.linkedInvestmentId] ? (
-                          <div>
-                            <p className="text-xs text-[var(--text-primary)]">{investmentMap[l.linkedInvestmentId].investmentName}</p>
-                            <p className="text-[10px] text-[var(--text-dim)]">{investmentMap[l.linkedInvestmentId].investmentType}</p>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-[var(--text-dim)]">—</span>
-                        )}
+                        {(() => {
+                          const linked = (l.linkedInvestmentId && investmentMap[l.linkedInvestmentId]) || reverseLinkedMap[l.liabilityId]
+                          if (!linked) return <span className="text-xs text-[var(--text-dim)]">—</span>
+                          return (
+                            <div>
+                              <p className="text-xs text-[var(--text-primary)]">{linked.investmentName}</p>
+                              <p className="text-[10px] text-[var(--text-dim)]">{linked.investmentType}</p>
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: l })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
@@ -176,12 +194,16 @@ export default function LiabilitiesTab() {
                       )}
                     </div>
                   </div>
-                  {l.linkedInvestmentId && investmentMap[l.linkedInvestmentId] && (
-                    <div className="mt-1.5 flex items-center justify-between bg-blue-500/5 rounded px-2 py-1">
-                      <span className="text-xs text-[var(--text-dim)]">Linked</span>
-                      <span className="text-xs text-[var(--text-secondary)]">{investmentMap[l.linkedInvestmentId].investmentName}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const linked = (l.linkedInvestmentId && investmentMap[l.linkedInvestmentId]) || reverseLinkedMap[l.liabilityId]
+                    if (!linked) return null
+                    return (
+                      <div className="mt-1.5 flex items-center justify-between bg-blue-500/5 rounded px-2 py-1">
+                        <span className="text-xs text-[var(--text-dim)]">Linked</span>
+                        <span className="text-xs text-[var(--text-secondary)]">{linked.investmentName}</span>
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

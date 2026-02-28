@@ -340,13 +340,47 @@ function autoRefreshMasterDataIfStale() {
   return refreshAllMasterData();
 }
 
+/**
+ * Ensure user sync triggers match the current schedule (10, 13, 16).
+ * If the user has old triggers (e.g., 6, 9, 12, 15), re-install them.
+ * Uses a Settings flag to avoid checking every single load.
+ */
+function ensureSyncTriggersUpdated() {
+  try {
+    var sheet = getSheet(CONFIG.settingsSheet);
+    if (!sheet) return;
+
+    // Check if we already migrated triggers
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] === 'syncTriggersVersion' && data[i][1] === 'v2') {
+          return; // Already updated
+        }
+      }
+    }
+
+    // Re-install triggers with new schedule
+    log('Migrating sync triggers to v2 schedule (10, 13, 16)...');
+    installDailyTriggerForUser();
+
+    // Mark as migrated
+    var newRow = Math.max(sheet.getLastRow() + 1, 2);
+    sheet.getRange(newRow, 1, 1, 2).setValues([['syncTriggersVersion', 'v2']]);
+    log('Sync triggers migrated successfully');
+  } catch (e) {
+    log('ensureSyncTriggersUpdated error (non-blocking): ' + e.toString());
+  }
+}
+
 // ============================================================================
 // DAILY TRIGGER (runs automatically for each user)
 // ============================================================================
 
 /**
  * Install data sync triggers for the current user.
- * Runs 4 times daily: 6 AM, 9 AM, 12 PM, 3 PM.
+ * Runs 3 times daily: 10 AM, 1 PM, 4 PM (30 min after master DB refresh).
  * This ensures NAV data is always fresh throughout the trading day.
  * The trigger runs as the user who installed it — so it has access
  * to their spreadsheet automatically.
@@ -362,8 +396,9 @@ function installDailyTriggerForUser() {
     }
   }
 
-  // Create 4 daily sync triggers: 6 AM, 9 AM, 12 PM, 3 PM
-  var syncHours = [6, 9, 12, 15];
+  // Create 3 daily sync triggers: 10 AM, 1 PM, 4 PM
+  // Staggered 30 min after master DB refresh (9, 12, 15) to ensure fresh data
+  var syncHours = [10, 13, 16];
   for (var h = 0; h < syncHours.length; h++) {
     ScriptApp.newTrigger('dailyUserSync')
       .timeBased()
@@ -375,7 +410,7 @@ function installDailyTriggerForUser() {
 }
 
 /**
- * Data sync handler — runs automatically via time-driven trigger (4x daily).
+ * Data sync handler — runs automatically via time-driven trigger (3x daily).
  * When triggered, Session.getEffectiveUser() returns the user who installed it.
  * This function ONLY syncs data — email is handled by a separate trigger.
  */

@@ -41,8 +41,8 @@ function updateLiability(data) {
 function processAddStockPortfolio(params) {
   return createStockPortfolio(
     params.portfolioName,
-    params.investmentAccount || params.broker || '',
-    params.owner || params.memberName || params.memberId || ''
+    params.investmentAccount || params.investmentAccountId || params.broker || '',
+    params.owner || params.ownerId || params.memberName || params.memberId || ''
   );
 }
 
@@ -74,8 +74,8 @@ function processEditStockPortfolio(params) {
 
     // Update editable fields (keep formulas in E-L intact)
     if (params.portfolioName) sheet.getRange(rowIndex, 2).setValue(params.portfolioName);
-    if (params.investmentAccount || params.broker) sheet.getRange(rowIndex, 3).setValue(params.investmentAccount || params.broker);
-    if (params.owner || params.memberName) sheet.getRange(rowIndex, 4).setValue(params.owner || params.memberName);
+    if (params.investmentAccount || params.investmentAccountId || params.broker) sheet.getRange(rowIndex, 3).setValue(params.investmentAccount || params.investmentAccountId || params.broker);
+    if (params.owner || params.ownerId || params.memberName) sheet.getRange(rowIndex, 4).setValue(params.owner || params.ownerId || params.memberName);
     if (params.status) sheet.getRange(rowIndex, 13).setValue(params.status);
 
     log('Stock portfolio updated: ' + params.portfolioId);
@@ -199,22 +199,22 @@ function getStockTransactions(portfolioId) {
       if (portfolioId && row[1] !== portfolioId) continue;
 
       transactions.push({
-        transactionId: row[0],
-        portfolioId: row[1],
-        portfolioName: row[2] || '',
-        symbol: row[3] || '',
-        companyName: row[4] || '',
-        exchange: row[5] || '',
-        gfSymbol: row[6] || '',
-        type: row[7] || '',
-        date: row[8] ? formatDate(row[8]) : '',
-        quantity: parseFloat(row[9]) || 0,
-        pricePerShare: parseFloat(row[10]) || 0,
-        brokerage: parseFloat(row[11]) || 0,
-        tax: parseFloat(row[12]) || 0,
-        totalAmount: parseFloat(row[13]) || 0,
-        notes: row[14] || '',
-        realizedPL: parseFloat(row[15]) || 0
+        transactionId: row[0],       // A
+        portfolioId: row[1],         // B
+        portfolioName: row[2] || '', // C
+        symbol: row[3] || '',        // D
+        companyName: row[4] || '',   // E
+        exchange: row[5] || '',      // F
+        gfSymbol: row[6] || '',      // G
+        type: row[7] || '',          // H
+        date: row[8] ? formatDate(row[8]) : '', // I
+        quantity: parseFloat(row[9]) || 0,       // J
+        pricePerShare: parseFloat(row[10]) || 0, // K
+        totalAmount: parseFloat(row[11]) || 0,   // L
+        brokerage: parseFloat(row[12]) || 0,     // M
+        netAmount: parseFloat(row[13]) || 0,     // N
+        notes: row[14] || '',                    // O
+        realizedPL: parseFloat(row[15]) || 0     // P
       });
     }
 

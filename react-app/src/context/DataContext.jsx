@@ -480,6 +480,16 @@ export function DataProvider({ children }) {
     return result
   }, [refreshStocks])
 
+  const editStockTransaction = useCallback(async (data) => {
+    await api.editStockTransaction(data)
+    await refreshStocks()
+  }, [refreshStocks])
+
+  const deleteStockTransaction = useCallback(async (transactionId) => {
+    await api.deleteStockTransaction(transactionId)
+    await refreshStocks()
+  }, [refreshStocks])
+
   // ── MF Portfolios CRUD ──
   const addMFPortfolio = useCallback(async (data) => {
     const result = await api.createMFPortfolio(data)
@@ -599,7 +609,7 @@ export function DataProvider({ children }) {
       stockPortfolios, stockHoldings, stockTransactions,
       // Stock CRUD
       addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
-      buyStock, sellStock,
+      buyStock, sellStock, editStockTransaction, deleteStockTransaction,
       // MF data
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD

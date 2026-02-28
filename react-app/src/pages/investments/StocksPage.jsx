@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react'
-import { Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, ChevronDown } from 'lucide-react'
+import { useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, ChevronDown, MoreVertical, Trash2 } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
-import Modal from '../../components/Modal'
+import Modal, { FormDateInput } from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
 import BuyStockForm from '../../components/forms/BuyStockForm'
 import SellStockForm from '../../components/forms/SellStockForm'
@@ -16,9 +17,9 @@ export default function StocksPage() {
   const { selectedMember } = useFamily()
   const {
     stockPortfolios, stockHoldings, stockTransactions,
-    activeInvestmentAccounts,
+    activeInvestmentAccounts, activeMembers,
     addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
-    buyStock, sellStock,
+    buyStock, sellStock, editStockTransaction, deleteStockTransaction,
   } = useData()
 
   const { showToast, showBlockUI, hideBlockUI } = useToast()
@@ -28,13 +29,17 @@ export default function StocksPage() {
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [txnMenuOpen, setTxnMenuOpen] = useState(null)
 
-  // Filter portfolios by member
+  // Filter portfolios by member + enrich ownerName
   const portfolios = useMemo(() => {
     if (!stockPortfolios) return []
-    const active = stockPortfolios.filter((p) => p.status !== 'Inactive')
+    const active = stockPortfolios.filter((p) => p.status !== 'Inactive').map((p) => {
+      const member = p.ownerId ? activeMembers.find((m) => m.memberId === p.ownerId) : null
+      return { ...p, ownerName: member?.memberName || p.ownerName || '' }
+    })
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
-  }, [stockPortfolios, selectedMember])
+  }, [stockPortfolios, selectedMember, activeMembers])
 
   // Per-portfolio computed data
   const portfolioData = useMemo(() => {
@@ -96,7 +101,7 @@ export default function StocksPage() {
   // Dropdown label
   const dropdownLabel = selectedPortfolioId === 'all'
     ? `All Portfolios (${portfolios.length})`
-    : `${selectedPortfolio?.portfolioName} — ${mv(selectedPortfolio?.ownerName, 'name')}`
+    : selectedPortfolio?.ownerName ? `${selectedPortfolio?.portfolioName} — ${mv(selectedPortfolio?.ownerName, 'name')}` : selectedPortfolio?.portfolioName
 
   // Handlers
   async function handleSavePortfolio(data) {
@@ -150,6 +155,33 @@ export default function StocksPage() {
       setModal(null)
     } catch (err) {
       showToast(err.message || 'Failed to record sale', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleDeleteTransaction(transactionId) {
+    if (!await confirm('Delete this transaction? This will recalculate your holdings.', { title: 'Delete Transaction', confirmLabel: 'Delete' })) return
+    showBlockUI('Deleting...')
+    try {
+      await deleteStockTransaction(transactionId)
+      showToast('Transaction deleted')
+      setTxnMenuOpen(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to delete transaction', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleEditTransaction(data) {
+    showBlockUI('Updating...')
+    try {
+      await editStockTransaction(data)
+      showToast('Transaction updated')
+      setModal(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to update transaction', 'error')
     } finally {
       hideBlockUI()
     }
@@ -343,7 +375,7 @@ export default function StocksPage() {
                           const up = h.unrealizedPL >= 0
                           const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === h.portfolioId) : null
                           return (
-                            <tr key={h.holdingId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                            <tr key={`${h.portfolioId}-${h.symbol}`} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
                               <td className="py-2.5 px-4">
                                 <p className="text-xs font-medium text-[var(--text-primary)]">{h.companyName}</p>
                                 <p className="text-xs font-mono text-[var(--text-dim)]">
@@ -390,7 +422,7 @@ export default function StocksPage() {
                       const up = h.unrealizedPL >= 0
                       const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === h.portfolioId) : null
                       return (
-                        <div key={h.holdingId} className="px-4 py-3">
+                        <div key={`${h.portfolioId}-${h.symbol}`} className="px-4 py-3">
                           <div className="flex items-center justify-between mb-1.5">
                             <div>
                               <p className="text-xs font-medium text-[var(--text-primary)]">{h.companyName}</p>
@@ -454,6 +486,7 @@ export default function StocksPage() {
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Brokerage</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Net</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Realized P&L</th>
+                          <th className="w-8 py-2 px-2"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -491,6 +524,15 @@ export default function StocksPage() {
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 )}
                               </td>
+                              <td className="py-2.5 px-2">
+                                <StockTxnActionMenu
+                                  txn={t}
+                                  isOpen={txnMenuOpen === t.transactionId}
+                                  onToggle={() => setTxnMenuOpen(txnMenuOpen === t.transactionId ? null : t.transactionId)}
+                                  onEdit={() => { setTxnMenuOpen(null); setModal({ editTxn: t }) }}
+                                  onDelete={() => { setTxnMenuOpen(null); handleDeleteTransaction(t.transactionId) }}
+                                />
+                              </td>
                             </tr>
                           )
                         })}
@@ -513,7 +555,16 @@ export default function StocksPage() {
                               </span>
                               <p className="text-xs font-semibold text-[var(--text-primary)]">{t.symbol}</p>
                             </div>
-                            <p className="text-xs text-[var(--text-dim)]">{t.date}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-[var(--text-dim)]">{t.date}</p>
+                              <StockTxnActionMenu
+                                txn={t}
+                                isOpen={txnMenuOpen === t.transactionId}
+                                onToggle={() => setTxnMenuOpen(txnMenuOpen === t.transactionId ? null : t.transactionId)}
+                                onEdit={() => { setTxnMenuOpen(null); setModal({ editTxn: t }) }}
+                                onDelete={() => { setTxnMenuOpen(null); handleDeleteTransaction(t.transactionId) }}
+                              />
+                            </div>
                           </div>
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-[var(--text-dim)]">{t.quantity} shares @ {formatINR(t.pricePerShare)}</p>
@@ -571,6 +622,16 @@ export default function StocksPage() {
           onCancel={() => setModal(null)}
         />
       </Modal>
+
+      <Modal open={!!modal?.editTxn} onClose={() => setModal(null)} title="Edit Transaction">
+        {modal?.editTxn && (
+          <EditStockTxnForm
+            txn={modal.editTxn}
+            onSave={handleEditTransaction}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
     </div>
   )
 }
@@ -590,6 +651,186 @@ function StatCard({ label, value, sub, positive, bold }) {
           {sub}
         </p>
       )}
+    </div>
+  )
+}
+
+/* ── Stock Transaction Action Menu (3-dot dropdown via portal) ── */
+function StockTxnActionMenu({ txn, isOpen, onToggle, onEdit, onDelete }) {
+  const buttonRef = useRef(null)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+
+  if (!txn.transactionId) return null
+
+  function handleToggle(e) {
+    e.stopPropagation()
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    onToggle()
+  }
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={handleToggle}
+        className="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Actions"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {isOpen && createPortal(
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            onClick={(e) => { e.stopPropagation(); onToggle() }}
+          />
+          <div
+            style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
+            className="bg-[var(--bg-dropdown)] border border-white/10 rounded-lg shadow-2xl py-1 min-w-[120px] animate-fade-in"
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit() }}
+              className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] flex items-center gap-2 transition-colors"
+            >
+              <Pencil size={12} /> Edit
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="w-full text-left px-3 py-2 text-xs text-[var(--accent-rose)] hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  )
+}
+
+/* ── Edit Stock Transaction Form ── */
+function EditStockTxnForm({ txn, onSave, onCancel }) {
+  const [date, setDate] = useState(() => {
+    if (!txn.date) return ''
+    const s = String(txn.date)
+    const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (ddmm) {
+      const d = new Date(Number(ddmm[3]), Number(ddmm[2]) - 1, Number(ddmm[1]))
+      return d.toISOString().split('T')[0]
+    }
+    const parsed = new Date(s)
+    return isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0]
+  })
+  const [quantity, setQuantity] = useState(String(txn.quantity || ''))
+  const [price, setPrice] = useState(String(txn.pricePerShare || ''))
+  const [brokerage, setBrokerage] = useState(String(txn.brokerage || '0'))
+  const [notes, setNotes] = useState(txn.notes || '')
+  const [saving, setSaving] = useState(false)
+
+  const totalAmount = (Number(quantity) || 0) * (Number(price) || 0)
+  const brokerageNum = Number(brokerage) || 0
+  const netAmount = txn.type === 'BUY' ? totalAmount + brokerageNum : totalAmount - brokerageNum
+
+  async function handleSubmit() {
+    if (!quantity || Number(quantity) <= 0) return
+    if (!price || Number(price) <= 0) return
+    setSaving(true)
+    try {
+      await onSave({
+        transactionId: txn.transactionId,
+        date,
+        quantity,
+        pricePerShare: price,
+        brokerage,
+        notes,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
+        <p className="text-xs font-medium text-[var(--text-primary)]">{txn.companyName}</p>
+        <p className="text-xs text-[var(--text-muted)]">
+          {txn.symbol} · {txn.type} · {txn.transactionId}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Date</label>
+          <FormDateInput value={date} onChange={setDate} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Quantity</label>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Price per Share</label>
+          <input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Brokerage</label>
+          <input
+            type="number"
+            value={brokerage}
+            onChange={(e) => setBrokerage(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+          />
+        </div>
+      </div>
+
+      {totalAmount > 0 && (
+        <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)] flex items-center justify-between">
+          <div>
+            <p className="text-xs text-[var(--text-dim)]">Total Amount</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(totalAmount)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-[var(--text-dim)]">Net Amount</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(netAmount)}</p>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Notes</label>
+        <input
+          type="text"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Optional notes..."
+          className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
+        />
+      </div>
+
+      <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--border-light)]">
+        <button onClick={onCancel} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={saving || !quantity || Number(quantity) <= 0 || !price || Number(price) <= 0}
+          className="px-4 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving...' : 'Update Transaction'}
+        </button>
+      </div>
     </div>
   )
 }

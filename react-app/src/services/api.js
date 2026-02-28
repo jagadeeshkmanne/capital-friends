@@ -206,6 +206,10 @@ export const createStockPortfolio = (data) => callAPI('stock-portfolio:create', 
 export const updateStockPortfolio = (data) => callAPI('stock-portfolio:update', data)
 export const deleteStockPortfolio = (portfolioId) => callAPI('stock-portfolio:delete', { portfolioId })
 
+// Stock Data
+export const getAllStocks = () => callAPI('stocks:all')
+export const getStockPrice = (symbol) => callAPI('stock:price', { symbol })
+
 // Stock Transactions
 export const buyStock = (data) => callAPI('stock:buy', data)
 export const sellStock = (data) => callAPI('stock:sell', data)
@@ -215,6 +219,10 @@ export const getStockTransactions = (portfolioId) => callAPI('stock:transactions
 // MF Transaction Edit/Delete
 export const deleteMFTransaction = (transactionId) => callAPI('mf-transaction:delete', { transactionId })
 export const editMFTransaction = (data) => callAPI('mf-transaction:edit', data)
+
+// Stock Transaction Edit/Delete
+export const editStockTransaction = (data) => callAPI('stock-transaction:edit', data)
+export const deleteStockTransaction = (transactionId) => callAPI('stock-transaction:delete', { transactionId })
 
 // Bulk Data (for cache refresh)
 export const getAllMFHoldings = () => callAPI('mf-holdings:list')

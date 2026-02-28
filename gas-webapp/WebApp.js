@@ -304,6 +304,18 @@ function routeAction(action, params, userRecord) {
     case 'stock:transactions':
       return getStockTransactions(params.portfolioId);
 
+    case 'stocks:all':
+      return getAllStocksForClientSearch();
+
+    case 'stock:price':
+      return fetchStockPrice(params.symbol);
+
+    case 'stock-transaction:edit':
+      return editStockTransaction(params.transactionId, params);
+
+    case 'stock-transaction:delete':
+      return deleteStockTransaction(params.transactionId);
+
     // ── Reminders ──
     case 'reminders:list':
       return getAllReminders();
@@ -566,18 +578,20 @@ function getAllStockHoldingsData() {
     var row = data[i];
     if (!row[0]) continue;
     holdings.push({
-      holdingId: row[0],
-      portfolioId: row[1],
-      symbol: row[2] || '',
-      companyName: row[3] || '',
-      exchange: row[4] || 'NSE',
-      quantity: parseFloat(row[5]) || 0,
-      avgBuyPrice: parseFloat(row[6]) || 0,
-      totalInvestment: parseFloat(row[7]) || 0,
-      currentPrice: parseFloat(row[8]) || 0,
-      currentValue: parseFloat(row[9]) || 0,
-      unrealizedPL: parseFloat(row[10]) || 0,
-      unrealizedPLPct: parseFloat(row[11]) || 0
+      portfolioId: row[0],                       // A
+      portfolioName: row[1] || '',               // B
+      symbol: row[2] || '',                      // C
+      companyName: row[3] || '',                 // D
+      exchange: row[4] || 'NSE',                 // E
+      gfSymbol: row[5] || '',                    // F
+      quantity: parseFloat(row[6]) || 0,         // G
+      avgBuyPrice: parseFloat(row[7]) || 0,      // H
+      totalInvestment: parseFloat(row[8]) || 0,  // I
+      currentPrice: parseFloat(row[9]) || 0,     // J
+      currentValue: parseFloat(row[10]) || 0,    // K
+      unrealizedPL: parseFloat(row[11]) || 0,    // L
+      unrealizedPLPct: parseFloat(row[12]) || 0, // M
+      sector: row[13] || '',                     // N
     });
   }
   return holdings;
@@ -597,20 +611,22 @@ function getAllStockTransactionsData() {
     var row = data[i];
     if (!row[0]) continue;
     transactions.push({
-      transactionId: row[0],
-      portfolioId: row[1],
-      portfolioName: row[2] || '',
-      symbol: row[3] || '',
-      companyName: row[4] || '',
-      type: row[5] || '',
-      date: row[6] ? formatDate(row[6]) : '',
-      quantity: parseFloat(row[7]) || 0,
-      pricePerShare: parseFloat(row[8]) || 0,
-      totalAmount: parseFloat(row[9]) || 0,
-      brokerage: parseFloat(row[10]) || 0,
-      netAmount: parseFloat(row[11]) || 0,
-      realizedPL: parseFloat(row[12]) || 0,
-      notes: row[13] || ''
+      transactionId: row[0],       // A
+      portfolioId: row[1],         // B
+      portfolioName: row[2] || '', // C
+      symbol: row[3] || '',        // D
+      companyName: row[4] || '',   // E
+      exchange: row[5] || '',      // F
+      gfSymbol: row[6] || '',      // G
+      type: row[7] || '',          // H
+      date: row[8] ? formatDate(row[8]) : '', // I
+      quantity: parseFloat(row[9]) || 0,       // J
+      pricePerShare: parseFloat(row[10]) || 0, // K
+      totalAmount: parseFloat(row[11]) || 0,   // L
+      brokerage: parseFloat(row[12]) || 0,     // M
+      netAmount: parseFloat(row[13]) || 0,     // N
+      notes: row[14] || '',                    // O
+      realizedPL: parseFloat(row[15]) || 0     // P
     });
   }
   return transactions;

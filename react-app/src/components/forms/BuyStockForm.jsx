@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
+import StockSearchInput from './StockSearchInput'
 
 export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
   const { stockPortfolios } = useData()
@@ -73,14 +74,22 @@ export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
         <FormSelect value={form.portfolioId} onChange={(v) => set('portfolioId', v)} options={portfolioOptions} placeholder="Select portfolio..." />
       </FormField>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Stock Symbol" required error={errors.symbol}>
-          <FormInput value={form.symbol} onChange={(v) => set('symbol', v.toUpperCase())} placeholder="e.g., RELIANCE" />
-        </FormField>
-        <FormField label="Company Name" required error={errors.companyName}>
-          <FormInput value={form.companyName} onChange={(v) => set('companyName', v)} placeholder="e.g., Reliance Industries Ltd" />
-        </FormField>
-      </div>
+      <FormField label="Stock" required error={errors.symbol}>
+        <StockSearchInput
+          value={form.symbol ? { symbol: form.symbol, companyName: form.companyName, sector: form.sector, price: form.currentPrice } : null}
+          onSelect={(stock) => {
+            setForm((f) => ({
+              ...f,
+              symbol: stock.symbol || '',
+              companyName: stock.companyName || '',
+              sector: stock.sector || '',
+              currentPrice: stock.price || f.currentPrice || 0,
+            }))
+            setErrors((e) => ({ ...e, symbol: undefined, companyName: undefined }))
+          }}
+          placeholder="Search by symbol or company name..."
+        />
+      </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField label="Purchase Date" required error={errors.date}>

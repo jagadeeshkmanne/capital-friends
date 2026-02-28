@@ -440,14 +440,17 @@ function setupATHTrigger() {
     }
   });
 
-  // Create new trigger at 7 AM
-  ScriptApp.newTrigger('dailyATHUpdate')
-    .timeBased()
-    .atHour(7)
-    .everyDays(1)
-    .create();
+  // Create 3 daily triggers: 9 AM, 12 PM, 3 PM
+  var hours = [9, 12, 15];
+  hours.forEach(function(hour) {
+    ScriptApp.newTrigger('dailyATHUpdate')
+      .timeBased()
+      .atHour(hour)
+      .everyDays(1)
+      .create();
+  });
 
-  Logger.log('ATH daily trigger set to run at 7:00 AM');
+  Logger.log('ATH triggers set to run 3x daily at 9, 12, 15 hrs');
 }
 
 /**

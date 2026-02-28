@@ -185,6 +185,48 @@ function getStockBySymbol(symbol) {
   }
 }
 
+/**
+ * Get current stock price using GOOGLEFINANCE via a temp cell.
+ * @param {string} gfSymbol - Google Finance symbol (e.g., "NSE:RELIANCE")
+ * @returns {number} Current price or 0 if unavailable
+ */
+function getStockPrice(gfSymbol) {
+  try {
+    if (!gfSymbol) return 0;
+
+    var sheet = getSheet(CONFIG.settingsSheet);
+    if (!sheet) return 0;
+
+    // Use cell Z1 as temp cell (far from settings data)
+    var cell = sheet.getRange('Z1');
+    cell.setFormula('=IFERROR(GOOGLEFINANCE("' + gfSymbol + '", "price"), 0)');
+    SpreadsheetApp.flush();
+    var price = cell.getValue();
+    cell.clearContent();
+
+    return typeof price === 'number' ? price : 0;
+  } catch (e) {
+    log('getStockPrice error: ' + e.toString());
+    return 0;
+  }
+}
+
+/**
+ * Get stock price by symbol (looks up gfNSE symbol, then fetches price).
+ * Called from frontend after user selects a stock.
+ * @param {string} symbol - Stock symbol (e.g., "RELIANCE")
+ * @returns {Object} { symbol, price }
+ */
+function fetchStockPrice(symbol) {
+  var stock = getStockBySymbol(symbol);
+  if (!stock) return { symbol: symbol, price: 0 };
+
+  var gfSymbol = stock.gfNSE || stock.gfBSE || '';
+  var price = getStockPrice(gfSymbol);
+
+  return { symbol: symbol, price: price };
+}
+
 // ============================================================================
 // STOCK PORTFOLIOS
 // ============================================================================
@@ -633,6 +675,105 @@ function sellStock(portfolioId, stockSymbol, quantity, pricePerShare, transactio
       success: false,
       error: error.message
     };
+  }
+}
+
+/**
+ * Edit a stock transaction — updates date, quantity, price, brokerage, notes
+ * then recalculates holdings
+ */
+function editStockTransaction(transactionId, data) {
+  try {
+    if (!transactionId) throw new Error('Transaction ID is required');
+
+    var sheet = getSheet(CONFIG.stockTransactionsSheet);
+    if (!sheet) throw new Error('StockTransactions sheet not found');
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 3) throw new Error('Transaction not found');
+
+    var rows = sheet.getRange(3, 1, lastRow - 2, 16).getValues();
+    var rowIndex = -1;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][0] === transactionId) { rowIndex = i; break; }
+    }
+    if (rowIndex < 0) throw new Error('Transaction not found: ' + transactionId);
+
+    var sheetRow = rowIndex + 3;
+    var row = rows[rowIndex];
+    var portfolioId = row[1];
+    var symbol = row[3];
+
+    // Update editable fields
+    var date = data.date ? new Date(data.date) : row[8];
+    var quantity = data.quantity ? parseFloat(data.quantity) : row[9];
+    var price = data.pricePerShare ? parseFloat(data.pricePerShare) : row[10];
+    var brokerage = data.brokerage !== undefined ? parseFloat(data.brokerage) || 0 : row[12];
+    var notes = data.notes !== undefined ? data.notes : row[14];
+
+    if (quantity <= 0) throw new Error('Quantity must be > 0');
+    if (price <= 0) throw new Error('Price must be > 0');
+
+    var totalAmount = quantity * price;
+    var type = row[7]; // BUY or SELL
+    var netAmount = type === 'BUY' ? totalAmount + brokerage : totalAmount - brokerage;
+
+    // Write updated values
+    sheet.getRange(sheetRow, 9).setValue(date);           // I: Date
+    sheet.getRange(sheetRow, 10).setValue(quantity);       // J: Quantity
+    sheet.getRange(sheetRow, 11).setValue(price);          // K: Price
+    sheet.getRange(sheetRow, 12).setValue(totalAmount);    // L: Total Amount
+    sheet.getRange(sheetRow, 13).setValue(brokerage);      // M: Brokerage
+    sheet.getRange(sheetRow, 14).setValue(netAmount);      // N: Net Amount
+    sheet.getRange(sheetRow, 15).setValue(notes);          // O: Notes
+
+    log('Stock transaction edited: ' + transactionId);
+
+    // Recalculate holdings
+    recalculateStockHoldings(portfolioId, symbol);
+
+    return { success: true, message: 'Transaction updated' };
+  } catch (error) {
+    log('Error editing stock transaction: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Delete a stock transaction and recalculate holdings
+ */
+function deleteStockTransaction(transactionId) {
+  try {
+    if (!transactionId) throw new Error('Transaction ID is required');
+
+    var sheet = getSheet(CONFIG.stockTransactionsSheet);
+    if (!sheet) throw new Error('StockTransactions sheet not found');
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 3) throw new Error('Transaction not found');
+
+    var rows = sheet.getRange(3, 1, lastRow - 2, 16).getValues();
+    var rowIndex = -1;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][0] === transactionId) { rowIndex = i; break; }
+    }
+    if (rowIndex < 0) throw new Error('Transaction not found: ' + transactionId);
+
+    var portfolioId = rows[rowIndex][1];
+    var symbol = rows[rowIndex][3];
+
+    // Delete the row
+    sheet.deleteRow(rowIndex + 3);
+
+    log('Stock transaction deleted: ' + transactionId);
+
+    // Recalculate holdings
+    recalculateStockHoldings(portfolioId, symbol);
+
+    return { success: true, message: 'Transaction deleted' };
+  } catch (error) {
+    log('Error deleting stock transaction: ' + error.toString());
+    return { success: false, error: error.message };
   }
 }
 

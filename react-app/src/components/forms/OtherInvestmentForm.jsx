@@ -14,7 +14,6 @@ const INVESTMENT_TYPES = [
   { value: 'Physical Gold', category: 'Gold' },
   { value: 'Digital Gold', category: 'Gold' },
   { value: 'Real Estate', category: 'Property' },
-  { value: 'Vehicle', category: 'Property' },
   { value: 'Bonds', category: 'Debt' },
   { value: 'Physical Silver', category: 'Silver' },
   { value: 'Digital Silver', category: 'Silver' },
@@ -24,7 +23,6 @@ const INVESTMENT_TYPES = [
 
 const LOAN_SUGGESTIONS = {
   'Real Estate': 'Home Loan',
-  'Vehicle': 'Car Loan',
 }
 
 const TYPE_OPTIONS = INVESTMENT_TYPES.map((t) => ({ value: t.value, label: t.value }))
@@ -84,6 +82,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     investmentType: initial?.investmentType || '',
     investmentCategory: initial?.investmentCategory || '',
     investmentName: initial?.investmentName || '',
+    customType: initial?.customType || '',
     familyMemberId: initial?.familyMemberId || '',
     investedAmount: initial?.investedAmount || '',
     currentValue: initial?.currentValue || '',
@@ -140,6 +139,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   function validate() {
     const e = {}
     if (!form.investmentType) e.investmentType = 'Required'
+    if (form.investmentType === 'Other' && !form.customType?.trim()) e.customType = 'Specify the type'
     if (!form.investmentName.trim()) e.investmentName = 'Required'
     if (!form.currentValue || Number(form.currentValue) < 0) e.currentValue = 'Required'
     if (showQuickLoan) {
@@ -154,12 +154,14 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     if (!validate()) return
     const data = {
       ...form,
+      investmentType: form.investmentType === 'Other' ? form.customType.trim() : form.investmentType,
       familyMember: form.familyMemberId, // GAS expects 'familyMember'
       investedAmount: Number(form.investedAmount) || 0,
       currentValue: Number(form.currentValue) || 0,
       linkedLiabilityId: form.linkedLiabilityIds.join(','), // Convert array back to comma-separated for GAS
     }
     delete data.linkedLiabilityIds // Don't send the array version
+    delete data.customType
     // Include metal dynamic fields if applicable
     if (isMetalType(form.investmentType)) {
       data.dynamicFields = JSON.stringify({
@@ -195,6 +197,12 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
           <FormSelect value={form.investmentCategory} onChange={(v) => set('investmentCategory', v)} options={CATEGORY_OPTIONS} placeholder="Auto-selected..." />
         </FormField>
       </div>
+
+      {form.investmentType === 'Other' && (
+        <FormField label="Custom Type" required error={errors.customType}>
+          <FormInput value={form.customType || ''} onChange={(v) => set('customType', v)} placeholder="e.g., Art, Collectibles, ULIP..." />
+        </FormField>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Investment Name" required error={errors.investmentName}>
