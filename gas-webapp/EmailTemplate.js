@@ -1,2015 +1,647 @@
 /**
- * ============================================================================
- * EMAIL TEMPLATE - Build HTML Email Body with Tailwind CSS (for email)
- * and Inline CSS (for PDF)
- * ============================================================================
- * Creates consolidated wealth reports with light theme matching app dialogs
+ * EmailTemplate.js — Family Wealth Dashboard HTML Email
+ *
+ * buildDashboardPDFHTML(data) — Generates HTML email body matching ref.html design exactly
+ * buildSimpleEmailBody(...)   — Compact email body with financial highlights
+ *
+ * Design: Uses ref.html template directly — white cards with colored left borders,
+ * border-radius, box-shadow, linear-gradient bars. Designed for HTML email clients.
  */
 
-/**
- * Member color palette (Tailwind colors)
- */
-const MEMBER_COLORS = [
-  { border: 'border-sky-400', name: 'text-sky-600', bg: 'bg-sky-50' },      // Sky Blue
-  { border: 'border-rose-400', name: 'text-rose-600', bg: 'bg-rose-50' },   // Rose
-  { border: 'border-purple-400', name: 'text-purple-600', bg: 'bg-purple-50' }, // Purple
-  { border: 'border-emerald-400', name: 'text-emerald-600', bg: 'bg-emerald-50' }, // Emerald
-  { border: 'border-orange-400', name: 'text-orange-600', bg: 'bg-orange-50' }, // Orange
-  { border: 'border-cyan-400', name: 'text-cyan-600', bg: 'bg-cyan-50' }    // Cyan
-];
+// ── Helpers ──
 
-/**
- * Member color palette (Inline styles for PDF)
- */
-const MEMBER_COLORS_INLINE = [
-  { border: '#38bdf8', name: '#0284c7', bg: '#f0f9ff' },  // Sky Blue
-  { border: '#fb7185', name: '#e11d48', bg: '#fff1f2' },  // Rose
-  { border: '#c084fc', name: '#9333ea', bg: '#faf5ff' },  // Purple
-  { border: '#34d399', name: '#059669', bg: '#ecfdf5' },  // Emerald
-  { border: '#fb923c', name: '#ea580c', bg: '#fff7ed' },  // Orange
-  { border: '#22d3ee', name: '#0891b2', bg: '#ecfeff' }   // Cyan
-];
+var _imageBase64Cache = {};
 
-/**
- * Build consolidated email body showing ALL family members
- * @param {Object} data - Consolidated family dashboard data from getConsolidatedFamilyDashboardData()
- * @param {string} reportType - 'daily', 'weekly', or 'manual'
- * @returns {string} HTML email body
- */
-function buildConsolidatedEmailBody(data, reportType) {
-  const greeting = getTimeBasedGreeting();
-  const date = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy, hh:mm a');
+function _getImageBase64(url) {
+  if (_imageBase64Cache[url]) return _imageBase64Cache[url];
+  try {
+    var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return '';
+    var b = r.getBlob();
+    var uri = 'data:' + (b.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(b.getBytes());
+    _imageBase64Cache[url] = uri;
+    return uri;
+  } catch (e) { return ''; }
+}
 
-  // Build member sections (only for members with holdings)
-  let memberSectionsHTML = '';
-  data.membersData.forEach((memberData, index) => {
-    const memberColor = MEMBER_COLORS[index % MEMBER_COLORS.length];
-    memberSectionsHTML += buildMemberSection(memberData, memberColor);
-  });
+function _escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
-  // Build new sections
-  const actionItemsHTML = buildActionItemsSection(data.questionnaireData);
-  const insuranceHTML = buildInsurancePoliciesSection(data.insuranceData);
-  const familyMembersHTML = buildFamilyMemberDetailsSection(data.familyMembers);
-  const accountSummaryHTML = buildAccountSummarySection(data.bankAccounts, data.investmentAccounts);
+function _fmtDate(ds) {
+  if (!ds) return '-';
+  try {
+    var d = new Date(ds);
+    if (isNaN(d.getTime())) return String(ds);
+    return Utilities.formatDate(d, 'Asia/Kolkata', 'dd MMM yyyy');
+  } catch (e) { return String(ds); }
+}
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif']
-          }
+function _fmtCur(amount) { return formatCurrencyForEmail(amount); }
+function _plColor(v) { return v >= 0 ? '#10b981' : '#dc2626'; }
+function _plSign(v) { return v >= 0 ? '+' : ''; }
+function _maskAadhar(a) {
+  if (!a) return '-';
+  var s = String(a).replace(/\D/g, '');
+  return s.length >= 4 ? 'XXXX-XXXX-' + s.slice(-4) : s;
+}
+
+var _ALLOC_GRADIENT = {
+  Equity: ['#10b981', '#059669'], Debt: ['#3b82f6', '#2563eb'],
+  Gold: ['#f59e0b', '#d97706'], Commodities: ['#f59e0b', '#d97706'],
+  'Real Estate': ['#f97316', '#ea580c'], Hybrid: ['#8b5cf6', '#7c3aed'],
+  Cash: ['#0891b2', '#0e7490'], Other: ['#8b5cf6', '#7c3aed']
+};
+var _MEMBER_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#ec4899'];
+var _ACTION_STYLES = {
+  critical: { bg: '#fef2f2', border: '#ef4444', titleColor: '#7f1d1d', descColor: '#991b1b', actionBg: '#fecaca', actionColor: '#7f1d1d' },
+  warning: { bg: '#fff7ed', border: '#f97316', titleColor: '#7c2d12', descColor: '#9a3412', actionBg: '#fed7aa', actionColor: '#7c2d12' },
+  info: { bg: '#eff6ff', border: '#3b82f6', titleColor: '#1e3a5f', descColor: '#1e40af', actionBg: '#bfdbfe', actionColor: '#1e3a5f' },
+  success: { bg: '#f0fdf4', border: '#10b981', titleColor: '#14532d', descColor: '#166534', actionBg: '#bbf7d0', actionColor: '#14532d' }
+};
+
+function buildDashboardPDFHTML(data) {
+  var d = data || {};
+  var logoUrl = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-new.png';
+  var netWorth = d.netWorth || 0, totalAssets = d.totalAssets || 0, totalInvested = d.totalInvested || 0;
+  var totalLiabilities = d.totalLiabilities || 0;
+  var lifeCover = d.lifeCover || 0, healthCover = d.healthCover || 0;
+  var assetClassList = d.assetClassList || [], actionItems = d.actionItems || [];
+  var activeInsurance = d.activeInsurance || [], membersData = d.membersData || [];
+  var activeLiabilities = d.activeLiabilities || [];
+  var familyMembers = d.familyMembers || [], bankAccounts = d.bankAccounts || [];
+  var investmentAccounts = d.investmentAccounts || [];
+  var allMFPortfolios = d.allMFPortfoliosFlat || [], allStockPortfolios = d.allStockPortfoliosFlat || [];
+  var allOtherInvestments = d.allOtherInvestments || [];
+  var generatedAt = d.generatedAt || Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy');
+  // memberNetWorth available via d.memberNetWorth if needed
+
+  // Build investment account lookup
+  var iaLookup = {};
+  for (var iai = 0; iai < investmentAccounts.length; iai++) iaLookup[investmentAccounts[iai].accountId] = investmentAccounts[iai];
+
+  // No "Open Google Sheet" button per user request
+
+  // Style constants
+  var _thS = 'padding:8px;font-size:11px;font-weight:600;color:#1f2937;text-align:left;';
+  var _thR = 'padding:8px;font-size:11px;font-weight:600;color:#1f2937;text-align:right;';
+  var _thC = 'padding:8px;font-size:11px;font-weight:600;color:#1f2937;text-align:center;';
+  var _tdS = 'padding:8px;font-size:12px;color:#111827;';
+  var _tdSec = 'padding:8px;font-size:12px;color:#374151;';
+  var _tdMono = 'padding:8px;font-size:11px;font-family:monospace;color:#374151;';
+  var _tdR = 'padding:8px;font-size:12px;color:#111827;text-align:right;';
+  var _tdSecR = 'padding:8px;font-size:12px;color:#374151;text-align:right;'; // used in buildSimpleEmailBody
+  var _tdBoldR = 'padding:8px;font-size:12px;font-weight:600;color:#111827;text-align:right;';
+  var _tdC = 'padding:8px;font-size:12px;color:#4b5563;text-align:center;';
+  var _fThS = 'padding:6px 8px;font-size:10px;font-weight:600;color:#1f2937;text-align:left;';
+  var _fThR = 'padding:6px 8px;font-size:10px;font-weight:600;color:#1f2937;text-align:right;';
+  var _fTdS = 'padding:6px 8px;font-size:11px;color:#111827;';
+  var _fTdMono = 'padding:6px 8px;font-size:11px;font-family:monospace;color:#374151;';
+  var _fTdSecR = 'padding:6px 8px;font-size:11px;color:#374151;text-align:right;';
+  var _fTdR = 'padding:6px 8px;font-size:11px;color:#111827;text-align:right;';
+  var _fTdBoldR = 'padding:6px 8px;font-size:11px;font-weight:700;text-align:right;';
+  var _card = 'background:white;border-top:1px solid #e5e7eb;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;border-radius:8px;margin-bottom:24px;';
+
+  // Build per-member data from flat arrays
+  var memberMap = {};
+  for (var fmi = 0; fmi < familyMembers.length; fmi++) {
+    var fm = familyMembers[fmi];
+    memberMap[fm.memberId] = { member: fm, mfPortfolios: [], stockPortfolios: [], otherInvestments: [], liabilities: [], insurance: [] };
+  }
+  for (var mi = 0; mi < allMFPortfolios.length; mi++) {
+    var mp = allMFPortfolios[mi];
+    if (mp.ownerId && memberMap[mp.ownerId]) memberMap[mp.ownerId].mfPortfolios.push(mp);
+  }
+  for (var si = 0; si < allStockPortfolios.length; si++) {
+    var sp = allStockPortfolios[si];
+    if (sp.ownerId && memberMap[sp.ownerId]) memberMap[sp.ownerId].stockPortfolios.push(sp);
+  }
+  for (var oi = 0; oi < allOtherInvestments.length; oi++) {
+    var inv = allOtherInvestments[oi];
+    if (inv.familyMemberId && memberMap[inv.familyMemberId]) memberMap[inv.familyMemberId].otherInvestments.push(inv);
+  }
+  for (var li = 0; li < activeLiabilities.length; li++) {
+    var lb = activeLiabilities[li];
+    if (lb.familyMemberId && memberMap[lb.familyMemberId]) memberMap[lb.familyMemberId].liabilities.push(lb);
+  }
+  for (var ii = 0; ii < activeInsurance.length; ii++) {
+    var ins = activeInsurance[ii];
+    if (ins.memberId && memberMap[ins.memberId]) memberMap[ins.memberId].insurance.push(ins);
+  }
+
+  var h = '<div style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Arial,sans-serif;background-color:#fafafa"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#fafafa"><tbody><tr><td style="padding:24px">';
+
+  // 1. HEADER
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(90deg,#eef2ff 0%,#f3e8ff 50%,#fce7f3 100%);border-left:4px solid #6366f1;border-top:1px solid #d1d5db;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;border-radius:8px;margin-bottom:24px"><tbody><tr><td style="padding:20px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+  h += '<td style="vertical-align:middle;width:220px;padding-right:15px"><img src="' + logoUrl + '" alt="Capital Friends Logo" style="display:block;border:0;max-width:200px;height:auto;max-height:100px"></td>';
+  h += '<td align="right" style="vertical-align:top;padding-left:15px"><div style="font-size:11px;color:#4b5563;margin-bottom:8px">This report is auto-generated from your Google Sheets. Keep your financial data secure.</div>';
+  h += '<div style="font-size:13px;color:#374151;font-weight:600;margin-bottom:10px">Made with &#10084;&#65039; in India by <strong>Jagadeesh Manne</strong> &middot; Donate: <strong>8977099970</strong> (GPay)</div>';
+  if (ssUrl) h += '<div><a href="' + ssUrl + '" style="display:inline-block;padding:8px 16px;background:#10b981;color:white;text-decoration:none;font-size:12px;font-weight:600;border-radius:6px" target="_blank">&#128202; Open Google Sheet</a></div>';
+  h += '</td></tr></tbody></table></td></tr></tbody></table>';
+
+  // 2. FAMILY WEALTH DASHBOARD
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #818cf8;"><tbody><tr><td style="padding:20px">';
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:16px"><tbody><tr><td style="font-size:18px;font-weight:700;color:#111827">Family Wealth Dashboard</td><td align="right" style="font-size:12px;color:#6b7280;vertical-align:bottom">Generated on: ' + _escHtml(generatedAt) + '</td></tr></tbody></table>';
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+  // LEFT: Net Worth + Life Cover
+  h += '<td style="width:48%;vertical-align:top;padding-right:12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr><td style="vertical-align:top">';
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:2px solid #e5e7eb;border-radius:12px;background:white;margin-bottom:20px"><tbody><tr><td style="padding:24px">';
+  h += '<div style="font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">Net Worth Breakdown</div>';
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+  h += '<td style="width:50%;vertical-align:middle;padding-right:14px">';
+  h += '<div style="margin-bottom:18px"><div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Total Wealth</div><div style="font-size:22px;font-weight:700;color:#10b981;line-height:1.2">' + _fmtCur(totalAssets) + '</div></div>';
+  h += '<div style="margin-bottom:18px"><div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Liabilities</div><div style="font-size:22px;font-weight:700;color:#ef4444;line-height:1.2">' + _fmtCur(totalLiabilities) + '</div></div>';
+  h += '<div><div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Total Invested</div><div style="font-size:22px;font-weight:700;color:#3b82f6;line-height:1.2">' + _fmtCur(totalInvested) + '</div></div></td>';
+  h += '<td style="width:50%;vertical-align:middle;padding-left:14px;border-left:2px solid #3b82f6;text-align:center"><div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.9px;margin-bottom:10px">Your Net Worth</div><div style="font-size:36px;font-weight:800;color:#3b82f6;line-height:1;white-space:nowrap">' + _fmtCur(netWorth) + '</div><div style="font-size:10px;color:#6b7280;margin-top:10px">Wealth minus liabilities</div></td>';
+  h += '</tr></tbody></table></td></tr></tbody></table>';
+  // Life Cover
+  var coverMsg = lifeCover > 0 ? 'Your family is protected' : 'No life cover found';
+  var coverCol = lifeCover > 0 ? '#059669' : '#dc2626';
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:2px solid #e5e7eb;border-radius:12px;background:white"><tbody><tr><td style="padding:20px;text-align:center">';
+  h += '<div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.9px;margin-bottom:8px">Total Life Cover</div>';
+  h += '<div style="font-size:30px;font-weight:800;color:#8b5cf6;line-height:1;white-space:nowrap">' + _fmtCur(lifeCover) + '</div>';
+  h += '<div style="font-size:10px;color:' + coverCol + ';margin-top:8px;font-weight:600">' + coverMsg + '</div></td></tr></tbody></table>';
+  h += '</td></tr></tbody></table></td>';
+  // RIGHT: Asset Allocation
+  h += '<td style="width:48%;vertical-align:top;padding-left:12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:2px solid #e5e7eb;border-radius:12px;background:white;height:100%"><tbody><tr><td style="padding:24px">';
+  h += '<div style="font-size:14px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">Asset Allocation</div>';
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">';
+  for (var ai = 0; ai < assetClassList.length; ai++) {
+    var ac = assetClassList[ai]; if ((ac.pct || 0) <= 0) continue;
+    var g = _ALLOC_GRADIENT[ac.name] || _ALLOC_GRADIENT.Other;
+    h += '<tr><td style="padding:12px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+    h += '<td style="vertical-align:middle;width:80px"><div style="font-size:11px;color:#6b7280;font-weight:600">' + _escHtml(ac.name) + '</div></td>';
+    h += '<td align="right" style="vertical-align:middle;width:60px;padding-right:10px"><div style="font-size:13px;font-weight:700;color:#1f2937">' + ac.pct.toFixed(1) + '%</div></td>';
+    h += '<td align="right" style="vertical-align:middle"><div style="font-size:12px;color:#6b7280">' + _fmtCur(ac.value) + '</div></td></tr>';
+    h += '<tr><td colspan="3" style="padding-top:6px"><div style="width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">';
+    h += '<div style="width:' + Math.max(1, ac.pct).toFixed(1) + '%;height:100%;background:linear-gradient(90deg,' + g[0] + ' 0%,' + g[1] + ' 100%);border-radius:4px"></div></div></td></tr></tbody></table></td></tr>';
+  }
+  h += '</table></td></tr></tbody></table></td></tr></tbody></table>';
+  h += '</td></tr></tbody></table>';
+
+  // 3. ACTION ITEMS
+  if (actionItems.length > 0) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #fbbf24;"><tbody><tr><td style="padding:20px">';
+    h += '<div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:16px">Action Items &amp; Recommendations</div>';
+    for (var aci = 0; aci < actionItems.length; aci++) {
+      var itm = actionItems[aci], st = _ACTION_STYLES[itm.type] || _ACTION_STYLES.warning;
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:10px"><tbody><tr><td style="background:' + st.bg + ';border-left:4px solid ' + st.border + ';border-radius:6px;padding:14px">';
+      h += '<div style="font-size:14px;font-weight:700;color:' + st.titleColor + ';margin-bottom:6px">' + _escHtml(itm.title) + '</div>';
+      h += '<div style="font-size:12px;color:' + st.descColor + ';margin-bottom:8px;line-height:1.5">' + _escHtml(itm.description) + '</div>';
+      if (itm.action) h += '<div style="font-size:11px;color:' + st.actionColor + ';background:' + st.actionBg + ';display:inline-block;padding:6px 10px;border-radius:4px"><strong>Action:</strong> ' + _escHtml(itm.action) + '</div>';
+      h += '</td></tr></tbody></table>';
+    }
+    var hs = 0;
+    if (lifeCover > 0) hs++; if (healthCover > 0) hs++;
+    if (totalAssets > 0) hs++; if (totalLiabilities === 0) hs++; if (assetClassList.length >= 2) hs++;
+    if (membersData.length > 0) hs++; if (activeInsurance.length > 0) hs++;
+    if (familyMembers.length > 0) hs++;
+    h += '<div style="border-top:1px solid #d1d5db;padding-top:12px;margin-top:10px"><div style="font-size:12px;color:#6b7280"><strong>Financial Health Score: ' + hs + '/8</strong> - Complete these actions to improve your score</div></div>';
+    h += '</td></tr></tbody></table>';
+  }
+
+  // 4. INSURANCE (grouped by type with subtotals, matching ref.html)
+  if (activeInsurance.length > 0) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #818cf8;"><tbody><tr><td style="padding:20px">';
+    h += '<div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:16px">Insurance Policies</div>';
+    var ibt = {};
+    for (var iig = 0; iig < activeInsurance.length; iig++) { var ip0 = activeInsurance[iig]; var pt = ip0.policyType || 'Other'; if (!ibt[pt]) ibt[pt] = []; ibt[pt].push(ip0); }
+    var itk = Object.keys(ibt);
+    // Preferred order: Health first, then Term
+    itk.sort(function(a, b) { var ord = {'Health':0, 'Term Life':1}; return (ord[a]||9) - (ord[b]||9); });
+    var insTypeColors = {'Health':'#10b981', 'Term Life':'#7c3aed'};
+    for (var iti = 0; iti < itk.length; iti++) {
+      var it = itk[iti], ipl = ibt[it], ilt = (iti === itk.length - 1);
+      var insColor = insTypeColors[it] || '#6b7280';
+      h += '<div style="margin-bottom:' + (ilt ? '0' : '20') + 'px"><div style="font-size:14px;font-weight:600;color:' + insColor + ';margin-bottom:12px">' + _escHtml(it === 'Term Life' ? 'Term Insurance' : it + ' Insurance') + '</div>';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+      h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Member</th><th style="' + _thS + '">Policy Name</th><th style="' + _thS + '">Provider</th><th style="' + _thS + '">Policy Number</th><th style="' + _thR + '">Sum Assured</th><th style="' + _thS + '">Nominee</th></tr>';
+      var insTypeTotal = 0;
+      for (var ipi = 0; ipi < ipl.length; ipi++) {
+        var ip = ipl[ipi], ipLast = (ipi === ipl.length - 1);
+        insTypeTotal += (parseFloat(ip.sumAssured) || 0);
+        var nominee = ip.nominee || (ip.dynamicFields ? (ip.dynamicFields['Nominee'] || ip.dynamicFields['nominee'] || '') : '');
+        h += '<tr' + (ipLast ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+        h += '<td style="' + _tdS + '">' + _escHtml(ip.insuredMember) + '</td>';
+        h += '<td style="' + _tdSec + '">' + _escHtml(ip.policyName || ip.policyType) + '</td>';
+        h += '<td style="' + _tdS + '">' + _escHtml(ip.company) + '</td>';
+        h += '<td style="' + _tdMono + '">' + _escHtml(ip.policyNumber) + '</td>';
+        h += '<td style="' + _tdBoldR + '">' + _fmtCur(ip.sumAssured) + '</td>';
+        h += '<td style="' + _tdSec + '">' + _escHtml(nominee || '-') + '</td></tr>';
+      }
+      // Subtotal row
+      h += '<tr style="background:#f9fafb;font-weight:600;border-top:2px solid #d1d5db"><td colspan="4" style="' + _tdS + '">Total ' + _escHtml(it === 'Term Life' ? 'Term Insurance' : it + ' Insurance') + ' Coverage</td>';
+      h += '<td style="padding:8px;font-size:12px;font-weight:700;color:' + insColor + ';text-align:right">' + _fmtCur(insTypeTotal) + '</td>';
+      h += '<td style="padding:8px;font-size:11px;color:#6b7280">' + ipl.length + ' polic' + (ipl.length === 1 ? 'y' : 'ies') + '</td></tr>';
+      h += '</tbody></table></div>';
+    }
+    h += '</td></tr></tbody></table>';
+  }
+
+  // 5. PER-MEMBER SECTIONS (Financial Summary + Portfolios + Other Inv + Liabilities)
+  for (var mci = 0; mci < familyMembers.length; mci++) {
+    var mem = familyMembers[mci];
+    var md = memberMap[mem.memberId] || { mfPortfolios: [], stockPortfolios: [], otherInvestments: [], liabilities: [], insurance: [] };
+    var mColor = _MEMBER_COLORS[mci % _MEMBER_COLORS.length];
+
+    // Compute member totals
+    var mMFInv = 0, mMFCur = 0, mStkInv = 0, mStkCur = 0, mOthInv = 0, mOthCur = 0, mLiab = 0;
+    for (var mpi = 0; mpi < md.mfPortfolios.length; mpi++) { mMFInv += parseFloat(md.mfPortfolios[mpi].totalInvestment) || 0; mMFCur += parseFloat(md.mfPortfolios[mpi].currentValue) || 0; }
+    for (var msi = 0; msi < md.stockPortfolios.length; msi++) { mStkInv += parseFloat(md.stockPortfolios[msi].totalInvestment) || 0; mStkCur += parseFloat(md.stockPortfolios[msi].currentValue) || 0; }
+    for (var moi = 0; moi < md.otherInvestments.length; moi++) { mOthCur += parseFloat(md.otherInvestments[moi].currentValue) || 0; mOthInv += parseFloat(md.otherInvestments[moi].investedAmount) || 0; }
+    for (var mli = 0; mli < md.liabilities.length; mli++) { mLiab += parseFloat(md.liabilities[mli].outstandingBalance) || 0; }
+    var mTotalAssets = mMFCur + mStkCur + mOthCur;
+    var mNetWorth = mTotalAssets - mLiab;
+    var mPortCount = md.mfPortfolios.length + md.stockPortfolios.length;
+
+    // Member term cover
+    var mTermCover = 0;
+    for (var mii = 0; mii < md.insurance.length; mii++) { if (md.insurance[mii].policyType === 'Term Life') mTermCover += parseFloat(md.insurance[mii].sumAssured) || 0; }
+
+    // Member card
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid ' + mColor + ';"><tbody><tr><td style="padding:20px">';
+
+    // Member name header
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #d1d5db"><tbody><tr>';
+    h += '<td style="font-size:20px;font-weight:700;color:' + mColor + '">' + _escHtml(mem.memberName) + '</td>';
+    h += '<td align="right" style="font-size:14px;font-weight:500;color:#4b5563;vertical-align:bottom">Financial Summary</td>';
+    h += '</tr></tbody></table>';
+
+    // Financial Summary + Personal Details box
+    h += '<div style="margin-bottom:20px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:2px solid #e5e7eb;border-radius:8px;background:linear-gradient(135deg,#f9fafb 0%,#ffffff 100%)"><tbody><tr><td style="padding:16px">';
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+
+    // LEFT: Financial Summary
+    h += '<td style="width:50%;vertical-align:top;padding-right:16px">';
+    h += '<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">Financial Summary</div>';
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+    h += '<td style="width:50%;vertical-align:middle;padding-right:10px">';
+    h += '<div style="margin-bottom:12px"><div style="font-size:9px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">Total Assets</div><div style="font-size:16px;font-weight:700;color:#10b981;line-height:1.2">' + _fmtCur(mTotalAssets) + '</div></div>';
+    h += '<div style="margin-bottom:12px"><div style="font-size:9px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">Liabilities</div><div style="font-size:16px;font-weight:700;color:#ef4444;line-height:1.2">' + _fmtCur(mLiab) + '</div></div>';
+    h += '<div><div style="font-size:9px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">Term Cover</div><div style="font-size:16px;font-weight:700;color:#8b5cf6;line-height:1.2">' + (mTermCover > 0 ? _fmtCur(mTermCover) : '<span style="color:#6b7280;font-style:italic">None</span>') + '</div></div>';
+    h += '</td>';
+    h += '<td style="width:50%;vertical-align:middle;padding-left:10px;border-left:2px solid #3b82f6;text-align:center">';
+    h += '<div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:6px">Net Worth</div>';
+    h += '<div style="font-size:22px;font-weight:800;color:#3b82f6;line-height:1;white-space:nowrap">' + _fmtCur(mNetWorth) + '</div>';
+    h += '<div style="font-size:9px;color:#6b7280;margin-top:6px">' + mPortCount + ' Portfolio' + (mPortCount !== 1 ? 's' : '') + '</div>';
+    h += '</td></tr></tbody></table></td>';
+
+    // RIGHT: Personal Details
+    h += '<td style="width:50%;vertical-align:top;padding-left:16px;border-left:2px solid #d1d5db">';
+    h += '<div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Personal Details</div>';
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+    h += '<td style="width:50%;vertical-align:top;padding-right:8px">';
+    h += '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Email</div><div style="font-size:11px;color:#111827;font-weight:600;word-break:break-all;line-height:1.3">' + _escHtml(mem.email || '-') + '</div></div>';
+    h += '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px"><div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">PAN</div><div style="font-size:11px;color:#111827;font-weight:600;font-family:monospace">' + _escHtml(mem.pan || '-') + '</div></div>';
+    h += '</td><td style="width:50%;vertical-align:top;padding-left:8px">';
+    h += '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Mobile</div><div style="font-size:11px;color:#111827;font-weight:600;font-family:monospace">' + _escHtml(mem.mobile || '-') + '</div></div>';
+    h += '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px"><div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Aadhar</div><div style="font-size:11px;color:#111827;font-weight:600;font-family:monospace">' + _maskAadhar(mem.aadhar) + '</div></div>';
+    h += '</td></tr></tbody></table></td>';
+
+    h += '</tr></tbody></table></td></tr></tbody></table></div>';
+
+    // Member MF Portfolios table
+    if (md.mfPortfolios.length > 0) {
+      h += '<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;color:#1f2937;margin-bottom:12px">Mutual Funds Portfolios</div>';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+      h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Portfolio Name</th><th style="' + _thR + '">Invested</th><th style="' + _thR + '">Current Value</th><th style="' + _thR + '">Unrealized P&amp;L</th><th style="' + _thR + '">Realized P&amp;L</th><th style="' + _thR + '">Total P&amp;L</th><th style="' + _thR + '">Returns %</th><th style="padding:8px;font-size:11px;font-weight:600;color:#8b5cf6;text-align:right">XIRR %</th><th style="padding:8px;font-size:11px;font-weight:600;color:#8b5cf6;text-align:right">CAGR %</th><th style="' + _thC + '">Funds</th></tr>';
+      var mmti = 0, mmtc = 0, mmtUPL = 0, mmtRPL = 0, mmtTPL = 0, mmtf = 0;
+      for (var mpi2 = 0; mpi2 < md.mfPortfolios.length; mpi2++) {
+        var mp2 = md.mfPortfolios[mpi2];
+        var mpI = parseFloat(mp2.totalInvestment) || 0, mpC = parseFloat(mp2.currentValue) || 0;
+        var mpUPL = parseFloat(mp2.unrealizedPL) || 0, mpUPLPct = parseFloat(mp2.unrealizedPLPct) || (mpI > 0 ? ((mpC - mpI) / mpI * 100) : 0);
+        var mpRPL = parseFloat(mp2.realizedPL) || 0, mpRPLPct = parseFloat(mp2.realizedPLPct) || 0;
+        var mpTPL = parseFloat(mp2.totalPL) || (mpC - mpI + mpRPL), mpTPP = mpI > 0 ? ((mpC - mpI) / mpI * 100) : 0;
+        var mpF = (mp2.funds || []).length;
+        mmti += mpI; mmtc += mpC; mmtUPL += mpUPL; mmtRPL += mpRPL; mmtTPL += mpTPL; mmtf += mpF;
+        var mpLast = (mpi2 === md.mfPortfolios.length - 1);
+        h += '<tr' + (mpLast ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+        h += '<td style="' + _tdS + 'font-weight:600">' + _escHtml(mp2.portfolioName) + '</td>';
+        h += '<td style="' + _tdR + '">' + _fmtCur(mpI) + '</td>';
+        h += '<td style="' + _tdBoldR + '">' + _fmtCur(mpC) + '</td>';
+        h += '<td style="padding:8px;font-size:11px;color:#3b82f6;text-align:right">' + _plSign(mpUPL) + _fmtCur(Math.abs(mpUPL)) + '<br><span style="font-size:10px">' + _plSign(mpUPLPct) + mpUPLPct.toFixed(1) + '%</span></td>';
+        h += '<td style="padding:8px;font-size:11px;color:#34d399;text-align:right">' + _plSign(mpRPL) + _fmtCur(Math.abs(mpRPL)) + '<br><span style="font-size:10px">' + _plSign(mpRPLPct) + mpRPLPct.toFixed(1) + '%</span></td>';
+        h += '<td style="' + _tdR + 'color:' + _plColor(mpTPL) + '">' + _plSign(mpTPL) + _fmtCur(Math.abs(mpTPL)) + '</td>';
+        h += '<td style="' + _fTdBoldR + 'color:' + _plColor(mpTPP) + '">' + _plSign(mpTPP) + mpTPP.toFixed(1) + '%</td>';
+        h += '<td style="padding:8px;font-size:12px;font-weight:600;color:#6b7280;text-align:right">-</td>';
+        h += '<td style="padding:8px;font-size:12px;font-weight:600;color:#6b7280;text-align:right">-</td>';
+        h += '<td style="' + _tdC + '">' + mpF + '</td></tr>';
+      }
+      // MF totals row
+      var mmtPP = mmti > 0 ? ((mmtc - mmti) / mmti * 100) : 0;
+      var mmtUPLPct = mmti > 0 ? ((mmtc - mmti) / mmti * 100) : 0;
+      h += '<tr style="background:#f9fafb;font-weight:600;border-top:2px solid #d1d5db"><td style="' + _tdS + '">Total Mutual Funds</td>';
+      h += '<td style="' + _tdR + '">' + _fmtCur(mmti) + '</td><td style="' + _tdR + '">' + _fmtCur(mmtc) + '</td>';
+      h += '<td style="padding:8px;font-size:11px;color:#3b82f6;text-align:right">' + _plSign(mmtUPL) + _fmtCur(Math.abs(mmtUPL)) + '<br><span style="font-size:10px">' + _plSign(mmtUPLPct) + mmtUPLPct.toFixed(1) + '%</span></td>';
+      h += '<td style="padding:8px;font-size:11px;color:#34d399;text-align:right">' + _plSign(mmtRPL) + _fmtCur(Math.abs(mmtRPL)) + '<br><span style="font-size:10px">+0.0%</span></td>';
+      h += '<td style="' + _tdR + 'color:' + _plColor(mmtTPL) + '">' + _plSign(mmtTPL) + _fmtCur(Math.abs(mmtTPL)) + '</td>';
+      h += '<td style="' + _tdR + 'color:' + _plColor(mmtPP) + '">' + _plSign(mmtPP) + mmtPP.toFixed(1) + '%</td>';
+      h += '<td style="' + _tdR + '"></td><td style="' + _tdR + '"></td><td style="' + _tdC + '">' + mmtf + '</td></tr>';
+      h += '</tbody></table></div>';
+    }
+
+    // Member Stock Portfolios table
+    if (md.stockPortfolios.length > 0) {
+      h += '<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;color:#1f2937;margin-bottom:12px">Stock Portfolios</div>';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+      h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Platform</th><th style="' + _thS + '">Client ID</th><th style="' + _thR + '">Invested</th><th style="' + _thR + '">Current Value</th><th style="' + _thR + '">P&amp;L</th><th style="' + _thR + '">Returns %</th><th style="' + _thC + '">Stocks</th></tr>';
+      var msti = 0, mstc = 0, msth = 0;
+      for (var msi2 = 0; msi2 < md.stockPortfolios.length; msi2++) {
+        var msp = md.stockPortfolios[msi2];
+        var msI = parseFloat(msp.totalInvestment) || 0, msC = parseFloat(msp.currentValue) || 0;
+        var msPL = msC - msI, msPP = msI > 0 ? (msPL / msI * 100) : 0, msH = (msp.holdings || []).length;
+        msti += msI; mstc += msC; msth += msH;
+        var msia = msp.investmentAccountId ? iaLookup[msp.investmentAccountId] : null;
+        var mscid = msia ? (msia.clientId || '') : 'N/A';
+        h += '<tr><td style="' + _tdS + 'font-weight:600">' + _escHtml(msp.platformBroker || msp.portfolioName) + '</td>';
+        h += '<td style="' + _tdMono + '">' + _escHtml(mscid) + '</td>';
+        h += '<td style="' + _tdR + '">' + _fmtCur(msI) + '</td><td style="' + _tdBoldR + '">' + _fmtCur(msC) + '</td>';
+        h += '<td style="' + _tdR + 'color:' + _plColor(msPL) + '">' + _plSign(msPL) + _fmtCur(Math.abs(msPL)) + '</td>';
+        h += '<td style="' + _fTdBoldR + 'color:' + _plColor(msPL) + '">' + _plSign(msPL) + msPP.toFixed(1) + '%</td>';
+        h += '<td style="' + _tdC + '">' + msH + '</td></tr>';
+      }
+      var mstPL = mstc - msti, mstPP = msti > 0 ? (mstPL / msti * 100) : 0;
+      h += '<tr style="background:#f9fafb;font-weight:600;border-top:2px solid #d1d5db"><td colspan="2" style="' + _tdS + '">Total Stocks</td>';
+      h += '<td style="' + _tdR + '">' + _fmtCur(msti) + '</td><td style="' + _tdR + '">' + _fmtCur(mstc) + '</td>';
+      h += '<td style="' + _tdR + 'color:' + _plColor(mstPL) + '">' + _plSign(mstPL) + _fmtCur(Math.abs(mstPL)) + '</td>';
+      h += '<td style="' + _tdR + 'color:' + _plColor(mstPL) + '">' + _plSign(mstPL) + mstPP.toFixed(1) + '%</td>';
+      h += '<td style="' + _tdC + '">' + msth + '</td></tr></tbody></table></div>';
+    }
+
+    // Member Other Investments table
+    if (md.otherInvestments.length > 0) {
+      h += '<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;color:#1f2937;margin-bottom:12px">Other Investments</div>';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+      h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Type</th><th style="' + _thS + '">Name</th><th style="' + _thR + '">Invested</th><th style="' + _thR + '">Current Value</th><th style="' + _thR + '">Returns</th></tr>';
+      for (var moi2 = 0; moi2 < md.otherInvestments.length; moi2++) {
+        var moInv = md.otherInvestments[moi2];
+        var moI = parseFloat(moInv.investedAmount) || 0, moC = parseFloat(moInv.currentValue) || 0;
+        var moRet = moI > 0 ? (moC - moI) : 0;
+        var moLast = (moi2 === md.otherInvestments.length - 1);
+        h += '<tr' + (moLast ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+        h += '<td style="' + _tdS + '">' + _escHtml(moInv.investmentType) + '</td>';
+        h += '<td style="' + _tdSec + '"><div>' + _escHtml(moInv.investmentName) + '</div></td>';
+        h += '<td style="' + _tdR + '">' + (moI > 0 ? _fmtCur(moI) : '<span style="font-style:italic;color:#6b7280">Unknown</span>') + '</td>';
+        h += '<td style="' + _tdBoldR + '">' + _fmtCur(moC) + '</td>';
+        h += '<td style="' + _tdR + 'color:' + (moRet >= 0 ? '#10b981' : '#dc2626') + '">' + (moI > 0 ? _plSign(moRet) + _fmtCur(Math.abs(moRet)) : 'N/A') + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+
+    // Member Liabilities table
+    if (md.liabilities.length > 0) {
+      h += '<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;color:#1f2937;margin-bottom:12px">Liabilities</div>';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+      h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Type</th><th style="' + _thS + '">Lender</th><th style="' + _thR + '">Outstanding Balance</th></tr>';
+      var mlTotal = 0;
+      for (var mli2 = 0; mli2 < md.liabilities.length; mli2++) {
+        var mlb = md.liabilities[mli2];
+        var mlBal = parseFloat(mlb.outstandingBalance) || 0;
+        mlTotal += mlBal;
+        h += '<tr><td style="' + _tdS + '">' + _escHtml(mlb.liabilityType) + '</td>';
+        h += '<td style="' + _tdSec + '">' + _escHtml(mlb.lenderName) + '</td>';
+        h += '<td style="padding:8px;font-size:12px;font-weight:600;color:#ef4444;text-align:right">' + _fmtCur(mlBal) + '</td></tr>';
+      }
+      h += '<tr style="background:#f9fafb;font-weight:600;border-top:2px solid #d1d5db"><td colspan="2" style="' + _tdS + '">Total Outstanding</td>';
+      h += '<td style="padding:8px;font-size:12px;font-weight:700;color:#ef4444;text-align:right">' + _fmtCur(mlTotal) + '</td></tr></tbody></table></div>';
+    }
+
+    h += '</td></tr></tbody></table>'; // close member card
+  }
+
+  // 6. DETAILED PORTFOLIO HOLDINGS (matching ref.html — rich fund tables with NAV, Allocation, Rebalance)
+  if (allMFPortfolios.length > 0 || allStockPortfolios.length > 0) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #818cf8;"><tbody><tr><td style="padding:20px">';
+    h += '<div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:16px">Detailed Portfolio Holdings</div>';
+
+    // MF fund details
+    if (allMFPortfolios.length > 0) {
+      h += '<div style="margin-bottom:24px"><div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Mutual Funds - Individual Fund Details</div>';
+      for (var dpi = 0; dpi < allMFPortfolios.length; dpi++) {
+        var dp = allMFPortfolios[dpi], dfs = dp.funds || []; if (dfs.length === 0) continue;
+        var dpI = parseFloat(dp.totalInvestment) || 0, dpC = parseFloat(dp.currentValue) || 0;
+        var dpPL = dpC - dpI, dpPP = dpI > 0 ? (dpPL / dpI * 100) : 0;
+        var dpia = dp.investmentAccountId ? iaLookup[dp.investmentAccountId] : null;
+        var dcid = dpia ? (dpia.clientId || '') : 'N/A';
+        var dpOwner = dp.ownerName || (dpia ? dpia.member : '') || '';
+        var dpEmail = dpia ? (dpia.email || '') : '';
+        var dpPhone = dpia ? (dpia.phone || '') : '';
+
+        // Portfolio header card
+        h += '<div style="background:#f9fafb;border-left:4px solid #9ca3af;border-radius:6px;padding:12px;margin-bottom:16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+        h += '<td style="vertical-align:top"><div style="font-size:14px;font-weight:700;color:#111827">' + _escHtml(dpOwner) + ' - ' + _escHtml(dp.portfolioName) + '</div>';
+        h += '<div style="font-size:11px;color:#4b5563;margin-top:4px"><strong>Platform:</strong> ' + _escHtml(dp.platformBroker || 'N/A') + ' | <strong>Client ID:</strong> ' + _escHtml(dcid) + ' | <strong>Email:</strong> ' + _escHtml(dpEmail || '-') + ' | <strong>Mobile:</strong> ' + _escHtml(dpPhone || '-') + '</div></td>';
+        h += '<td align="right" style="vertical-align:top"><div style="font-size:11px;color:#4b5563">Portfolio Value</div><div style="font-size:18px;font-weight:700;color:' + _plColor(dpPL) + '">' + _fmtCur(dpC) + '</div><div style="font-size:11px;color:' + _plColor(dpPL) + ';font-weight:600">' + _plSign(dpPL) + dpPP.toFixed(1) + '% returns</div></td>';
+        h += '</tr></tbody></table>';
+
+        // Show invested & P&L summary line
+        if (dpC > 0) {
+          h += '<div style="padding-top:8px;border-top:1px solid #d1d5db;margin-top:8px;font-size:11px"><strong style="color:#4b5563">Invested:</strong> <strong style="color:#6b7280">' + _fmtCur(dpI) + '</strong> <span style="color:#9ca3af;margin:0 6px">&bull;</span> <strong style="color:#4b5563">P&amp;L:</strong> <strong style="color:' + _plColor(dpPL) + '">' + _plSign(dpPL) + _fmtCur(Math.abs(dpPL)) + ' (' + _plSign(dpPP) + dpPP.toFixed(1) + '%)</strong></div>';
         }
+        h += '</div>';
+
+        // Fund detail table with rich columns
+        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px;margin-bottom:20px;font-size:11px"><tbody>';
+        h += '<tr style="background:#f3f4f6">';
+        h += '<th style="' + _fThS + '">Fund Name</th>';
+        h += '<th style="' + _fThR + '">Units</th>';
+        h += '<th style="padding:6px 8px;font-size:10px;text-align:right;border-left:2px solid #d1d5db"><div style="font-weight:700;color:#1f2937">NAV</div><div style="font-size:8px;font-weight:500;color:#6b7280">Current / Avg</div></th>';
+        h += '<th style="padding:6px 8px;font-size:10px;text-align:right;border-left:2px solid #d1d5db"><div style="font-weight:700;color:#1f2937">Allocation %</div><div style="font-size:8px;font-weight:500;color:#6b7280">Current / Target</div></th>';
+        h += '<th style="padding:6px 8px;font-size:10px;text-align:right;border-left:2px solid #d1d5db"><div style="font-weight:700;color:#1f2937">Amount</div><div style="font-size:8px;font-weight:500;color:#6b7280">Current / Invested</div></th>';
+        h += '<th style="padding:6px 8px;font-size:10px;font-weight:600;color:#1f2937;text-align:center;border-left:2px solid #d1d5db">Rebalance<br>via SIP</th>';
+        h += '<th style="padding:6px 8px;font-size:10px;font-weight:600;color:#1f2937;text-align:center;border-left:2px solid #d1d5db">Rebalance<br>via Buy/Sell</th>';
+        h += '<th style="padding:6px 8px;font-size:10px;text-align:right;border-left:2px solid #d1d5db"><div style="font-weight:700;color:#1f2937">P&amp;L</div><div style="font-size:8px;font-weight:500;color:#6b7280">Amount / %</div></th>';
+        h += '</tr>';
+        for (var fi = 0; fi < dfs.length; fi++) {
+          var f = dfs[fi], fI = parseFloat(f.investment) || 0, fC = parseFloat(f.currentValue) || 0;
+          var fPL = fC - fI, fPP = fI > 0 ? (fPL / fI * 100) : 0;
+          var fU = parseFloat(f.units) || 0;
+          var fCurNav = parseFloat(f.currentNav) || (fU > 0 ? fC / fU : 0);
+          var fAvgNav = parseFloat(f.avgNav) || (fU > 0 ? fI / fU : 0);
+          var fCurAlloc = parseFloat(f.currentAllocationPct) || 0;
+          var fTgtAlloc = parseFloat(f.targetAllocationPct) || 0;
+          var fRebSIP = parseFloat(f.rebalanceSIP) || 0;
+          var fBuySell = parseFloat(f.buySell) || 0;
+          var fLast = (fi === dfs.length - 1);
+          h += '<tr' + (fLast ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+          h += '<td style="' + _fTdS + 'max-width:200px">' + _escHtml(f.fundName) + '</td>';
+          h += '<td style="' + _fTdSecR + '">' + fU.toFixed(2) + '</td>';
+          // NAV Current/Avg
+          h += '<td style="padding:6px 8px;font-size:11px;text-align:right;border-left:2px solid #e5e7eb"><div style="font-weight:700;color:#111827">\u20B9' + fCurNav.toFixed(2) + '</div><div style="font-size:10px;color:#6b7280">\u20B9' + fAvgNav.toFixed(2) + '</div></td>';
+          // Allocation Current/Target
+          h += '<td style="padding:6px 8px;font-size:11px;text-align:right;border-left:2px solid #e5e7eb"><div style="font-weight:700;color:#111827">' + fCurAlloc.toFixed(1) + '%</div><div style="font-size:10px;color:#6b7280">' + fTgtAlloc.toFixed(1) + '%</div></td>';
+          // Amount Current/Invested
+          h += '<td style="padding:6px 8px;font-size:11px;text-align:right;border-left:2px solid #e5e7eb"><div style="font-weight:700;color:#111827">' + _fmtCur(fC) + '</div><div style="font-size:10px;color:#6b7280">' + _fmtCur(fI) + '</div></td>';
+          // Rebalance SIP
+          var sipTxt = '-';
+          if (fRebSIP > 0) sipTxt = '<span style="color:#3b82f6">+' + _fmtCur(fRebSIP) + '</span>';
+          else if (fRebSIP < 0) sipTxt = '<span style="color:#ef4444">' + _fmtCur(fRebSIP) + '</span>';
+          h += '<td style="padding:6px 8px;font-size:11px;font-weight:600;text-align:center;border-left:2px solid #e5e7eb">' + sipTxt + '</td>';
+          // Rebalance Buy/Sell
+          var bsTxt = '-';
+          if (fBuySell > 0) bsTxt = '<span style="color:#3b82f6">Buy ' + _fmtCur(fBuySell) + '</span>';
+          else if (fBuySell < 0) bsTxt = '<span style="color:#ef4444">Sell ' + _fmtCur(Math.abs(fBuySell)) + '</span>';
+          h += '<td style="padding:6px 8px;font-size:11px;font-weight:600;text-align:center;border-left:2px solid #e5e7eb">' + bsTxt + '</td>';
+          // P&L Amount/%
+          h += '<td style="padding:6px 8px;font-size:11px;text-align:right;border-left:2px solid #e5e7eb"><div style="font-weight:700;color:' + _plColor(fPL) + '">' + _plSign(fPL) + _fmtCur(Math.abs(fPL)) + '</div><div style="font-size:8px;font-weight:700;color:' + _plColor(fPL) + '">' + _plSign(fPP) + fPP.toFixed(1) + '%</div></td>';
+          h += '</tr>';
+        }
+        h += '</tbody></table>';
       }
+      h += '</div>';
     }
-  </script>
-  <style>
-    /* Ensure box styles work in all email clients */
-    .box-card {
-      background-color: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.5rem;
-      padding: 1rem;
-      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      margin-bottom: 1rem;
-    }
-  </style>
-</head>
-<body class="m-0 p-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 font-sans">
 
-<div class="max-w-6xl mx-auto p-6">
+    // Stock details
+    if (allStockPortfolios.length > 0) {
+      h += '<div><div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Stocks - Individual Stock Details</div>';
+      for (var sdpi = 0; sdpi < allStockPortfolios.length; sdpi++) {
+        var sdp = allStockPortfolios[sdpi], sdh = sdp.holdings || []; if (sdh.length === 0) continue;
+        var sdI = parseFloat(sdp.totalInvestment) || 0, sdC = parseFloat(sdp.currentValue) || 0;
+        var sdPL = sdC - sdI, sdPP = sdI > 0 ? (sdPL / sdI * 100) : 0;
+        var sdia = sdp.investmentAccountId ? iaLookup[sdp.investmentAccountId] : null;
+        var sdcid = sdia ? (sdia.clientId || '') : 'N/A';
+        var sdOwner = sdp.ownerName || (sdia ? sdia.member : '') || '';
 
-  <!-- MAIN CONTAINER -->
-  <div class="bg-white border border-gray-300 rounded-xl shadow-lg p-6">
+        h += '<div style="background:#f9fafb;border-left:4px solid #9ca3af;border-radius:6px;padding:12px;margin-bottom:8px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+        h += '<td style="vertical-align:top"><div style="font-size:14px;font-weight:700;color:#111827">' + _escHtml(sdOwner) + ' - ' + _escHtml(sdp.platformBroker || sdp.portfolioName) + ' Demat</div>';
+        h += '<div style="font-size:11px;color:#4b5563;margin-top:4px"><strong>Platform:</strong> ' + _escHtml(sdp.platformBroker) + ' | <strong>Client ID:</strong> ' + _escHtml(sdcid) + '</div></td>';
+        h += '<td align="right" style="vertical-align:top"><div style="font-size:11px;color:#4b5563">Portfolio Value</div><div style="font-size:18px;font-weight:700;color:' + _plColor(sdPL) + '">' + _fmtCur(sdC) + '</div><div style="font-size:11px;color:' + _plColor(sdPL) + ';font-weight:600">' + _plSign(sdPL) + sdPP.toFixed(1) + '% returns</div></td>';
+        h += '</tr></tbody></table></div>';
 
-    <!-- HEADER -->
-    <div class="bg-white border-l-4 border-indigo-500 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-6 mb-6">
-      <div class="flex items-center gap-6">
-        <img src="/Users/jags/Desktop/cfv1/logo-main.png" alt="Capital Friends Logo" style="height:65px;width:auto;object-fit:contain;" onerror="this.outerHTML='<div style=\\'font-size:32px\\'>💰 <span style=\\'font-size:24px;font-weight:bold;color:#059669\\'>Capital Friends</span></div>';" />
-        <div class="border-l-2 border-gray-300 pl-6 flex-1 text-center">
-          <h2 class="text-xl font-bold text-gray-900 m-0 mb-1">Family Wealth Report</h2>
-          <p class="text-sm text-gray-600 m-0">${greeting} · ${date}</p>
-        </div>
-        <div class="border-l-2 border-gray-300 pl-6 text-right flex-shrink-0">
-          <p class="text-xs text-gray-500 m-0 mb-1">💝 Free Tool - Donations Welcome</p>
-          <p class="text-base font-bold text-gray-900 m-0">Jagadeesh Manne</p>
-          <p class="text-sm text-gray-600 m-0 mt-1">💰 UPI: jagadeeshmanne.hdfc@kphdfc</p>
-        </div>
-      </div>
-    </div>
-
-  ${buildFamilyWealthDashboard(data)}
-
-  ${actionItemsHTML}
-
-  ${insuranceHTML}
-
-  ${memberSectionsHTML}
-
-  ${familyMembersHTML}
-
-  ${accountSummaryHTML}
-
-    <!-- FOOTER -->
-    <div class="bg-white border-l-4 border-indigo-500 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mt-8">
-      <p class="text-xs text-gray-600 m-0 mb-3 text-center">
-        🔒 This report is auto-generated from your Google Sheets. Keep your financial data secure.
-      </p>
-      <p class="text-sm text-gray-700 m-0 text-center font-semibold">
-        Made with ❤️ in India by <strong>Jagadeesh Manne</strong> · 💝 Donate via UPI: <strong>jagadeeshmanne.hdfc@kphdfc</strong>
-      </p>
-    </div>
-
-  </div>
-
-</div>
-
-</body>
-</html>
-  `.trim();
-}
-
-/**
- * Build Family Wealth Dashboard section (3 cards + asset allocation + insurance)
- */
-function buildFamilyWealthDashboard(data) {
-  const totalWealth = formatCurrency(data.familyTotals.totalWealth);
-  const liabilities = formatCurrency(data.familyTotals.liabilities);
-  const netWorth = formatCurrency(data.familyTotals.totalWealth - data.familyTotals.liabilities);
-
-  // Net Worth and Asset Allocation with Pie Charts
-  let chartsHTML = '';
-  let chartsScript = '';
-
-  // Net Worth Chart (Total Wealth vs Liabilities)
-  const netWorthChartLabels = ['Total Wealth', 'Liabilities'];
-  const netWorthChartData = [data.familyTotals.totalWealth, data.familyTotals.liabilities];
-  const netWorthChartColors = ['#10b981', '#ef4444'];
-
-  chartsHTML += `
-    <div class="flex gap-6">
-      <!-- Net Worth Breakdown -->
-      <div class="flex-1 bg-white border border-gray-300 rounded-lg p-4 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">Net Worth Breakdown</h3>
-        <div class="flex items-start gap-4">
-          <div class="w-32 h-32 flex-shrink-0">
-            <canvas id="netWorthChart"></canvas>
-          </div>
-          <div class="flex flex-col gap-y-2 flex-1">
-            <div>
-              <div class="text-xs text-gray-500 uppercase">Total Wealth</div>
-              <div class="text-lg font-bold text-emerald-600">${totalWealth}</div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500 uppercase">Liabilities</div>
-              <div class="text-lg font-bold text-red-600">${liabilities}</div>
-            </div>
-            <div class="pt-2 border-t border-gray-300">
-              <div class="text-xs text-gray-500 uppercase">Net Worth</div>
-              <div class="text-lg font-bold text-sky-600">${netWorth}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-  `;
-
-  // Asset Allocation Chart
-  if (data.assetAllocation && data.assetAllocation.breakdown) {
-    const assetLabels = data.assetAllocation.breakdown.map(item => item.assetClass);
-    const assetData = data.assetAllocation.breakdown.map(item => item.percentage);
-    const assetColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'];
-
-    // Icon and color mapping for the 6 main asset classes
-    const assetIconMap = {
-      'Equity': { icon: '📈', bgColor: 'bg-emerald-50' },
-      'Debt': { icon: '💰', bgColor: 'bg-blue-50' },
-      'Commodities': { icon: '🥇', bgColor: 'bg-amber-50' },
-      'Real Estate': { icon: '🏠', bgColor: 'bg-purple-50' },
-      'Crypto': { icon: '₿', bgColor: 'bg-orange-50' },
-      'Other': { icon: '💎', bgColor: 'bg-gray-50' }
-    };
-
-    const assetItems = data.assetAllocation.breakdown.map(item => {
-      const assetInfo = assetIconMap[item.assetClass] || { icon: '💎', bgColor: 'bg-gray-50' };
-      return `
-      <div class="flex items-center justify-between py-1.5">
-        <div class="flex items-center gap-1.5">
-          <span class="text-sm">${assetInfo.icon}</span>
-          <span style="font-size: 10px;" class="font-medium text-gray-600 uppercase">${item.assetClass}</span>
-        </div>
-        <span class="text-xs font-bold text-gray-900">${item.percentage.toFixed(1)}%</span>
-      </div>
-      `;
-    }).join('');
-
-    chartsHTML += `
-      <!-- Asset Allocation -->
-      <div class="flex-1 bg-white border border-gray-300 rounded-lg p-4 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">Asset Allocation</h3>
-        <div class="flex items-start gap-4">
-          <div class="w-32 h-32 flex-shrink-0">
-            <canvas id="assetChart"></canvas>
-          </div>
-          <div class="flex flex-col flex-1">
-            ${assetItems}
-          </div>
-        </div>
-      </div>
-    `;
-
-    chartsScript = `
-      <script>
-        document.addEventListener('DOMContentLoaded', function() {
-          // Net Worth Chart
-          const netWorthCtx = document.getElementById('netWorthChart');
-          if (netWorthCtx) {
-            new Chart(netWorthCtx, {
-              type: 'doughnut',
-              data: {
-                labels: ${JSON.stringify(netWorthChartLabels)},
-                datasets: [{
-                  data: ${JSON.stringify(netWorthChartData)},
-                  backgroundColor: ${JSON.stringify(netWorthChartColors)},
-                  borderWidth: 2,
-                  borderColor: '#ffffff'
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    callbacks: {
-                      label: function(context) {
-                        const value = context.parsed;
-                        const crores = (value / 10000000).toFixed(2);
-                        const lakhs = (value / 100000).toFixed(2);
-                        return context.label + ': ₹' + (value >= 10000000 ? crores + ' Cr' : lakhs + ' L');
-                      }
-                    }
-                  }
-                }
-              }
-            });
-          }
-
-          // Asset Allocation Chart
-          const assetCtx = document.getElementById('assetChart');
-          if (assetCtx) {
-            new Chart(assetCtx, {
-              type: 'doughnut',
-              data: {
-                labels: ${JSON.stringify(assetLabels)},
-                datasets: [{
-                  data: ${JSON.stringify(assetData)},
-                  backgroundColor: ${JSON.stringify(assetColors.slice(0, assetData.length))},
-                  borderWidth: 2,
-                  borderColor: '#ffffff'
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    callbacks: {
-                      label: function(context) {
-                        return context.label + ': ' + context.parsed + '%';
-                      }
-                    }
-                  }
-                }
-              }
-            });
-          }
-        });
-      </script>
-    `;
-  }
-
-  // Insurance Summary - add as third column inside the grid
-  let insuranceHTML = '';
-  if (data.familyTotals.termInsurance || data.familyTotals.healthInsurance) {
-    const termCount = data.familyTotals.termInsurance?.count || 0;
-    const termCover = formatCurrency(data.familyTotals.termInsurance?.totalCover || 0);
-    const healthCount = data.familyTotals.healthInsurance?.count || 0;
-    const healthCover = formatCurrency(data.familyTotals.healthInsurance?.totalCover || 0);
-
-    insuranceHTML = `
-      <!-- Insurance Coverage -->
-      <div class="flex-1 bg-white border border-gray-300 rounded-lg p-4 shadow-sm">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">Insurance Coverage</h3>
-        <div class="flex flex-col gap-3">
-          <div class="flex items-start gap-3">
-            <span class="text-xl">🛡️</span>
-            <div class="flex-1">
-              <div class="text-xs font-medium text-gray-500 uppercase mb-1">Term Insurance</div>
-              <div class="text-sm font-bold text-gray-900">${termCount} ${termCount === 1 ? 'policy' : 'policies'}</div>
-              <div class="text-xs text-gray-600">${termCover} cover</div>
-            </div>
-          </div>
-          <div class="flex items-start gap-3">
-            <span class="text-xl">🏥</span>
-            <div class="flex-1">
-              <div class="text-xs font-medium text-gray-500 uppercase mb-1">Health Insurance</div>
-              <div class="text-sm font-bold text-gray-900">${healthCount} ${healthCount === 1 ? 'policy' : 'policies'}</div>
-              <div class="text-xs text-gray-600">${healthCover} cover</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  chartsHTML += `
-      ${insuranceHTML}
-    </div>
-  `;
-
-  // Don't include Chart.js script in return (charts won't work in PDF anyway)
-  return `
-    <!-- FAMILY WEALTH DASHBOARD -->
-    <div class="bg-white border-l-4 border-indigo-400 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-
-      <!-- Section Title -->
-      <h2 class="text-base font-bold text-gray-900 mb-4 m-0">📊 Family Wealth Dashboard</h2>
-
-      <!-- 3-Column Grid: Net Worth + Asset Allocation + Insurance -->
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        ${chartsHTML}
-      </div>
-
-    </div>
-  `;
-}
-
-/**
- * Build member section with all investment details
- */
-function buildMemberSection(memberData, memberColor) {
-  const mutualFundsHTML = buildMutualFundsSection(memberData.mutualFunds, memberData.memberName);
-  const stocksHTML = buildStocksSection(memberData.stocks, memberData.memberName);
-  const otherInvestmentsHTML = buildOtherInvestmentsSection(memberData.otherInvestments);
-  const liabilitiesHTML = buildLiabilitiesSection(memberData.liabilities);
-
-  // CRITICAL FIX: Only show member section if they have HOLDINGS (MF, Stocks, or Other Investments)
-  // Liabilities alone don't count - member must have actual investments
-  const hasHoldings = mutualFundsHTML || stocksHTML || otherInvestmentsHTML;
-
-  if (!hasHoldings) {
-    return '';
-  }
-
-  return `
-    <!-- MEMBER SECTION -->
-    <div class="bg-white border-l-4 ${memberColor.border} border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-
-      <!-- Member Header -->
-      <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-        <h2 class="text-lg font-bold ${memberColor.name} m-0">${memberData.memberName}</h2>
-        <span class="text-sm font-medium text-gray-600">Investment Summary</span>
-      </div>
-
-      ${mutualFundsHTML}
-      ${stocksHTML}
-      ${otherInvestmentsHTML}
-      ${liabilitiesHTML}
-
-    </div>
-  `;
-}
-
-/**
- * Build Mutual Funds section for a member
- */
-function buildMutualFundsSection(mfData, memberName) {
-  if (!mfData || !mfData.portfolios || mfData.portfolios.length === 0) {
-    return '';
-  }
-
-  // Filter portfolios to only include those with invested > 0
-  const activePortfolios = mfData.portfolios.filter(p => p.invested > 0);
-  if (activePortfolios.length === 0) {
-    return '';
-  }
-
-  let portfoliosHTML = '';
-
-  activePortfolios.forEach(portfolio => {
-    // Portfolio summary cards (5 cards)
-    const summaryCardsHTML = `
-      <div class="grid grid-cols-5 gap-3 mb-4">
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Invested</div>
-          <div class="text-base font-bold text-gray-900">${formatCurrency(portfolio.invested)}</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Current</div>
-          <div class="text-base font-bold text-gray-900">${formatCurrency(portfolio.current)}</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Unrealized</div>
-          <div class="text-base font-bold ${portfolio.unrealizedPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(portfolio.unrealizedPnL)}</div>
-          <div class="text-xs ${portfolio.unrealizedPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${portfolio.unrealizedPnL >= 0 ? '+' : ''}${portfolio.unrealizedPnLPercent.toFixed(2)}%</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Realized</div>
-          <div class="text-base font-bold ${portfolio.realizedPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(portfolio.realizedPnL)}</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Total P&L</div>
-          <div class="text-base font-bold ${portfolio.totalPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(portfolio.totalPnL)}</div>
-          <div class="text-xs ${portfolio.totalPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${portfolio.totalPnL >= 0 ? '+' : ''}${portfolio.totalPnLPercent.toFixed(2)}%</div>
-        </div>
-      </div>
-    `;
-
-    // Asset Allocation + Market Cap (portfolio level)
-    // CRITICAL FIX: Only show allocation if there's actual data in breakdown arrays
-    let allocationHTML = '';
-    const hasAssetData = portfolio.assetAllocation?.breakdown && portfolio.assetAllocation.breakdown.length > 0;
-    const hasMarketCapData = portfolio.marketCapAllocation?.breakdown && portfolio.marketCapAllocation.breakdown.length > 0;
-
-    if (hasAssetData || hasMarketCapData) {
-      const assetItems = hasAssetData ? portfolio.assetAllocation.breakdown.map(item =>
-        `<span class="text-xs text-gray-700">${item.assetClass}: ${item.percentage.toFixed(1)}%</span>`
-      ).join(' · ') : '';
-
-      const marketCapItems = hasMarketCapData ? portfolio.marketCapAllocation.breakdown.map(item =>
-        `<span class="text-xs text-gray-700">${item.marketCap}: ${item.percentage.toFixed(1)}%</span>`
-      ).join(' · ') : '';
-
-      // Only render the allocation box if we have at least one type of data
-      if (assetItems || marketCapItems) {
-        allocationHTML = `
-          <div class="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
-            ${assetItems ? `<div class="mb-1"><span class="text-xs font-semibold text-gray-800">Asset:</span> ${assetItems}</div>` : ''}
-            ${marketCapItems ? `<div><span class="text-xs font-semibold text-gray-800">Market Cap:</span> ${marketCapItems}</div>` : ''}
-          </div>
-        `;
+        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px;margin-bottom:20px"><tbody>';
+        h += '<tr style="background:#f3f4f6"><th style="' + _fThS + '">Stock Name</th><th style="' + _fThS + '">Symbol</th><th style="' + _fThR + '">Qty</th><th style="' + _fThR + '">Avg Price</th><th style="' + _fThR + '">LTP</th><th style="' + _fThR + '">Invested</th><th style="' + _fThR + '">Current</th><th style="' + _fThR + '">P&amp;L</th><th style="' + _fThR + '">Returns %</th></tr>';
+        for (var shi = 0; shi < sdh.length; shi++) {
+          var sk = sdh[shi], skI = parseFloat(sk.totalInvestment) || 0, skC = parseFloat(sk.currentValue) || 0;
+          var skPL = parseFloat(sk.unrealizedPL) || (skC - skI), skPP = parseFloat(sk.unrealizedPLPct) || (skI > 0 ? (skPL / skI * 100) : 0);
+          var skl = (shi === sdh.length - 1);
+          h += '<tr' + (skl ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+          h += '<td style="' + _fTdS + '">' + _escHtml(sk.companyName) + '</td>';
+          h += '<td style="' + _fTdMono + '">' + _escHtml(sk.symbol) + '</td>';
+          h += '<td style="' + _fTdSecR + '">' + (parseFloat(sk.quantity) || 0) + '</td>';
+          h += '<td style="' + _fTdSecR + '">\u20B9' + (parseFloat(sk.avgBuyPrice) || 0).toLocaleString('en-IN') + '</td>';
+          h += '<td style="' + _fTdR + '">\u20B9' + (parseFloat(sk.currentPrice) || 0).toLocaleString('en-IN') + '</td>';
+          h += '<td style="' + _fTdSecR + '">' + _fmtCur(skI) + '</td>';
+          h += '<td style="' + _fTdR + '">' + _fmtCur(skC) + '</td>';
+          h += '<td style="' + _fTdSecR + 'color:' + _plColor(skPL) + '">' + _plSign(skPL) + _fmtCur(Math.abs(skPL)) + '</td>';
+          h += '<td style="' + _fTdBoldR + 'color:' + _plColor(skPL) + '">' + _plSign(skPL) + skPP.toFixed(1) + '%</td></tr>';
+        }
+        h += '</tbody></table>';
       }
+      h += '</div>';
     }
+    h += '</td></tr></tbody></table>';
+  }
 
-    // Funds table
-    let fundsTableHTML = '';
-    if (portfolio.funds && portfolio.funds.length > 0) {
-      const fundsRows = portfolio.funds.map(fund => `
-        <tr class="border-b border-gray-200 hover:bg-gray-50">
-          <td class="py-1.5 px-2 text-gray-900">${fund.schemeName}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(fund.invested)}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(fund.current)}</td>
-          <td class="py-1.5 px-2 text-right font-medium ${fund.pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(fund.pnl)}</td>
-          <td class="py-1.5 px-2 text-right ${fund.pnlPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}">${fund.pnlPercent >= 0 ? '+' : ''}${fund.pnlPercent.toFixed(2)}%</td>
-          <td class="py-1.5 px-2 text-right ${fund.rebalanceSip >= 0 ? 'text-emerald-700' : 'text-red-700'} font-semibold">${fund.rebalanceSip ? (fund.rebalanceSip >= 0 ? '+' : '') + formatCurrency(fund.rebalanceSip) : '—'}</td>
-          <td class="py-1.5 px-2 text-right ${fund.buySell >= 0 ? 'text-emerald-700' : 'text-red-700'} font-semibold">${fund.buySell ? (fund.buySell >= 0 ? '+' : '') + formatCurrency(fund.buySell) : '—'}</td>
-        </tr>
-      `).join('');
-
-      fundsTableHTML = `
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Fund Name</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Invested</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Current</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">P&L</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">P&L %</th>
-                <th class="py-1.5 px-2 font-semibold text-emerald-700 text-right bg-emerald-50" style="font-size: 11px;">Rebalance SIP ₹</th>
-                <th class="py-1.5 px-2 font-semibold text-orange-700 text-right bg-orange-50" style="font-size: 11px;">Buy/Sell ₹</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${fundsRows}
-            </tbody>
-          </table>
-        </div>
-      `;
+  // 7. BANK ACCOUNTS
+  if (bankAccounts.length > 0) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #2dd4bf;"><tbody><tr><td style="padding:20px">';
+    h += '<div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:16px">Bank Accounts</div>';
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+    h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Member</th><th style="' + _thS + '">Bank Name</th><th style="' + _thS + '">Account Number</th><th style="' + _thS + '">Account Type</th><th style="' + _thS + '">Branch</th></tr>';
+    for (var bi = 0; bi < bankAccounts.length; bi++) {
+      var bk = bankAccounts[bi], bLast = (bi === bankAccounts.length - 1);
+      var an = bk.accountNumber || ''; if (an.length > 4) an = 'XXXX-XXXX-' + an.slice(-4);
+      h += '<tr' + (bLast ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+      h += '<td style="' + _tdS + '">' + _escHtml(bk.member) + '</td>';
+      h += '<td style="' + _tdS + '">' + _escHtml(bk.bankName) + '</td>';
+      h += '<td style="' + _tdMono + '">' + _escHtml(an) + '</td>';
+      h += '<td style="' + _tdSec + '">' + _escHtml(bk.accountType) + '</td>';
+      h += '<td style="' + _tdSec + '">' + _escHtml(bk.branch) + '</td></tr>';
     }
-
-    portfoliosHTML += `
-      <div class="mb-4 bg-gray-50 border-l-4 border-gray-300 border-t border-r border-b border-gray-100 rounded-lg p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-sm font-semibold text-gray-800 m-0">📁 ${portfolio.portfolioName}</h4>
-          ${portfolio.clientId ? `<span class="text-xs text-gray-500 font-mono">Client ID: ${portfolio.clientId}</span>` : ''}
-        </div>
-        ${summaryCardsHTML}
-        ${allocationHTML}
-        ${fundsTableHTML}
-      </div>
-    `;
-  });
-
-  return `
-    <!-- MUTUAL FUNDS -->
-    <div class="mb-5">
-      <h3 class="text-base font-semibold text-gray-800 mb-3 m-0">📊 Mutual Funds</h3>
-      ${portfoliosHTML}
-    </div>
-  `;
-}
-
-/**
- * Build Stocks section for a member
- */
-function buildStocksSection(stocksData, memberName) {
-  if (!stocksData || !stocksData.portfolios || stocksData.portfolios.length === 0) {
-    return '';
+    h += '</tbody></table></td></tr></tbody></table>';
   }
 
-  // Filter portfolios to only include those with invested > 0
-  const activePortfolios = stocksData.portfolios.filter(p => p.invested > 0);
-  if (activePortfolios.length === 0) {
-    return '';
-  }
-
-  let portfoliosHTML = '';
-
-  activePortfolios.forEach(portfolio => {
-    // Portfolio summary cards (5 cards)
-    const summaryCardsHTML = `
-      <div class="grid grid-cols-5 gap-3 mb-4">
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Invested</div>
-          <div class="text-base font-bold text-gray-900">${formatCurrency(portfolio.invested)}</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Current</div>
-          <div class="text-base font-bold text-gray-900">${formatCurrency(portfolio.current)}</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Unrealized</div>
-          <div class="text-base font-bold ${portfolio.unrealizedPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(portfolio.unrealizedPnL)}</div>
-          <div class="text-xs ${portfolio.unrealizedPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${portfolio.unrealizedPnL >= 0 ? '+' : ''}${portfolio.unrealizedPnLPercent.toFixed(2)}%</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Realized</div>
-          <div class="text-base font-bold ${portfolio.realizedPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(portfolio.realizedPnL)}</div>
-        </div>
-        <div class="bg-gray-50 border border-gray-200 rounded p-3">
-          <div class="text-xs text-gray-600 mb-1">Total P&L</div>
-          <div class="text-base font-bold ${portfolio.totalPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(portfolio.totalPnL)}</div>
-          <div class="text-xs ${portfolio.totalPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}">${portfolio.totalPnL >= 0 ? '+' : ''}${portfolio.totalPnLPercent.toFixed(2)}%</div>
-        </div>
-      </div>
-    `;
-
-    // Holdings table
-    let holdingsTableHTML = '';
-    if (portfolio.holdings && portfolio.holdings.length > 0) {
-      const holdingsRows = portfolio.holdings.map(holding => `
-        <tr class="border-b border-gray-200 hover:bg-gray-50">
-          <td class="py-1.5 px-2 text-gray-900">${holding.stockName}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${holding.quantity}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(holding.avgPrice)}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(holding.ltp)}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(holding.invested)}</td>
-          <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(holding.current)}</td>
-          <td class="py-1.5 px-2 text-right font-medium ${holding.pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}">${formatCurrency(holding.pnl)}</td>
-          <td class="py-1.5 px-2 text-right ${holding.pnlPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}">${holding.pnlPercent >= 0 ? '+' : ''}${holding.pnlPercent.toFixed(2)}%</td>
-        </tr>
-      `).join('');
-
-      holdingsTableHTML = `
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Stock</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Qty</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Avg Price</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">LTP</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Invested</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Current</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">P&L</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">P&L %</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${holdingsRows}
-            </tbody>
-          </table>
-        </div>
-      `;
+  // 8. INVESTMENT ACCOUNTS
+  if (investmentAccounts.length > 0) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #818cf8;"><tbody><tr><td style="padding:20px">';
+    h += '<div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:16px">Investment Accounts</div>';
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #d1d5db;border-radius:8px"><tbody>';
+    h += '<tr style="background:#f3f4f6"><th style="' + _thS + '">Member</th><th style="' + _thS + '">Platform</th><th style="' + _thS + '">Account Type</th><th style="' + _thS + '">Account ID</th><th style="' + _thS + '">Email</th><th style="' + _thS + '">Phone</th></tr>';
+    for (var iv = 0; iv < investmentAccounts.length; iv++) {
+      var ia2 = investmentAccounts[iv], ivLast = (iv === investmentAccounts.length - 1);
+      h += '<tr' + (ivLast ? '' : ' style="border-bottom:1px solid #d1d5db"') + '>';
+      h += '<td style="' + _tdS + '">' + _escHtml(ia2.member) + '</td>';
+      h += '<td style="' + _tdS + '">' + _escHtml(ia2.platform) + '</td>';
+      h += '<td style="' + _tdSec + '">' + _escHtml(ia2.accountType) + '</td>';
+      h += '<td style="' + _tdMono + '">' + _escHtml(ia2.clientId) + '</td>';
+      h += '<td style="' + _tdSec + '">' + _escHtml(ia2.email) + '</td>';
+      h += '<td style="' + _tdMono + '">' + _escHtml(ia2.phone) + '</td></tr>';
     }
-
-    portfoliosHTML += `
-      <div class="mb-4 bg-gray-50 border-l-4 border-gray-300 border-t border-r border-b border-gray-100 rounded-lg p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-sm font-semibold text-gray-800 m-0">📁 ${portfolio.portfolioName}</h4>
-          ${portfolio.clientId ? `<span class="text-xs text-gray-500 font-mono">Client ID: ${portfolio.clientId}</span>` : ''}
-        </div>
-        ${summaryCardsHTML}
-        ${holdingsTableHTML}
-      </div>
-    `;
-  });
-
-  return `
-    <!-- STOCKS -->
-    <div class="mb-5">
-      <h3 class="text-base font-semibold text-gray-800 mb-3 m-0">📈 Stocks</h3>
-      ${portfoliosHTML}
-    </div>
-  `;
-}
-
-/**
- * Build Other Investments section for a member
- */
-function buildOtherInvestmentsSection(otherData) {
-  if (!otherData || !otherData.investments || otherData.investments.length === 0) {
-    return '';
+    h += '</tbody></table></td></tr></tbody></table>';
   }
 
-  const investmentRows = otherData.investments.map(inv => `
-    <tr class="border-b border-gray-200 hover:bg-gray-50">
-      <td class="py-1.5 px-2 text-gray-900">${inv.investmentType}</td>
-      <td class="py-1.5 px-2 text-gray-700">${inv.description || '-'}</td>
-      <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(inv.amount)}</td>
-    </tr>
-  `).join('');
+  // 9. FOOTER
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _card + 'border-left:4px solid #6366f1;"><tbody><tr><td style="padding:20px;text-align:center">';
+  h += '<div style="font-size:12px;color:#6b7280;margin-bottom:8px">This report is auto-generated from your Google Sheets. Keep your financial data secure.</div>';
+  h += '<div style="font-size:14px;color:#374151;font-weight:600">Made with &#10084;&#65039; in India by <strong>Jagadeesh Manne</strong> &middot; Donate: <strong>8977099970</strong> (GPay)</div>';
+  h += '</td></tr></tbody></table>';
 
-  const totalAmount = otherData.investments.reduce((sum, inv) => sum + inv.amount, 0);
-
-  return `
-    <!-- OTHER INVESTMENTS -->
-    <div class="mb-5">
-      <h3 class="text-base font-semibold text-gray-800 mb-3 m-0">💎 Other Investments</h3>
-      <div class="mb-4 bg-gray-50 border-l-4 border-gray-300 border-t border-r border-b border-gray-100 rounded-lg p-4">
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Type</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Description</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${investmentRows}
-              <tr class="bg-gray-50 font-semibold">
-                <td colspan="2" class="py-1.5 px-2 text-gray-900">Total</td>
-                <td class="py-1.5 px-2 text-right text-gray-900">${formatCurrency(totalAmount)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
+  h += '</td></tr></tbody></table></div>';
+  return h;
 }
 
-/**
- * Build Liabilities section for a member
- */
-function buildLiabilitiesSection(liabilitiesData) {
-  if (!liabilitiesData || !liabilitiesData.liabilities || liabilitiesData.liabilities.length === 0) {
-    return '';
+
+// ============================================================================
+// SIMPLE EMAIL BODY
+// ============================================================================
+
+function _emailMetricCard(label, value, pl, accentColor) {
+  var plHtml = '';
+  if (pl !== null && pl !== undefined) {
+    var plCol = pl >= 0 ? '#059669' : '#dc2626';
+    var plSgn = pl >= 0 ? '+' : '';
+    plHtml = '<div style="font-size:11px;color:' + plCol + ';margin-top:2px;">' + plSgn + formatEmailCurrency(pl) + '</div>';
   }
-
-  const liabilityRows = liabilitiesData.liabilities.map(liab => `
-    <tr class="border-b border-gray-200 hover:bg-gray-50">
-      <td class="py-1.5 px-2 text-gray-900">${liab.liabilityType}</td>
-      <td class="py-1.5 px-2 text-gray-700">${liab.description || '-'}</td>
-      <td class="py-1.5 px-2 text-right text-gray-700">${formatCurrency(liab.outstandingAmount)}</td>
-    </tr>
-  `).join('');
-
-  const totalAmount = liabilitiesData.liabilities.reduce((sum, liab) => sum + liab.outstandingAmount, 0);
-
-  return `
-    <!-- LIABILITIES -->
-    <div class="mb-5">
-      <h3 class="text-base font-semibold text-gray-800 mb-3 m-0">💳 Liabilities</h3>
-      <div class="mb-4 bg-gray-50 border-l-4 border-gray-300 border-t border-r border-b border-gray-100 rounded-lg p-4">
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Type</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Description</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Outstanding</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${liabilityRows}
-              <tr class="bg-gray-50 font-semibold">
-                <td colspan="2" class="py-1.5 px-2 text-gray-900">Total</td>
-                <td class="py-1.5 px-2 text-right text-gray-900">${formatCurrency(totalAmount)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
+  return '<td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;border-top:3px solid ' + accentColor + ';"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;">' + _escHtml(label) + '</div><div style="font-size:16px;font-weight:700;color:#0f172a;margin-top:2px;">' + value + '</div>' + plHtml + '</td>';
 }
 
-/**
- * Get time-based greeting
- */
+function buildSimpleEmailBody(recipientName, dashData, familyHeadName) {
+  var greeting = getTimeBasedGreeting();
+  var date = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy');
+  var name = recipientName || '';
+  var d = dashData || {};
+  var ff = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif";
+  var familyLabel = 'Your Family';
+  if (familyHeadName) { var pts = familyHeadName.trim().split(/\s+/); familyLabel = (pts.length > 1 ? pts[pts.length - 1] : pts[0]) + ' Family'; }
+  var nw = d.netWorth || 0, ta = d.totalAssets || 0, ti = d.totalInvested || 0, tl = d.totalLiabilities || 0;
+  var tPL = d.totalPL || 0, pp = d.plPct || (ti > 0 ? ((tPL / ti) * 100) : 0);
+  var pc = tPL >= 0 ? '#059669' : '#dc2626', ps = tPL >= 0 ? '+' : '';
+  var mfI = parseFloat(d.mfInvested) || 0, mfC = parseFloat(d.mfCurrentValue) || 0;
+  var skI = parseFloat(d.stkInvested) || 0, skC = parseFloat(d.stkCurrentValue) || 0;
+  var oC = parseFloat(d.otherCurrentValue) || 0;
+  var eL = _getImageBase64('https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-new.png');
+  var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;font-family:' + ff + ';background-color:#f0f4f8;"><div style="margin:0 auto;padding:0;">';
+  h += '<div style="background:linear-gradient(135deg,#059669 0%,#047857 50%,#065f46 100%);padding:32px 28px 24px;text-align:center;">';
+  h += (eL ? '<img src="' + eL + '" alt="Capital Friends" style="height:44px;width:auto;display:inline-block;margin-bottom:8px;filter:brightness(0) invert(1);" />' : '<div style="margin-bottom:8px;"><span style="font-size:24px;font-weight:800;color:#fff;">Capital</span><span style="font-size:24px;font-weight:800;color:#a7f3d0;">Friends</span></div>');
+  h += '<div style="font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:0.5px;">FAMILY PORTFOLIO MANAGER</div></div>';
+  h += '<div style="background:#065f46;padding:12px 28px;text-align:center;"><span style="font-size:13px;color:rgba(255,255,255,0.6);">' + _escHtml(date) + '</span><span style="color:rgba(255,255,255,0.3);margin:0 8px;">\u2022</span><span style="font-size:13px;font-weight:700;color:#fff;">' + _escHtml(familyLabel) + '</span></div>';
+  h += '<div style="background:#fff;padding:28px;"><p style="margin:0 0 20px;font-size:16px;color:#1e293b;font-weight:600;">' + greeting + (name ? ', ' + _escHtml(name) : '') + '</p>';
+  h += '<p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">Here\'s your ' + _escHtml(familyLabel) + ' financial summary for <strong>' + _escHtml(date) + '</strong>. Scroll down for the complete report.</p>';
+  h += '<div style="background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:20px;text-align:center;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:6px;">Net Worth</div><div style="font-size:32px;font-weight:800;color:#065f46;">' + formatEmailCurrency(nw) + '</div>';
+  h += '<div style="margin-top:8px;"><span style="font-size:12px;color:' + pc + ';font-weight:600;">' + ps + formatEmailCurrency(tPL) + ' (' + ps + (typeof pp === 'number' ? pp.toFixed(1) : pp) + '%)</span><span style="font-size:12px;color:#94a3b8;margin-left:4px;">overall P&amp;L</span></div></div>';
+  h += '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:20px;"><tr>' + _emailMetricCard('Mutual Funds', formatEmailCurrency(mfC), mfC - mfI, '#10b981') + '<td style="width:12px;"></td>' + _emailMetricCard('Stocks', formatEmailCurrency(skC), skC - skI, '#3b82f6') + '<td style="width:12px;"></td>' + _emailMetricCard('Other Inv.', formatEmailCurrency(oC), null, '#8b5cf6') + '</tr></table>';
+  if (tl > 0) h += '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:20px;"><tr><td style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;"><div style="font-size:11px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;">Total Liabilities</div><div style="font-size:18px;font-weight:700;color:#dc2626;margin-top:2px;">' + formatEmailCurrency(tl) + '</div></td><td style="width:12px;"></td><td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;"><div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Total Investments</div><div style="font-size:18px;font-weight:700;color:#0f172a;margin-top:2px;">' + formatEmailCurrency(ta) + '</div></td></tr></table>';
+  h += '</div>';
+  h += '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 28px;"><table cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr><td style="vertical-align:middle;text-align:left;">' + (eL ? '<img src="' + eL + '" alt="Capital Friends" style="height:30px;width:auto;display:block;margin-bottom:6px;" />' : '') + '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Built with love by Jagadeesh Manne</div></td></tr></table></div></div></body></html>';
+  return h;
+}
+
 function getTimeBasedGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good Morning';
-  if (hour < 17) return 'Good Afternoon';
-  return 'Good Evening';
+  var now = new Date(), ist = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + 19800000);
+  var hr = ist.getHours();
+  return hr < 12 ? 'Good Morning' : hr < 17 ? 'Good Afternoon' : 'Good Evening';
 }
 
-/**
- * Format currency (Indian format)
- */
-function formatCurrency(amount) {
-  if (amount === null || amount === undefined) return '₹0';
-
-  const absAmount = Math.abs(amount);
-  let formatted = '';
-
-  if (absAmount >= 10000000) { // >= 1 Crore
-    formatted = '₹' + (absAmount / 10000000).toFixed(2) + ' Cr';
-  } else if (absAmount >= 100000) { // >= 1 Lakh
-    formatted = '₹' + (absAmount / 100000).toFixed(2) + ' L';
-  } else if (absAmount >= 1000) { // >= 1 Thousand
-    formatted = '₹' + (absAmount / 1000).toFixed(2) + ' K';
-  } else {
-    formatted = '₹' + absAmount.toFixed(2);
-  }
-
-  return amount < 0 ? '-' + formatted : formatted;
+function formatEmailCurrency(amount) {
+  if (amount === null || amount === undefined || isNaN(amount)) return '\u20B90';
+  var neg = amount < 0, abs = Math.abs(amount), fmt;
+  if (abs >= 10000000) fmt = '\u20B9' + (abs / 10000000).toFixed(2) + ' Cr';
+  else if (abs >= 100000) fmt = '\u20B9' + (abs / 100000).toFixed(2) + ' L';
+  else if (abs >= 1000) fmt = '\u20B9' + (abs / 1000).toFixed(2) + ' K';
+  else fmt = '\u20B9' + (abs === Math.floor(abs) ? abs.toFixed(0) : abs.toFixed(2));
+  return neg ? '-' + fmt : fmt;
 }
 
-/**
- * Build Action Items & Recommendations section based on questionnaire
- * @param {Object} questionnaireData - Data from getQuestionnaireData()
- * @returns {string} HTML for action items section
- */
-function buildActionItemsSection(questionnaireData) {
-  if (!questionnaireData || !questionnaireData.hasData || questionnaireData.answers.length === 0) {
-    return '';
-  }
-
-  // Find all "No" answers to show as action items
-  const actionItems = questionnaireData.answers.filter(item => item.answer === 'No');
-
-  if (actionItems.length === 0) {
-    // All "Yes" - show congratulatory message
-    return `
-    <!-- ACTION ITEMS & RECOMMENDATIONS -->
-    <div class="bg-white border-l-4 border-emerald-400 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-      <h2 class="text-base font-bold text-gray-900 mb-4 m-0">✅ Financial Health Check - Excellent!</h2>
-      <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-        <p class="text-sm text-emerald-800 m-0">🎉 Congratulations! You've answered "Yes" to all ${questionnaireData.totalQuestions} financial health questions. Your family's financial foundation is strong!</p>
-      </div>
-    </div>
-    `;
-  }
-
-  // Action item icon and color mapping based on question number
-  const actionMapping = {
-    1: { icon: '👨‍👩‍👧‍👦', color: 'bg-red-50 border-red-200', title: 'Family Awareness Missing', severity: 'critical' },
-    2: { icon: '🏥', color: 'bg-orange-50 border-orange-200', title: 'Health Insurance Gap', severity: 'critical' },
-    3: { icon: '🛡️', color: 'bg-red-50 border-red-200', title: 'Term Insurance Missing', severity: 'critical' },
-    4: { icon: '📜', color: 'bg-orange-50 border-orange-200', title: 'Will Not Created', severity: 'important' },
-    5: { icon: '👤', color: 'bg-yellow-50 border-yellow-200', title: 'Nominees Not Updated', severity: 'important' },
-    6: { icon: '💰', color: 'bg-amber-50 border-amber-200', title: 'Emergency Fund Missing', severity: 'critical' },
-    7: { icon: '📁', color: 'bg-blue-50 border-blue-200', title: 'Documents Not Organized', severity: 'recommended' },
-    8: { icon: '🔐', color: 'bg-purple-50 border-purple-200', title: 'Access Not Shared', severity: 'important' }
-  };
-
-  const actionCardsHTML = actionItems.map(item => {
-    const mapping = actionMapping[item.questionNumber] || { icon: '⚠️', color: 'bg-gray-50 border-gray-200', title: 'Action Required', severity: 'recommended' };
-
-    return `
-      <div class="border ${mapping.color} rounded-lg p-4 mb-3">
-        <div class="flex items-start gap-3">
-          <span class="text-2xl">${mapping.icon}</span>
-          <div class="flex-1">
-            <h4 class="text-sm font-bold text-gray-900 m-0 mb-1">${mapping.title}</h4>
-            <p class="text-xs text-gray-700 m-0 mb-2">${item.questionText}</p>
-            <p class="text-xs text-gray-600 m-0 italic">💡 Recommendation: ${getRecommendation(item.questionNumber)}</p>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const score = questionnaireData.yesCount;
-  const total = questionnaireData.totalQuestions;
-  const scoreColor = score >= 6 ? 'text-emerald-600' : (score >= 4 ? 'text-amber-600' : 'text-red-600');
-
-  return `
-    <!-- ACTION ITEMS & RECOMMENDATIONS -->
-    <div class="bg-white border-l-4 border-amber-400 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-      <h2 class="text-base font-bold text-gray-900 mb-4 m-0">⚠️ Action Items & Recommendations</h2>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        ${actionCardsHTML}
-        <div class="mt-4 pt-3 border-t border-gray-300 text-center">
-          <span class="text-xs text-gray-600">Financial Health Score: </span>
-          <span class="text-base font-bold ${scoreColor}">${score}/${total}</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Get recommendation text for each question
- */
-function getRecommendation(questionNumber) {
-  const recommendations = {
-    1: 'Schedule a family meeting to discuss financial accounts and share account details with your spouse.',
-    2: 'Get family floater health insurance with adequate coverage (₹10L+ per person) from a reputable insurer.',
-    3: 'Purchase term life insurance with coverage 15-20x of annual income to protect your family financially.',
-    4: 'Consult a lawyer to draft a legal Will to ensure smooth asset transfer and avoid family disputes.',
-    5: 'Update nominees in all bank accounts, investments, and insurance policies. Keep nomination documents updated.',
-    6: 'Build emergency fund covering 6-12 months of expenses in a liquid savings account or liquid fund.',
-    7: 'Organize all financial documents (insurance, deeds, accounts) in a secure physical and digital folder.',
-    8: 'Share account access details (logins, passwords) with a trusted family member in a secure manner.'
-  };
-  return recommendations[questionNumber] || 'Take necessary action to improve your financial security.';
-}
-
-/**
- * Build Insurance Policies section showing Term and Health insurance
- * @param {Object} insuranceData - Data from getAllInsurancePoliciesDetailed()
- * @returns {string} HTML for insurance policies section
- */
-function buildInsurancePoliciesSection(insuranceData) {
-  if (!insuranceData || insuranceData.totalPolicies === 0) {
-    return '';
-  }
-
-  const hasTermInsurance = insuranceData.termInsurance && insuranceData.termInsurance.length > 0;
-  const hasHealthInsurance = insuranceData.healthInsurance && insuranceData.healthInsurance.length > 0;
-
-  if (!hasTermInsurance && !hasHealthInsurance) {
-    return '';
-  }
-
-  let termTableHTML = '';
-  if (hasTermInsurance) {
-    const termRows = insuranceData.termInsurance.map(policy => `
-      <tr class="border-b border-gray-200 hover:bg-gray-50">
-        <td class="py-1.5 px-2 text-gray-900">${policy.member}</td>
-        <td class="py-1.5 px-2 text-gray-700">${policy.provider}</td>
-        <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${policy.policyNumber || '—'}</td>
-        <td class="py-1.5 px-2 text-gray-700">${policy.policyType}</td>
-        <td class="py-1.5 px-2 text-right font-semibold text-gray-900">${formatCurrency(policy.sumAssured)}</td>
-        <td class="py-1.5 px-2 text-right text-gray-700">${policy.premium || '—'}</td>
-        <td class="py-1.5 px-2 text-center text-gray-700">${policy.maturityDate || '—'}</td>
-        <td class="py-1.5 px-2 text-center">
-          <span class="text-xs px-2 py-0.5 rounded ${policy.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}">${policy.status}</span>
-        </td>
-      </tr>
-    `).join('');
-
-    termTableHTML = `
-      <div class="mb-4">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">🛡️ Term Life Insurance</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-indigo-50">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Member</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Provider</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Policy No.</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Policy Type</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Sum Assured</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Annual Premium</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-center" style="font-size: 11px;">Maturity Date</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-center" style="font-size: 11px;">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${termRows}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
-
-  let healthTableHTML = '';
-  if (hasHealthInsurance) {
-    const healthRows = insuranceData.healthInsurance.map(policy => `
-      <tr class="border-b border-gray-200 hover:bg-gray-50">
-        <td class="py-1.5 px-2 text-gray-900">${policy.member}</td>
-        <td class="py-1.5 px-2 text-gray-700">${policy.provider}</td>
-        <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${policy.policyNumber || '—'}</td>
-        <td class="py-1.5 px-2 text-gray-700">${policy.policyType}</td>
-        <td class="py-1.5 px-2 text-right font-semibold text-gray-900">${formatCurrency(policy.sumAssured)}</td>
-        <td class="py-1.5 px-2 text-right text-gray-700">${policy.premium || '—'}</td>
-        <td class="py-1.5 px-2 text-center text-gray-700">${policy.renewalDate || '—'}</td>
-        <td class="py-1.5 px-2 text-center">
-          <span class="text-xs px-2 py-0.5 rounded ${policy.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}">${policy.status}</span>
-        </td>
-      </tr>
-    `).join('');
-
-    healthTableHTML = `
-      <div class="mb-4">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">🏥 Health Insurance</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-emerald-50">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Member</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Provider</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Policy No.</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Policy Type</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Sum Assured</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-right" style="font-size: 11px;">Annual Premium</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-center" style="font-size: 11px;">Renewal Date</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-center" style="font-size: 11px;">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${healthRows}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <!-- INSURANCE POLICIES -->
-    <div class="bg-white border-l-4 border-indigo-400 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-      <h2 class="text-base font-bold text-gray-900 mb-4 m-0">🛡️ Insurance Policies Overview</h2>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        ${termTableHTML}
-        ${healthTableHTML}
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Family Member Details section
- * @param {Array} familyMembers - Data from getAllFamilyMembersForReport()
- * @returns {string} HTML for family member details section
- */
-function buildFamilyMemberDetailsSection(familyMembers) {
-  if (!familyMembers || familyMembers.length === 0) {
-    return '';
-  }
-
-  const memberRows = familyMembers.map(member => {
-    // Mask Aadhar number for privacy (show only last 4 digits)
-    const maskedAadhar = member.aadharNumber ? 'XXXX-XXXX-' + member.aadharNumber.slice(-4) : '—';
-
-    return `
-      <tr class="border-b border-gray-200 hover:bg-gray-50">
-        <td class="py-1.5 px-2 font-medium text-gray-900">${member.memberName}</td>
-        <td class="py-1.5 px-2 text-gray-700">${member.relationship}</td>
-        <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${maskedAadhar}</td>
-        <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${member.panNumber || '—'}</td>
-        <td class="py-1.5 px-2 text-center text-gray-700">${member.dateOfBirth || '—'}</td>
-        <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${member.mobileNumber || '—'}</td>
-        <td class="py-1.5 px-2 text-gray-700 text-xs">${member.emailAddress || '—'}</td>
-      </tr>
-    `;
-  }).join('');
-
-  return `
-    <!-- FAMILY MEMBER DETAILS -->
-    <div class="bg-white border-l-4 border-purple-400 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-      <h2 class="text-base font-bold text-gray-900 mb-4 m-0">👨‍👩‍👧‍👦 Family Member Details</h2>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-purple-50">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Member Name</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Relationship</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Aadhar Number</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">PAN Number</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-center" style="font-size: 11px;">Date of Birth</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Mobile</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${memberRows}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Account Summary section (Bank + Investment Accounts)
- * @param {Array} bankAccounts - Data from getAllBankAccountsForReport()
- * @param {Array} investmentAccounts - Data from getAllInvestmentAccountsForReport()
- * @returns {string} HTML for account summary section
- */
-function buildAccountSummarySection(bankAccounts, investmentAccounts) {
-  const hasBankAccounts = bankAccounts && bankAccounts.length > 0;
-  const hasInvestmentAccounts = investmentAccounts && investmentAccounts.length > 0;
-
-  if (!hasBankAccounts && !hasInvestmentAccounts) {
-    return '';
-  }
-
-  let bankTableHTML = '';
-  if (hasBankAccounts) {
-    const bankRows = bankAccounts.map(account => {
-      // Mask account number (show only last 4 digits)
-      const maskedAccountNumber = account.accountNumber ? 'XXXX-' + account.accountNumber.slice(-4) : '—';
-
-      return `
-        <tr class="border-b border-gray-200 hover:bg-gray-50">
-          <td class="py-1.5 px-2 text-gray-900">${account.member}</td>
-          <td class="py-1.5 px-2 text-gray-700">${account.bankName}</td>
-          <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${maskedAccountNumber}</td>
-          <td class="py-1.5 px-2 text-gray-700">${account.accountType}</td>
-          <td class="py-1.5 px-2 text-gray-700">${account.branch || '—'}</td>
-        </tr>
-      `;
-    }).join('');
-
-    bankTableHTML = `
-      <div class="mb-4">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">🏦 Bank Accounts</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-teal-50">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Member</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Bank Name</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Account Number</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Account Type</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Branch</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${bankRows}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
-
-  let investmentTableHTML = '';
-  if (hasInvestmentAccounts) {
-    const investmentRows = investmentAccounts.map(account => {
-      return `
-        <tr class="border-b border-gray-200 hover:bg-gray-50">
-          <td class="py-1.5 px-2 text-gray-900">${account.member}</td>
-          <td class="py-1.5 px-2 text-gray-700">${account.platform}</td>
-          <td class="py-1.5 px-2 text-gray-700">${account.accountType}</td>
-          <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${account.accountId || account.clientId || '—'}</td>
-          <td class="py-1.5 px-2 text-gray-700 text-xs">${account.emailAddress || '—'}</td>
-          <td class="py-1.5 px-2 text-gray-700 font-mono text-xs">${account.phoneNumber || '—'}</td>
-        </tr>
-      `;
-    }).join('');
-
-    investmentTableHTML = `
-      <div class="mb-4">
-        <h3 class="text-sm font-semibold text-gray-800 mb-3 m-0">📈 Investment Accounts</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full border border-gray-200 rounded" style="font-size: 12px;">
-            <thead class="bg-blue-50">
-              <tr>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Member</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Platform</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Account Type</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Account ID</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Email</th>
-                <th class="py-1.5 px-2 font-semibold text-gray-800 text-left" style="font-size: 11px;">Phone</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${investmentRows}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <!-- ACCOUNT SUMMARY -->
-    <div class="bg-white border-l-4 border-teal-400 border-t border-r border-b border-gray-100 rounded-lg shadow-sm p-5 mb-6">
-      <h2 class="text-base font-bold text-gray-900 mb-4 m-0">💳 Account Summary</h2>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        ${bankTableHTML}
-        ${investmentTableHTML}
-      </div>
-    </div>
-  `;
-}
-
-// ============================================================================
-// INLINE STYLES VERSIONS (FOR PDF)
-// ============================================================================
-
-/**
- * Build consolidated email body with INLINE STYLES (for PDF generation)
- * @param {Object} data - Consolidated family dashboard data from getConsolidatedFamilyDashboardData()
- * @param {string} reportType - 'daily', 'weekly', or 'manual'
- * @returns {string} HTML email body with inline CSS
- */
-function buildConsolidatedEmailBodyInlineStyles(data, reportType) {
-  const greeting = getTimeBasedGreeting();
-  const date = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy, hh:mm a');
-
-  // Build member sections (only for members with holdings)
-  let memberSectionsHTML = '';
-  data.membersData.forEach((memberData, index) => {
-    const memberColor = MEMBER_COLORS_INLINE[index % MEMBER_COLORS_INLINE.length];
-    memberSectionsHTML += buildMemberSectionInlineStyles(memberData, memberColor);
-  });
-
-  // Build new sections
-  const actionItemsHTML = buildActionItemsSectionInlineStyles(data.questionnaireData);
-  const insuranceHTML = buildInsurancePoliciesSectionInlineStyles(data.insuranceData);
-  const familyMembersHTML = buildFamilyMemberDetailsSectionInlineStyles(data.familyMembers);
-  const accountSummaryHTML = buildAccountSummarySectionInlineStyles(data.bankAccounts, data.investmentAccounts);
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: linear-gradient(135deg, #EBF4FF 0%, #E0E7FF 50%, #F3E8FF 100%);
-      padding: 32px;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #1f2937;
-    }
-    .container { max-width: 1152px; margin: 0 auto; }
-    table { width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 12px; }
-    thead { background: #f3f4f6; }
-    th { padding: 6px 8px; text-align: left; font-weight: 600; color: #374151; font-size: 11px; border-bottom: 1px solid #d1d5db; }
-    td { padding: 6px 8px; color: #4b5563; border-bottom: 1px solid #e5e7eb; }
-    tr:hover { background: #f9fafb; }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <!-- MAIN CONTAINER -->
-  <div style="background: white; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding: 24px;">
-
-    <!-- DEVELOPER CREDIT SECTION -->
-    <div style="background: linear-gradient(90deg, #EEF2FF 0%, #F3E8FF 50%, #FCE7F3 100%); border-left: 4px solid #6366f1; border-top: 1px solid #d1d5db; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); padding: 16px; margin-bottom: 24px;">
-      <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-        <td style="border: none; padding: 0; width: 80px; vertical-align: middle;">
-          <div style="font-size: 32px;">💰 <span style="font-size: 24px; font-weight: 700; color: #059669;">Capital Friends</span></div>
-        </td>
-        <td style="border: none; padding: 0; text-align: right; vertical-align: middle;">
-          <div style="font-size: 12px; color: #4b5563; margin-bottom: 4px;">
-            🔒 This report is auto-generated from your Google Sheets. Keep your financial data secure.
-          </div>
-          <div style="font-size: 14px; color: #374151; font-weight: 600;">
-            Made with ❤️ in India by <strong>Jagadeesh Manne</strong> · 💝 Donate via UPI: <strong>jagadeeshmanne.hdfc@kphdfc</strong>
-          </div>
-        </td>
-      </tr></table>
-    </div>
-
-    ${buildFamilyWealthDashboardInlineStyles(data)}
-
-    ${actionItemsHTML}
-
-    ${insuranceHTML}
-
-    ${memberSectionsHTML}
-
-    ${familyMembersHTML}
-
-    ${accountSummaryHTML}
-
-  </div>
-  <!-- END MAIN CONTAINER -->
-
-</div>
-
-</body>
-</html>
-  `.trim();
-}
-
-/**
- * Build Family Wealth Dashboard with inline styles
- * MATCHES preview HTML: 2-column layout (Net Worth + Asset Allocation)
- */
-function buildFamilyWealthDashboardInlineStyles(data) {
-  const totalWealth = formatCurrency(data.familyTotals.totalWealth);
-  const liabilities = formatCurrency(data.familyTotals.liabilities);
-  const netWorth = formatCurrency(data.familyTotals.totalWealth - data.familyTotals.liabilities);
-
-  // Column 1: Net Worth Breakdown with chart placeholder
-  const column1HTML = `
-    <div style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px;">
-      <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 16px;">Net Worth Breakdown</div>
-      <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-        <td style="border: none; padding: 0; width: 160px; vertical-align: top;">
-          <div style="width: 160px; height: 160px; background: #e5e7eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-top: 8px;">
-            <div style="text-align: center; color: #9ca3af; font-size: 11px;">Chart<br/>Placeholder</div>
-          </div>
-        </td>
-        <td style="border: none; padding: 0 0 0 24px; vertical-align: top;">
-          <div style="margin-bottom: 12px;">
-            <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Total Wealth</div>
-            <div style="font-size: 18px; font-weight: 700; color: #10b981;">${totalWealth}</div>
-          </div>
-          <div style="margin-bottom: 12px;">
-            <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Liabilities</div>
-            <div style="font-size: 18px; font-weight: 700; color: #dc2626;">${liabilities}</div>
-          </div>
-          <div style="padding-top: 8px; border-top: 1px solid #d1d5db;">
-            <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Net Worth</div>
-            <div style="font-size: 20px; font-weight: 700; color: #0ea5e9;">${netWorth}</div>
-          </div>
-        </td>
-      </tr></table>
-    </div>
-  `;
-
-  // Column 2: Asset Allocation with chart placeholder
-  let column2HTML = '';
-  if (data.assetAllocation && data.assetAllocation.breakdown && data.assetAllocation.breakdown.length > 0) {
-    const assetIconMap = {
-      'Equity': '📈',
-      'Debt': '💰',
-      'Commodities': '🥇',
-      'Real Estate': '🏠',
-      'Crypto': '₿',
-      'Other': '💎'
-    };
-
-    const assetItems = data.assetAllocation.breakdown.map(item => {
-      const icon = assetIconMap[item.assetClass] || '💎';
-      return `
-        <div style="padding: 6px 0;">
-          <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-            <td style="border: none; padding: 0; text-align: left;">
-              <span style="font-size: 16px;">${icon}</span>
-              <span style="font-size: 12px; font-weight: 500; color: #4b5563; text-transform: uppercase; margin-left: 8px;">${item.assetClass}</span>
-            </td>
-            <td style="border: none; padding: 0; text-align: right;">
-              <span style="font-size: 14px; font-weight: 700; color: #111827;">${item.percentage.toFixed(1)}%</span>
-            </td>
-          </tr></table>
-        </div>
-      `;
-    }).join('');
-
-    column2HTML = `
-      <div style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px;">
-        <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 16px;">Asset Allocation</div>
-        <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-          <td style="border: none; padding: 0; width: 160px; vertical-align: top;">
-            <div style="width: 160px; height: 160px; background: #e5e7eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-top: 8px;">
-              <div style="text-align: center; color: #9ca3af; font-size: 11px;">Chart<br/>Placeholder</div>
-            </div>
-          </td>
-          <td style="border: none; padding: 0 0 0 24px; vertical-align: top;">
-            ${assetItems}
-          </td>
-        </tr></table>
-      </div>
-    `;
-  }
-
-  // Build 2-column dashboard using table layout for PDF compatibility
-  const columnsHTML = `
-    <table style="width: 100%; border: none; border-collapse: separate; border-spacing: 24px; margin: 0;">
-      <tr>
-        <td style="border: none; padding: 0; width: 50%; vertical-align: top;">${column1HTML}</td>
-        ${column2HTML ? `<td style="border: none; padding: 0; width: 50%; vertical-align: top;">${column2HTML}</td>` : ''}
-      </tr>
-    </table>
-  `;
-
-  return `
-    <div style="background: white; border-left: 4px solid #818cf8; border-top: 1px solid #f3f4f6; border-right: 1px solid #f3f4f6; border-bottom: 1px solid #f3f4f6; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 24px;">
-      <table style="width: 100%; border: none; margin: 0 0 16px 0; border-collapse: collapse;"><tr>
-        <td style="border: none; padding: 0; text-align: left;">
-          <div style="font-size: 16px; font-weight: 700; color: #111827;">📊 Family Wealth Dashboard</div>
-        </td>
-        <td style="border: none; padding: 0; text-align: right;">
-          <div style="font-size: 12px; color: #6b7280;">Generated on: ${Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy, hh:mm a')}</div>
-        </td>
-      </tr></table>
-      ${columnsHTML}
-    </div>
-  `;
-}
-
-/**
- * Build Insurance Summary section (separate from dashboard) - inline styles
- */
-function buildInsuranceSummarySectionInlineStyles(familyTotals) {
-  if (!familyTotals.termInsurance && !familyTotals.healthInsurance) {
-    return '';
-  }
-
-  const termCount = familyTotals.termInsurance?.count || 0;
-  const termCover = formatCurrency(familyTotals.termInsurance?.totalCover || 0);
-  const healthCount = familyTotals.healthInsurance?.count || 0;
-  const healthCover = formatCurrency(familyTotals.healthInsurance?.totalCover || 0);
-
-  let termHTML = '';
-  if (termCount > 0) {
-    termHTML = `
-      <div style="margin-bottom: 12px;">
-        <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-          <td style="border: none; padding: 0; width: 40px; vertical-align: top;"><span style="font-size: 24px;">🛡️</span></td>
-          <td style="border: none; padding: 0;">
-            <div style="font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Term Insurance</div>
-            <div style="font-size: 16px; font-weight: 700; color: #111827;">${termCount} ${termCount === 1 ? 'policy' : 'policies'}</div>
-            <div style="font-size: 13px; color: #6b7280;">${termCover} cover</div>
-          </td>
-        </tr></table>
-      </div>
-    `;
-  }
-
-  let healthHTML = '';
-  if (healthCount > 0) {
-    healthHTML = `
-      <div>
-        <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-          <td style="border: none; padding: 0; width: 40px; vertical-align: top;"><span style="font-size: 24px;">🏥</span></td>
-          <td style="border: none; padding: 0;">
-            <div style="font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Health Insurance</div>
-            <div style="font-size: 16px; font-weight: 700; color: #111827;">${healthCount} ${healthCount === 1 ? 'policy' : 'policies'}</div>
-            <div style="font-size: 13px; color: #6b7280;">${healthCover} cover</div>
-          </td>
-        </tr></table>
-      </div>
-    `;
-  }
-
-  return `
-    <div style="background: white; border-left: 4px solid #818cf8; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 24px;">
-      <div style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;">🛡️ Insurance Coverage</div>
-      <div style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px;">
-        ${termHTML}
-        ${healthHTML}
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Action Items section with inline styles
- * MATCHES preview HTML: Colored borders matching severity (red, orange, yellow, blue, purple)
- */
-function buildActionItemsSectionInlineStyles(questionnaireData) {
-  if (!questionnaireData || !questionnaireData.hasData || questionnaireData.answers.length === 0) {
-    return '';
-  }
-
-  const actionItems = questionnaireData.answers.filter(item => item.answer === 'No');
-
-  if (actionItems.length === 0) {
-    return `
-    <div style="background: white; border-left: 4px solid #34d399; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 24px;">
-      <div style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;">✅ Financial Health Check - Excellent!</div>
-      <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px;">
-        <p style="font-size: 14px; color: #065f46;">🎉 Congratulations! You have answered "Yes" to all ${questionnaireData.totalQuestions} financial health questions.</p>
-      </div>
-    </div>
-    `;
-  }
-
-  // Color mapping matching preview HTML exactly
-  const actionMapping = {
-    3: { icon: '🛡️', bgColor: '#fef2f2', borderColor: '#ef4444', textColor: '#7f1d1d', title: 'Missing Term Life Insurance' },
-    2: { icon: '🏥', bgColor: '#fff7ed', borderColor: '#f97316', textColor: '#7c2d12', title: 'Inadequate Health Insurance' },
-    4: { icon: '📜', bgColor: '#fefce8', borderColor: '#eab308', textColor: '#713f12', title: 'Legal Will Not Created' },
-    5: { icon: '👤', bgColor: '#fefce8', borderColor: '#eab308', textColor: '#713f12', title: 'Nominees Not Added' },
-    6: { icon: '💰', bgColor: '#fef3c7', borderColor: '#f59e0b', textColor: '#78350f', title: 'Emergency Fund Missing' },
-    1: { icon: '👨‍👩‍👧‍👦', bgColor: '#eff6ff', borderColor: '#3b82f6', textColor: '#1e3a8a', title: 'Family Not Aware of Accounts' },
-    7: { icon: '📁', bgColor: '#eef2ff', borderColor: '#6366f1', textColor: '#312e81', title: 'Important Documents Not Organized' },
-    8: { icon: '🔑', bgColor: '#faf5ff', borderColor: '#a855f7', textColor: '#581c87', title: 'Access Details Not Shared' }
-  };
-
-  const actionCardsHTML = actionItems.map(item => {
-    const mapping = actionMapping[item.questionNumber] || { icon: '⚠️', bgColor: '#f9fafb', borderColor: '#d1d5db', textColor: '#1f2937', title: 'Action Required' };
-
-    return `
-      <div style="border-left: 4px solid ${mapping.borderColor}; background: ${mapping.bgColor}; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
-        <table style="width: 100%; border: none; margin: 0; border-collapse: collapse;"><tr>
-          <td style="border: none; padding: 0; width: 40px; vertical-align: top;"><span style="font-size: 20px;">${mapping.icon}</span></td>
-          <td style="border: none; padding: 0;">
-            <div style="font-size: 14px; font-weight: 700; color: ${mapping.textColor}; margin-bottom: 4px;">${mapping.title}</div>
-            <div style="font-size: 12px; color: ${mapping.textColor}; margin-bottom: 8px;">${item.questionText}</div>
-            <div style="font-size: 11px; color: ${mapping.textColor}; background: rgba(255,255,255,0.5); display: inline-block; padding: 4px 8px; border-radius: 4px;">
-              💡 <strong>Action:</strong> ${getRecommendation(item.questionNumber)}
-            </div>
-          </td>
-        </tr></table>
-      </div>
-    `;
-  }).join('');
-
-  const score = questionnaireData.yesCount;
-  const total = questionnaireData.totalQuestions;
-  const scoreColor = score >= 6 ? '#10b981' : (score >= 4 ? '#f59e0b' : '#ef4444');
-
-  return `
-    <div style="background: white; border-left: 4px solid #f59e0b; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 24px;">
-      <div style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;">⚠️ Action Items & Recommendations</div>
-      ${actionCardsHTML}
-      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #d1d5db;">
-        <span style="font-size: 12px; color: #6b7280;">📊 <strong>Financial Health Score: ${score}/${total}</strong> - Complete these actions to improve your score</span>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Insurance Policies section with inline styles
- */
-function buildInsurancePoliciesSectionInlineStyles(insuranceData) {
-  if (!insuranceData || insuranceData.totalPolicies === 0) {
-    return '';
-  }
-
-  const hasTermInsurance = insuranceData.termInsurance && insuranceData.termInsurance.length > 0;
-  const hasHealthInsurance = insuranceData.healthInsurance && insuranceData.healthInsurance.length > 0;
-
-  if (!hasTermInsurance && !hasHealthInsurance) {
-    return '';
-  }
-
-  let termTableHTML = '';
-  if (hasTermInsurance) {
-    const termRows = insuranceData.termInsurance.map(policy => `
-      <tr>
-        <td>${policy.member}</td>
-        <td>${policy.provider}</td>
-        <td style="font-family: monospace; font-size: 11px;">${policy.policyNumber || '—'}</td>
-        <td>${policy.policyType}</td>
-        <td style="text-align: right; font-weight: 700;">${formatCurrency(policy.sumAssured)}</td>
-        <td style="text-align: right;">${policy.premium || '—'}</td>
-        <td style="text-align: center;">${policy.maturityDate || '—'}</td>
-        <td style="text-align: center;">
-          <span style="display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; ${policy.status === 'Active' ? 'background: #d1fae5; color: #065f46;' : 'background: #f3f4f6; color: #4b5563;'}">${policy.status}</span>
-        </td>
-      </tr>
-    `).join('');
-
-    termTableHTML = `
-      <div style="margin-bottom: 16px;">
-        <div style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px;">🛡️ Term Life Insurance</div>
-        <table>
-          <thead style="background: #eef2ff;">
-            <tr>
-              <th>Member</th>
-              <th>Provider</th>
-              <th>Policy No.</th>
-              <th>Policy Type</th>
-              <th style="text-align: right;">Sum Assured</th>
-              <th style="text-align: right;">Annual Premium</th>
-              <th style="text-align: center;">Maturity Date</th>
-              <th style="text-align: center;">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${termRows}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  let healthTableHTML = '';
-  if (hasHealthInsurance) {
-    const healthRows = insuranceData.healthInsurance.map(policy => `
-      <tr>
-        <td>${policy.member}</td>
-        <td>${policy.provider}</td>
-        <td style="font-family: monospace; font-size: 11px;">${policy.policyNumber || '—'}</td>
-        <td>${policy.policyType}</td>
-        <td style="text-align: right; font-weight: 700;">${formatCurrency(policy.sumAssured)}</td>
-        <td style="text-align: right;">${policy.premium || '—'}</td>
-        <td style="text-align: center;">${policy.renewalDate || '—'}</td>
-        <td style="text-align: center;">
-          <span style="display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; ${policy.status === 'Active' ? 'background: #d1fae5; color: #065f46;' : 'background: #f3f4f6; color: #4b5563;'}">${policy.status}</span>
-        </td>
-      </tr>
-    `).join('');
-
-    healthTableHTML = `
-      <div>
-        <div style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px;">🏥 Health Insurance</div>
-        <table>
-          <thead style="background: #d1fae5;">
-            <tr>
-              <th>Member</th>
-              <th>Provider</th>
-              <th>Policy No.</th>
-              <th>Policy Type</th>
-              <th style="text-align: right;">Sum Assured</th>
-              <th style="text-align: right;">Annual Premium</th>
-              <th style="text-align: center;">Renewal Date</th>
-              <th style="text-align: center;">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${healthRows}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  return `
-    <div style="background: white; border-left: 4px solid #818cf8; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 16px;">
-      <div style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;">🛡️ Insurance Policies Overview</div>
-      <div style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 16px;">
-        ${termTableHTML}
-        ${healthTableHTML}
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Member section with inline styles
- */
-function buildMemberSectionInlineStyles(memberData, memberColor) {
-  const mutualFundsHTML = buildMutualFundsSectionInlineStyles(memberData.mutualFunds, memberData.memberName);
-  const stocksHTML = buildStocksSectionInlineStyles(memberData.stocks, memberData.memberName);
-  const otherInvestmentsHTML = buildOtherInvestmentsSectionInlineStyles(memberData.otherInvestments);
-  const liabilitiesHTML = buildLiabilitiesSectionInlineStyles(memberData.liabilities);
-
-  const hasHoldings = mutualFundsHTML || stocksHTML || otherInvestmentsHTML;
-
-  if (!hasHoldings) {
-    return '';
-  }
-
-  return `
-    <div style="background: white; border-left: 4px solid ${memberColor.border}; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">
-        <div style="font-size: 18px; font-weight: 700; color: ${memberColor.name};">${memberData.memberName}</div>
-        <div style="font-size: 13px; color: #6b7280;">Investment Summary</div>
-      </div>
-
-      ${mutualFundsHTML}
-      ${stocksHTML}
-      ${otherInvestmentsHTML}
-      ${liabilitiesHTML}
-    </div>
-  `;
-}
-
-/**
- * Build Mutual Funds section with inline styles
- */
-function buildMutualFundsSectionInlineStyles(mfData, memberName) {
-  if (!mfData || !mfData.portfolios || mfData.portfolios.length === 0) {
-    return '';
-  }
-
-  const activePortfolios = mfData.portfolios.filter(p => p.invested > 0);
-  if (activePortfolios.length === 0) {
-    return '';
-  }
-
-  let portfoliosHTML = '';
-
-  activePortfolios.forEach(portfolio => {
-    // Use table layout for 5-column summary cards (PDF compatible)
-    const summaryCardsHTML = `
-      <table style="width: 100%; border: none; border-collapse: separate; border-spacing: 8px; margin-bottom: 12px;">
-        <tr>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Invested</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatCurrency(portfolio.invested)}</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Current</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatCurrency(portfolio.current)}</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Unrealized</div>
-            <div style="font-size: 14px; font-weight: 700; color: ${portfolio.unrealizedPnL >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(portfolio.unrealizedPnL)}</div>
-            <div style="font-size: 10px; color: ${portfolio.unrealizedPnL >= 0 ? '#10b981' : '#ef4444'};">${portfolio.unrealizedPnL >= 0 ? '+' : ''}${portfolio.unrealizedPnLPercent.toFixed(2)}%</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Realized</div>
-            <div style="font-size: 14px; font-weight: 700; color: ${portfolio.realizedPnL >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(portfolio.realizedPnL)}</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Total P&L</div>
-            <div style="font-size: 14px; font-weight: 700; color: ${portfolio.totalPnL >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(portfolio.totalPnL)}</div>
-            <div style="font-size: 10px; color: ${portfolio.totalPnL >= 0 ? '#10b981' : '#ef4444'};">${portfolio.totalPnL >= 0 ? '+' : ''}${portfolio.totalPnLPercent.toFixed(2)}%</div>
-          </td>
-        </tr>
-      </table>
-    `;
-
-    let fundsTableHTML = '';
-    if (portfolio.funds && portfolio.funds.length > 0) {
-      const fundsRows = portfolio.funds.map(fund => `
-        <tr>
-          <td style="text-align: left;">${fund.schemeName}</td>
-          <td style="text-align: right;">${formatCurrency(fund.invested)}</td>
-          <td style="text-align: right;">${formatCurrency(fund.current)}</td>
-          <td style="text-align: right; font-weight: 600; color: ${fund.pnl >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(fund.pnl)}</td>
-          <td style="text-align: right; color: ${fund.pnlPercent >= 0 ? '#10b981' : '#ef4444'};">${fund.pnlPercent >= 0 ? '+' : ''}${fund.pnlPercent.toFixed(2)}%</td>
-          <td style="text-align: right; font-weight: 600; color: ${fund.rebalanceSip >= 0 ? '#065f46' : '#991b1b'};">${fund.rebalanceSip ? (fund.rebalanceSip >= 0 ? '+' : '') + formatCurrency(fund.rebalanceSip) : '—'}</td>
-          <td style="text-align: right; font-weight: 600; color: ${fund.buySell >= 0 ? '#065f46' : '#7c2d12'};">${fund.buySell ? (fund.buySell >= 0 ? '+' : '') + formatCurrency(fund.buySell) : '—'}</td>
-        </tr>
-      `).join('');
-
-      fundsTableHTML = `
-        <table>
-          <thead style="background: #f3f4f6;">
-            <tr>
-              <th style="text-align: left;">Fund Name</th>
-              <th style="text-align: right;">Invested</th>
-              <th style="text-align: right;">Current</th>
-              <th style="text-align: right;">P&L</th>
-              <th style="text-align: right;">P&L %</th>
-              <th style="text-align: right; background: #d1fae5; color: #065f46;">Rebalance SIP ₹</th>
-              <th style="text-align: right; background: #fed7aa; color: #7c2d12;">Buy/Sell ₹</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${fundsRows}
-          </tbody>
-        </table>
-      `;
-    }
-
-    portfoliosHTML += `
-      <div style="background: #f9fafb; border-left: 4px solid #d1d5db; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <div style="font-size: 14px; font-weight: 600; color: #374151;">📁 ${portfolio.portfolioName}</div>
-          ${portfolio.clientId ? `<div style="font-size: 11px; color: #6b7280; font-family: monospace;">Client ID: ${portfolio.clientId}</div>` : ''}
-        </div>
-        ${summaryCardsHTML}
-        ${fundsTableHTML}
-      </div>
-    `;
-  });
-
-  return `
-    <div style="margin-bottom: 14px;">
-      <div style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 12px;">📊 Mutual Funds</div>
-      ${portfoliosHTML}
-    </div>
-  `;
-}
-
-/**
- * Build Stocks section with inline styles
- */
-function buildStocksSectionInlineStyles(stocksData, memberName) {
-  if (!stocksData || !stocksData.portfolios || stocksData.portfolios.length === 0) {
-    return '';
-  }
-
-  const activePortfolios = stocksData.portfolios.filter(p => p.invested > 0);
-  if (activePortfolios.length === 0) {
-    return '';
-  }
-
-  let portfoliosHTML = '';
-
-  activePortfolios.forEach(portfolio => {
-    // Use table layout for 5-column summary cards (PDF compatible)
-    const summaryCardsHTML = `
-      <table style="width: 100%; border: none; border-collapse: separate; border-spacing: 8px; margin-bottom: 12px;">
-        <tr>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Invested</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatCurrency(portfolio.invested)}</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Current</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatCurrency(portfolio.current)}</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Unrealized</div>
-            <div style="font-size: 14px; font-weight: 700; color: ${portfolio.unrealizedPnL >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(portfolio.unrealizedPnL)}</div>
-            <div style="font-size: 10px; color: ${portfolio.unrealizedPnL >= 0 ? '#10b981' : '#ef4444'};">${portfolio.unrealizedPnL >= 0 ? '+' : ''}${portfolio.unrealizedPnLPercent.toFixed(2)}%</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Realized</div>
-            <div style="font-size: 14px; font-weight: 700; color: ${portfolio.realizedPnL >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(portfolio.realizedPnL)}</div>
-          </td>
-          <td style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; width: 20%;">
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: 3px;">Total P&L</div>
-            <div style="font-size: 14px; font-weight: 700; color: ${portfolio.totalPnL >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(portfolio.totalPnL)}</div>
-            <div style="font-size: 10px; color: ${portfolio.totalPnL >= 0 ? '#10b981' : '#ef4444'};">${portfolio.totalPnL >= 0 ? '+' : ''}${portfolio.totalPnLPercent.toFixed(2)}%</div>
-          </td>
-        </tr>
-      </table>
-    `;
-
-    let holdingsTableHTML = '';
-    if (portfolio.holdings && portfolio.holdings.length > 0) {
-      const holdingsRows = portfolio.holdings.map(holding => `
-        <tr>
-          <td>${holding.stockName}</td>
-          <td style="text-align: right;">${holding.quantity}</td>
-          <td style="text-align: right;">${formatCurrency(holding.avgPrice)}</td>
-          <td style="text-align: right;">${formatCurrency(holding.ltp)}</td>
-          <td style="text-align: right;">${formatCurrency(holding.invested)}</td>
-          <td style="text-align: right;">${formatCurrency(holding.current)}</td>
-          <td style="text-align: right; font-weight: 600; color: ${holding.pnl >= 0 ? '#10b981' : '#ef4444'};">${formatCurrency(holding.pnl)}</td>
-          <td style="text-align: right; color: ${holding.pnlPercent >= 0 ? '#10b981' : '#ef4444'};">${holding.pnlPercent >= 0 ? '+' : ''}${holding.pnlPercent.toFixed(2)}%</td>
-        </tr>
-      `).join('');
-
-      holdingsTableHTML = `
-        <table>
-          <thead style="background: #f3f4f6;">
-            <tr>
-              <th>Stock</th>
-              <th style="text-align: right;">Qty</th>
-              <th style="text-align: right;">Avg Price</th>
-              <th style="text-align: right;">LTP</th>
-              <th style="text-align: right;">Invested</th>
-              <th style="text-align: right;">Current</th>
-              <th style="text-align: right;">P&L</th>
-              <th style="text-align: right;">P&L %</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${holdingsRows}
-          </tbody>
-        </table>
-      `;
-    }
-
-    portfoliosHTML += `
-      <div style="background: #f9fafb; border-left: 4px solid #d1d5db; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <div style="font-size: 14px; font-weight: 600; color: #374151;">📁 ${portfolio.portfolioName}</div>
-          ${portfolio.clientId ? `<div style="font-size: 11px; color: #6b7280; font-family: monospace;">Client ID: ${portfolio.clientId}</div>` : ''}
-        </div>
-        ${summaryCardsHTML}
-        ${holdingsTableHTML}
-      </div>
-    `;
-  });
-
-  return `
-    <div style="margin-bottom: 14px;">
-      <div style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 12px;">📈 Stocks</div>
-      ${portfoliosHTML}
-    </div>
-  `;
-}
-
-/**
- * Build Other Investments section with inline styles
- */
-function buildOtherInvestmentsSectionInlineStyles(otherData) {
-  if (!otherData || !otherData.investments || otherData.investments.length === 0) {
-    return '';
-  }
-
-  const investmentRows = otherData.investments.map(inv => `
-    <tr>
-      <td>${inv.investmentType}</td>
-      <td>${inv.description || '—'}</td>
-      <td style="text-align: right;">${formatCurrency(inv.amount)}</td>
-    </tr>
-  `).join('');
-
-  const totalAmount = otherData.investments.reduce((sum, inv) => sum + inv.amount, 0);
-
-  return `
-    <div style="margin-bottom: 14px;">
-      <div style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 12px;">💎 Other Investments</div>
-      <div style="background: #f9fafb; border-left: 4px solid #d1d5db; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
-        <table>
-          <thead style="background: #f3f4f6;">
-            <tr>
-              <th>Type</th>
-              <th>Description</th>
-              <th style="text-align: right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${investmentRows}
-            <tr style="background: #f9fafb; font-weight: 700;">
-              <td colspan="2">Total</td>
-              <td style="text-align: right;">${formatCurrency(totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Liabilities section with inline styles
- */
-function buildLiabilitiesSectionInlineStyles(liabilitiesData) {
-  if (!liabilitiesData || !liabilitiesData.liabilities || liabilitiesData.liabilities.length === 0) {
-    return '';
-  }
-
-  const liabilityRows = liabilitiesData.liabilities.map(liab => `
-    <tr>
-      <td>${liab.liabilityType}</td>
-      <td>${liab.description || '—'}</td>
-      <td style="text-align: right;">${formatCurrency(liab.outstandingAmount)}</td>
-    </tr>
-  `).join('');
-
-  const totalAmount = liabilitiesData.liabilities.reduce((sum, liab) => sum + liab.outstandingAmount, 0);
-
-  return `
-    <div style="margin-bottom: 14px;">
-      <div style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 12px;">💳 Liabilities</div>
-      <div style="background: #f9fafb; border-left: 4px solid #d1d5db; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
-        <table>
-          <thead style="background: #f3f4f6;">
-            <tr>
-              <th>Type</th>
-              <th>Description</th>
-              <th style="text-align: right;">Outstanding</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${liabilityRows}
-            <tr style="background: #f9fafb; font-weight: 700;">
-              <td colspan="2">Total</td>
-              <td style="text-align: right;">${formatCurrency(totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Family Member Details section with inline styles
- */
-function buildFamilyMemberDetailsSectionInlineStyles(familyMembers) {
-  if (!familyMembers || familyMembers.length === 0) {
-    return '';
-  }
-
-  const memberRows = familyMembers.map(member => {
-    const maskedAadhar = member.aadharNumber ? 'XXXX-XXXX-' + member.aadharNumber.slice(-4) : '—';
-
-    return `
-      <tr>
-        <td style="font-weight: 600;">${member.memberName}</td>
-        <td>${member.relationship}</td>
-        <td style="font-family: monospace; font-size: 11px;">${maskedAadhar}</td>
-        <td style="font-family: monospace; font-size: 11px;">${member.panNumber || '—'}</td>
-        <td style="text-align: center;">${member.dateOfBirth || '—'}</td>
-        <td style="font-family: monospace; font-size: 11px;">${member.mobileNumber || '—'}</td>
-        <td style="font-size: 11px;">${member.emailAddress || '—'}</td>
-      </tr>
-    `;
-  }).join('');
-
-  return `
-    <div style="background: white; border-left: 4px solid #a78bfa; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 16px;">
-      <div style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;">👨‍👩‍👧‍👦 Family Member Details</div>
-      <div style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 16px;">
-        <table>
-          <thead style="background: #f3e8ff;">
-            <tr>
-              <th>Member Name</th>
-              <th>Relationship</th>
-              <th>Aadhar Number</th>
-              <th>PAN Number</th>
-              <th style="text-align: center;">Date of Birth</th>
-              <th>Mobile</th>
-              <th>Email</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${memberRows}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Build Account Summary section with inline styles
- */
-function buildAccountSummarySectionInlineStyles(bankAccounts, investmentAccounts) {
-  const hasBankAccounts = bankAccounts && bankAccounts.length > 0;
-  const hasInvestmentAccounts = investmentAccounts && investmentAccounts.length > 0;
-
-  if (!hasBankAccounts && !hasInvestmentAccounts) {
-    return '';
-  }
-
-  let bankTableHTML = '';
-  if (hasBankAccounts) {
-    const bankRows = bankAccounts.map(account => {
-      const maskedAccountNumber = account.accountNumber ? 'XXXX-' + account.accountNumber.slice(-4) : '—';
-
-      return `
-        <tr>
-          <td>${account.member}</td>
-          <td>${account.bankName}</td>
-          <td style="font-family: monospace; font-size: 11px;">${maskedAccountNumber}</td>
-          <td>${account.accountType}</td>
-          <td>${account.branch || '—'}</td>
-        </tr>
-      `;
-    }).join('');
-
-    bankTableHTML = `
-      <div style="margin-bottom: 16px;">
-        <div style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px;">🏦 Bank Accounts</div>
-        <table>
-          <thead style="background: #ccfbf1;">
-            <tr>
-              <th>Member</th>
-              <th>Bank Name</th>
-              <th>Account Number</th>
-              <th>Account Type</th>
-              <th>Branch</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${bankRows}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  let investmentTableHTML = '';
-  if (hasInvestmentAccounts) {
-    const investmentRows = investmentAccounts.map(account => {
-      return `
-        <tr>
-          <td>${account.member}</td>
-          <td>${account.platform}</td>
-          <td>${account.accountType}</td>
-          <td style="font-family: monospace; font-size: 11px;">${account.accountId || account.clientId || '—'}</td>
-          <td style="font-size: 11px;">${account.emailAddress || '—'}</td>
-          <td style="font-family: monospace; font-size: 11px;">${account.phoneNumber || '—'}</td>
-        </tr>
-      `;
-    }).join('');
-
-    investmentTableHTML = `
-      <div>
-        <div style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px;">📈 Investment Accounts</div>
-        <table>
-          <thead style="background: #dbeafe;">
-            <tr>
-              <th>Member</th>
-              <th>Platform</th>
-              <th>Account Type</th>
-              <th>Account ID</th>
-              <th>Email</th>
-              <th>Phone</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${investmentRows}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  return `
-    <div style="background: white; border-left: 4px solid #14b8a6; border-top: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 16px;">
-      <div style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;">💳 Account Summary</div>
-      <div style="background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 16px;">
-        ${bankTableHTML}
-        ${investmentTableHTML}
-      </div>
-    </div>
-  `;
-}
+function buildConsolidatedEmailBody(data, reportType) { return buildDashboardPDFHTML(data); }
+function buildConsolidatedEmailBodyInlineStyles(data, reportType) { return buildDashboardPDFHTML(data); }

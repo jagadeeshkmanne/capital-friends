@@ -59,7 +59,7 @@ function addFamilyMember(data) {
 
     // Add member
     const now = getCurrentTimestamp();
-    const includeInEmailReports = data.includeInEmailReports !== false ? 'Yes' : 'No';
+    const includeInEmailReports = (data.includeInEmailReports === false || data.includeInEmailReports === 'No') ? 'No' : 'Yes';
 
     sheet.appendRow([
       memberId,            // Column A: Member ID
@@ -278,7 +278,7 @@ function updateFamilyMember(data) {
 
     // Update member (keep Member ID, Created Date, update rest)
     const createdDate = sheet.getRange(rowIndex, 10).getValue(); // Column J is Created Date
-    const includeInEmailReports = data.includeInEmailReports !== false ? 'Yes' : 'No';
+    const includeInEmailReports = (data.includeInEmailReports === false || data.includeInEmailReports === 'No') ? 'No' : 'Yes';
 
     sheet.getRange(rowIndex, 1, 1, 12).setValues([[
       data.memberId,           // Column A: Member ID

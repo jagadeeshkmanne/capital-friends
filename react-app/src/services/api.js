@@ -121,7 +121,7 @@ export async function callAPI(action, params = {}, retry = true) {
     const returnedData = result ? result.data : null
     // GAS CRUD functions return { success: false, message } inside data — check inner result
     if (returnedData && returnedData.success === false) {
-      throw new Error(returnedData.message || 'Operation failed')
+      throw new Error(returnedData.error || returnedData.message || 'Operation failed')
     }
     return returnedData
   }
@@ -251,6 +251,10 @@ export const getMarketData = () => callAPI('market:data')
 // Master Data Refresh
 export const refreshMasterData = () => callAPI('data:refresh-master')
 export const checkDataFreshness = () => callAPI('data:check-freshness')
+
+// Email Reports
+export const sendDashboardEmail = () => callAPI('email:send-report-now')
+export const sendDashboardPDF = (pdfBase64, fileName) => callAPI('email:send-dashboard-pdf', { pdfBase64, fileName })
 
 // Diagnostics (for testing in browser console)
 export const checkTriggers = () => callAPI('test:triggers')

@@ -10,7 +10,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 // OAuth scopes — must match all scopes in webapp's appsscript.json
 // spreadsheets: GAS reads/writes user spreadsheets + master DB
 // drive: GAS copies template spreadsheet for new users (DriveApp.makeCopy)
-// gmail.send: GAS sends email reports from user's own Gmail
+// gmail.send: GAS sends email reports via GmailApp from user's Gmail
 // script.scriptapp: GAS creates daily sync triggers for auto-refresh
 // openid/email/profile: user identity
 const SCOPES = [

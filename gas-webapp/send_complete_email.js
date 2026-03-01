@@ -155,10 +155,10 @@ function getFromEmailAddress() {
 }
 
 /**
- * Get family members who should receive email reports
- * Returns array of email addresses for members with "Include in Email Reports" = "Yes"
+ * Get family members who should receive email reports (LEGACY - used by send_complete_email only)
+ * Returns array of email address strings for members with "Include in Email Reports" = "Yes"
  */
-function getEmailRecipients() {
+function getLegacyEmailRecipients() {
   try {
     const sheet = getSheet(CONFIG.familyMembersSheet);
 
@@ -216,7 +216,7 @@ function sendCompleteWealthReportEmail(customRecipients) {
     let recipients = customRecipients;
 
     if (!recipients || recipients.length === 0) {
-      recipients = getEmailRecipients();
+      recipients = getLegacyEmailRecipients();
     }
 
     // If still no recipients, try to get sheet owner's email
@@ -318,7 +318,7 @@ function getEmailReportData() {
     const totalLifeCover = calculateTotalLifeCover();
 
     // Get questionnaire data
-    const questionnaireData = getQuestionnaireData();
+    const questionnaireData = _legacyGetQuestionnaireData();
 
     return {
       totalWealth: data.totalAssets,
@@ -604,7 +604,7 @@ function calculateTotalLifeCover() {
  * Get Questionnaire data from Questionnaire sheet
  * Returns object with Yes/No values for each question
  */
-function getQuestionnaireData() {
+function _legacyGetQuestionnaireData() {
   try {
     const sheet = getSheet(CONFIG.questionnaireSheet);
 
@@ -656,7 +656,7 @@ function buildActionItemsHTML(questionnaireData) {
   let itemCount = 0;
 
   // Check each question and add action item if answer is not "Yes"
-  const isNo = (value) => value.toLowerCase() !== 'yes';
+  const isNo = (value) => !value || String(value).toLowerCase() !== 'yes';
 
   // 1. Health Insurance
   if (isNo(questionnaireData.healthInsurance)) {
@@ -1085,7 +1085,7 @@ function getCompleteWealthReportHTML() {
                             </tr>
                           </table>
 
-                          ${(reportData.questionnaire && reportData.questionnaire.termInsurance.toLowerCase() === 'yes') ? `
+                          ${(reportData.questionnaire && reportData.questionnaire.termInsurance && reportData.questionnaire.termInsurance.toLowerCase() === 'yes') ? `
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px solid #e5e7eb; border-radius: 12px; background: white;">
                             <tr>
                               <td style="padding: 20px; text-align: center;">
@@ -2690,7 +2690,7 @@ function buildFamilyMembersSectionHTML(familyMembers) {
  * Get color based on relationship type
  */
 function getRelationshipColor(relationship) {
-  const rel = relationship.toLowerCase();
+  const rel = (relationship || '').toLowerCase();
   if (rel.includes('self') || rel.includes('head')) return '#8b5cf6';
   if (rel.includes('spouse') || rel.includes('wife') || rel.includes('husband')) return '#ec4899';
   if (rel.includes('son') || rel.includes('daughter') || rel.includes('child')) return '#3b82f6';

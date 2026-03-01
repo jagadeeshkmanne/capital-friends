@@ -6,8 +6,8 @@ import * as api from '../services/api'
 import * as idb from '../services/idb'
 
 const QUESTIONS = [
-  { id: 'healthIns', question: 'Does your family have Health Insurance?', tip: '₹50L to ₹1Cr family floater recommended (considering inflation & future expenses)', category: 'Insurance' },
-  { id: 'termLife', question: 'Do you have adequate Term Life Insurance?', tip: 'Recommended: 10-15x annual income', category: 'Insurance' },
+  { id: 'healthIns', question: 'Does your family have Health Insurance?', tip: '₹50L to ₹1Cr family floater recommended (considering inflation & future expenses)', category: 'Insurance', autoFromPolicies: true },
+  { id: 'termLife', question: 'Do you have adequate Term Life Insurance?', tip: 'Recommended: 10-15x annual income', category: 'Insurance', autoFromPolicies: true },
   { id: 'emergencyFund', question: 'Do you have an Emergency Fund?', tip: '6-12 months of monthly expenses in liquid assets', category: 'Savings' },
   { id: 'familyAware', question: 'Is your family aware of all investments?', tip: 'Ensure nominees and family know about all assets', category: 'Planning' },
   { id: 'hasWill', question: 'Do you have a Will?', tip: 'Legal document for asset distribution', category: 'Planning' },
@@ -69,25 +69,33 @@ export default function HealthCheckPage() {
   const [answers, setAnswers] = useState(() => {
     const initial = {}
     QUESTIONS.forEach((q) => {
-      initial[q.id] = autoDetected[q.id] ? 'yes' : ''
+      // Policy-based questions are always derived from autoDetected
+      initial[q.id] = q.autoFromPolicies
+        ? (autoDetected[q.id] ? 'yes' : 'no')
+        : (autoDetected[q.id] ? 'yes' : '')
     })
     return initial
   })
 
-  // Once previous answers load, merge them in (overrides auto-detected)
+  // Once previous answers load, merge them in (but policy-based questions stay auto-derived)
   useEffect(() => {
     if (previousAnswers) {
       setAnswers((prev) => {
         const merged = { ...prev }
         QUESTIONS.forEach((q) => {
-          const saved = previousAnswers[q.id]
-          if (saved === 'Yes') merged[q.id] = 'yes'
-          else if (saved === 'No') merged[q.id] = 'no'
+          // Policy-based questions always use autoDetected, ignore saved answers
+          if (q.autoFromPolicies) {
+            merged[q.id] = autoDetected[q.id] ? 'yes' : 'no'
+          } else {
+            const saved = previousAnswers[q.id]
+            if (saved === 'Yes') merged[q.id] = 'yes'
+            else if (saved === 'No') merged[q.id] = 'no'
+          }
         })
         return merged
       })
     }
-  }, [previousAnswers])
+  }, [previousAnswers, autoDetected])
 
   const answeredCount = Object.values(answers).filter((v) => v).length
   const yesCount = Object.values(answers).filter((v) => v === 'yes').length
@@ -181,46 +189,51 @@ export default function HealthCheckPage() {
           <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Health Check Questions</h3>
         </div>
         <div className="divide-y divide-[var(--border-light)]">
-          {QUESTIONS.map((q, idx) => (
-            <div key={q.id} className="px-4 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <p className="text-sm text-[var(--text-primary)]">
-                    <span className="text-[var(--text-dim)] mr-2">{idx + 1}.</span>
-                    {q.question}
+          {QUESTIONS.map((q, idx) => {
+            const isReadonly = q.autoFromPolicies
+            return (
+              <div key={q.id} className={`px-4 py-3 ${isReadonly ? 'opacity-80' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm text-[var(--text-primary)]">
+                      <span className="text-[var(--text-dim)] mr-2">{idx + 1}.</span>
+                      {q.question}
+                    </p>
+                    <p className="text-xs text-[var(--text-dim)] mt-0.5 ml-5">{q.tip}</p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      onClick={() => !isReadonly && setAnswers((a) => ({ ...a, [q.id]: 'yes' }))}
+                      disabled={isReadonly}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                        answers[q.id] === 'yes'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border)] hover:text-[var(--text-primary)]'
+                      } ${isReadonly ? 'cursor-not-allowed' : ''}`}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => !isReadonly && setAnswers((a) => ({ ...a, [q.id]: 'no' }))}
+                      disabled={isReadonly}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                        answers[q.id] === 'no'
+                          ? 'bg-rose-500/20 text-[var(--accent-rose)] border border-rose-500/30'
+                          : 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border)] hover:text-[var(--text-primary)]'
+                      } ${isReadonly ? 'cursor-not-allowed' : ''}`}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+                {isReadonly && (
+                  <p className="text-xs text-violet-400 mt-1 ml-5">
+                    {autoDetected[q.id] ? 'Auto-detected: policy found in your data' : 'Auto-set: add a policy under Insurance to update'}
                   </p>
-                  <p className="text-xs text-[var(--text-dim)] mt-0.5 ml-5">{q.tip}</p>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    onClick={() => setAnswers((a) => ({ ...a, [q.id]: 'yes' }))}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      answers[q.id] === 'yes'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => setAnswers((a) => ({ ...a, [q.id]: 'no' }))}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      answers[q.id] === 'no'
-                        ? 'bg-rose-500/20 text-[var(--accent-rose)] border border-rose-500/30'
-                        : 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    No
-                  </button>
-                </div>
+                )}
               </div>
-              {autoDetected[q.id] && (
-                <p className="text-xs text-violet-400 mt-1 ml-5">
-                  Auto-detected from your data
-                </p>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

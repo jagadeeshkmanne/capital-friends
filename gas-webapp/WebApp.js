@@ -376,6 +376,50 @@ function routeAction(action, params, userRecord) {
     case 'stock-transactions:list-all':
       return getAllStockTransactionsData();
 
+    // ── Reminder Notifications ──
+    case 'reminder:test-email':
+      return testReminderEmail();
+
+    case 'reminder:check-now':
+      checkAndSendReminders();
+      return { success: true, message: 'Reminder check completed' };
+
+    // ── Email Report (on-demand) ──
+    case 'email:send-report-now':
+      return sendDashboardEmailReport('manual', true);
+
+    case 'email:send-dashboard-pdf': {
+      // Accept base64 PDF from client and email to all configured recipients
+      var pdfBase64 = params.pdfBase64;
+      var fileName = params.fileName || 'Capital-Friends-Dashboard.pdf';
+      if (!pdfBase64) return { success: false, error: 'No PDF data provided' };
+      var recipients = getEmailRecipients();
+      if (!recipients || recipients.length === 0) return { success: false, error: 'No email recipients configured' };
+      var pdfBytes = Utilities.base64Decode(pdfBase64);
+      var pdfBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
+      var pdfSizeKB = Math.round(pdfBytes.length / 1024);
+      log('Dashboard PDF email: ' + pdfSizeKB + 'KB, recipients: ' + recipients.length);
+      var subject = 'Capital Friends - Dashboard Report (' + new Date().toLocaleDateString('en-IN') + ')';
+      var sent = 0;
+      var errors = [];
+      recipients.forEach(function(r) {
+        try {
+          GmailApp.sendEmail(r.email, subject, '', {
+            htmlBody: '<p>Hi ' + (r.name || '') + ',</p><p>Please find attached your Capital Friends dashboard report.</p><p style="color:#888;font-size:12px;">Generated from <a href="https://capitalfriends.in">capitalfriends.in</a></p>',
+            attachments: [pdfBlob]
+          });
+          sent++;
+        } catch(e) {
+          errors.push(r.email + ': ' + e.message);
+          log('Email send failed to ' + r.email + ': ' + e.message);
+        }
+      });
+      if (sent === 0 && errors.length > 0) {
+        return { success: false, error: 'Failed to send: ' + errors[0], pdfSizeKB: pdfSizeKB };
+      }
+      return { success: true, sentCount: sent, totalRecipients: recipients.length, pdfSizeKB: pdfSizeKB };
+    }
+
     // ── Diagnostics (for testing) ──
     case 'test:diagnose':
       return runDiagnostics();
@@ -687,7 +731,9 @@ function getAllSettings() {
  */
 function updateAllSettings(params) {
   var emailSettings = ['EmailConfigured', 'EmailFrequency', 'EmailHour', 'EmailMinute', 'EmailDayOfWeek', 'EmailDayOfMonth'];
+  var reminderSettings = ['ReminderNotificationsEnabled', 'ReminderCheckHour'];
   var emailChanged = false;
+  var reminderChanged = false;
   var count = 0;
 
   for (var key in params) {
@@ -697,6 +743,9 @@ function updateAllSettings(params) {
     if (emailSettings.indexOf(key) !== -1) {
       emailChanged = true;
     }
+    if (reminderSettings.indexOf(key) !== -1) {
+      reminderChanged = true;
+    }
   }
 
   // Reinstall email trigger if email settings changed
@@ -705,6 +754,15 @@ function updateAllSettings(params) {
       installEmailScheduleTrigger();
     } catch (e) {
       log('Error reinstalling email trigger: ' + e.message);
+    }
+  }
+
+  // Reinstall reminder trigger if reminder settings changed
+  if (reminderChanged) {
+    try {
+      installReminderTrigger();
+    } catch (e) {
+      log('Error reinstalling reminder trigger: ' + e.message);
     }
   }
 
@@ -831,6 +889,9 @@ function checkUserTriggers() {
 
   result.hasDailySync = result.list.some(function(t) {
     return t.function === 'dailyUserSync';
+  });
+  result.hasReminderTrigger = result.list.some(function(t) {
+    return t.function === 'checkAndSendReminders';
   });
 
   return result;

@@ -23,3 +23,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# UPI QR code (personal payment info — generated at runtime)
+public/upi-qr-code.png

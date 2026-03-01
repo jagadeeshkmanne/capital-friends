@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { Wallet, CreditCard, Target, Bell, MoreHorizontal } from 'lucide-react'
+import { LayoutDashboard, Wallet, CreditCard, Target, MoreHorizontal } from 'lucide-react'
 
 const tabs = [
+  { label: 'Dashboard',  icon: LayoutDashboard,  path: '/dashboard' },
   { label: 'Invest',     icon: Wallet,           path: '/investments/mutual-funds' },
   { label: 'Accounts',   icon: CreditCard,      path: '/accounts/bank' },
   { label: 'Goals',      icon: Target,           path: '/goals' },
-  { label: 'Reminders',  icon: Bell,             path: '/reminders' },
   { label: 'More',       icon: MoreHorizontal,   path: '/more' },
 ]
 

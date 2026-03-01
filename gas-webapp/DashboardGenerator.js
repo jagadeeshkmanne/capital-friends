@@ -20,15 +20,13 @@
 /**
  * Generate Dashboard and send via Email
  */
-function sendDashboardEmail() {
+function _legacySendDashboardEmail() {
   try {
     const emailHtml = generateDashboardHTML();
     const recipient = Session.getActiveUser().getEmail();
     const subject = '💰 Capital Friends - Family Wealth Dashboard';
 
-    MailApp.sendEmail({
-      to: recipient,
-      subject: subject,
+    GmailApp.sendEmail(recipient, subject, '', {
       htmlBody: emailHtml
     });
 
@@ -318,11 +316,11 @@ function getDashboardPortfolioFunds(portfolioId, rebalanceThreshold) {
         if (deviation > 0) {
           // Overweight - suggest switching out
           const switchAmount = (deviation / 100) * currentValue;
-          switchSuggestion = `Switch ₹${formatCurrency(switchAmount)} to underweight fund`;
+          switchSuggestion = `Switch ₹${_legacyFormatCurrency(switchAmount)} to underweight fund`;
         } else {
           // Underweight - suggest receiving from overweight
           const receiveAmount = (Math.abs(deviation) / 100) * currentValue;
-          switchSuggestion = `Receive ₹${formatCurrency(receiveAmount)} from overweight fund`;
+          switchSuggestion = `Receive ₹${_legacyFormatCurrency(receiveAmount)} from overweight fund`;
         }
       }
 
@@ -356,7 +354,7 @@ function getDashboardPortfolioFunds(portfolioId, rebalanceThreshold) {
 /**
  * Format currency for display (convert to Cr/L format)
  */
-function formatCurrency(amount) {
+function _legacyFormatCurrency(amount) {
   if (amount >= 10000000) {
     return (amount / 10000000).toFixed(1) + 'Cr';
   } else if (amount >= 100000) {
@@ -531,13 +529,13 @@ function renderFamilySummaryExcel(sheet, startRow, family) {
 
   // Asset Allocation with better formatting and colors
   const assetText = 'Asset:  ' +
-    `Equity ${family.assetAllocation.equity.percent}% (₹${formatCurrency(family.assetAllocation.equity.value)})  •  ` +
-    `Debt ${family.assetAllocation.debt.percent}% (₹${formatCurrency(family.assetAllocation.debt.value)})  •  ` +
-    `Gold ${family.assetAllocation.gold.percent}% (₹${formatCurrency(family.assetAllocation.gold.value)})  |  ` +
+    `Equity ${family.assetAllocation.equity.percent}% (₹${_legacyFormatCurrency(family.assetAllocation.equity.value)})  •  ` +
+    `Debt ${family.assetAllocation.debt.percent}% (₹${_legacyFormatCurrency(family.assetAllocation.debt.value)})  •  ` +
+    `Gold ${family.assetAllocation.gold.percent}% (₹${_legacyFormatCurrency(family.assetAllocation.gold.value)})  |  ` +
     'Cap:  ' +
-    `Large ${family.capAllocation.large.percent}% (₹${formatCurrency(family.capAllocation.large.value)})  •  ` +
-    `Mid ${family.capAllocation.mid.percent}% (₹${formatCurrency(family.capAllocation.mid.value)})  •  ` +
-    `Small ${family.capAllocation.small.percent}% (₹${formatCurrency(family.capAllocation.small.value)})`;
+    `Large ${family.capAllocation.large.percent}% (₹${_legacyFormatCurrency(family.capAllocation.large.value)})  •  ` +
+    `Mid ${family.capAllocation.mid.percent}% (₹${_legacyFormatCurrency(family.capAllocation.mid.value)})  •  ` +
+    `Small ${family.capAllocation.small.percent}% (₹${_legacyFormatCurrency(family.capAllocation.small.value)})`;
 
   sheet.getRange(startRow, 1, 1, 15).merge()
     .setValue(assetText)
@@ -616,8 +614,8 @@ function renderAllPortfoliosSummaryExcel(sheet, startRow, portfolios) {
     // Unrealized P&L with color
     const unrealizedColor = portfolio.unrealizedPL >= 0 ? '#10b981' : '#ef4444';
     const unrealizedText = portfolio.unrealizedPL >= 0 ?
-      `▲ ₹${formatCurrency(portfolio.unrealizedPL)} (+${(portfolio.unrealizedPL/portfolio.invested*100).toFixed(0)}%)` :
-      `▼ ₹${formatCurrency(Math.abs(portfolio.unrealizedPL))} (${(portfolio.unrealizedPL/portfolio.invested*100).toFixed(0)}%)`;
+      `▲ ₹${_legacyFormatCurrency(portfolio.unrealizedPL)} (+${(portfolio.unrealizedPL/portfolio.invested*100).toFixed(0)}%)` :
+      `▼ ₹${_legacyFormatCurrency(Math.abs(portfolio.unrealizedPL))} (${(portfolio.unrealizedPL/portfolio.invested*100).toFixed(0)}%)`;
     sheet.getRange(startRow, 5).setValue(unrealizedText)
       .setBackground(rowBg).setFontColor(unrealizedColor).setFontSize(11)
       .setFontWeight('bold').setHorizontalAlignment('right');
@@ -625,8 +623,8 @@ function renderAllPortfoliosSummaryExcel(sheet, startRow, portfolios) {
     // Realized P&L with color
     const realizedColor = portfolio.realizedPL >= 0 ? '#10b981' : '#ef4444';
     const realizedText = portfolio.realizedPL >= 0 ?
-      `▲ ₹${formatCurrency(portfolio.realizedPL)} (+${(portfolio.realizedPL/portfolio.invested*100).toFixed(0)}%)` :
-      `▼ ₹${formatCurrency(Math.abs(portfolio.realizedPL))} (${(portfolio.realizedPL/portfolio.invested*100).toFixed(0)}%)`;
+      `▲ ₹${_legacyFormatCurrency(portfolio.realizedPL)} (+${(portfolio.realizedPL/portfolio.invested*100).toFixed(0)}%)` :
+      `▼ ₹${_legacyFormatCurrency(Math.abs(portfolio.realizedPL))} (${(portfolio.realizedPL/portfolio.invested*100).toFixed(0)}%)`;
     sheet.getRange(startRow, 6).setValue(realizedText)
       .setBackground(rowBg).setFontColor(realizedColor).setFontSize(11)
       .setFontWeight('bold').setHorizontalAlignment('right');
@@ -634,8 +632,8 @@ function renderAllPortfoliosSummaryExcel(sheet, startRow, portfolios) {
     // Total P&L with color
     const totalColor = portfolio.totalPL >= 0 ? '#10b981' : '#ef4444';
     const totalText = portfolio.totalPL >= 0 ?
-      `▲ ₹${formatCurrency(portfolio.totalPL)} (+${portfolio.totalPLPercent.toFixed(0)}%)` :
-      `▼ ₹${formatCurrency(Math.abs(portfolio.totalPL))} (${portfolio.totalPLPercent.toFixed(0)}%)`;
+      `▲ ₹${_legacyFormatCurrency(portfolio.totalPL)} (+${portfolio.totalPLPercent.toFixed(0)}%)` :
+      `▼ ₹${_legacyFormatCurrency(Math.abs(portfolio.totalPL))} (${portfolio.totalPLPercent.toFixed(0)}%)`;
     sheet.getRange(startRow, 7).setValue(totalText)
       .setBackground(rowBg).setFontColor(totalColor).setFontSize(11)
       .setFontWeight('bold').setHorizontalAlignment('right');
@@ -961,8 +959,8 @@ function renderPortfolioDetailsExcel(sheet, startRow, portfolio) {
     // P&L with color and formatting
     const plColor = fund.pl >= 0 ? '#10b981' : '#ef4444';
     const plText = fund.pl >= 0 ?
-      `▲ ₹${formatCurrency(fund.pl)} (+${fund.plPercent.toFixed(0)}%)` :
-      `▼ ₹${formatCurrency(Math.abs(fund.pl))} (${fund.plPercent.toFixed(0)}%)`;
+      `▲ ₹${_legacyFormatCurrency(fund.pl)} (+${fund.plPercent.toFixed(0)}%)` :
+      `▼ ₹${_legacyFormatCurrency(Math.abs(fund.pl))} (${fund.plPercent.toFixed(0)}%)`;
     sheet.getRange(startRow, 6).setValue(plText)
       .setBackground(rowBg).setFontColor(plColor).setFontSize(11)
       .setFontWeight('bold').setHorizontalAlignment('right');

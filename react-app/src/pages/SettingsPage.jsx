@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun, Mail, Globe, ChevronDown, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye } from 'lucide-react'
+import { Moon, Sun, Mail, ChevronDown, ChevronRight, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye, CloudDownload, Heart, Send, Palette } from 'lucide-react'
+import DonateDialog from '../components/DonateDialog'
 import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -12,9 +13,10 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
-  const { members, settings, updateSettings, updateMember, healthCheckCompleted } = useData()
+  const { members, settings, updateSettings, updateMember, healthCheckCompleted, refreshData, isRefreshing } = useData()
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
+  const [showDonate, setShowDonate] = useState(false)
   const activeMembers = members.filter((m) => m.status === 'Active')
 
   // Local form state (synced from backend settings)
@@ -23,6 +25,10 @@ export default function SettingsPage() {
   const [emailDay, setEmailDay] = useState('Monday')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Send email now
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailStatus, setEmailStatus] = useState(null) // 'sent' | 'error'
 
   // Data refresh state
   const [refreshing, setRefreshing] = useState(false)
@@ -112,75 +118,10 @@ export default function SettingsPage() {
         </div>
       </Card>
 
-      {/* Financial Health Check */}
+      {/* Preferences — theme + privacy */}
       <Card>
-        <CardHeader icon={<Zap size={14} />} title="Financial Health Check" />
+        <CardHeader icon={<Palette size={14} />} title="Preferences" />
         <div className="px-4 py-4 space-y-3">
-          <Row label="Status">
-            <span className={`text-xs font-semibold ${healthCheckCompleted ? 'text-emerald-400' : 'text-[var(--accent-amber)]'}`}>
-              {healthCheckCompleted ? 'Completed' : 'Not completed'}
-            </span>
-          </Row>
-          <div className="flex justify-end pt-1">
-            <button
-              onClick={() => navigate('/health-check')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            >
-              <Zap size={12} />
-              {healthCheckCompleted ? 'Update Answers' : 'Take Health Check'}
-            </button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Data & Sync */}
-      <Card>
-        <CardHeader icon={<Database size={14} />} title="Data & Sync" />
-        <div className="px-4 py-4 space-y-3">
-          <Row label="Last synced">
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold text-[var(--text-primary)]">
-                {formatLastSync(settings.masterDataLastSync)}
-              </p>
-              {settings._stale && (
-                <span className="text-[10px] font-bold text-amber-600 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30">STALE</span>
-              )}
-            </div>
-          </Row>
-          {settings._navDataDate && (
-            <Row label="NAV data as of">
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{settings._navDataDate}</p>
-            </Row>
-          )}
-          <Row label="Auto-refresh">
-            <p className="text-xs text-[var(--text-muted)]">Daily at ~6:30 AM</p>
-          </Row>
-          <div className="flex items-center justify-between pt-1">
-            <p className="text-xs text-[var(--text-dim)]">Refresh MF NAVs, ATH & Stock prices</p>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Refreshing...' : 'Refresh Now'}
-            </button>
-          </div>
-          {refreshResult && (
-            <div className={`text-xs px-3 py-2 rounded-lg ${refreshResult.error ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
-              {refreshResult.error
-                ? 'Failed: ' + refreshResult.error
-                : `Done — MF: ${refreshResult.mf?.count || 0} | ATH: ${refreshResult.ath?.count || 0} | Stocks: ${refreshResult.stocks?.count || 0} (${refreshResult.duration})`
-              }
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* Appearance */}
-      <Card>
-        <CardHeader icon={<Sun size={14} />} title="Appearance" />
-        <div className="px-4 py-4">
           <Row label="Theme">
             <button
               onClick={toggle}
@@ -190,6 +131,83 @@ export default function SettingsPage() {
               {theme === 'dark' ? 'Dark' : 'Light'}
             </button>
           </Row>
+          <div className="border-t border-[var(--border-light)]" />
+          <Row label="Mask sensitive data">
+            <button
+              onClick={toggleMask}
+              className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${masked ? 'bg-amber-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${masked ? 'left-[18px] bg-white' : 'left-0.5 bg-[var(--text-dim)]'}`} />
+            </button>
+          </Row>
+          <p className="text-[11px] text-[var(--text-dim)]">
+            Hides PAN, Aadhaar, mobile, email & account numbers. Use the {masked ? <EyeOff size={10} className="inline text-amber-400" /> : <Eye size={10} className="inline" />} icon in the header to quickly toggle.
+          </p>
+          {masked && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <EyeOff size={13} className="text-amber-400 shrink-0" />
+              <p className="text-[11px] text-amber-400 font-medium">Data masking active — safe for screen sharing</p>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Data & Sync */}
+      <Card>
+        <CardHeader icon={<Database size={14} />} title="Data & Sync" />
+        <div className="px-4 py-4 space-y-4">
+          {/* Sync App Data */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)]">Sync App Data</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Re-fetch all data from your Google Sheet</p>
+            </div>
+            <button
+              onClick={() => refreshData(true)}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+            >
+              <CloudDownload size={12} className={isRefreshing ? 'animate-pulse' : ''} />
+              {isRefreshing ? 'Syncing...' : 'Sync Now'}
+            </button>
+          </div>
+
+          <div className="border-t border-[var(--border-light)]" />
+
+          {/* Refresh Market Data */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">Refresh Market Data</p>
+                <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Update MF NAVs, ATH & Stock prices</p>
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? 'Refreshing...' : 'Refresh Now'}
+              </button>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-[var(--text-dim)]">
+              <span>Last: <span className="font-medium text-[var(--text-muted)]">{formatLastSync(settings.masterDataLastSync)}</span></span>
+              {settings._stale && (
+                <span className="font-bold text-amber-600 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-[10px]">STALE</span>
+              )}
+              {settings._navDataDate && (
+                <span>NAV: <span className="font-medium text-[var(--text-muted)]">{settings._navDataDate}</span></span>
+              )}
+            </div>
+          </div>
+          {refreshResult && (
+            <div className={`text-xs px-3 py-2 rounded-lg ${refreshResult.error ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
+              {refreshResult.error
+                ? 'Failed: ' + refreshResult.error
+                : `Done — MF: ${refreshResult.mf?.count || 0} | ATH: ${refreshResult.ath?.count || 0} | Stocks: ${refreshResult.stocks?.count || 0} (${refreshResult.duration})`
+              }
+            </div>
+          )}
         </div>
       </Card>
 
@@ -225,59 +243,93 @@ export default function SettingsPage() {
 
           {/* Member email toggles */}
           {activeMembers.length > 0 && (
-            <>
-              <div className="border-t border-[var(--border-light)] pt-3">
-                <p className="text-xs text-[var(--text-dim)] mb-2">Send report to</p>
-                <div className="space-y-2">
-                  {activeMembers.map((m) => (
-                    <MemberEmailToggle key={m.memberId} member={m} onToggle={updateMember} />
-                  ))}
-                </div>
+            <div className="border-t border-[var(--border-light)] pt-3">
+              <p className="text-xs text-[var(--text-dim)] mb-2">Send report to</p>
+              <div className="space-y-2">
+                {activeMembers.map((m) => (
+                  <MemberEmailToggle key={m.memberId} member={m} onToggle={updateMember} />
+                ))}
               </div>
-            </>
+            </div>
           )}
           {activeMembers.length === 0 && (
             <p className="text-xs text-[var(--text-dim)] pt-1">Add family members to configure email recipients.</p>
           )}
-        </div>
-      </Card>
 
-      {/* Privacy */}
-      <Card>
-        <CardHeader icon={<EyeOff size={14} />} title="Privacy" />
-        <div className="px-4 py-4 space-y-3">
-          <Row label="Mask sensitive data">
-            <button
-              onClick={toggleMask}
-              className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${masked ? 'bg-amber-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}
-            >
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${masked ? 'left-[18px] bg-white' : 'left-0.5 bg-[var(--text-dim)]'}`} />
-            </button>
-          </Row>
-          <p className="text-xs text-[var(--text-dim)]">
-            {masked ? 'Sensitive data is hidden. ' : ''}Masks PAN, Aadhaar, mobile, email, account numbers, client IDs, and policy numbers across the app. Use the {masked ? <EyeOff size={11} className="inline text-amber-400" /> : <Eye size={11} className="inline" />} icon in the header to quickly toggle.
-          </p>
-          {masked && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <EyeOff size={14} className="text-amber-400 shrink-0" />
-              <p className="text-xs text-amber-400 font-medium">Data masking is active — safe for screen sharing</p>
+          {/* Send Now */}
+          <div className="border-t border-[var(--border-light)] pt-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-[var(--text-secondary)]">Send Report Now</p>
+                <p className="text-[11px] text-[var(--text-dim)]">Send wealth report to all enabled members</p>
+              </div>
+              <button
+                onClick={async () => {
+                  setSendingEmail(true)
+                  setEmailStatus(null)
+                  try {
+                    await api.sendDashboardEmail()
+                    setEmailStatus('sent')
+                    setTimeout(() => setEmailStatus(null), 5000)
+                  } catch (e) {
+                    setEmailStatus('error')
+                    setTimeout(() => setEmailStatus(null), 5000)
+                  } finally {
+                    setSendingEmail(false)
+                  }
+                }}
+                disabled={sendingEmail}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                style={{
+                  background: emailStatus === 'sent' ? 'rgba(16,185,129,0.1)' : emailStatus === 'error' ? 'rgba(248,113,113,0.1)' : 'rgba(139,92,246,0.1)',
+                  color: emailStatus === 'sent' ? '#34d399' : emailStatus === 'error' ? '#f87171' : '#a78bfa',
+                  border: `1px solid ${emailStatus === 'sent' ? 'rgba(16,185,129,0.2)' : emailStatus === 'error' ? 'rgba(248,113,113,0.2)' : 'rgba(139,92,246,0.2)'}`,
+                }}
+              >
+                {sendingEmail ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
+                {sendingEmail ? 'Sending...' : emailStatus === 'sent' ? 'Sent!' : emailStatus === 'error' ? 'Failed' : 'Send Now'}
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </Card>
 
-      {/* Display Preferences */}
-      <Card>
-        <CardHeader icon={<Globe size={14} />} title="Display" />
-        <div className="px-4 py-4 space-y-3">
-          <Row label="Currency">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">INR (₹)</p>
-          </Row>
-          <Row label="Date format">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">DD/MM/YYYY</p>
-          </Row>
+      {/* Financial Health Check */}
+      <button onClick={() => navigate('/health-check')}
+              className="w-full text-left bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden hover:bg-[var(--bg-hover)] transition-colors">
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/15">
+            <Zap size={15} className="text-amber-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Financial Health Check</p>
+            <p className="text-[11px] text-[var(--text-dim)]">
+              {healthCheckCompleted ? 'Completed — update your answers' : 'Take the health check questionnaire'}
+            </p>
+          </div>
+          {healthCheckCompleted && <span className="text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 shrink-0">Done</span>}
+          <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
         </div>
-      </Card>
+      </button>
+
+      {/* Support Developer */}
+      <button
+        onClick={() => setShowDonate(true)}
+        className="w-full text-left rounded-xl border border-amber-500/25 p-4 hover:border-amber-500/40 transition-colors"
+        style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.04) 100%)' }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/15">
+            <Heart size={20} className="text-amber-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-400">Support the Developer</p>
+            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Capital Friends is free. If it helps your family, consider a small donation!</p>
+          </div>
+        </div>
+      </button>
+
+      <DonateDialog open={showDonate} onClose={() => setShowDonate(false)} />
     </div>
   )
 }
@@ -331,15 +383,21 @@ function Select({ value, onChange, options, suffix }) {
 
 function MemberEmailToggle({ member, onToggle }) {
   const { mv } = useMask()
-  const isOn = member.includeInEmailReports === 'Yes' || member.includeInEmailReports === true
+  const propOn = member.includeInEmailReports === 'Yes' || member.includeInEmailReports === true
+  const [localOn, setLocalOn] = useState(propOn)
   const [toggling, setToggling] = useState(false)
 
+  // Sync from props when member data refreshes
+  useEffect(() => { setLocalOn(propOn) }, [propOn])
+
   async function handleToggle() {
+    const newVal = !localOn
+    setLocalOn(newVal) // Optimistic UI update
     setToggling(true)
     try {
-      await onToggle(member.memberId, { ...member, includeInEmailReports: isOn ? 'No' : 'Yes' })
+      await onToggle(member.memberId, { ...member, includeInEmailReports: newVal ? 'Yes' : 'No' })
     } catch {
-      // ignore
+      setLocalOn(!newVal) // Revert on error
     } finally {
       setToggling(false)
     }
@@ -359,9 +417,9 @@ function MemberEmailToggle({ member, onToggle }) {
       <button
         onClick={handleToggle}
         disabled={toggling}
-        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 disabled:opacity-50 ${isOn ? 'bg-violet-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}
+        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 disabled:opacity-50 ${localOn ? 'bg-violet-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}
       >
-        <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${isOn ? 'left-[18px] bg-white' : 'left-0.5 bg-[var(--text-dim)]'}`} />
+        <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${localOn ? 'left-[18px] bg-white' : 'left-0.5 bg-[var(--text-dim)]'}`} />
       </button>
     </div>
   )

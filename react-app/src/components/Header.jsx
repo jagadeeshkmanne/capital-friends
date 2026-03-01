@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, RefreshCw, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -61,6 +61,7 @@ const avatarSolids = [
 ]
 
 const NAV_ITEMS = [
+  { label: 'Dashboard', path: '/dashboard', match: '/dashboard' },
   { label: 'Family Members', path: '/family', match: '/family' },
   { label: 'Bank Accounts', path: '/accounts/bank', match: '/accounts/bank' },
   { label: 'Investment Accounts', path: '/accounts/investment', match: '/accounts/investment' },
@@ -135,7 +136,7 @@ const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alert
 export default function Header() {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
-  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, assetAllocations, refreshData, isRefreshing } = useData()
+  const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, assetAllocations } = useData()
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
 
@@ -288,25 +289,11 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-30 shrink-0">
-      {/* Glow animation styles */}
-      <style>{`
-        @keyframes glow-emerald {
-          0%, 100% { box-shadow: 0 0 6px rgba(16,185,129,0.3), 0 0 12px rgba(16,185,129,0.15); }
-          50% { box-shadow: 0 0 12px rgba(16,185,129,0.5), 0 0 24px rgba(16,185,129,0.25); }
-        }
-        @keyframes glow-violet {
-          0%, 100% { box-shadow: 0 0 6px rgba(139,92,246,0.3), 0 0 12px rgba(139,92,246,0.15); }
-          50% { box-shadow: 0 0 12px rgba(139,92,246,0.5), 0 0 24px rgba(139,92,246,0.25); }
-        }
-        .glow-emerald { animation: glow-emerald 2s ease-in-out infinite; }
-        .glow-violet { animation: glow-violet 2s ease-in-out infinite; }
-      `}</style>
-
       {/* ── Top Bar ── */}
       <div className="relative z-10 bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
-          {/* Left: logo (clickable → MF page) */}
-          <Link to="/investments/mutual-funds" className="flex items-center gap-2">
+          {/* Left: logo (clickable → Dashboard) */}
+          <Link to="/dashboard" className="flex items-center gap-2">
             <img src={LOGO_ICON} alt="CF" className="h-9 sm:h-12 w-auto" />
             <span className="hidden sm:flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
               <span className="font-bold text-[var(--text-primary)]">Capital</span>
@@ -314,50 +301,39 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Right: action pills (desktop) + icons + avatar */}
+          {/* Right: icon buttons + avatar */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Buying Opportunities pill — desktop only (mobile: in sidebar) */}
+            {/* Buy Opportunities — icon button with count badge */}
             {buyOppCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
-                className={`hidden sm:flex glow-emerald items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                className={`hidden sm:flex relative p-2 rounded-lg transition-colors ${
                   dialogKey === 'buyopp'
-                    ? 'bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-400/50'
-                    : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                    ? 'text-emerald-300 bg-emerald-500/20'
+                    : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
                 }`}
+                title={`${buyOppCount} Buy Opportunit${buyOppCount === 1 ? 'y' : 'ies'}${strongBuyCount > 0 ? ` (${strongBuyCount} Strong)` : ''}`}
               >
-                <TrendingDown size={13} strokeWidth={2.5} />
-                <span>{strongBuyCount > 0 ? 'Buy Opportunities' : 'Buying Opportunities'}</span>
-                {strongBuyCount > 0 && <span className="text-[11px] bg-emerald-500/30 px-1.5 py-0.5 rounded-full">{strongBuyCount} Strong</span>}
-                {buyCount > 0 && <span className="text-[11px] bg-emerald-500/20 px-1.5 py-0.5 rounded-full">{buyCount} Buy</span>}
+                <TrendingDown size={18} />
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold text-white bg-emerald-500 rounded-full px-1">{buyOppCount}</span>
               </button>
             )}
 
-            {/* Rebalance Alerts pill — desktop only (mobile: in sidebar) */}
+            {/* Rebalance Alerts — icon button with count badge */}
             {rebalanceCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
-                className={`hidden sm:flex glow-violet items-center gap-1.5 text-xs font-bold whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                className={`hidden sm:flex relative p-2 rounded-lg transition-colors ${
                   dialogKey === 'rebalance'
-                    ? 'bg-violet-500/30 text-violet-300 ring-1 ring-violet-400/50'
-                    : 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/25'
+                    ? 'text-violet-300 bg-violet-500/20'
+                    : 'text-violet-400 hover:text-violet-300 hover:bg-violet-500/10'
                 }`}
+                title={`${rebalanceCount} fund${rebalanceCount === 1 ? '' : 's'} need rebalancing`}
               >
-                <RefreshCw size={13} strokeWidth={2.5} />
-                <span>Rebalance Alerts</span>
-                <span className="text-[11px] bg-violet-500/30 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
+                <Scale size={18} />
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold text-white bg-violet-500 rounded-full px-1">{rebalanceCount}</span>
               </button>
             )}
-
-            {/* Sync / Refresh data */}
-            <button
-              onClick={() => refreshData(true)}
-              disabled={isRefreshing}
-              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${isRefreshing ? 'text-blue-400 cursor-not-allowed' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
-              title="Sync data from Google Sheets"
-            >
-              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            </button>
 
             {/* Mask toggle — desktop only, moved to avatar dropdown on mobile */}
             <button onClick={toggleMask} className={`hidden sm:block p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>
@@ -593,19 +569,19 @@ export default function Header() {
         {buyOppCount > 0 && (
           <button
             onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/12 border border-emerald-500/25 rounded-full"
+            className="relative p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors"
           >
-            <TrendingDown size={11} strokeWidth={2.5} />
-            <span>{buyOppCount}</span>
+            <TrendingDown size={16} />
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 flex items-center justify-center text-[8px] font-bold text-white bg-emerald-500 rounded-full px-0.5">{buyOppCount}</span>
           </button>
         )}
         {rebalanceCount > 0 && (
           <button
             onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-violet-400 bg-violet-500/12 border border-violet-500/25 rounded-full"
+            className="relative p-1.5 rounded-lg text-violet-400 hover:bg-violet-500/10 transition-colors"
           >
-            <RefreshCw size={11} strokeWidth={2.5} />
-            <span>{rebalanceCount}</span>
+            <Scale size={16} />
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 flex items-center justify-center text-[8px] font-bold text-white bg-violet-500 rounded-full px-0.5">{rebalanceCount}</span>
           </button>
         )}
         <button
@@ -642,11 +618,33 @@ export default function Header() {
                 <X size={18} className="text-[var(--text-secondary)]" />
               </button>
 
-              {/* Mobile: vertical, Desktop: horizontal */}
+              {/* TOP — Asset Allocation (full width) */}
+              {nw.assetAllocation.length > 0 && (
+                <div className="px-6 pt-6 pb-3 border-b border-[var(--border-light)]">
+                  <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider text-center mb-2">Asset Allocation</p>
+                  {/* Stacked bar */}
+                  <div className="flex h-3 rounded-full overflow-hidden">
+                    {nw.assetAllocation.map((a) => (
+                      <div key={a.cls} style={{ width: `${(a.total / nw.totalInv) * 100}%`, backgroundColor: a.hex }} title={`${a.cls}: ${((a.total / nw.totalInv) * 100).toFixed(1)}%`} />
+                    ))}
+                  </div>
+                  {/* Legend */}
+                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
+                    {nw.assetAllocation.map((a) => (
+                      <div key={a.cls} className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: a.hex }} />
+                        <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{a.cls} {((a.total / nw.totalInv) * 100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* MIDDLE — Donut + Investment breakdown */}
               <div className="flex flex-col md:flex-row">
-                {/* LEFT — Donut */}
+                {/* LEFT — Donut + Summary */}
                 <div className="flex-shrink-0 md:w-[340px] pt-6 pb-4 md:pb-6 px-6 flex flex-col items-center justify-center md:border-r md:border-[var(--border-light)]">
-                  <div className="relative w-[200px] h-[200px] md:w-[280px] md:h-[280px]">
+                  <div className="relative w-[200px] h-[200px] md:w-[260px] md:h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie data={donutData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" paddingAngle={3} stroke="none" isAnimationActive={false} activeShape={null}>
@@ -667,36 +665,45 @@ export default function Header() {
                     {/* Center label */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Net Worth</p>
-                      <p className="text-lg md:text-xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(nw.netWorth)}</p>
+                      <p className={`text-lg md:text-xl font-bold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</p>
                     </div>
                   </div>
 
-                  {/* Asset Allocation */}
-                  {nw.assetAllocation.length > 0 && (
-                    <div className="w-full mt-4">
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider text-center mb-2">Asset Allocation</p>
-                      {/* Stacked bar */}
-                      <div className="flex h-2.5 rounded-full overflow-hidden">
-                        {nw.assetAllocation.map((a) => (
-                          <div key={a.cls} style={{ width: `${(a.total / nw.totalInv) * 100}%`, backgroundColor: a.hex }} title={`${a.cls}: ${((a.total / nw.totalInv) * 100).toFixed(1)}%`} />
-                        ))}
-                      </div>
-                      {/* Legend */}
-                      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
-                        {nw.assetAllocation.map((a) => (
-                          <div key={a.cls} className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: a.hex }} />
-                            <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{a.cls} {((a.total / nw.totalInv) * 100).toFixed(0)}%</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-[var(--text-muted)] text-center mt-2">Approximate. MF splits are estimated from fund names. Add Morningstar data in Fund Breakdown for accuracy.</p>
+                  {/* Summary cards below donut */}
+                  <div className="w-full max-w-[280px] mt-4 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
+                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Investments</p>
+                      <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(nw.totalInv)}</p>
+                      {nw.totalInvested > 0 && (
+                        <p className="text-[10px] tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
+                          {nw.totalInv >= nw.totalInvested ? '+' : ''}{formatINR(nw.totalInv - nw.totalInvested)} P&L
+                        </p>
+                      )}
                     </div>
-                  )}
+                    {nw.totalLiab > 0 ? (
+                      <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(244,63,94,0.08)' }}>
+                        <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Liabilities</p>
+                        <p className="text-sm font-bold text-rose-400 tabular-nums mt-0.5">{formatINR(nw.totalLiab)}</p>
+                        <p className="text-[10px] text-[var(--text-dim)] tabular-nums mt-0.5">
+                          {nw.liabilities.length} {nw.liabilities.length === 1 ? 'loan' : 'loans'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(52,211,153,0.08)' }}>
+                        <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Invested</p>
+                        <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(nw.totalInvested)}</p>
+                        {nw.totalInvested > 0 && (
+                          <p className="text-[10px] tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
+                            {((nw.totalInv - nw.totalInvested) / nw.totalInvested * 100).toFixed(1)}% returns
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* RIGHT — Allocation breakdown */}
-                <div className="flex-1 min-w-0 px-3 md:px-5 pt-12 md:pt-10 pb-5 flex flex-col justify-center">
+                {/* RIGHT — Investment breakdown */}
+                <div className="flex-1 min-w-0 px-3 md:px-5 pt-4 md:pt-6 pb-5 flex flex-col justify-center">
                   {/* Investment rows — color-tinted chips */}
                   <div className="space-y-2">
                     {nw.sections.map(sec => {
@@ -734,19 +741,20 @@ export default function Header() {
                     )}
                   </div>
 
-                  {/* Net Worth footer */}
+                  {/* Net Worth total */}
                   <div className="mt-4 pt-3 mx-1 border-t border-[var(--border-light)] flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Net Worth</span>
-                      <span className={`text-lg font-bold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</span>
-                    </div>
-                    <div className="flex flex-col items-end text-[11px] text-[var(--text-dim)] tabular-nums">
-                      <span>{formatINR(nw.totalInv)} invested</span>
-                      {nw.totalLiab > 0 && <span className="text-rose-400/70">&minus;{formatINR(nw.totalLiab)} owed</span>}
-                    </div>
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Net Worth</span>
+                    <span className={`text-base font-bold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</span>
                   </div>
                 </div>
               </div>
+
+              {/* BOTTOM — Disclaimer */}
+              {nw.assetAllocation.length > 0 && (
+                <div className="px-6 py-2.5 border-t border-[var(--border-light)] bg-[var(--bg-inset)]">
+                  <p className="text-[10px] text-[var(--text-dim)] text-center">Approximate. MF splits are estimated from fund names. Add Morningstar data in Fund Breakdown for accuracy.</p>
+                </div>
+              )}
             </div>
           </div>
         )

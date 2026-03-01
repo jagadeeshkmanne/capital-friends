@@ -18,8 +18,11 @@
 
 /**
  * Adapter: API router calls addLiability(params) but file has processAddLiability(data)
+ * React sends familyMemberId, emiAmount, interestRate as top-level fields;
+ * GAS expects familyMember and dynamicFields JSON.
  */
 function addLiability(data) {
+  data = _mapLiabilityFields(data);
   return processAddLiability(data);
 }
 
@@ -27,7 +30,24 @@ function addLiability(data) {
  * Adapter: API router calls updateLiability(params) but file has processEditLiability(data)
  */
 function updateLiability(data) {
+  data = _mapLiabilityFields(data);
   return processEditLiability(data);
+}
+
+/**
+ * Map React liability field names to GAS expected names
+ */
+function _mapLiabilityFields(data) {
+  // React sends familyMemberId, GAS expects familyMember
+  if (data.familyMemberId && !data.familyMember) {
+    data.familyMember = data.familyMemberId;
+  }
+  // Merge top-level emiAmount/interestRate into dynamicFields JSON
+  var df = data.dynamicFields || {};
+  if (data.emiAmount != null) df.emiAmount = data.emiAmount;
+  if (data.interestRate != null) df.interestRate = data.interestRate;
+  data.dynamicFields = df;
+  return data;
 }
 
 // ============================================================================

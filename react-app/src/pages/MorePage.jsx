@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Settings, Info, Heart, Zap, Users, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, Copy, Check } from 'lucide-react'
+import { Bell, Settings, Info, Heart, Zap, Users, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight } from 'lucide-react'
+import DonateDialog from '../components/DonateDialog'
 
 const navItems = [
   { label: 'Family Members', desc: 'Manage family profiles', icon: Users, path: '/family', color: 'bg-violet-500/15 text-violet-400' },
@@ -36,18 +37,9 @@ function NavItem({ item, onClick }) {
   )
 }
 
-const UPI_ID = 'jagadeeshmanne.hdfc@kphdfc'
-
 export default function MorePage() {
   const navigate = useNavigate()
-  const [copied, setCopied] = useState(false)
-
-  function copyUPI() {
-    navigator.clipboard.writeText(UPI_ID).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
+  const [showDonate, setShowDonate] = useState(false)
 
   return (
     <div className="space-y-5">
@@ -73,24 +65,25 @@ export default function MorePage() {
         </div>
       </div>
 
-      {/* Support Developer — highlighted */}
-      <div className="bg-gradient-to-r from-pink-500/10 via-violet-500/10 to-pink-500/10 rounded-xl border border-pink-500/25 p-4">
+      {/* Support Developer — highlighted, opens donate dialog */}
+      <button
+        onClick={() => setShowDonate(true)}
+        className="w-full text-left rounded-xl border border-amber-500/25 p-4 hover:border-amber-500/40 transition-colors"
+        style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.04) 100%)' }}
+      >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-pink-500/20 text-pink-400">
-            <Heart size={20} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/15">
+            <Heart size={20} className="text-amber-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-pink-400">Support Developer</p>
-            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Help maintain this app with a small donation</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <p className="text-xs text-[var(--text-primary)] font-mono bg-[var(--bg-card)] px-2 py-1 rounded border border-[var(--border)] truncate">{UPI_ID}</p>
-              <button onClick={copyUPI} className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold bg-pink-500/15 text-pink-400 hover:bg-pink-500/25 transition-colors flex items-center gap-1">
-                {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-              </button>
-            </div>
+            <p className="text-sm font-semibold text-amber-400">Support the Developer</p>
+            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Capital Friends is free. If it helps, consider a small donation!</p>
           </div>
+          <ChevronRight size={14} className="text-amber-400/60 shrink-0" />
         </div>
-      </div>
+      </button>
+
+      <DonateDialog open={showDonate} onClose={() => setShowDonate(false)} />
     </div>
   )
 }

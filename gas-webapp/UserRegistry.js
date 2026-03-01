@@ -143,6 +143,14 @@ function createNewUser(email, name) {
     log('Warning: Could not install daily trigger for ' + email + ': ' + e.toString());
   }
 
+  // Install reminder notification trigger (daily check at 8 AM)
+  try {
+    installReminderTrigger();
+    log('Reminder trigger installed for ' + email);
+  } catch (e) {
+    log('Warning: Could not install reminder trigger for ' + email + ': ' + e.toString());
+  }
+
   log('Created new user: ' + email + ' → Spreadsheet: ' + spreadsheetId);
 
   record.email = email;

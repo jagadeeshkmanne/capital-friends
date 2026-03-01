@@ -20,6 +20,7 @@ import ReportsPage from './pages/ReportsPage'
 import HealthCheckPage from './pages/HealthCheckPage'
 import AboutPage from './pages/AboutPage'
 import TestPage from './pages/TestPage'
+import Dashboard from './pages/dashboard/Dashboard'
 
 export default function App() {
   return (
@@ -31,8 +32,8 @@ export default function App() {
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          {/* Dashboard redirects to Mutual Funds */}
-          <Route path="dashboard" element={<Navigate to="/investments/mutual-funds" replace />} />
+          {/* Dashboard */}
+          <Route path="dashboard" element={<Dashboard />} />
 
           {/* Family */}
           <Route path="family" element={<Family />} />

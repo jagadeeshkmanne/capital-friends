@@ -27,6 +27,9 @@ function installTriggers(showMessage = true) {
   // Install email schedule trigger if configured
   installEmailScheduleTrigger();
 
+  // Install reminder notification trigger (daily check at 8 AM)
+  installReminderTrigger();
+
   // Only show message if called manually from menu
   if (showMessage) {
     showSuccess('Triggers installed successfully! You can now click "✏️ Edit" buttons in sheets.');
@@ -144,11 +147,11 @@ function sendScheduledDailyEmail() {
   try {
     Logger.log('=== SCHEDULED EMAIL STARTED at ' + new Date().toLocaleTimeString('en-IN') + ' ===');
 
-    // Send email to configured recipients
-    const result = sendCompleteWealthReportEmail();
+    // Use the unified dashboard email report (same as manual send from React Settings)
+    const result = sendDashboardEmailReport('daily', true);
 
     if (result && result.success) {
-      Logger.log('Scheduled email sent successfully to: ' + result.recipients.join(', '));
+      Logger.log('Scheduled email sent successfully to ' + (result.sentCount || 0) + ' recipients');
     } else {
       Logger.log('Scheduled email failed: ' + (result ? result.error : 'Unknown error'));
     }

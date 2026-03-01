@@ -47,6 +47,7 @@ export function DataProvider({ children }) {
   const [healthCheckCompleted, setHealthCheckCompleted] = useState(
     cachedHC !== null ? cachedHC : null
   )
+  const [healthCheckAnswers, setHealthCheckAnswers] = useState(null)
 
   const didInitRef = useRef(false)
 
@@ -214,6 +215,7 @@ export function DataProvider({ children }) {
       const cached = await idb.get('healthCheckAnswers')
       if (cached && Object.keys(cached).length > 0) {
         setHealthCheckCompleted(true)
+        setHealthCheckAnswers(cached)
         setHCSession(true)
         return
       }
@@ -222,6 +224,7 @@ export function DataProvider({ children }) {
       const answers = await api.getHealthCheckAnswers()
       if (answers && Object.keys(answers).length > 0) {
         setHealthCheckCompleted(true)
+        setHealthCheckAnswers(answers)
         setHCSession(true)
         idb.put('healthCheckAnswers', answers)
       } else {
@@ -239,6 +242,7 @@ export function DataProvider({ children }) {
     const result = await api.saveHealthCheck(answers)
     if (result?.success) {
       setHealthCheckCompleted(true)
+      setHealthCheckAnswers(answers)
       setHCSession(true)
       idb.put('healthCheckAnswers', answers)
     }
@@ -263,6 +267,7 @@ export function DataProvider({ children }) {
         // Health check: if answers exist in IDB, user is verified
         if (cached.healthCheckAnswers && Object.keys(cached.healthCheckAnswers).length > 0) {
           setHealthCheckCompleted(true)
+          setHealthCheckAnswers(cached.healthCheckAnswers)
           setHCSession(true)
         }
         setLoading(false) // UI renders instantly with cached data
@@ -618,7 +623,7 @@ export function DataProvider({ children }) {
       // Settings
       settings, updateSettings, refreshSettings,
       // Health Check
-      healthCheckCompleted, completeHealthCheck,
+      healthCheckCompleted, healthCheckAnswers, completeHealthCheck,
     }}>
       {children}
     </DataContext.Provider>
