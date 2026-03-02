@@ -413,19 +413,10 @@ function sendDashboardEmailReport(reportType, sendAsPDF = true) {
     // Build email subject with family name
     const subject = buildEmailSubject(reportType, dashData.netWorth, familyHeadName);
 
-    // Build simple email summary (greeting + key metrics)
-    const summaryBody = buildSimpleEmailBody('', dashData, familyHeadName);
-
     // Build the full dashboard HTML report (matches ref.html design)
-    const dashboardHTML = buildDashboardPDFHTML(dashData);
+    const fullEmailHTML = buildDashboardPDFHTML(dashData);
 
-    // Combine: summary on top, full dashboard below in one email
-    // Strip HTML/body tags from dashboard to embed inside summary
-    var dashContent = dashboardHTML.replace(/^<!DOCTYPE html>[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>\s*<\/html>\s*$/i, '');
-    var fullEmailHTML = summaryBody.replace('</body></html>', '') +
-      '<div style="margin:24px auto 0;padding:0 40px 40px;">' + dashContent + '</div></body></html>';
-
-    // Send INDIVIDUAL emails to each recipient as HTML body (no PDF)
+    // Send INDIVIDUAL emails to each recipient as HTML body
     let successCount = 0;
     let errorMessages = [];
 
@@ -553,8 +544,11 @@ function buildDashboardReportData() {
     });
 
     // ── 3. Enrich MF portfolios with owner info from investment accounts ──
+    log('iaMap keys: ' + Object.keys(iaMap).join(', '));
     const enrichedMFPortfolios = allMFPortfolios.map(function(p) {
-      const ia = iaMap[String(p.investmentAccountId || '').trim()];
+      const iaKey = String(p.investmentAccountId || '').trim();
+      const ia = iaMap[iaKey];
+      log('MF Portfolio ' + p.portfolioId + ' (' + p.portfolioName + '): investmentAccountId=' + iaKey + ', ia found=' + !!ia + ', ownerId=' + (ia ? ia.memberId : 'NONE'));
       return {
         portfolioId: p.portfolioId,
         portfolioName: p.portfolioName,
@@ -1145,6 +1139,7 @@ function buildDashboardReportData() {
       bankAccounts: activeBanks.map(function(b) {
         return {
           accountId: b.accountId,
+          memberId: b.memberId || '',
           member: b.memberName,
           bankName: b.bankName,
           accountNumber: b.accountNumber,
@@ -1156,6 +1151,7 @@ function buildDashboardReportData() {
       investmentAccounts: activeInvAccounts.map(function(a) {
         return {
           accountId: a.accountId,
+          memberId: a.memberId || '',
           member: a.memberName,
           platform: a.platformBroker,
           accountType: a.accountType,

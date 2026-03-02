@@ -21,6 +21,7 @@ import HealthCheckPage from './pages/HealthCheckPage'
 import AboutPage from './pages/AboutPage'
 import TestPage from './pages/TestPage'
 import Dashboard from './pages/dashboard/Dashboard'
+import DonatePage from './pages/DonatePage'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
       {/* Home: Landing if not logged in, Dashboard if logged in */}
       <Route index element={<HomePage />} />
       <Route path="login" element={<LandingPage />} />
+      <Route path="donate" element={<DonatePage />} />
 
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
