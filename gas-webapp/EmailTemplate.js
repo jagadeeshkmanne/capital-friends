@@ -313,28 +313,34 @@ function buildDashboardPDFHTML(data) {
     h += '</tr></tbody></table></div>';
     // Content
     h += '<div style="padding:24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
-    // LEFT: SVG Donut + Assets/Liabilities
+    // LEFT: QuickChart.io donut (PNG image, renders in Gmail) + Assets/Liabilities
     h += '<td style="width:40%;vertical-align:top;padding-right:24px">';
-    // SVG Donut
-    h += '<div style="text-align:center;padding:0 0 16px">';
-    var circ = 2 * Math.PI * 90;
-    h += '<svg viewBox="0 0 240 240" width="220" height="220" style="display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">';
-    h += '<circle cx="120" cy="120" r="90" fill="none" stroke="#e2e8f0" stroke-width="46" />';
-    var dOffset = 0;
-    for (var di = 0; di < allocItems.length; di++) {
-      var dit = allocItems[di];
-      if ((dit.pct || 0) <= 0) continue;
-      var dArc = (dit.pct / 100) * circ;
-      var dColor = dit.color || dit.fill || (_ASSET_COLORS[dit.name] || '#94a3b8');
-      var dVis = Math.max(1, dArc - 2);
-      h += '<circle cx="120" cy="120" r="90" fill="none" stroke="' + dColor + '" stroke-width="44" ';
-      h += 'stroke-dasharray="' + dVis.toFixed(0) + ' ' + (circ - dVis).toFixed(0) + '" ';
-      h += 'stroke-dashoffset="' + (-dOffset).toFixed(0) + '" transform="rotate(-90 120 120)" />';
-      dOffset += dArc;
+    // Build QuickChart.io donut URL — PNG renders in Gmail unlike SVG
+    var _qcData = [], _qcColors = [];
+    for (var _qi = 0; _qi < allocItems.length; _qi++) {
+      var _qit = allocItems[_qi];
+      if ((_qit.pct || 0) <= 0) continue;
+      _qcData.push(+(_qit.pct).toFixed(1));
+      _qcColors.push(_qit.color || _qit.fill || (_ASSET_COLORS[_qit.name] || '#94a3b8'));
     }
-    h += '<text x="120" y="112" text-anchor="middle" fill="#475569" font-size="10" font-weight="700" font-family="-apple-system,BlinkMacSystemFont,sans-serif" letter-spacing="1.5" text-transform="uppercase">NET WORTH</text>';
-    h += '<text x="120" y="138" text-anchor="middle" fill="#1e293b" font-size="22" font-weight="700" font-family="-apple-system,BlinkMacSystemFont,sans-serif">' + _fmtCur(netWorth) + '</text>';
-    h += '</svg></div>';
+    var _qcConfig = {
+      type: 'doughnut',
+      data: { datasets: [{ data: _qcData, backgroundColor: _qcColors, borderWidth: 3, borderColor: '#ffffff' }] },
+      options: {
+        plugins: {
+          doughnutlabel: { labels: [
+            { text: 'NET WORTH', font: { size: 10, weight: 'bold' }, color: '#475569' },
+            { text: _fmtCur(netWorth), font: { size: 16, weight: 'bold' }, color: '#1e293b' }
+          ]},
+          legend: { display: false }
+        },
+        cutout: '70%'
+      }
+    };
+    var _qcUrl = 'https://quickchart.io/chart?v=2&w=220&h=220&bkg=white&c=' + encodeURIComponent(JSON.stringify(_qcConfig));
+    h += '<div style="text-align:center;padding:0 0 16px">';
+    h += '<img src="' + _qcUrl + '" width="220" height="220" alt="Asset Allocation" style="display:block;margin:0 auto">';
+    h += '</div>';
     // Assets + Liabilities cards
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
     h += '<td style="width:48%;background:rgba(139,92,246,0.08);border-radius:8px;padding:12px;text-align:center">';

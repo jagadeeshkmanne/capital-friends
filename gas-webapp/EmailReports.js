@@ -538,24 +538,42 @@ function buildDashboardReportData() {
         allOtherInv.length + ' other investments');
 
     // ── 2. Build investment account lookup for owner enrichment ──
+    // Key by: accountId (IA-001), "accountName - platformBroker" label, accountName, accountClientId
+    // NOTE: AllPortfolios column C may store any of these formats depending on how the portfolio was created
     const iaMap = {};
+    const iaLabelMap = {};      // "accountName - platformBroker" (what React dropdown stores)
+    const iaNameMap = {};       // lowercase accountName only
+    const iaClientIdMap = {};   // lowercase clientId (e.g. IHJ411, DUB071)
     allInvestmentAccounts.forEach(function(a) {
       iaMap[String(a.accountId).trim()] = a;
+      if (a.accountName && a.platformBroker) iaLabelMap[String(a.accountName + ' - ' + a.platformBroker).trim().toLowerCase()] = a;
+      if (a.accountName) iaNameMap[String(a.accountName).trim().toLowerCase()] = a;
+      if (a.accountClientId) iaClientIdMap[String(a.accountClientId).trim().toLowerCase()] = a;
     });
+    log('iaMap keys: ' + Object.keys(iaMap).join(', '));
+    log('iaLabelMap keys: ' + Object.keys(iaLabelMap).join(', '));
 
     // ── 3. Enrich MF portfolios with owner info from investment accounts ──
-    log('iaMap keys: ' + Object.keys(iaMap).join(', '));
     const enrichedMFPortfolios = allMFPortfolios.map(function(p) {
       const iaKey = String(p.investmentAccountId || '').trim();
-      const ia = iaMap[iaKey];
-      log('MF Portfolio ' + p.portfolioId + ' (' + p.portfolioName + '): investmentAccountId=' + iaKey + ', ia found=' + !!ia + ', ownerId=' + (ia ? ia.memberId : 'NONE'));
+      // Match 1: by accountId (IA-001 etc.)
+      var ia = iaMap[iaKey];
+      // Match 2: by "accountName - platformBroker" label (what React dropdown stores in column C)
+      if (!ia && iaKey) ia = iaLabelMap[iaKey.toLowerCase()];
+      // Match 3: by accountClientId (broker client IDs like IHJ411, DUB071)
+      if (!ia && iaKey) ia = iaClientIdMap[iaKey.toLowerCase()];
+      // Match 4: by accountName only
+      if (!ia && iaKey) ia = iaNameMap[iaKey.toLowerCase()];
+      var ownerId = ia ? ia.memberId : '';
+      var ownerName = ia ? ia.memberName : '';
+      log('MF Portfolio ' + p.portfolioId + ' (' + p.portfolioName + '): iaKey=' + iaKey + ', ia=' + !!ia + ', ownerId=' + ownerId);
       return {
         portfolioId: p.portfolioId,
         portfolioName: p.portfolioName,
         investmentAccountId: p.investmentAccountId,
         investmentAccountName: ia ? ia.accountName : '',
-        ownerId: ia ? ia.memberId : '',
-        ownerName: ia ? ia.memberName : '',
+        ownerId: ownerId,
+        ownerName: ownerName,
         platformBroker: ia ? ia.platformBroker : '',
         totalInvestment: parseFloat(p.totalInvestment) || 0,
         currentValue: parseFloat(p.currentValue) || 0,
@@ -572,10 +590,18 @@ function buildDashboardReportData() {
 
     // ── 4. Enrich stock portfolios with owner info from investment accounts ──
     const enrichedStockPortfolios = allStockPortfolios.map(function(p) {
-      const ia = iaMap[String(p.investmentAccountId || '').trim()];
-      // Stock portfolios may have ownerId directly; fall back to investment account
-      const ownerId = p.ownerId || (ia ? ia.memberId : '');
-      const ownerName = p.ownerName || (ia ? ia.memberName : '');
+      const iaKey = String(p.investmentAccountId || '').trim();
+      // Match 1: by accountId (IA-001 etc.)
+      var ia = iaMap[iaKey];
+      // Match 2: by "accountName - platformBroker" label (what React dropdown stores in column C)
+      if (!ia && iaKey) ia = iaLabelMap[iaKey.toLowerCase()];
+      // Match 3: by accountClientId (broker client IDs like IHJ411, DUB071)
+      if (!ia && iaKey) ia = iaClientIdMap[iaKey.toLowerCase()];
+      // Match 4: by accountName only
+      if (!ia && iaKey) ia = iaNameMap[iaKey.toLowerCase()];
+      var ownerId = ia ? ia.memberId : '';
+      var ownerName = ia ? ia.memberName : '';
+      log('Stock Portfolio ' + p.portfolioId + ' (' + p.portfolioName + '): iaKey=' + iaKey + ', ia=' + !!ia + ', ownerId=' + ownerId);
       return {
         portfolioId: p.portfolioId,
         portfolioName: p.portfolioName,
@@ -1031,7 +1057,7 @@ function buildDashboardReportData() {
     const insuranceData = getAllInsurancePoliciesDetailed();
 
     // ── 17. Build the result ──
-    const generatedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const generatedAt = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy');
 
     const result = {
       // Totals
@@ -1180,9 +1206,14 @@ function buildDashboardReportData() {
           totalPL: p.totalPL || 0,
           totalPLPct: parseFloat(p.totalPLPct) || 0,
           funds: pHoldings.map(function(h) {
+            var rawName = h.fundName || '';
+            var planMatch = rawName.match(/ ?-\s+(Direct|Regular|Growth)\b/i);
+            var baseName = planMatch ? rawName.slice(0, planMatch.index).trim() : rawName;
+            var planName = planMatch ? rawName.slice(planMatch.index).replace(/^ ?- ?/, '').trim() : '';
             return {
               fundCode: h.fundCode,
-              fundName: h.fundName,
+              fundName: baseName,
+              planName: planName,
               units: h.units,
               avgNav: h.avgNav || 0,
               currentNav: h.currentNav || 0,
@@ -1933,34 +1964,46 @@ function getQuestionnaireData() {
       return { hasData: false, answers: [], yesCount: 0, noCount: 0 };
     }
 
-    // Read questionnaire data (Row 3 onwards: Question #, Question Text, Answer)
-    const data = sheet.getRange(3, 1, lastRow - 2, 3).getValues();
+    // Questionnaire sheet is HORIZONTAL: Row 2 = headers, Row 3+ = data
+    // Columns: A=Date, B=Health Insurance, C=Term Insurance, D=Emergency Fund,
+    //          E=Family Awareness, F=Will, G=Nominees, H=Goals, I=Score, J=Total
+    const row = sheet.getRange(lastRow, 1, 1, 10).getValues()[0];
+
+    const QUEST_LABELS = [
+      'Health Insurance',  // col B = index 1
+      'Term Insurance',    // col C = index 2
+      'Emergency Fund',    // col D = index 3
+      'Family Awareness',  // col E = index 4
+      'Will',              // col F = index 5
+      'Nominees',          // col G = index 6
+      'Goals'              // col H = index 7
+    ];
 
     const answers = [];
     let yesCount = 0;
     let noCount = 0;
 
-    data.forEach(row => {
-      if (row[0]) { // If question number exists
-        const answer = {
-          questionNumber: row[0],
-          questionText: row[1],
-          answer: row[2]
-        };
-
-        answers.push(answer);
-
-        if (row[2] === 'Yes') yesCount++;
-        if (row[2] === 'No') noCount++;
-      }
+    QUEST_LABELS.forEach(function(label, i) {
+      const answer = String(row[i + 1] || '');
+      answers.push({
+        questionNumber: i + 1,
+        questionText: label,
+        shortLabel: label,
+        answer: answer
+      });
+      if (answer === 'Yes') yesCount++;
+      if (answer === 'No') noCount++;
     });
+
+    const scoreFromSheet = parseFloat(row[8]) || yesCount;
+    const totalFromSheet = parseFloat(row[9]) || 7;
 
     return {
       hasData: true,
       answers: answers,
-      yesCount: yesCount,
+      yesCount: scoreFromSheet,
       noCount: noCount,
-      totalQuestions: answers.length
+      totalQuestions: totalFromSheet
     };
   } catch (error) {
     log('Error getting questionnaire data: ' + error.toString());
