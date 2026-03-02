@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Minus, Pencil, TrendingUp, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon } from 'lucide-react'
+import { Plus, Minus, Pencil, TrendingUp, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -88,7 +88,7 @@ export default function MutualFundsPage() {
     mfPortfolios, mfHoldings, mfTransactions,
     activeMembers, activeInvestmentAccounts,
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-    investMF, redeemMF, switchMF, updateHoldingAllocations,
+    investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted,
     deleteMFTransaction, editMFTransaction,
     assetAllocations, updateAssetAllocation,
   } = useData()
@@ -482,6 +482,19 @@ export default function MutualFundsPage() {
       setModal(null)
     } catch (err) {
       showToast(err.message || 'Failed to save classification', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleToggleLumpsumRestricted(h) {
+    const newVal = !h.lumpsumRestricted
+    showBlockUI(newVal ? 'Restricting lumpsum...' : 'Enabling lumpsum...')
+    try {
+      await toggleLumpsumRestricted(h.portfolioId, h.fundCode || h.schemeCode, newVal)
+      showToast(newVal ? 'Lumpsum buy restricted for this fund' : 'Lumpsum buy enabled for this fund')
+    } catch (err) {
+      showToast(err.message || 'Failed to update restriction', 'error')
     } finally {
       hideBlockUI()
     }
@@ -985,8 +998,11 @@ export default function MutualFundsPage() {
                                     onClick={(e) => { e.stopPropagation(); if (!isPlanned) setFundDetailHolding(h) }}
                                     className={`text-xs leading-tight text-left ${isPlanned ? 'text-[var(--text-secondary)] cursor-default' : 'text-[var(--text-secondary)] hover:text-violet-400 transition-colors cursor-pointer'}`}
                                   >
-                                    {splitFundName(h.fundName).main}
-                                    {isPlanned && <span className="ml-1.5 text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
+                                    <span className="flex items-center gap-1.5 flex-wrap">
+                                      {splitFundName(h.fundName).main}
+                                      {isPlanned && <span className="text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
+                                      {h.lumpsumRestricted && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />SIP only</span>}
+                                    </span>
                                     {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)] font-normal mt-0.5">{splitFundName(h.fundName).plan}</p>}
                                   </button>
                                   {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
@@ -1081,6 +1097,13 @@ export default function MutualFundsPage() {
                                       >
                                         <Repeat2 size={14} strokeWidth={2.5} />
                                       </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleToggleLumpsumRestricted(h) }}
+                                        className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
+                                        title={h.lumpsumRestricted ? 'Lumpsum restricted (SIP only) — click to allow' : 'Click to restrict lumpsum buy (SIP only)'}
+                                      >
+                                        {h.lumpsumRestricted ? <Lock size={11} strokeWidth={2.5} /> : <LockOpen size={11} strokeWidth={2.5} />}
+                                      </button>
                                     </>
                                   )}
                                 </div>
@@ -1136,7 +1159,10 @@ export default function MutualFundsPage() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
+                                {h.lumpsumRestricted && <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />SIP only</span>}
+                              </div>
                               {splitFundName(h.fundName).plan && <p className="text-[9px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                             </div>
                             <div className="text-right shrink-0">

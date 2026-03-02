@@ -536,6 +536,11 @@ export function DataProvider({ children }) {
     await refreshMF()
   }, [refreshMF])
 
+  const toggleLumpsumRestricted = useCallback(async (portfolioId, fundCode, restricted) => {
+    await api.toggleLumpsumRestricted(portfolioId, fundCode, restricted)
+    await refreshMF()
+  }, [refreshMF])
+
   const deleteMFTransaction = useCallback(async (transactionId) => {
     await api.deleteMFTransaction(transactionId)
     await refreshMF()
@@ -619,7 +624,7 @@ export function DataProvider({ children }) {
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-      investMF, redeemMF, switchMF, updateHoldingAllocations, deleteMFTransaction, editMFTransaction,
+      investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, deleteMFTransaction, editMFTransaction,
       // Settings
       settings, updateSettings, refreshSettings,
       // Health Check

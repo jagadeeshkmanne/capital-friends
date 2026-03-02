@@ -234,7 +234,9 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
     const newTotal = lumpsumAmount > 0 ? totalValue + lumpsumAmount : totalValue
     const all = enriched.map((h) => {
       const targetVal = (h.targetAllocationPct / 100) * newTotal
-      const invest = lumpsumAmount > 0 ? Math.max(0, targetVal - h.currentValue) : 0
+      let invest = lumpsumAmount > 0 ? Math.max(0, targetVal - h.currentValue) : 0
+      // Lumpsum restricted: block BUY (invest > 0) but allow display of SELL candidates
+      if (h.lumpsumRestricted && invest > 0) invest = 0
       const newPct = newTotal > 0 ? ((h.currentValue + invest) / newTotal) * 100 : 0
       const isOverweight = h.currentValue > targetVal + 1
       return { ...h, invest, newPct, isOverweight }
@@ -313,6 +315,8 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
                     <td className="py-2 px-2 text-right font-semibold tabular-nums">
                       {h.isOverweight ? (
                         <span className="text-amber-400/70 text-xs">Overweight</span>
+                      ) : h.lumpsumRestricted && !h.isOverweight ? (
+                        <span className="text-amber-400/80 text-xs">🔒 SIP only</span>
                       ) : h.invest > 0 ? (
                         <span className="text-emerald-400">{fmt(h.invest)}</span>
                       ) : (
@@ -336,12 +340,14 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
           {/* Mobile cards */}
           <div className="sm:hidden space-y-2">
             {distribution.map((h) => (
-              <FundCard key={h.holdingId} dimmed={h.invest === 0}>
+              <FundCard key={h.holdingId} dimmed={h.invest === 0 && !h.lumpsumRestricted}>
                 <div className="flex items-start justify-between gap-2">
                   <FundCardName fundName={h.fundName} />
                   <div className="text-right shrink-0">
                     {h.isOverweight ? (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
+                    ) : h.lumpsumRestricted && !h.isOverweight ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">🔒 SIP only</span>
                     ) : h.invest > 0 ? (
                       <p className="text-xs font-bold text-emerald-400 tabular-nums">{fmt(h.invest)}</p>
                     ) : (
@@ -392,9 +398,11 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
     const isExit = h.targetAllocationPct === 0 && h.units > 0
     const drifted = isExit || Math.abs(currentPct - h.targetAllocationPct) > threshold
     const targetVal = (h.targetAllocationPct / 100) * totalValue
-    const amount = drifted ? targetVal - h.currentValue : 0
-    return { ...h, currentPct, amount, isExit }
-  }).filter((h) => Math.abs(h.amount) >= 500)
+    const rawAmount = drifted ? targetVal - h.currentValue : 0
+    // Lumpsum restricted: show 0 for BUY (positive amount), SELL (negative) still allowed
+    const amount = h.lumpsumRestricted && rawAmount > 0 ? 0 : rawAmount
+    return { ...h, currentPct, amount, rawAmount, isExit }
+  }).filter((h) => Math.abs(h.amount) >= 500 || (h.lumpsumRestricted && h.rawAmount > 500))
 
   if (buySellData.length === 0) return <p className="text-xs text-[var(--text-dim)] py-2">Portfolio is balanced</p>
 
@@ -423,9 +431,15 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
                     {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${h.targetAllocationPct.toFixed(1)}%`}
                   </td>
                   <td className="py-2 px-2 text-right">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
-                      {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
-                    </span>
+                    {h.lumpsumRestricted && h.rawAmount > 0 ? (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">
+                        🔒 SIP only
+                      </span>
+                    ) : (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
+                        {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
+                      </span>
+                    )}
                   </td>
                 </tr>
               )
@@ -442,9 +456,13 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
             <FundCard key={h.schemeCode || h.fundCode}>
               <div className="flex items-start justify-between gap-2">
                 <FundCardName fundName={h.fundName} />
-                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
-                  {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
-                </span>
+                {h.lumpsumRestricted && h.rawAmount > 0 ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-amber-500/15 text-amber-400">🔒 SIP only</span>
+                ) : (
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
+                    {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
+                  </span>
+                )}
               </div>
               <FundCardRow
                 label="Drift"

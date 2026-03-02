@@ -214,6 +214,9 @@ function routeAction(action, params, userRecord) {
     case 'asset-allocation:save':
       return processAssetAllocation(params);
 
+    case 'mf:lumpsum-restricted':
+      return toggleFundLumpsumRestricted(params.portfolioId, params.fundCode, params.restricted);
+
     case 'funds:search':
       return searchFunds(params.query);
 

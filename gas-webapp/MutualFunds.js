@@ -799,6 +799,9 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
       `=IF(A${newRow}="","",IFERROR(VLOOKUP(A${newRow}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
     );
 
+    // T (20): Lumpsum Restricted - static flag, FALSE by default
+    portfolioSheet.getRange(newRow, 20).setValue(false);
+
     log(`DEBUG: All formulas set, applying formatting...`);
 
     // Apply formatting
@@ -922,8 +925,8 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
     }
 
     // Portfolio sheet: Row 1=Watermark, Row 2=Group headers, Row 3=Column headers, Row 4+=Data
-    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH = 19 cols max
-    var maxCol = Math.min(portfolioSheet.getLastColumn(), 19);
+    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH + T=Lumpsum Restricted = 20 cols max
+    var maxCol = Math.min(portfolioSheet.getLastColumn(), 20);
     var data = portfolioSheet.getRange(4, 1, lastRow - 3, maxCol).getValues();
 
     var funds = [];
@@ -949,6 +952,7 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
           pl: parseFloat(row[15]) || 0,
           athNav: maxCol >= 18 ? (parseFloat(row[17]) || 0) : 0,
           belowATHPct: maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0,
+          lumpsumRestricted: maxCol >= 20 ? (row[19] === true || row[19] === 'TRUE' || row[19] === 'true') : false,
           navDate: '',
           portfolioId: portfolioId
         });
@@ -961,6 +965,37 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
   } catch (error) {
     log('Error getting portfolio funds: ' + error.toString());
     return [];
+  }
+}
+
+/**
+ * Toggle lumpsum restricted flag for a fund in a portfolio (column T, col 20)
+ * When restricted=true: lumpsum BUY is blocked (only SIP and SELL are allowed)
+ * @param {string} portfolioId - Portfolio ID
+ * @param {string} fundCode - Fund scheme code
+ * @param {boolean} restricted - true to restrict, false to allow
+ */
+function toggleFundLumpsumRestricted(portfolioId, fundCode, restricted) {
+  try {
+    var sheet = getPortfolioSheet(portfolioId);
+    if (!sheet) throw new Error('Portfolio sheet not found: ' + portfolioId);
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 3) throw new Error('No funds in portfolio');
+
+    var data = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === fundCode.toString()) {
+        sheet.getRange(i + 4, 20).setValue(restricted === true || restricted === 'true');
+        log('Set lumpsumRestricted=' + restricted + ' for fund ' + fundCode + ' in portfolio ' + portfolioId);
+        return { success: true };
+      }
+    }
+
+    throw new Error('Fund not found in portfolio: ' + fundCode);
+  } catch (error) {
+    log('Error in toggleFundLumpsumRestricted: ' + error.toString());
+    throw error;
   }
 }
 

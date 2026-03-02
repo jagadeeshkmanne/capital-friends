@@ -234,6 +234,9 @@ function createPortfolioSheet(portfolioName, portfolioId) {
   portfolioSheet.getRange(3, 18).setValue("ATH NAV ₹");
   portfolioSheet.getRange(3, 19).setValue("% Below ATH");
 
+  // T: Lumpsum Restricted (column 20) — static flag, set per fund
+  portfolioSheet.getRange(3, 20).setValue("Lumpsum\nRestricted");
+
   // Format header row with better styling (including ATH columns)
   const headerRange = portfolioSheet.getRange(3, 1, 1, 19);  // Extended to column S
   headerRange.setFontWeight("bold");
@@ -1284,6 +1287,9 @@ function addFundRowToPortfolio(sheet, row, portfolioId, schemeCode, targetPercen
   sheet.getRange(row, 19).setFormula(
     `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
   );
+
+  // Column T (20): Lumpsum Restricted - static flag, FALSE by default
+  sheet.getRange(row, 20).setValue(false);
 
   // Apply formatting
   sheet.getRange(row, 1, 1, 16).setBorder(true, true, true, true, false, false);
