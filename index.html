@@ -29,12 +29,44 @@
   </head>
   <body class="bg-slate-50 antialiased">
     <div id="root">
-      <!-- Visible to crawlers before JS hydrates (React replaces this on mount) -->
-      <div id="crawler-content" style="max-width:700px;margin:40px auto;padding:0 20px;font-family:Inter,sans-serif;color:#333">
-        <h1>Capital Friends</h1>
-        <p>Capital Friends is a free, open-source family portfolio tracker built by Jagadeesh Manne. Track mutual funds, stocks, FDs, gold, insurance, loans, and goals for your entire family — all stored privately in your Google Drive. No servers, no database, no tracking.</p>
-        <p><a href="https://capitalfriends.in/privacy">Privacy Policy</a> | <a href="https://capitalfriends.in/terms">Terms &amp; Conditions</a></p>
-        <p>Contact: jagadeesh.k.manne@gmail.com</p>
+      <!-- Static content for crawlers. React replaces everything inside #root on mount. -->
+      <div id="crawler-content" style="font-family:'Inter',sans-serif;color:#333">
+        <div style="background:#080d1a;color:#e2e8f0;padding:24px 20px 48px;text-align:center">
+          <h1 style="font-family:'Poppins',sans-serif;font-size:28px;font-weight:800;color:#fff;margin:0 0 8px">Capital Friends</h1>
+          <p style="font-size:18px;color:#fff;margin:0 0 16px">One dashboard for your family's entire wealth</p>
+          <p style="font-size:15px;color:#94a3b8;max-width:600px;margin:0 auto;line-height:1.7">
+            Capital Friends is a free, open-source family portfolio tracker built by Jagadeesh Manne.
+            Track mutual funds, stocks, FDs, gold, insurance, loans, and goals for your entire family
+            — all stored privately in your Google Drive. No servers, no database, no tracking.
+          </p>
+        </div>
+        <div style="max-width:700px;margin:0 auto;padding:32px 20px">
+          <h2 style="font-size:22px;font-weight:700;margin:0 0 16px">What makes Capital Friends different</h2>
+          <ul style="line-height:2;padding-left:20px;color:#475569">
+            <li><strong>ATH Tracking</strong> — See how far each mutual fund is from its All-Time High NAV. Spot buying opportunities when quality funds dip below ATH.</li>
+            <li><strong>Smart Rebalancing</strong> — Set target allocation for each fund. Get exact buy/sell/SIP adjustment amounts when your portfolio drifts.</li>
+            <li><strong>Goal-Based Investing</strong> — Link portfolios to goals like retirement, education, or emergency fund. Track progress with on-track indicators.</li>
+            <li><strong>Family Dashboard</strong> — Track wealth for your entire family. Switch between members, see combined or individual net worth.</li>
+            <li><strong>Your Data, Your Drive</strong> — Everything stored in a Google Spreadsheet in your own Google Drive. No external servers, no database.</li>
+            <li><strong>Email Reports &amp; Reminders</strong> — Scheduled portfolio summaries sent from your Gmail. SIP reminders, insurance renewals, goal check-ins.</li>
+          </ul>
+          <h2 style="font-size:22px;font-weight:700;margin:32px 0 16px">How it works</h2>
+          <ol style="line-height:2;padding-left:20px;color:#475569">
+            <li>Sign in with your Google account — no registration, no passwords</li>
+            <li>Capital Friends creates a private spreadsheet in your Google Drive</li>
+            <li>Start tracking — add family members, portfolios, goals, insurance, loans</li>
+          </ol>
+          <p style="margin:32px 0 16px;color:#475569;line-height:1.7">
+            <strong>No bank credentials needed</strong> — manual entry means you control what goes in.
+            <strong>Always free</strong>, no ads, no premium plans.
+            <a href="https://github.com/jagadeeshkmanne/capital-friends" style="color:#7c3aed">Open source on GitHub</a>.
+          </p>
+          <p style="margin:24px 0;font-size:14px">
+            <a href="https://capitalfriends.in/privacy" style="color:#7c3aed;margin-right:16px">Privacy Policy</a>
+            <a href="https://capitalfriends.in/terms" style="color:#7c3aed">Terms &amp; Conditions</a>
+          </p>
+          <p style="font-size:13px;color:#94a3b8">Contact: jagadeesh.k.manne@gmail.com</p>
+        </div>
       </div>
     </div>
   </body>
