@@ -29,13 +29,13 @@
   </head>
   <body class="bg-slate-50 antialiased">
     <div id="root">
-      <!-- Fallback content for crawlers that don't execute JavaScript -->
-      <noscript>
+      <!-- Visible to crawlers before JS hydrates (React replaces this on mount) -->
+      <div id="crawler-content" style="max-width:700px;margin:40px auto;padding:0 20px;font-family:Inter,sans-serif;color:#333">
         <h1>Capital Friends</h1>
         <p>Capital Friends is a free, open-source family portfolio tracker built by Jagadeesh Manne. Track mutual funds, stocks, FDs, gold, insurance, loans, and goals for your entire family — all stored privately in your Google Drive. No servers, no database, no tracking.</p>
-        <p><a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms &amp; Conditions</a></p>
+        <p><a href="https://capitalfriends.in/privacy">Privacy Policy</a> | <a href="https://capitalfriends.in/terms">Terms &amp; Conditions</a></p>
         <p>Contact: jagadeesh.k.manne@gmail.com</p>
-      </noscript>
+      </div>
     </div>
   </body>
 </html>
