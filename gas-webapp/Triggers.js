@@ -147,6 +147,24 @@ function sendScheduledDailyEmail() {
   try {
     Logger.log('=== SCHEDULED EMAIL STARTED at ' + new Date().toLocaleTimeString('en-IN') + ' ===');
 
+    // Time-based triggers run without spreadsheet context.
+    // We must look up the trigger owner's spreadsheet first.
+    var email = Session.getEffectiveUser().getEmail();
+    if (!email) {
+      Logger.log('sendScheduledDailyEmail: No user email available from trigger');
+      return;
+    }
+
+    var userRecord = findUserByEmail(email);
+    if (!userRecord || userRecord.status !== 'Active') {
+      Logger.log('sendScheduledDailyEmail: User not found or not active: ' + email);
+      return;
+    }
+
+    // Set spreadsheet context so all business logic functions can access the user's sheets
+    _currentUserSpreadsheetId = userRecord.spreadsheetId;
+    Logger.log('Spreadsheet context set for: ' + email + ' (' + userRecord.spreadsheetId + ')');
+
     // Use the unified dashboard email report (same as manual send from React Settings)
     const result = sendDashboardEmailReport('daily', true);
 

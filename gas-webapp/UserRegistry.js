@@ -67,6 +67,15 @@ function getOrCreateUser(email, name) {
   var existing = findUserByEmail(email);
 
   if (existing) {
+    // Verify the spreadsheet still exists (user may have deleted it from Drive)
+    try {
+      SpreadsheetApp.openById(existing.spreadsheetId);
+    } catch (e) {
+      // Spreadsheet deleted or inaccessible — recreate for this user
+      log('Spreadsheet missing for ' + email + ' (id: ' + existing.spreadsheetId + '). Recreating...');
+      return createNewUser(email, existing.displayName || name);
+    }
+
     // Update last login
     existing.lastLogin = new Date().toISOString();
 

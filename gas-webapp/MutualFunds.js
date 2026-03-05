@@ -309,6 +309,24 @@ function processRedeem(formData) {
 }
 
 /**
+ * Process multiple redemptions in one call (goal withdrawal bulk)
+ * params.redemptions = [{ portfolioId, fundCode, saleDate, units, salePrice, notes }]
+ */
+function processRedeemBulk(params) {
+  const redemptions = params.redemptions || [];
+  if (!redemptions.length) return { success: false, message: 'No redemptions provided' };
+  const results = [];
+  for (const item of redemptions) {
+    const result = processRedeem(item);
+    results.push({ fundCode: item.fundCode, ...result });
+    if (!result.success) {
+      return { success: false, message: result.message, results };
+    }
+  }
+  return { success: true, message: `${redemptions.length} redemption(s) recorded successfully.`, results };
+}
+
+/**
  * Process Switch Funds transaction (SELL + SWITCH from one fund, BUY + SWITCH to another)
  */
 function processSwitchFunds(formData) {
@@ -317,7 +335,10 @@ function processSwitchFunds(formData) {
     log(`Form data: ${JSON.stringify(formData)}`);
 
     // Validate required fields
-    isRequired(formData.portfolioId, 'Portfolio');
+    // Supports cross-portfolio switch: fromPortfolioId + toPortfolioId
+    // Falls back to portfolioId for backward compatibility (same-portfolio switch)
+    isRequired(formData.fromPortfolioId || formData.portfolioId, 'From Portfolio');
+    isRequired(formData.toPortfolioId || formData.portfolioId, 'To Portfolio');
     isRequired(formData.fromFundCode, 'From Fund');
     isRequired(formData.toFundCode, 'To Fund');
     isRequired(formData.switchDate, 'Switch Date');
@@ -325,7 +346,8 @@ function processSwitchFunds(formData) {
     isRequired(formData.fromFundPrice, 'From Fund Price');
     isRequired(formData.toFundPrice, 'To Fund Price');
 
-    const portfolioId = formData.portfolioId;
+    const fromPortfolioId = formData.fromPortfolioId || formData.portfolioId;
+    const toPortfolioId = formData.toPortfolioId || formData.portfolioId;
     const fromFundCode = formData.fromFundCode;
     const toFundCode = formData.toFundCode;
     const switchDate = formData.switchDate;
@@ -337,8 +359,8 @@ function processSwitchFunds(formData) {
     const targetAllocation = parseFloat(formData.targetAllocation || 0);
     const notes = formData.notes || '';
 
-    if (fromFundCode === toFundCode) {
-      throw new Error('Cannot switch to the same fund');
+    if (fromFundCode === toFundCode && fromPortfolioId === toPortfolioId) {
+      throw new Error('Cannot switch to the same fund in the same portfolio');
     }
     if (units <= 0) throw new Error('Units must be greater than 0');
     if (fromFundPrice <= 0) throw new Error('From fund price must be greater than 0');
@@ -347,82 +369,67 @@ function processSwitchFunds(formData) {
       throw new Error('Target allocation must be between 0 and 100');
     }
 
-    // Get portfolio details
+    // Get portfolio details for both sides
     const portfolios = getAllPortfolios();
-    const portfolio = portfolios.find(p => p.portfolioId === portfolioId);
-    if (!portfolio) {
-      throw new Error('Portfolio not found');
-    }
+    const fromPortfolio = portfolios.find(p => p.portfolioId === fromPortfolioId);
+    if (!fromPortfolio) throw new Error('From portfolio not found');
+    const toPortfolio = portfolios.find(p => p.portfolioId === toPortfolioId);
+    if (!toPortfolio) throw new Error('To portfolio not found');
 
-    const portfolioName = portfolio.portfolioName;
+    const fromPortfolioName = fromPortfolio.portfolioName;
+    const toPortfolioName = toPortfolio.portfolioName;
 
-    // Get portfolio sheet (with PFL- prefix fallback)
-    const portfolioSheet = getPortfolioSheet(portfolioId);
-    if (!portfolioSheet) {
-      throw new Error(`Portfolio sheet "${portfolioId}" not found`);
-    }
+    // Get portfolio sheets (reuse same sheet object if same portfolio)
+    const fromPortfolioSheet = getPortfolioSheet(fromPortfolioId);
+    if (!fromPortfolioSheet) throw new Error(`Portfolio sheet "${fromPortfolioId}" not found`);
+    const toPortfolioSheet = fromPortfolioId === toPortfolioId ? fromPortfolioSheet : getPortfolioSheet(toPortfolioId);
+    if (!toPortfolioSheet) throw new Error(`Portfolio sheet "${toPortfolioId}" not found`);
 
     // Get fund names from MutualFundData
     const mfDataSheet = getSheet(CONFIG.mutualFundDataSheet);
-    if (!mfDataSheet) {
-      throw new Error('MutualFundData sheet not found');
-    }
-
+    if (!mfDataSheet) throw new Error('MutualFundData sheet not found');
     const mfData = mfDataSheet.getDataRange().getValues();
     let fromFundName = '';
     let toFundName = '';
-
-    // MutualFundData structure: Row 1 = Headers, Row 2+ = Data
-    // Skip header (row 0 in array), start from row 1 (data row 2 in sheet)
     for (let i = 1; i < mfData.length; i++) {
-      if (mfData[i][0] && mfData[i][0].toString() === fromFundCode.toString()) {
-        fromFundName = mfData[i][1];
-      }
-      if (mfData[i][0] && mfData[i][0].toString() === toFundCode.toString()) {
-        toFundName = mfData[i][1];
-      }
+      if (mfData[i][0] && mfData[i][0].toString() === fromFundCode.toString()) fromFundName = mfData[i][1];
+      if (mfData[i][0] && mfData[i][0].toString() === toFundCode.toString()) toFundName = mfData[i][1];
     }
-
-    if (!fromFundName) {
-      throw new Error(`From fund code ${fromFundCode} not found in MutualFundData`);
-    }
-    if (!toFundName) {
-      throw new Error(`To fund code ${toFundCode} not found in MutualFundData`);
-    }
+    if (!fromFundName) throw new Error(`From fund code ${fromFundCode} not found in MutualFundData`);
+    if (!toFundName) throw new Error(`To fund code ${toFundCode} not found in MutualFundData`);
 
     const baseFromFundName = getBaseFundName(fromFundName);
     const baseToFundName = getBaseFundName(toFundName);
 
-    // Check if from fund exists in portfolio and get average buy price
-    const portfolioData = portfolioSheet.getDataRange().getValues();
+    // Check from fund exists in source portfolio, get avg buy price
+    const fromPortfolioData = fromPortfolioSheet.getDataRange().getValues();
     let fromFundExists = false;
-    let toFundExists = false;
     let avgBuyPrice = 0;
-
-    // Portfolio structure: Row 1=Watermark, Row 2=Group Headers, Row 3=Column Headers, Row 4+=Data
-    // Columns: A=Code, B=Name, C=Units, D=Avg NAV ₹, E=Current NAV, F=Investment...
-    // Array index 0=Row1, index 1=Row2, index 2=Row3, index 3=Row4 (first data row)
-    for (let i = 3; i < portfolioData.length; i++) {
-      const rowFundCode = portfolioData[i][0];
+    for (let i = 3; i < fromPortfolioData.length; i++) {
+      const rowFundCode = fromPortfolioData[i][0];
       if (rowFundCode && rowFundCode.toString() === fromFundCode.toString()) {
         fromFundExists = true;
-        avgBuyPrice = parseFloat(portfolioData[i][3]) || 0;  // Column D (index 3) = Avg NAV ₹
-        log(`Found from fund ${baseFromFundName} in portfolio. Avg Buy Price: ₹${avgBuyPrice}`);
-      }
-      if (rowFundCode && rowFundCode.toString() === toFundCode.toString()) {
-        toFundExists = true;
+        avgBuyPrice = parseFloat(fromPortfolioData[i][3]) || 0;
+        log(`Found from fund ${baseFromFundName}. Avg Buy Price: ₹${avgBuyPrice}`);
       }
     }
-
     if (!fromFundExists) {
-      throw new Error(`From fund ${baseFromFundName} (Code: ${fromFundCode}) not found in portfolio ${portfolioName}`);
+      throw new Error(`From fund ${baseFromFundName} (Code: ${fromFundCode}) not found in portfolio ${fromPortfolioName}`);
     }
 
-    // Record SELL transaction for from fund with P&L calculation
+    // Check if to fund already exists in destination portfolio
+    const toPortfolioData = fromPortfolioId === toPortfolioId ? fromPortfolioData : toPortfolioSheet.getDataRange().getValues();
+    let toFundExists = false;
+    for (let i = 3; i < toPortfolioData.length; i++) {
+      const rowFundCode = toPortfolioData[i][0];
+      if (rowFundCode && rowFundCode.toString() === toFundCode.toString()) toFundExists = true;
+    }
+
+    // Record SELL against source portfolio
     recordTransactionInHistory({
       date: switchDate,
-      portfolioId: portfolioId,
-      portfolio: portfolioName,
+      portfolioId: fromPortfolioId,
+      portfolio: fromPortfolioName,
       fundCode: fromFundCode,
       fund: baseFromFundName,
       type: 'SELL',
@@ -430,15 +437,15 @@ function processSwitchFunds(formData) {
       units: units,
       price: fromFundPrice,
       totalAmount: switchAmount,
-      avgBuyPrice: avgBuyPrice,  // For P&L calculation
+      avgBuyPrice: avgBuyPrice,
       notes: notes
     });
 
-    // Record BUY transaction for to fund
+    // Record BUY against destination portfolio
     recordTransactionInHistory({
       date: switchDate,
-      portfolioId: portfolioId,
-      portfolio: portfolioName,
+      portfolioId: toPortfolioId,
+      portfolio: toPortfolioName,
       fundCode: toFundCode,
       fund: baseToFundName,
       type: 'BUY',
@@ -449,35 +456,29 @@ function processSwitchFunds(formData) {
       notes: notes
     });
 
-    // Add to fund to portfolio sheet if it doesn't exist
+    // Add to fund to destination portfolio sheet if it doesn't exist
     if (!toFundExists) {
-      // Validate total allocation before adding new fund
       if (targetAllocation > 0) {
-        const currentTotalAllocation = calculateTotalAllocation(portfolioSheet);
+        const currentTotalAllocation = calculateTotalAllocation(toPortfolioSheet);
         const newTotalAllocation = currentTotalAllocation + targetAllocation;
-
         if (newTotalAllocation > 100) {
           throw new Error(
-            `Total allocation would exceed 100%!\n\n` +
-            `Current total: ${currentTotalAllocation.toFixed(2)}%\n` +
-            `Adding: ${targetAllocation.toFixed(2)}%\n` +
-            `New total: ${newTotalAllocation.toFixed(2)}%\n\n` +
-            `Please adjust the target allocation to keep total at or below 100%.`
+            `Total allocation would exceed 100%!\n\nCurrent total: ${currentTotalAllocation.toFixed(2)}%\nAdding: ${targetAllocation.toFixed(2)}%\nNew total: ${newTotalAllocation.toFixed(2)}%\n\nPlease adjust the target allocation to keep total at or below 100%.`
           );
         }
       }
-
-      addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, toFundCode, targetAllocation);
+      addFundToPortfolioSheet(toPortfolioSheet, toPortfolioId, toPortfolioName, toFundCode, targetAllocation);
     }
 
-    log(`SWITCH transaction processed successfully for ${portfolioId}`);
+    const crossPortfolio = fromPortfolioId !== toPortfolioId;
+    log(`SWITCH transaction processed successfully (${crossPortfolio ? 'cross-portfolio' : 'same-portfolio'})`);
 
-    // Check if from fund now has 0 units and delete row if so
-    deleteZeroUnitFunds(portfolioSheet, portfolioName);
+    // Remove zero-unit fund from source portfolio
+    deleteZeroUnitFunds(fromPortfolioSheet, fromPortfolioName);
 
     return {
       success: true,
-      message: `Switch recorded successfully! ${units.toFixed(4)} units of ${baseFromFundName} switched to ${toFundUnits.toFixed(4)} units of ${baseToFundName}.`
+      message: `Switch recorded! ${units.toFixed(4)} units of ${baseFromFundName}${crossPortfolio ? ` (${fromPortfolioName})` : ''} switched to ${toFundUnits.toFixed(4)} units of ${baseToFundName}${crossPortfolio ? ` (${toPortfolioName})` : ''}.`
     };
 
   } catch (error) {
@@ -802,6 +803,9 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
     // T (20): Lumpsum Restricted - static flag, FALSE by default
     portfolioSheet.getRange(newRow, 20).setValue(false);
 
+    // U (21): SIP Restricted - static flag, FALSE by default
+    portfolioSheet.getRange(newRow, 21).setValue(false);
+
     log(`DEBUG: All formulas set, applying formatting...`);
 
     // Apply formatting
@@ -925,8 +929,8 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
     }
 
     // Portfolio sheet: Row 1=Watermark, Row 2=Group headers, Row 3=Column headers, Row 4+=Data
-    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH + T=Lumpsum Restricted = 20 cols max
-    var maxCol = Math.min(portfolioSheet.getLastColumn(), 20);
+    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH + T=Lumpsum Restricted + U=SIP Restricted = 21 cols max
+    var maxCol = Math.min(portfolioSheet.getLastColumn(), 21);
     var data = portfolioSheet.getRange(4, 1, lastRow - 3, maxCol).getValues();
 
     var funds = [];
@@ -953,6 +957,7 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
           athNav: maxCol >= 18 ? (parseFloat(row[17]) || 0) : 0,
           belowATHPct: maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0,
           lumpsumRestricted: maxCol >= 20 ? (row[19] === true || row[19] === 'TRUE' || row[19] === 'true') : false,
+          sipRestricted: maxCol >= 21 ? (row[20] === true || row[20] === 'TRUE' || row[20] === 'true') : false,
           navDate: '',
           portfolioId: portfolioId
         });
@@ -969,32 +974,66 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
 }
 
 /**
- * Toggle lumpsum restricted flag for a fund in a portfolio (column T, col 20)
+ * Toggle lumpsum restricted flag for a fund GLOBALLY across ALL portfolios (column T, col 20)
  * When restricted=true: lumpsum BUY is blocked (only SIP and SELL are allowed)
- * @param {string} portfolioId - Portfolio ID
+ * Updates every portfolio sheet that contains this fund.
+ * @param {string} _portfolioId - Ignored (kept for API compat), restriction is global
  * @param {string} fundCode - Fund scheme code
  * @param {boolean} restricted - true to restrict, false to allow
  */
-function toggleFundLumpsumRestricted(portfolioId, fundCode, restricted) {
+function toggleFundLumpsumRestricted(_portfolioId, fundCode, restricted) {
+  return toggleFundRestrictionGlobal(fundCode, restricted, 20, 'lumpsumRestricted');
+}
+
+/**
+ * Toggle SIP restricted flag for a fund GLOBALLY across ALL portfolios (column U, col 21)
+ * When restricted=true: SIP is blocked (only lumpsum and SELL are allowed)
+ * Updates every portfolio sheet that contains this fund.
+ * @param {string} _portfolioId - Ignored (kept for API compat), restriction is global
+ * @param {string} fundCode - Fund scheme code
+ * @param {boolean} restricted - true to restrict, false to allow
+ */
+function toggleFundSipRestricted(_portfolioId, fundCode, restricted) {
+  return toggleFundRestrictionGlobal(fundCode, restricted, 21, 'sipRestricted');
+}
+
+/**
+ * Toggle a restriction flag for a fund across ALL active portfolio sheets.
+ * @param {string} fundCode - Fund scheme code
+ * @param {boolean} restricted - true to restrict, false to allow
+ * @param {number} column - Column number (20=lumpsum, 21=sip)
+ * @param {string} label - Label for logging
+ */
+function toggleFundRestrictionGlobal(fundCode, restricted, column, label) {
   try {
-    var sheet = getPortfolioSheet(portfolioId);
-    if (!sheet) throw new Error('Portfolio sheet not found: ' + portfolioId);
+    var portfolios = getAllPortfolios();
+    var value = restricted === true || restricted === 'true';
+    var updated = [];
 
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 3) throw new Error('No funds in portfolio');
+    for (var p = 0; p < portfolios.length; p++) {
+      if (portfolios[p].status === 'Inactive') continue;
+      var sheet = getPortfolioSheet(portfolios[p].portfolioId);
+      if (!sheet) continue;
+      var lastRow = sheet.getLastRow();
+      if (lastRow <= 3) continue;
 
-    var data = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
-    for (var i = 0; i < data.length; i++) {
-      if (data[i][0] && data[i][0].toString() === fundCode.toString()) {
-        sheet.getRange(i + 4, 20).setValue(restricted === true || restricted === 'true');
-        log('Set lumpsumRestricted=' + restricted + ' for fund ' + fundCode + ' in portfolio ' + portfolioId);
-        return { success: true };
+      var data = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] && data[i][0].toString() === fundCode.toString()) {
+          sheet.getRange(i + 4, column).setValue(value);
+          updated.push(portfolios[p].portfolioId);
+          break;
+        }
       }
     }
 
-    throw new Error('Fund not found in portfolio: ' + fundCode);
+    log('Set ' + label + '=' + restricted + ' for fund ' + fundCode + ' across ' + updated.length + ' portfolios: ' + updated.join(', '));
+    if (updated.length === 0) {
+      throw new Error('Fund not found in any portfolio: ' + fundCode);
+    }
+    return { success: true, updatedPortfolios: updated.length };
   } catch (error) {
-    log('Error in toggleFundLumpsumRestricted: ' + error.toString());
+    log('Error in toggleFundRestrictionGlobal (' + label + '): ' + error.toString());
     throw error;
   }
 }

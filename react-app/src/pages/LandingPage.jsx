@@ -1,28 +1,543 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import {
-  Shield, Users, TrendingUp, Target, BarChart3,
-  CreditCard, Bell, Lock, RefreshCw, Link2,
-  Heart, PiggyBank, ArrowDown, CheckCircle2, AlertTriangle,
-  Eye, LogIn, FileSpreadsheet, ClipboardCheck,
-} from 'lucide-react'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
 
+function GI({ s = 14 }) {
+  return (
+    <svg style={{ flexShrink: 0 }} width={s} height={s} viewBox="0 0 24 24">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+    </svg>
+  )
+}
+
+// ─── Mock window nav icons ───
+function MockNav({ active }) {
+  const icons = ['DB', 'FM', 'MF', 'GL', 'IN', 'LN']
+  return (
+    <div style={{ width: 40, flexShrink: 0, background: '#02060f', borderRight: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0', gap: 2, alignSelf: 'stretch' }}>
+      {icons.map(ic => (
+        <div key={ic} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, ...(ic === active ? { background: 'rgba(167,139,250,0.12)', color: '#a78bfa' } : { color: '#475569' }) }}>
+          {ic}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function WinBar({ url }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#02060f', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f57' }} />
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fec02f' }} />
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#29ca41' }} />
+      <div style={{ flex: 1, maxWidth: 360, margin: '0 auto', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: '3px 10px', fontSize: 10.5, color: '#64748b', textAlign: 'center' }}>
+        {url}
+      </div>
+    </div>
+  )
+}
+
+// ─── Slide 0: Family Awareness / Dashboard ───
+function Slide0() {
+  return (
+    <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
+      <MockNav active="DB" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Page header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,.25)' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Dashboard</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(167,139,250,.1)', color: '#a78bfa' }}>Everyone</span>
+            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(255,255,255,.04)', color: '#475569' }}>Jagadeesh</span>
+            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(255,255,255,.04)', color: '#475569' }}>Priya</span>
+          </div>
+        </div>
+        {/* Net Worth */}
+        <div style={{ padding: '12px 16px 14px', borderBottom: '1px solid rgba(255,255,255,.06)', background: 'rgba(128,128,128,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+            <div style={{ width: 3, height: 12, borderRadius: 2, background: 'rgba(148,163,184,.5)' }} />
+            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#475569' }}>Net Worth</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 30, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-.02em', lineHeight: 1.1 }}>₹1.37 Cr</div>
+              <div style={{ marginTop: 5, fontSize: 11.5 }}>
+                <span style={{ fontWeight: 600, color: '#34d399' }}>+₹31.4L</span>
+                <span style={{ color: '#64748b', marginLeft: 5 }}>(+29.6% returns)</span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 8.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total Assets</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#94a3b8' }}>₹1.56 Cr</div>
+              <div style={{ fontSize: 8.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginTop: 6 }}>Liabilities</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#f87171' }}>₹18.4L</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', height: 9, borderRadius: 5, overflow: 'hidden', gap: 1 }}>
+              <div style={{ width: '46%', background: '#8b5cf6' }} />
+              <div style={{ width: '30%', background: '#60a5fa' }} />
+              <div style={{ width: '10%', background: '#fbbf24' }} />
+              <div style={{ width: '9%', background: '#818cf8' }} />
+              <div style={{ width: '5%', background: '#94a3b8' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+              {[['#8b5cf6','Equity 46%'],['#60a5fa','Debt 30%'],['#fbbf24','Gold 10%'],['#818cf8','Hybrid 9%'],['#94a3b8','Cash 5%']].map(([c,l]) => (
+                <span key={l} style={{ fontSize: 9.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <b style={{ width: 6, height: 6, background: c, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />{l}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Asset Allocation */}
+        <div style={{ padding: '12px 16px 14px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+            <div style={{ width: 3, height: 12, borderRadius: 2, background: 'rgba(148,163,184,.5)' }} />
+            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#475569' }}>Asset Allocation</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ position: 'relative', width: 136, height: 136 }}>
+                <div style={{ width: 136, height: 136, borderRadius: '50%', background: 'conic-gradient(#f97316 0% 50%,#8b5cf6 50% 58%,#fbbf24 58% 68%,#f59e0b 68% 73%,#0d9488 73% 77%,#6366f1 77% 83%,#94a3b8 83% 100%)' }} />
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 86, height: 86, borderRadius: '50%', background: '#080d1a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  <div style={{ fontSize: 7, color: '#64748b', letterSpacing: '.04em', textTransform: 'uppercase' }}>Net Worth</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f1f5f9' }}>₹1.37Cr</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, width: '100%' }}>
+                <div style={{ background: 'rgba(139,92,246,0.08)', borderRadius: 7, padding: '5px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 7, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' }}>Assets</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#f1f5f9' }}>₹1.56Cr</div>
+                  <div style={{ fontSize: 8, color: '#34d399' }}>+₹31.4L P&L</div>
+                </div>
+                <div style={{ background: 'rgba(248,113,113,0.08)', borderRadius: 7, padding: '5px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 7, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' }}>Liabilities</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#f87171' }}>₹18.4L</div>
+                  <div style={{ fontSize: 8, color: '#64748b' }}>1 Loan</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {[
+                ['#f97316','Mutual Funds','₹78.4L','50%','rgba(249,115,22,.1)','#f97316'],
+                ['#8b5cf6','Stocks','₹12.2L','10%','rgba(139,92,246,.1)','#8b5cf6'],
+                ['#fbbf24','Gold (SGB)','₹14.9L','12%','rgba(251,191,36,.1)','#fbbf24'],
+                ['#f59e0b','Fixed Deposits','₹8.0L','6%','rgba(245,158,11,.1)','#f59e0b'],
+                ['#0d9488','PPF','₹5.2L','3%','rgba(13,148,136,.1)','#0d9488'],
+                ['#6366f1','EPF','₹8.8L','6%','rgba(99,102,241,.1)','#6366f1'],
+              ].map(([dotColor, name, val, pct, pctBg, pctColor]) => (
+                <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 9px', borderRadius: 7, background: 'rgba(128,128,128,0.05)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 500 }}>{name}</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: '#94a3b8' }}>{val}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: pctBg, color: pctColor }}>{pct}</span>
+                  </span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 9px', borderRadius: 7, background: 'rgba(248,113,113,0.06)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f87171', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, color: '#f87171', fontWeight: 500 }}>1 Loan</span>
+                </span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: '#f87171' }}>−₹18.4L</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Slide 1: ATH Buy Signals ───
+function Slide1() {
+  return (
+    <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
+      <MockNav active="MF" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,.18)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#e2e8f0', cursor: 'pointer' }}>
+            Growth Portfolio — Jagadeesh
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(198,40,40,.12)', color: '#c62828' }}>3 buy signals</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: 'rgba(255,255,255,.04)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+          {[['Invested','₹12.4L','#f1f5f9'],['Current Value','₹15.6L','#f1f5f9'],['Unrealized P&L','+₹3.2L +25.8%','#34d399'],['Monthly SIP','₹20,000','#34d399']].map(([label, val, color], i) => (
+            <div key={i} style={{ padding: '8px 10px', background: '#080d1a' }}>
+              <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#64748b', marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color }}>{val.split(' ')[0]}</div>
+              {val.split(' ')[1] && <div style={{ fontSize: 9, color }}>{val.split(' ')[1]}</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+          <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#c62828' }} />
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#c62828' }}>ATH Tracker</span>
+          <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 100, background: 'rgba(198,40,40,.1)', color: '#c62828' }}>3 signals</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 58px 60px 76px', padding: '4px 14px', borderBottom: '1px solid rgba(255,255,255,.04)', gap: 8 }}>
+          {['Fund','ATH NAV','Current','Signal'].map((h, i) => (
+            <span key={h} style={{ fontSize: 8.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#475569', textAlign: i > 0 ? 'right' : 'left' }}>{h}</span>
+          ))}
+        </div>
+        {[
+          { name: 'Axis Small Cap Fund', sub: 'Dec 2024', pct: '▼26.6%', pctColor: '#c62828', ath: '₹52.10', cur: '₹38.22', signal: 'Strong Buy', sigBg: 'rgba(198,40,40,.12)', sigColor: '#c62828' },
+          { name: 'HDFC Mid-Cap Opp.', sub: 'Jan 2025', pct: '▼15.5%', pctColor: '#d84315', ath: '₹168.50', cur: '₹142.35', signal: 'Good Buy', sigBg: 'rgba(216,67,21,.1)', sigColor: '#d84315' },
+          { name: 'Kotak Emerging Eq.', sub: 'Feb 2025', pct: '▼3.6%', pctColor: '#b8860b', ath: '₹92.40', cur: '₹89.10', signal: 'Watch', sigBg: 'rgba(184,134,11,.1)', sigColor: '#b8860b' },
+          { name: 'Parag Parikh Flexi Cap', sub: 'Mar 2025 · ▼0.4%', pct: null, pctColor: null, ath: '₹82.80', cur: '₹82.45', signal: 'Near ATH', sigBg: 'rgba(71,85,105,.1)', sigColor: '#475569' },
+          { name: 'Mirae Asset Large Cap', sub: 'At all-time high today', pct: null, pctColor: null, ath: '₹105.80', curBold: true, cur: '₹105.80', curColor: '#34d399', signal: 'At ATH', sigBg: 'rgba(52,211,153,.1)', sigColor: '#34d399' },
+        ].map((r, i, arr) => (
+          <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '1fr 58px 60px 76px', padding: '8px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', gap: 8, alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 600, color: '#e2e8f0', fontSize: 12 }}>{r.name}</div>
+              <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>
+                {r.pct ? <>{r.sub} · <b style={{ color: r.pctColor }}>{r.pct}</b></> : r.sub}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: '#475569' }}>{r.ath}</div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: r.curColor || '#475569', fontWeight: r.curBold ? 700 : 400 }}>{r.cur}</div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: r.sigBg, color: r.sigColor }}>{r.signal}</span>
+            </div>
+          </div>
+        ))}
+        <div style={{ padding: '5px 14px', background: 'rgba(0,0,0,.15)', borderTop: '1px solid rgba(255,255,255,.04)' }}>
+          <p style={{ fontSize: 9, color: '#475569' }}>Strong Buy ≥20% · Good Buy 10–20% · Watch 5–10% below ATH</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Slide 2: Smart Rebalancing ───
+function Slide2() {
+  return (
+    <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
+      <MockNav active="MF" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,.18)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#e2e8f0', cursor: 'pointer' }}>
+            Growth Portfolio — Jagadeesh
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(167,139,250,.1)', color: '#a78bfa' }}>4 off-target</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+          <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#7c3aed' }} />
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7c3aed' }}>Rebalance</span>
+        </div>
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+          <div style={{ flex: 1, textAlign: 'center', padding: '8px 4px', fontSize: 11.5, fontWeight: 600, color: '#a78bfa', borderBottom: '2px solid #a78bfa' }}>Adjust SIP</div>
+          <div style={{ flex: 1, textAlign: 'center', padding: '8px 4px', fontSize: 11.5, fontWeight: 600, color: '#64748b', borderBottom: '2px solid transparent' }}>Lumpsum</div>
+          <div style={{ flex: 1, textAlign: 'center', padding: '8px 4px', fontSize: 11.5, fontWeight: 600, color: '#64748b', borderBottom: '2px solid transparent' }}>Buy / Sell</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 14px', borderBottom: '1px solid rgba(255,255,255,.04)', background: 'rgba(0,0,0,.12)', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: '#64748b' }}>Value</span><span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>₹12,40,000</span>
+          <span style={{ fontSize: 10, color: '#64748b' }}>SIP</span><span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>₹20,000/mo</span>
+          <span style={{ fontSize: 10, color: '#64748b' }}>Threshold</span><span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa' }}>5%</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 50px 92px', padding: '4px 14px', borderBottom: '1px solid rgba(255,255,255,.04)', gap: 8 }}>
+          {['Fund','Now','Target','New SIP'].map((h, i) => (
+            <span key={h} style={{ fontSize: 8.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#475569', textAlign: i === 0 ? 'left' : i < 3 ? 'center' : 'right' }}>{h}</span>
+          ))}
+        </div>
+        {[
+          { name: 'Axis Bluechip Fund', sub: 'overweight +5%', now: '30%', target: '25%', sip: 'Stop SIP', sipColor: '#fbbf24' },
+          { name: 'Parag Parikh Flexi Cap', sub: 'underweight −5%', now: '35%', target: '40%', sip: '₹12,000', sipColor: '#34d399' },
+          { name: 'SBI Small Cap', sub: 'overweight +5%', now: '20%', target: '15%', sip: 'Stop SIP', sipColor: '#fbbf24' },
+          { name: 'HDFC Short Duration', sub: 'underweight −5%', now: '15%', target: '20%', sip: '₹8,000', sipColor: '#34d399' },
+        ].map((r, i, arr) => (
+          <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '1fr 44px 50px 92px', padding: '8px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', gap: 8, alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 600, color: '#e2e8f0', fontSize: 12 }}>{r.name}</div>
+              <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>{r.sub}</div>
+            </div>
+            <span style={{ textAlign: 'center', color: '#475569', fontSize: 11.5 }}>{r.now}</span>
+            <span style={{ textAlign: 'center', color: '#64748b', fontSize: 11.5 }}>{r.target}</span>
+            <span style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: r.sipColor }}>{r.sip}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Slide 3: Goals ───
+function Slide3() {
+  return (
+    <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
+      <MockNav active="GL" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,.25)' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Goals</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span style={{ fontSize: 11, color: '#60a5fa' }}>2 On Track</span>
+            <span style={{ fontSize: 11, color: '#fb923c' }}>1 Attention</span>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 1, background: 'rgba(255,255,255,.04)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+          {[['Target','₹2.7 Cr','#f1f5f9',null],['Current','₹59.7L','#f1f5f9',null],['Gap','₹2.1 Cr','#f87171',null],['Progress','22%','#f1f5f9','3 goals'],['SIP Needed','₹42,000','#34d399','per month'],['Lumpsum','₹8.4L','#f1f5f9','one-time']].map(([l, v, c, sub]) => (
+            <div key={l} style={{ padding: '8px 9px', background: '#080d1a' }}>
+              <div style={{ fontSize: 7.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#64748b', marginBottom: 2 }}>{l}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: c }}>{v}</div>
+              {sub && <div style={{ fontSize: 8, color: '#64748b' }}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '10px 14px 12px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#475569', marginBottom: 10 }}>Goal Timeline</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { name: 'Retirement', status: 'Behind', statusBg: 'rgba(239,68,68,.12)', statusColor: '#ef4444', yrs: '18.0 yrs', pct: 14, barColor: '#ef4444', val: '₹28.5L', extra: '₹4.2L behind', extraColor: '#ef4444' },
+              { name: 'Child Education', status: 'On track', statusBg: 'rgba(16,185,129,.12)', statusColor: '#10b981', yrs: '12.0 yrs', pct: 24, barColor: '#10b981', val: '₹12.2L', extra: 'Target ₹50L', extraColor: '#64748b' },
+              { name: 'Own House', status: 'On track', statusBg: 'rgba(16,185,129,.12)', statusColor: '#10b981', yrs: '8.0 yrs', pct: 38, barColor: '#10b981', val: '₹19.0L', extra: 'Target ₹50L', extraColor: '#64748b' },
+            ].map(r => (
+              <div key={r.name}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                    <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 7px', borderRadius: 100, background: r.statusBg, color: r.statusColor, flexShrink: 0 }}>{r.status}</span>
+                  </div>
+                  <span style={{ fontSize: 10, color: '#64748b', flexShrink: 0, marginLeft: 8 }}>{r.yrs}</span>
+                </div>
+                <div style={{ height: 8, background: 'rgba(255,255,255,.06)', borderRadius: 100, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${r.pct}%`, background: r.barColor, borderRadius: 100 }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#f1f5f9' }}>{r.val}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: r.barColor }}>{r.pct}%</span>
+                  <span style={{ fontSize: 10, color: r.extraColor }}>{r.extra}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ margin: '8px 10px', padding: '9px 12px', borderRadius: 8, background: 'rgba(251,146,60,.04)', border: '1px solid rgba(251,146,60,.2)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <svg style={{ width: 13, height: 13, flexShrink: 0, color: '#fb923c', marginTop: 2 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#fb923c', marginBottom: 2 }}>De-Risking Alert</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0' }}>Retirement · Equity 78% vs rec. max 60%</div>
+            <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>Excess ₹3.2L in equity — above glide path by 18%</div>
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 5, background: 'rgba(251,146,60,.12)', color: '#fb923c', whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer' }}>Rebalance</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Slide 4: Retirement Buckets ───
+function Slide4() {
+  return (
+    <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
+      <MockNav active="GL" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,.25)' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Retirement Bucket Plan</span>
+          <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(251,146,60,.1)', color: '#fb923c' }}>Smart routing</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+          <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#ea580c' }} />
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#ea580c' }}>Bucket State vs Targets</span>
+        </div>
+        <div style={{ padding: '8px 14px 10px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+          <div style={{ display: 'flex', height: 9, borderRadius: 5, overflow: 'hidden', gap: 1, marginBottom: 9 }}>
+            <div style={{ width: '83%', background: '#8b5cf6' }} />
+            <div style={{ width: '10%', background: '#fbbf24' }} />
+            <div style={{ width: '7%', background: '#34d399' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div style={{ background: 'rgba(139,92,246,.06)', border: '1px solid rgba(139,92,246,.25)', borderRadius: 8, padding: '10px 11px' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#a78bfa', marginBottom: 4 }}>B3 · Equity</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1.2, marginBottom: 3 }}>₹48.2L</div>
+              <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 5 }}>Long-term growth</div>
+              <div style={{ fontSize: 9, fontWeight: 600, color: '#34d399' }}>✓ On target</div>
+            </div>
+            <div style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '10px 11px' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#fbbf24', marginBottom: 4 }}>B2 · Hybrid</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#fbbf24', lineHeight: 1.2, marginBottom: 3 }}>₹6.1L</div>
+              <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 5 }}>Target: 60 mo</div>
+              <div style={{ fontSize: 9, fontWeight: 600, color: '#f87171' }}>↓ ₹2.5L short</div>
+            </div>
+            <div style={{ background: 'rgba(52,211,153,.06)', border: '1px solid rgba(52,211,153,.25)', borderRadius: 8, padding: '10px 11px' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#34d399', marginBottom: 4 }}>B1 · Liquid</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#34d399', lineHeight: 1.2, marginBottom: 3 }}>₹3.8L</div>
+              <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 5 }}>Target: 24 mo</div>
+              <div style={{ fontSize: 9, fontWeight: 600, color: '#f87171' }}>↓ ₹3.4L short</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+          <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#34d399' }} />
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#34d399' }}>Annual Refill Switches</span>
+        </div>
+        <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ background: 'rgba(52,211,153,.05)', border: '1px solid rgba(52,211,153,.18)', borderRadius: 8, padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(139,92,246,.15)', color: '#a78bfa' }}>B3 Equity</span>
+                <span style={{ fontSize: 10, color: '#64748b' }}>→</span>
+                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(52,211,153,.15)', color: '#34d399' }}>B1 Liquid</span>
+                <span style={{ fontSize: 8, fontWeight: 700, color: '#34d399', marginLeft: 2 }}>DIRECT</span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399' }}>₹3.4L</div>
+              <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>Skips B2 · Saves ~₹12,000 LTCG tax</div>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399', cursor: 'pointer', flexShrink: 0, marginLeft: 10 }}>Confirm →</span>
+          </div>
+          <div style={{ background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.18)', borderRadius: 8, padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(139,92,246,.15)', color: '#a78bfa' }}>B3 Equity</span>
+                <span style={{ fontSize: 10, color: '#64748b' }}>→</span>
+                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(251,191,36,.15)', color: '#fbbf24' }}>B2 Hybrid</span>
+                <span style={{ fontSize: 8, fontWeight: 700, color: '#fbbf24', marginLeft: 2 }}>REFILL</span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#fbbf24' }}>₹2.5L</div>
+              <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>Only what B2 actually needs</div>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', cursor: 'pointer', flexShrink: 0, marginLeft: 10 }}>Confirm →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SLIDES = [
+  {
+    id: 0,
+    tabLabel: 'Family Awareness',
+    dotColor: '#16a34a',
+    tag: 'Family First',
+    tagStyle: { background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' },
+    heading: 'Your family knows where everything is — even in your absence',
+    para: 'If something happens to you, your family needs instant access to every investment, policy, loan, and FD — not months of confusion.',
+    bullets: [
+      { ck: '✓', ckColor: '#16a34a', text: 'Auto monthly email reports sent to family' },
+      { ck: '✓', ckColor: '#16a34a', text: 'Insurance, FD, SIP reminders for everyone' },
+      { ck: '✓', ckColor: '#16a34a', text: 'Family members can sign in any time' },
+      { ck: '✓', ckColor: '#16a34a', text: 'Combined or individual net worth view' },
+    ],
+    url: 'capitalfriends.in/dashboard',
+    MockUI: Slide0,
+  },
+  {
+    id: 1,
+    tabLabel: 'ATH Buy Signals',
+    dotColor: '#c62828',
+    tag: 'ATH Tracking',
+    tagStyle: { background: '#fff5f5', color: '#c62828', border: '1px solid #fecaca' },
+    heading: 'Know exactly when to buy your funds',
+    para: 'Daily NAV from AMFI. Color-coded buy signals for funds you actually hold — not random market noise.',
+    bullets: [
+      { ck: '▼', ckColor: '#c62828', text: 'Strong Buy — 20%+ below All-Time High' },
+      { ck: '▼', ckColor: '#d84315', text: 'Good Buy — 10–20% below ATH' },
+      { ck: '▼', ckColor: '#b8860b', text: 'Watch — 5–10% below ATH' },
+      { ck: '✓', ckColor: '#16a34a', text: 'Updated daily from AMFI' },
+    ],
+    url: 'capitalfriends.in/investments/mutual-funds',
+    MockUI: Slide1,
+  },
+  {
+    id: 2,
+    tabLabel: 'Smart Rebalancing',
+    dotColor: '#7c3aed',
+    tag: 'Smart Rebalancing',
+    tagStyle: { background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' },
+    heading: 'Three rebalancing modes — SIP, Lumpsum, Buy/Sell',
+    para: 'Set target allocation per fund. When portfolio drifts beyond your threshold, get exact numbers — no guesswork.',
+    bullets: [
+      { ck: '✓', ckColor: '#7c3aed', text: 'SIP Adjust — stop or increase monthly SIP' },
+      { ck: '✓', ckColor: '#7c3aed', text: 'Lumpsum Top-up — exact amount to invest' },
+      { ck: '✓', ckColor: '#7c3aed', text: 'Buy/Sell — exact units to transact' },
+      { ck: '✓', ckColor: '#7c3aed', text: 'Configurable threshold per portfolio' },
+    ],
+    url: 'capitalfriends.in/investments/mutual-funds',
+    MockUI: Slide2,
+  },
+  {
+    id: 3,
+    tabLabel: 'Goals & Glide Path',
+    dotColor: '#0891b2',
+    tag: 'Goals',
+    tagStyle: { background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc' },
+    heading: 'Goals with automatic glide path de-risk alerts',
+    para: 'As you get closer to a goal, equity % is auto-checked against the glide path. Alert fires when you\'re over-exposed.',
+    bullets: [
+      { ck: '✓', ckColor: '#0891b2', text: 'Link portfolios to goals with % allocation' },
+      { ck: '✓', ckColor: '#0891b2', text: 'Live goal progress as NAVs change daily' },
+      { ck: '✓', ckColor: '#0891b2', text: 'Glide path: equity reduces as goal nears' },
+      { ck: '✓', ckColor: '#0891b2', text: 'One-click rebalance when alert fires' },
+    ],
+    url: 'capitalfriends.in/goals',
+    MockUI: Slide3,
+  },
+  {
+    id: 4,
+    tabLabel: 'Retirement Buckets',
+    dotColor: '#ea580c',
+    tag: 'Retirement',
+    tagStyle: { background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa' },
+    heading: 'Retirement buckets with tax-smart routing',
+    para: 'B3→B1 direct switch skips B2 — avoiding an unnecessary redemption and capital gains tax every annual refill cycle.',
+    bullets: [
+      { ck: '✓', ckColor: '#ea580c', text: 'B3 Equity — long-term growth (10+ yrs)' },
+      { ck: '✓', ckColor: '#ea580c', text: 'B2 Hybrid — bridge buffer (3–7 yrs)' },
+      { ck: '✓', ckColor: '#ea580c', text: 'B1 Liquid — safety net (1–2 yrs)' },
+      { ck: '✓', ckColor: '#ea580c', text: 'Direct B3→B1 saves ~₹12,000/yr in tax' },
+    ],
+    url: 'capitalfriends.in/goals — Retirement Bucket Plan',
+    MockUI: Slide4,
+  },
+]
+
+const TRACK_CARDS = [
+  { color: '#f97316', title: 'Mutual Funds', desc: 'Track all MF portfolios across AMCs. Units, NAV, current value, P&L, XIRR. SIP and lumpsum transactions. ATH buy signals per fund.' },
+  { color: '#8b5cf6', title: 'Stocks', desc: 'Equity holdings across brokers. Buy/sell transactions, average cost, unrealized and realized P&L per scrip and portfolio.' },
+  { color: '#fbbf24', title: 'FDs, Gold & Other', desc: 'Fixed deposits, SGB, real estate, PPF and any other asset. Track invested amount, current value, maturity date and expected returns.' },
+  { color: '#f43f5e', title: 'Insurance Policies', desc: 'Term life, health, motor, home and travel policies. Sum assured, premium, maturity date — for every family member.' },
+  { color: '#ef4444', title: 'Loans & Liabilities', desc: 'Home loan, car loan, personal loan, credit card. Outstanding balance, EMI, interest rate, tenure — all in one view.' },
+  { color: '#16a34a', title: 'Family Members', desc: 'Add your entire family — spouse, parents, children. View combined or individual net worth, goals, insurance and loans per member.' },
+]
+
+const SMART_CARDS = [
+  { color: '#c62828', title: 'ATH Buy Signals', desc: 'See how far each fund is from its All-Time High NAV. Strong Buy / Good Buy / Watch — color-coded signals updated daily from AMFI.', uniq: true },
+  { color: '#7c3aed', title: 'Smart Rebalancing — 3 Modes', desc: 'Set target allocation per fund. Get exact SIP adjustment, lumpsum top-up, or buy/sell units when portfolio drifts beyond threshold.', uniq: true },
+  { color: '#0891b2', title: 'Goals & Glide Path De-risk', desc: 'Link portfolios to goals. Equity % auto-checked against years left. De-risk alert fires when you\'re overexposed — one click to rebalance.', uniq: true },
+  { color: '#ea580c', title: 'Retirement Bucket Strategy', desc: 'Split corpus into B3 (equity), B2 (hybrid), B1 (liquid). B3→B1 direct routing saves capital gains tax every refill cycle.', uniq: true },
+  { color: '#0d9488', title: 'Smart Reminders', desc: 'Insurance renewals, FD maturities, SIP due dates, loan EMIs. Sorted by urgency — never let a policy lapse or a date slip by.' },
+  { color: '#2563eb', title: 'Your Data, Your Drive', desc: 'Everything stored in a Google Spreadsheet in YOUR Google Drive. No servers, no database. Auto monthly email reports to your whole family.' },
+]
+
 export default function LandingPage() {
-  const { isAuthenticated, loading, error, signIn } = useAuth()
+  const { isAuthenticated, loading, signIn } = useAuth()
   const navigate = useNavigate()
-  const [activeFeature, setActiveFeature] = useState(0)
+  const [activeSlide, setActiveSlide] = useState(0)
+  const [featTab, setFeatTab] = useState(0)
   const [paused, setPaused] = useState(false)
   const timerRef = useRef(null)
+  const N = 5
 
-  // Auto-rotate features every 5s
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => {
       setPaused(p => {
-        if (!p) setActiveFeature(prev => (prev + 1) % 4)
+        if (!p) setActiveSlide(prev => (prev + 1) % N)
         return p
       })
     }, 5000)
@@ -33,8 +548,8 @@ export default function LandingPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [resetTimer])
 
-  function pickFeature(i) {
-    setActiveFeature(i)
+  function goSlide(i) {
+    setActiveSlide(i)
     resetTimer()
   }
 
@@ -43,590 +558,296 @@ export default function LandingPage() {
   }, [isAuthenticated, navigate])
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#080d1a]"><img src={LOGO_ICON} alt="" className="h-16 w-auto animate-pulse" /></div>
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080d1a' }}>
+        <img src={LOGO_ICON} alt="" style={{ height: 64, width: 'auto' }} />
+      </div>
+    )
   }
 
-  const features = [
-    {
-      id: 'ath',
-      label: 'ATH Tracking',
-      icon: <TrendingUp size={18} />,
-      color: 'emerald',
-      tagline: 'Spot Buying Opportunities',
-      desc: 'See how far each mutual fund is from its All-Time High NAV. When a quality fund dips 10-20% below ATH, it\'s your signal to invest more — via SIP increase or lumpsum.',
-      mock: <MockATH />,
-    },
-    {
-      id: 'rebalance',
-      label: 'Rebalancing',
-      icon: <RefreshCw size={18} />,
-      color: 'violet',
-      tagline: 'Know Exactly What to Buy or Sell',
-      desc: 'Set target allocation for each fund. When your portfolio drifts, Capital Friends tells you exactly how much to adjust — via SIP changes, lumpsum top-ups, or buy/sell actions.',
-      mock: <MockRebalance />,
-    },
-    {
-      id: 'goals',
-      label: 'Goal Linking',
-      icon: <Target size={18} />,
-      color: 'cyan',
-      tagline: 'Link Portfolios to Goals',
-      desc: 'Create goals like retirement, child education, or emergency fund. Link MF portfolios with allocation percentages. Goal progress updates automatically as NAVs change daily.',
-      mock: <MockGoals />,
-    },
-    {
-      id: 'dashboard',
-      label: 'Family View',
-      icon: <Users size={18} />,
-      color: 'amber',
-      tagline: 'Everyone\'s Wealth, One Dashboard',
-      desc: 'Switch between family members in one click. See combined or individual net worth, investments, insurance, loans — everything your family owns, in one place.',
-      mock: <MockDashboard />,
-    },
-  ]
-
-  const af = features[activeFeature]
+  const slide = SLIDES[activeSlide]
 
   return (
-    <div className="min-h-screen bg-[#080d1a] text-slate-200">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-[#0a0f1f]/95 backdrop-blur-sm border-b border-white/[0.06]">
-        <div className="flex items-center justify-between px-3 sm:px-4 h-14">
-          <div className="flex items-center gap-2">
-            <img src={LOGO_ICON} alt="CF" className="h-12 w-auto" />
-            <span className="flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
-              <span className="font-bold text-white">Capital</span>
-              <span className="font-extrabold text-emerald-400">Friends</span>
+    <div style={{ fontFamily: "'Inter', sans-serif", background: '#f8fafc', color: '#0f172a', WebkitFontSmoothing: 'antialiased' }}>
+      {/* ─── HEADER ─── */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(10,15,31,0.98)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 56 }}>
+          <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+            <img src={LOGO_ICON} alt="" style={{ height: 44, width: 'auto' }}
+              onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
+            <div style={{ display: 'none', width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 12, color: '#fff', flexShrink: 0 }}>CF</div>
+            <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px' }}>
+              <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b><em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
             </span>
-          </div>
-          <button onClick={signIn} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-600 text-white text-sm font-semibold hover:from-violet-500 hover:to-cyan-500 transition-all cursor-pointer">
-            <GI s={14} /> Sign In
+          </a>
+          <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
+            <GI s={14} />
+            Sign In
           </button>
         </div>
       </header>
 
-      {/* ── Hero ── */}
-      <section className="relative px-5 sm:px-8 lg:px-16 pt-10 sm:pt-14 pb-8 sm:pb-10 overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[400px] bg-violet-600/8 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-20 right-1/4 w-[400px] h-[300px] bg-cyan-600/6 rounded-full blur-[100px] pointer-events-none" />
-        <div className="relative text-center">
-          <span className="inline-block text-xs font-bold uppercase tracking-[0.2em] text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-full px-4 py-1.5 mb-5">
-            Always Free &middot; 100% Private &middot; Your Google Sheet
-          </span>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-[1.1] tracking-tight text-white">
-            One dashboard for your family&apos;s{' '}
-            <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">entire wealth</span>
-          </h1>
-          <p className="mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-2xl mx-auto">
-            Mutual funds, stocks, FDs, gold, insurance, loans — track everything for every family member.
-            Manual entry means <strong className="text-white">no bank credentials, no privacy risk</strong>.
-          </p>
-          {error && <p className="mt-5 text-sm text-rose-400">{error}</p>}
-        </div>
-      </section>
-
-      {/* ── The Big Question — Emotional Hook ── */}
-      <section className="bg-gradient-to-b from-[#0d0a1a] to-[#0a0e1c] border-y border-white/[0.06] px-5 sm:px-8 lg:px-16 py-10 sm:py-14">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white inline-flex items-center gap-3 flex-wrap justify-center">
-              <AlertTriangle size={28} className="text-amber-400 shrink-0" />
-              <span>What happens if something happens to <span className="text-amber-400">you</span>?</span>
-            </h2>
-            <p className="mt-4 text-lg text-slate-400 leading-relaxed">
-              Your family should know about every investment, every policy, every loan.
-              Not someday. <strong className="text-white">Right now.</strong>
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <ScenarioCard
-              icon={<Eye size={20} />}
-              color="rose"
-              title="Without Capital Friends"
-              items={[
-                'Scattered investments across 10+ platforms',
-                'Family has no idea what you own or owe',
-                'Insurance policies lost in email threads',
-                'Months of confusion, missed renewals, lost money',
-              ]}
-              bad
-            />
-            <ScenarioCard
-              icon={<Shield size={20} />}
-              color="emerald"
-              title="With Capital Friends"
-              items={[
-                'One sheet — every investment, policy, and loan',
-                'Family receives email reports with full portfolio details',
-                'Reminders for SIPs, renewals, EMI payments',
-                'Complete clarity, instantly — when it matters most',
-              ]}
-            />
-          </div>
-
-          <p className="text-center mt-8 text-base text-slate-500">
-            Built for <strong className="text-white">you</strong> to manage your wealth — and for your <strong className="text-white">family</strong> to access it when they need to.
-          </p>
-      </section>
-
-      {/* ── How it Works ── */}
-      <section className="bg-[#0a0e1c] border-y border-white/[0.06] px-5 sm:px-8 lg:px-16 py-14 sm:py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-2">How it Works</h2>
-          <p className="text-base text-slate-500">Set up in 2 minutes — no bank credentials, no downloads</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
-          <HowStep num={1} icon={<LogIn size={24} />} color="violet" title="Sign In with Google" desc="Go to capitalfriends.in and sign in with your Google account. That's all — no registration form, no passwords." />
-          <HowStep num={2} icon={<FileSpreadsheet size={24} />} color="emerald" title="App Creates Your Sheet" desc="The app creates a private Google Sheet in your own Google Drive. This sheet stores all your financial data. Only you can see it — not even the developer." />
-          <HowStep num={3} icon={<ClipboardCheck size={24} />} color="cyan" title="Financial Health Check" desc="Answer 7 simple yes/no questions about your financial health. Get your score and personalized recommendations instantly." />
-          <HowStep num={4} icon={<TrendingUp size={24} />} color="amber" title="Start Tracking" desc="Add family members, portfolios, goals, insurance, and loans. The app connects to AMFI for live mutual fund prices automatically." />
-        </div>
-
-        <p className="text-center mt-10 text-sm text-slate-600">
-          Your sheet is named <strong className="text-slate-400">&ldquo;Capital Friends - Your Name&rdquo;</strong> and lives in your Google Drive.
-          The web app is just a beautiful dashboard to view and manage it.
+      {/* ─── HERO ─── */}
+      <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '20px 24px 16px', textAlign: 'center' }}>
+        <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 26, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 7 }}>
+          One dashboard for your family's <span style={{ color: '#16a34a' }}>entire wealth</span>
+        </h1>
+        <p style={{ fontSize: 13.5, color: '#475569', marginBottom: 14, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
+          Track mutual funds, stocks, insurance, loans for every family member — stored privately in your own Google Drive.
         </p>
+        <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 20px', borderRadius: 9, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+          <GI s={14} />
+          Sign in with Google — it's free
+        </button>
+        <div style={{ marginTop: 10, fontSize: 11.5, color: '#94a3b8' }}>
+          Free · Open source · No bank credentials · Data stays in your Google Drive
+        </div>
       </section>
 
-      {/* ── Features Showcase ── */}
-      <section id="features" className="bg-[#0b1022] border-y border-white/[0.06] px-5 sm:px-8 lg:px-16 py-14 sm:py-20" onMouseEnter={() => setPaused(true)} onMouseLeave={() => { setPaused(false); resetTimer() }}>
-        <div className="text-center mb-10">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-2">Features That Set Us Apart</h2>
-          <p className="text-base text-slate-500">Things you won&apos;t find on other portfolio trackers</p>
-        </div>
-
-        {/* Feature titles as navigation */}
-        <div className="flex justify-center gap-2 sm:gap-3 mb-10 flex-wrap">
-          {features.map((f, i) => {
-            const active = i === activeFeature
-            const borderC = { emerald: 'border-emerald-500', violet: 'border-violet-500', cyan: 'border-cyan-500', amber: 'border-amber-500' }
-            const textC = { emerald: 'text-emerald-400', violet: 'text-violet-400', cyan: 'text-cyan-400', amber: 'text-amber-400' }
-            return (
+      {/* ─── SHOWCASE ─── */}
+      <section style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Tabs bar */}
+        <nav style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', minWidth: 'max-content', margin: '0 auto' }}>
+            {SLIDES.map((s, i) => (
               <button
-                key={f.id}
-                onClick={() => pickFeature(i)}
-                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-semibold transition-all cursor-pointer ${
-                  active
-                    ? `${borderC[f.color]} bg-white/[0.05] ${textC[f.color]}`
-                    : 'border-white/[0.08] text-slate-500 hover:border-white/[0.15] hover:text-slate-300'
-                }`}
+                key={s.id}
+                onClick={() => goSlide(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px',
+                  fontSize: 12, fontWeight: 600, background: 'none', border: 'none',
+                  cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap',
+                  color: activeSlide === i ? '#0f172a' : '#94a3b8',
+                }}
               >
-                <span className="shrink-0">{f.icon}</span>
-                {f.label}
-                {/* Progress bar */}
-                {active && (
-                  <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-white/[0.06] rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full bg-current`} style={{ animation: 'featureProgress 5s linear', animationPlayState: paused ? 'paused' : 'running' }} />
-                  </div>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.dotColor, opacity: activeSlide === i ? 1 : 0.3, flexShrink: 0 }} />
+                {s.tabLabel}
+                {activeSlide === i && (
+                  <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: s.dotColor }} />
                 )}
               </button>
-            )
-          })}
-        </div>
-
-        {/* Active feature content */}
-        <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-12">
-          <div className="lg:flex-1 min-h-[280px]">
-            <h3 className="text-xl sm:text-2xl font-bold text-white">{af.tagline}</h3>
-            <p className="mt-3 text-base text-slate-400 leading-relaxed">{af.desc}</p>
-
-            {af.id === 'ath' && (
-              <div className="mt-6 space-y-5">
-                <Bullet c="emerald" t="ATH tracking only for funds in your portfolios" />
-                <Bullet c="emerald" t="Color-coded signals: watch, consider, buy, strong buy" />
-                <Bullet c="emerald" t="Increase SIP or invest lumpsum when funds dip" />
-                <Bullet c="emerald" t="Daily NAV updates from AMFI data" />
-              </div>
-            )}
-
-            {af.id === 'rebalance' && (
-              <div className="mt-6 space-y-5">
-                <Bullet c="violet" t="Adjust monthly SIP to rebalance gradually" />
-                <Bullet c="violet" t="Lumpsum top-up for quick rebalance" />
-                <Bullet c="violet" t="Buy/Sell amounts to match target" />
-                <Bullet c="violet" t="Configurable threshold per portfolio" />
-              </div>
-            )}
-
-            {af.id === 'goals' && (
-              <div className="mt-6 space-y-5">
-                <Bullet c="cyan" t="Link multiple MF portfolios to each goal" />
-                <Bullet c="cyan" t="Built-in SIP + lumpsum calculator with inflation" />
-                <Bullet c="cyan" t="Auto-status: On Track, Needs Attention, Achieved" />
-                <Bullet c="cyan" t="Withdrawal planning for retirement goals" />
-              </div>
-            )}
-
-            {af.id === 'dashboard' && (
-              <div className="mt-6 space-y-5">
-                <Bullet c="amber" t="One-click switch between family members" />
-                <Bullet c="amber" t="Combined net worth across everyone" />
-                <Bullet c="amber" t="MF, stocks, FD, gold, PPF, NPS, insurance" />
-                <Bullet c="amber" t="Email reports sent to family automatically" />
-              </div>
-            )}
+            ))}
           </div>
-          <div className="lg:flex-1 min-w-0 min-h-[380px] flex flex-col justify-center">
-            {af.mock}
-          </div>
-        </div>
+        </nav>
 
-        {/* CSS animation for progress bar */}
-        <style>{`
-          @keyframes featureProgress {
-            from { width: 0% }
-            to { width: 100% }
-          }
-        `}</style>
-      </section>
-
-      {/* ── Everything You Need ── */}
-      <section className="bg-[#0a0e1c] border-y border-white/[0.06] px-5 sm:px-8 lg:px-16 py-14 sm:py-20">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-2">Everything You Need</h2>
-          <p className="text-base text-slate-500">One dashboard for your entire financial life</p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <FC icon={<BarChart3 size={20} />} c="rose" t="Stock Portfolios" d="Buy/sell tracking, average cost, P&L with live NSE prices" />
-          <FC icon={<PiggyBank size={20} />} c="orange" t="FD, Gold, PPF, NPS" d="Track any investment type — all counted in net worth" />
-          <FC icon={<Shield size={20} />} c="teal" t="Insurance Tracker" d="Life, health, term policies with premiums & renewal dates" />
-          <FC icon={<CreditCard size={20} />} c="red" t="Liabilities" d="Loans & EMIs. Net worth = total assets minus debts" />
-          <FC icon={<Bell size={20} />} c="yellow" t="Smart Reminders" d="SIP dates, renewals, EMI payments, maturity alerts" />
-          <FC icon={<Users size={20} />} c="pink" t="Family Sharing" d="Invite family with Google accounts — shared dashboard" />
-          <FC icon={<RefreshCw size={20} />} c="blue" t="Daily Auto-Refresh" d="NAVs and stock prices update automatically every day" />
-          <FC icon={<Lock size={20} />} c="emerald" t="Complete Privacy" d="No servers, no database, no tracking — your Sheet only" />
-        </div>
-      </section>
-
-      {/* ── Trust / Privacy ── */}
-      <section className="border-y border-white/[0.06]">
-        {/* Section header */}
-        <div className="bg-[#0b1022] px-5 sm:px-8 lg:px-16 py-10 sm:py-14 text-center">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white inline-flex items-center gap-3"><Lock size={28} className="text-emerald-400 shrink-0" />Your Data Never Leaves Google</h2>
-          <p className="mt-3 text-base sm:text-lg text-slate-400 leading-relaxed">
-            No backend server. No database. No tracking. The web app is a static site.
-            Your spreadsheet lives in <strong className="text-white">your Google Drive</strong>. We literally cannot access your financial data.
-          </p>
-        </div>
-        {/* Three trust strips */}
-        <div className="flex flex-col sm:flex-row">
-          <TrustStrip icon={<Shield size={20} />} t="Manual Entry Only" d="No bank linking, no credentials shared. You type your data — no one else has access." bg="bg-[#0d1326]" c="emerald" />
-          <TrustStrip icon={<Lock size={20} />} t="Your Google Sheet" d="A private spreadsheet in your Drive. Share only with family you choose." bg="bg-[#0f1530]" c="violet" />
-          <TrustStrip icon={<Heart size={20} />} t="Always Free" d="No premium tier, no hidden fees, no ads. Free today, free forever." bg="bg-[#111838]" c="amber" />
-        </div>
-      </section>
-
-      {/* ── Final CTA ── */}
-      <section className="bg-gradient-to-t from-[#080d1a] to-[#0d1128] border-t border-white/[0.06] px-5 sm:px-8 lg:px-16 py-16 text-center">
-        <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-          Start managing your family&apos;s wealth today
-        </h2>
-        <p className="mt-3 text-base text-slate-500">
-          Always free. No credit card. No bank linking. Just your Google account.
-        </p>
-        <button onClick={signIn} className="mt-8 inline-flex items-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-bold text-base rounded-xl hover:from-violet-500 hover:to-cyan-500 shadow-lg shadow-violet-900/30 transition-all hover:scale-[1.02] cursor-pointer">
-          <GI s={20} /> Sign in with Google — It&apos;s Free
-        </button>
-        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-white/[0.04] px-5 sm:px-8 lg:px-16 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 opacity-30">
-          <img src={LOGO_ICON} alt="" className="h-5 w-auto" />
-          <span className="text-xs font-bold text-white" style={{ fontFamily: "'Poppins', sans-serif" }}>Capital<span class="text-emerald-400">Friends</span></span>
-        </div>
-        <p className="text-xs text-slate-600">Your data. Your Google Drive. Your control.</p>
-      </footer>
-    </div>
-  )
-}
-
-/* ─────────────────── SCENARIO CARDS ─────────────────── */
-
-function ScenarioCard({ icon, title, items, bad }) {
-  const border = bad ? 'border-rose-500/15' : 'border-emerald-500/15'
-  const bg = bad ? 'bg-rose-500/[0.04]' : 'bg-emerald-500/[0.04]'
-  const iconBg = bad ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'
-  const titleC = bad ? 'text-rose-400' : 'text-emerald-400'
-
-  return (
-    <div className={`rounded-2xl border ${border} ${bg} p-6`}>
-      <h3 className={`text-lg font-bold ${titleC} mb-4 flex items-center gap-2.5`}>
-        <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${iconBg} shrink-0`}>{icon}</span>
-        {title}
-      </h3>
-      <ul className="space-y-3">
-        {items.map((item, i) => (
-          <li key={i} className="flex items-start gap-2.5">
-            {bad
-              ? <span className="text-rose-500/60 mt-0.5 shrink-0">&times;</span>
-              : <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-            }
-            <span className="text-sm text-slate-300 leading-relaxed">{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-/* ─────────────────── MOCK UI COMPONENTS ─────────────────── */
-
-function MockDashboard() {
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#0d1326] overflow-hidden shadow-2xl shadow-black/40">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] bg-[#0a0f1f]">
-        <span className="text-sm text-slate-400 font-medium">Dashboard</span>
-        <div className="flex gap-1.5">
-          {['Everyone', 'Jagadeesh', 'Priya', 'Arjun'].map((n, i) => (
-            <span key={n} className={`text-xs px-2.5 py-1 rounded-full font-medium ${i === 0 ? 'bg-violet-500/20 text-violet-300' : 'text-slate-600'}`}>{n}</span>
-          ))}
-        </div>
-      </div>
-      <div className="grid grid-cols-3 divide-x divide-white/[0.04]">
-        <WS l="Net Worth" v={`\u20B945.2L`} lc="text-violet-400" vc="text-white" />
-        <WS l="Invested" v={`\u20B938.7L`} lc="text-slate-500" vc="text-slate-300" />
-        <WS l="P&L" v={`+\u20B96.5L`} lc="text-slate-500" vc="text-emerald-400" extra="+16.8%" />
-      </div>
-      <div className="border-t border-white/[0.04]">
-        <MRow n="Axis Bluechip Fund" alloc="30% / 25%" cur={`\u20B96.2L`} pl="+24.0%" ath="5.2%" athC="text-[#e67e00]" up />
-        <MRow n="Parag Parikh Flexi Cap" alloc="35% / 40%" cur={`\u20B94.8L`} pl="+37.1%" ath="At ATH" athC="text-emerald-500" up />
-        <MRow n="SBI Small Cap Fund" alloc="20% / 15%" cur={`\u20B91.8L`} pl="-10.0%" ath="18.3%" athC="text-[#d84315]" last />
-      </div>
-    </div>
-  )
-}
-
-function MockATH() {
-  const funds = [
-    { n: 'HDFC Mid-Cap Opportunities', nav: '142.35', ath: '168.50', pct: '15.5%', color: 'text-[#d84315]', signal: 'Good Buy Signal', sigC: 'text-[#d84315] bg-[#d84315]/15' },
-    { n: 'Axis Small Cap Fund', nav: '38.22', ath: '52.10', pct: '26.6%', color: 'text-[#c62828]', signal: 'Strong Buy', sigC: 'text-[#c62828] bg-[#c62828]/15 font-bold' },
-    { n: 'Kotak Emerging Equity', nav: '89.10', ath: '92.40', pct: '3.6%', color: 'text-[#b8860b]', signal: 'Watch', sigC: 'text-[#b8860b] bg-[#b8860b]/15' },
-    { n: 'Mirae Asset Large Cap', nav: '105.80', ath: '106.20', pct: '0.4%', color: 'text-slate-500', signal: 'Near ATH', sigC: 'text-slate-500 bg-white/[0.04]' },
-  ]
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#0d1326] overflow-hidden shadow-2xl shadow-black/40">
-      <div className="px-4 py-3 border-b border-white/[0.04] bg-[#0a0f1f] flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">Buy Opportunities</span>
-        <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-full">2 signals</span>
-      </div>
-      {funds.map((f, i) => (
-        <div key={i} className={`flex items-center justify-between px-4 py-3 ${i < funds.length - 1 ? 'border-b border-white/[0.03]' : ''}`}>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-300 truncate">{f.n}</p>
-            <p className="text-xs text-slate-600 mt-0.5">NAV {`\u20B9`}{f.nav} &middot; ATH {`\u20B9`}{f.ath}</p>
-          </div>
-          <div className="text-right shrink-0 ml-3">
-            <p className={`text-base font-bold tabular-nums ${f.color}`}><ArrowDown size={13} className="inline -mt-0.5" /> {f.pct}</p>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${f.sigC}`}>{f.signal}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function MockRebalance() {
-  const [activeTab, setActiveTab] = useState(0)
-  const tabs = ['SIP Adjust', 'Lumpsum', 'Buy / Sell']
-  const headers = ['New SIP', 'Lumpsum Top-up', 'Action']
-  // Portfolio total: ₹10,00,000. Each 5% = ₹50,000
-  const tabData = [
-    [ // SIP Adjust — Total SIP ₹20,000. Stop overweight, redirect to underweight
-      { n: 'Axis Bluechip', val: 'SIP \u20B96,000', cur: '30%', tgt: '25%', action: 'Stop SIP', actionC: 'text-amber-400' },
-      { n: 'Parag Parikh Flexi', val: 'SIP \u20B97,000', cur: '35%', tgt: '40%', action: '\u20B912,000/mo', actionC: 'text-emerald-400' },
-      { n: 'SBI Small Cap', val: 'SIP \u20B94,000', cur: '20%', tgt: '15%', action: 'Stop SIP', actionC: 'text-amber-400' },
-      { n: 'HDFC Large Cap', val: 'SIP \u20B93,000', cur: '15%', tgt: '20%', action: '\u20B98,000/mo', actionC: 'text-emerald-400' },
-    ],
-    [ // Lumpsum ₹1L — only underweight funds get investment. 55K + 45K = 1L
-      { n: 'Axis Bluechip', val: '3,00,000', cur: '30%', tgt: '25%', action: 'No action', actionC: 'text-slate-600' },
-      { n: 'Parag Parikh Flexi', val: '3,50,000', cur: '35%', tgt: '40%', action: 'Invest \u20B955,000', actionC: 'text-emerald-400' },
-      { n: 'SBI Small Cap', val: '2,00,000', cur: '20%', tgt: '15%', action: 'No action', actionC: 'text-slate-600' },
-      { n: 'HDFC Large Cap', val: '1,50,000', cur: '15%', tgt: '20%', action: 'Invest \u20B945,000', actionC: 'text-emerald-400' },
-    ],
-    [ // Buy / Sell — each 5% gap = ₹50,000. Sells fund buys
-      { n: 'Axis Bluechip', val: '3,00,000', cur: '30%', tgt: '25%', action: 'Sell \u20B950,000', actionC: 'text-rose-400' },
-      { n: 'Parag Parikh Flexi', val: '3,50,000', cur: '35%', tgt: '40%', action: 'Buy \u20B950,000', actionC: 'text-emerald-400' },
-      { n: 'SBI Small Cap', val: '2,00,000', cur: '20%', tgt: '15%', action: 'Sell \u20B950,000', actionC: 'text-rose-400' },
-      { n: 'HDFC Large Cap', val: '1,50,000', cur: '15%', tgt: '20%', action: 'Buy \u20B950,000', actionC: 'text-emerald-400' },
-    ],
-  ]
-  const funds = tabData[activeTab]
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#0d1326] overflow-hidden shadow-2xl shadow-black/40">
-      <div className="px-4 py-3 border-b border-white/[0.04] bg-[#0a0f1f] flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">Rebalance Portfolio</span>
-        <span className="text-xs text-violet-400 font-semibold bg-violet-500/10 px-2.5 py-1 rounded-full">4 off-target</span>
-      </div>
-      <div className="flex border-b border-white/[0.04]">
-        {tabs.map((t, i) => (
-          <button key={t} onClick={() => setActiveTab(i)} className={`flex-1 text-xs font-semibold py-2.5 text-center cursor-pointer transition-colors ${i === activeTab ? 'text-violet-400 border-b-2 border-violet-400' : 'text-slate-600 hover:text-slate-400'}`}>{t}</button>
-        ))}
-      </div>
-      {/* Context row — total value for all tabs, plus SIP/Lumpsum for relevant tabs */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.04] bg-[#0a0f1f]/50 flex-wrap">
-        <span className="text-xs text-slate-500">Portfolio Value</span>
-        <span className="text-sm text-white font-semibold tabular-nums">{`\u20B9`}10,00,000</span>
-        {activeTab === 0 && (
-          <>
-            <span className="text-xs text-slate-600">|</span>
-            <span className="text-xs text-slate-500">Total SIP</span>
-            <span className="text-sm text-white font-semibold tabular-nums">{`\u20B9`}20,000</span>
-          </>
-        )}
-        {activeTab === 1 && (
-          <>
-            <span className="text-xs text-slate-600">|</span>
-            <span className="text-xs text-slate-500">Lumpsum</span>
-            <input type="text" readOnly value={`\u20B91,00,000`} className="bg-white/[0.04] border border-white/[0.08] rounded-md px-2 py-1 text-sm text-white font-semibold tabular-nums w-24 text-right cursor-default outline-none" />
-          </>
-        )}
-      </div>
-      <div>
-        <div className="grid grid-cols-[1fr_50px_50px_1fr] gap-1 px-4 py-2.5 text-xs text-slate-600 font-semibold border-b border-white/[0.03]">
-          <span>Fund / Value</span><span className="text-center">Current</span><span className="text-center">Target</span><span className="text-right">{headers[activeTab]}</span>
-        </div>
-        {funds.map((f, i) => (
-          <div key={`${activeTab}-${i}`} className={`grid grid-cols-[1fr_50px_50px_1fr] gap-1 px-4 py-2.5 items-center ${i < funds.length - 1 ? 'border-b border-white/[0.03]' : ''}`}>
-            <div className="min-w-0">
-              <span className="text-sm text-slate-300 truncate block">{f.n}</span>
-              <span className="text-[10px] text-slate-600">{`\u20B9`}{f.val}</span>
+        {/* Show area */}
+        <div style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', height: 'calc(100vh - 295px)', overflow: 'hidden' }}>
+          <div style={{ maxWidth: 1360, margin: '0 auto', padding: '16px 24px', height: '100%', display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, alignItems: 'stretch' }}>
+            {/* Left feature panel */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '3px 10px', borderRadius: 100, marginBottom: 14, ...slide.tagStyle }}>
+                  {slide.tag}
+                </span>
+                <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 19, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.25, marginBottom: 10 }}>
+                  {slide.heading}
+                </div>
+                <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.7, marginBottom: 16 }}>{slide.para}</p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px' }}>
+                  {slide.bullets.map((b, i) => (
+                    <li key={i} style={{ fontSize: 12.5, color: '#64748b', padding: '2px 0', display: 'flex', alignItems: 'flex-start', gap: 7, lineHeight: 1.5 }}>
+                      <span style={{ flexShrink: 0, marginTop: 1, fontSize: 11, fontWeight: 700, color: b.ckColor }}>{b.ck}</span>
+                      {b.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 20px', borderRadius: 9, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
+                <GI s={13} />
+                Get started free
+              </button>
             </div>
-            <span className="text-sm text-center text-slate-400 tabular-nums">{f.cur}</span>
-            <span className="text-sm text-center text-slate-400 tabular-nums">{f.tgt}</span>
-            <span className={`text-sm text-right font-semibold ${f.actionC}`}>{f.action}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
-function MockGoals() {
-  const goals = [
-    { n: 'Retirement', tgt: '2Cr', cur: '28.5L', pct: 14, sip: '45,000', yrs: '18 yrs', status: 'On Track', sc: 'text-blue-400 bg-blue-500/15', bc: 'bg-blue-500' },
-    { n: 'Child Education', tgt: '50L', cur: '12.2L', pct: 24, sip: '15,000', yrs: '12 yrs', status: 'On Track', sc: 'text-blue-400 bg-blue-500/15', bc: 'bg-blue-500' },
-    { n: 'New Car', tgt: '15L', cur: '4.1L', pct: 27, sip: '12,000', yrs: '3 yrs', status: 'Needs Attention', sc: 'text-amber-400 bg-amber-500/15', bc: 'bg-amber-500' },
-  ]
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#0d1326] overflow-hidden shadow-2xl shadow-black/40">
-      <div className="px-4 py-3 border-b border-white/[0.04] bg-[#0a0f1f] flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">Goals</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">2 On Track</span>
-          <span className="text-xs text-amber-400">1 Needs Attention</span>
-        </div>
-      </div>
-      {goals.map((g, i) => (
-        <div key={i} className={`px-4 py-3.5 ${i < goals.length - 1 ? 'border-b border-white/[0.03]' : ''}`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">{g.n}</span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${g.sc}`}>{g.status}</span>
+            {/* Right: mock browser window */}
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 8px 32px rgba(15,23,42,.18),0 2px 8px rgba(15,23,42,.1)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <WinBar url={slide.url} />
+              <slide.MockUI />
             </div>
-            <span className="text-xs text-slate-500">{`\u20B9`}{g.sip}/mo &middot; {g.yrs}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className={`h-full rounded-full ${g.bc}`} style={{ width: `${g.pct}%` }} />
-            </div>
-            <span className="text-sm font-semibold text-slate-300 tabular-nums w-10 text-right">{g.pct}%</span>
-          </div>
-          <div className="flex justify-between mt-1.5 text-xs text-slate-600">
-            <span>{`\u20B9`}{g.cur} of {`\u20B9`}{g.tgt}</span>
-            <span className="flex items-center gap-1 text-slate-500"><Link2 size={10} /> 2 portfolios linked</span>
           </div>
         </div>
-      ))}
-    </div>
-  )
-}
+      </section>
 
-/* ─────────────────── SMALL COMPONENTS ─────────────────── */
+      {/* ─── WHY CF ─── */}
+      <section style={{ background: '#080d1a', borderTop: '1px solid rgba(255,255,255,.06)', padding: '40px 24px 48px' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
+          {/* Question badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#f87171', padding: '3px 14px', borderRadius: 100, background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.15)' }}>
+              A question worth asking
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
+          </div>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 22, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-.02em', lineHeight: 1.3, textAlign: 'center', marginBottom: 22 }}>
+            What happens to your family's finances if something happens to <span style={{ color: '#f87171' }}>you?</span>
+          </h2>
 
-function GI({ s = 16 }) {
-  return (
-    <svg viewBox="0 0 24 24" width={s} height={s} className="shrink-0">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-    </svg>
-  )
-}
+          {/* Before / After grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Without tracker */}
+            <div style={{ padding: '20px 22px', borderRadius: 12, background: 'rgba(248,113,113,.04)', border: '1px solid rgba(248,113,113,.2)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: '#fca5a5' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: '#f87171' }} />
+                Without a tracker
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {[
+                  'No one knows which MFs you hold or where to redeem',
+                  'Insurance policies expire unrenewed — premiums lapse',
+                  'FDs auto-renew at low rates because nobody tracked them',
+                  'Loan EMIs missed — credit score damaged',
+                  'Retirement corpus eroded by panicked decisions',
+                  'Family spends months just finding out what you owned',
+                ].map((t, i, arr) => (
+                  <li key={i} style={{ fontSize: 12.5, color: '#64748b', padding: '6px 0', display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', lineHeight: 1.5 }}>
+                    <span style={{ color: '#f87171', flexShrink: 0, fontSize: 11, fontWeight: 700, marginTop: 1 }}>✕</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* With CF */}
+            <div style={{ padding: '20px 22px', borderRadius: 12, background: 'rgba(52,211,153,.04)', border: '1px solid rgba(52,211,153,.2)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: '#34d399' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: '#34d399' }} />
+                With Capital Friends
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {[
+                  'Complete MF, stock, FD, gold, insurance & loan ledger',
+                  'Monthly email report auto-sent to spouse & parents',
+                  'Insurance renewal reminders before policies lapse',
+                  'FD maturity & SIP reminders every month',
+                  'Goals tracked — retirement, education, emergency fund',
+                  'Family signs in directly — all data available, any time',
+                ].map((t, i, arr) => (
+                  <li key={i} style={{ fontSize: 12.5, color: '#64748b', padding: '6px 0', display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', lineHeight: 1.5 }}>
+                    <span style={{ color: '#34d399', flexShrink: 0, fontSize: 11, fontWeight: 700, marginTop: 1 }}>✓</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
 
-function WS({ l, v, lc, vc, extra }) {
-  return (
-    <div className="py-3.5 text-center">
-      <p className={`text-xs font-semibold uppercase tracking-wider ${lc}`}>{l}</p>
-      <p className={`text-lg font-bold tabular-nums mt-0.5 ${vc}`}>{v}{extra && <span className="text-sm ml-1 text-emerald-400">{extra}</span>}</p>
-    </div>
-  )
-}
+          {/* Trust strip */}
+          <div style={{ marginTop: 28, textAlign: 'center' }}>
+            <span style={{ display: 'inline-flex', gap: 20, fontSize: 12.5, color: '#34d399', fontWeight: 500 }}>
+              <span>✓ Always Free</span>
+              <span style={{ color: '#1e293b' }}>·</span>
+              <span>✓ No Credit Card</span>
+              <span style={{ color: '#1e293b' }}>·</span>
+              <span>✓ Open Source</span>
+              <span style={{ color: '#1e293b' }}>·</span>
+              <span>✓ Your Data stays in Google Drive</span>
+            </span>
+          </div>
 
-function MRow({ n, alloc, cur, pl, ath, athC, up, last }) {
-  return (
-    <div className={`flex items-center justify-between px-4 py-3 ${last ? '' : 'border-b border-white/[0.03]'}`}>
-      <div>
-        <p className="text-sm font-medium text-slate-300">{n}</p>
-        <p className="text-xs text-slate-600">Alloc {alloc} &middot; <span className={athC}>{ath !== 'At ATH' ? `${ath} below ATH` : ath}</span></p>
-      </div>
-      <div className="text-right">
-        <p className="text-sm font-semibold text-slate-200 tabular-nums">{cur}</p>
-        <p className={`text-sm font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-rose-400'}`}>{pl}</p>
-      </div>
-    </div>
-  )
-}
+          {/* How it works */}
+          <div style={{ marginTop: 40, borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 32 }}>
+            <span style={{ display: 'block', textAlign: 'center', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: '#a78bfa', marginBottom: 24 }}>
+              Up and running in under a minute
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 0, position: 'relative' }}>
+              {[
+                { n: '1', h: 'Sign in with Google', p: 'No forms, no bank linking. Just your Google account.' },
+                { n: '2', h: 'Spreadsheet created in your Drive', p: 'A private Google Sheet is set up automatically. Your data never leaves your account.' },
+                { n: '3', h: 'Start tracking your wealth', p: 'Add MFs, stocks, FDs, insurance, loans. Dashboard updates live daily.' },
+              ].map(s => (
+                <div key={s.n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative', zIndex: 1, padding: '0 16px' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#080d1a', border: '1px solid rgba(167,139,250,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontSize: 16, fontWeight: 700, color: '#a78bfa', marginBottom: 12, flexShrink: 0 }}>{s.n}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 5 }}>{s.h}</div>
+                  <p style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.6 }}>{s.p}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
-function Bullet({ c, t }) {
-  const colors = { violet: 'text-violet-400', cyan: 'text-cyan-400', amber: 'text-amber-400', emerald: 'text-emerald-400' }
-  return (
-    <div className="flex items-center gap-2.5">
-      <CheckCircle2 size={16} className={`${colors[c]} shrink-0`} />
-      <span className="text-sm text-slate-300">{t}</span>
-    </div>
-  )
-}
+      {/* ─── FEATURES ─── */}
+      <section style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '36px 24px' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', width: '100%' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: '#94a3b8', display: 'block', textAlign: 'center', marginBottom: 6 }}>
+            Everything in one place
+          </span>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 26, fontWeight: 700, color: '#0f172a', textAlign: 'center', letterSpacing: '-0.02em', marginBottom: 4 }}>
+            Your family's complete financial OS
+          </div>
+          <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', marginBottom: 18 }}>
+            Built for Indian families · <span style={{ color: '#7c3aed', fontWeight: 700 }}>★ Unique</span> = not available in any other free tracker
+          </div>
 
-function HowStep({ num, icon, color, title, desc }) {
-  const colors = {
-    violet: ['text-violet-400', 'bg-violet-500/10', 'border-violet-500/20', 'from-violet-500/20 to-violet-500/5'],
-    emerald: ['text-emerald-400', 'bg-emerald-500/10', 'border-emerald-500/20', 'from-emerald-500/20 to-emerald-500/5'],
-    cyan: ['text-cyan-400', 'bg-cyan-500/10', 'border-cyan-500/20', 'from-cyan-500/20 to-cyan-500/5'],
-    amber: ['text-amber-400', 'bg-amber-500/10', 'border-amber-500/20', 'from-amber-500/20 to-amber-500/5'],
-  }
-  const [tc, ibg, bdr, grad] = colors[color] || colors.violet
-  return (
-    <div className={`relative rounded-2xl border ${bdr} bg-gradient-to-b ${grad} p-6 text-center`}>
-      <span className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${ibg} ${tc} mb-4`}>{icon}</span>
-      <span className={`absolute top-4 right-4 text-xs font-bold ${tc} opacity-40`}>0{num}</span>
-      <h3 className="text-base font-bold text-white mb-2">{title}</h3>
-      <p className="text-sm text-slate-400 leading-relaxed">{desc}</p>
-    </div>
-  )
-}
+          {/* Feature tabs */}
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 20, background: '#eef2f7', padding: 5, borderRadius: 12, width: 'fit-content', marginLeft: 'auto', marginRight: 'auto' }}>
+            <button
+              onClick={() => setFeatTab(0)}
+              style={{ padding: '8px 22px', borderRadius: 8, border: 'none', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, transition: 'all .15s', ...(featTab === 0 ? { background: '#fff', color: '#0f172a', boxShadow: '0 1px 4px rgba(15,23,42,.1)' } : { background: 'none', color: '#64748b' }) }}>
+              <span style={{ color: '#64748b', fontSize: 12 }}>📊</span> Track Everything
+            </button>
+            <button
+              onClick={() => setFeatTab(1)}
+              style={{ padding: '8px 22px', borderRadius: 8, border: 'none', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, transition: 'all .15s', ...(featTab === 1 ? { background: '#fff', color: '#0f172a', boxShadow: '0 1px 4px rgba(15,23,42,.1)' } : { background: 'none', color: '#64748b' }) }}>
+              <span style={{ color: '#7c3aed', fontSize: 11, fontWeight: 800 }}>★</span> Smart Tools
+            </button>
+          </div>
 
-function TrustStrip({ icon, t, d, bg, c }) {
-  const colors = { emerald: 'text-emerald-400', violet: 'text-violet-400', amber: 'text-amber-400' }
-  return (
-    <div className={`flex-1 ${bg} px-5 sm:px-8 lg:px-10 py-6 sm:py-8 border-b sm:border-b-0 sm:border-r border-white/[0.04] last:border-0`}>
-      <p className="text-base font-bold text-white flex items-center gap-2"><span className={`${colors[c]} shrink-0`}>{icon}</span>{t}</p>
-      <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{d}</p>
-    </div>
-  )
-}
+          {/* Feature cards grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+            {(featTab === 0 ? TRACK_CARDS : SMART_CARDS).map(card => (
+              <div key={card.title} style={{ padding: '22px 24px', borderRadius: 10, background: '#fff', border: '1px solid #e2e8f0' }}>
+                <div style={{ height: 3, borderRadius: 2, width: 30, marginBottom: 11, background: card.color }} />
+                {card.uniq && (
+                  <span style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', padding: '2px 9px', borderRadius: 4, background: 'rgba(124,58,237,.08)', color: '#7c3aed', border: '1px solid rgba(124,58,237,.18)', marginBottom: 8 }}>★ Unique</span>
+                )}
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>{card.title}</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.62 }}>{card.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-const CM = { violet: ['text-violet-400','bg-violet-500/8','border-violet-500/10'], blue: ['text-blue-400','bg-blue-500/8','border-blue-500/10'], emerald: ['text-emerald-400','bg-emerald-500/8','border-emerald-500/10'], cyan: ['text-cyan-400','bg-cyan-500/8','border-cyan-500/10'], rose: ['text-rose-400','bg-rose-500/8','border-rose-500/10'], orange: ['text-orange-400','bg-orange-500/8','border-orange-500/10'], teal: ['text-teal-400','bg-teal-500/8','border-teal-500/10'], red: ['text-red-400','bg-red-500/8','border-red-500/10'], yellow: ['text-yellow-400','bg-yellow-500/8','border-yellow-500/10'], pink: ['text-pink-400','bg-pink-500/8','border-pink-500/10'] }
+      {/* ─── CTA + FOOTER ─── */}
+      <section style={{ background: '#080d1a', borderTop: '1px solid rgba(255,255,255,.06)', padding: '28px 24px 0', textAlign: 'center' }}>
+        <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 20 }}>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-.02em', marginBottom: 6 }}>
+            Start managing your family's wealth today
+          </h2>
+          <p style={{ fontSize: 13, color: '#475569', marginBottom: 16 }}>No registration form. No bank linking. Just your Google account.</p>
+          <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 24px', borderRadius: 9, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13.5, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+            <GI s={14} />
+            Sign in with Google — it's free
+          </button>
+          <div style={{ marginTop: 10, fontSize: 11.5, color: '#475569' }}>
+            No bank credentials · Data stays in your Google Drive · Always free · Open source
+          </div>
+        </div>
 
-function FC({ icon, c, t, d }) {
-  const [ic, bg, br] = CM[c] || CM.violet
-  return (
-    <div className={`rounded-xl border ${br} ${bg} p-5`}>
-      <p className="text-base font-bold text-white flex items-center gap-2"><span className={`${ic} shrink-0`}>{icon}</span>{t}</p>
-      <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{d}</p>
+        {/* Footer */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', padding: '12px 0' }}>
+          <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '0 24px' }}>
+            <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
+              <img src={LOGO_ICON} alt="" style={{ height: 28 }}
+                onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
+              <div style={{ display: 'none', width: 24, height: 24, fontSize: 9, borderRadius: 5, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>CF</div>
+              <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, opacity: 0.4 }}>
+                <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b><em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
+              </span>
+            </a>
+            <div style={{ fontSize: 11.5, color: '#334155', textAlign: 'center' }}>
+              Built with <span style={{ color: '#f43f5e' }}>♥</span> by <span style={{ color: '#475569', fontWeight: 600 }}>Jagadeesh Manne</span>
+              <span style={{ color: '#1e293b', margin: '0 6px' }}>·</span>
+              <span style={{ color: '#334155' }}>Free &amp; open source</span>
+            </div>
+            <div>
+              <Link to="/privacy" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Privacy Policy</Link>
+              <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>
+              <Link to="/terms" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Terms &amp; Conditions</Link>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

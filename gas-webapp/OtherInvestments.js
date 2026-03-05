@@ -533,21 +533,7 @@ function getLoanTypeSuggestion(investmentType) {
   return suggestions[investmentType] || 'Personal Loan';
 }
 
-/**
- * Decode HTML entities
- * @param {string} text - Text with HTML entities
- * @returns {string} Decoded text
- */
-function decodeHtmlEntities(text) {
-  if (!text) return '';
-
-  return text
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
-}
+// decodeHtmlEntities() lives in Utilities.js
 
 
 // ============================================================================

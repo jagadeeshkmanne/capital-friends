@@ -846,7 +846,9 @@ function buildDashboardReportData() {
               ownerName: p.ownerName,
               currentPct: Math.round(currentPct),
               targetPct: Math.round(targetPct),
-              drift: Math.round(drift)
+              drift: Math.round(drift),
+              lumpsumRestricted: h.lumpsumRestricted || false,
+              sipRestricted: h.sipRestricted || false
             });
           }
         }
@@ -1056,7 +1058,108 @@ function buildDashboardReportData() {
     // ── 16. Insurance data (categorized by type for email template) ──
     const insuranceData = getAllInsurancePoliciesDetailed();
 
-    // ── 17. Build the result ──
+    // ── 17. Fund Performance (Top Gainers & Losers — deduplicated by schemeCode) ──
+    var fundMap = {};
+    activeMFHoldings.forEach(function(h) {
+      var inv = parseFloat(h.investment) || 0;
+      if (inv <= 0) return;
+      var key = h.schemeCode || h.fundName;
+      var pName = (activeMFPortfolios.find(function(p) { return p.portfolioId === h.portfolioId; }) || {}).portfolioName || '';
+      pName = pName.replace(/^PFL-/, '');
+      if (!fundMap[key]) fundMap[key] = { fundName: h.fundName, investment: 0, currentValue: 0, portfolios: [] };
+      fundMap[key].investment += inv;
+      fundMap[key].currentValue += (parseFloat(h.currentValue) || 0);
+      if (pName && fundMap[key].portfolios.indexOf(pName) === -1) fundMap[key].portfolios.push(pName);
+    });
+    var fundPerf = Object.keys(fundMap).map(function(k) {
+      var f = fundMap[k];
+      return { fundName: f.fundName, investment: f.investment, currentValue: f.currentValue,
+        pl: f.currentValue - f.investment, plPct: f.investment > 0 ? ((f.currentValue - f.investment) / f.investment) * 100 : 0,
+        portfolios: f.portfolios };
+    });
+    fundPerf.sort(function(a, b) { return b.plPct - a.plPct; });
+    var topGainers = fundPerf.filter(function(f) { return f.plPct > 0; }).slice(0, 5);
+    var topLosers = fundPerf.filter(function(f) { return f.plPct < 0; }).sort(function(a, b) { return a.plPct - b.plPct; }).slice(0, 5);
+
+    // ── 18. Portfolio Performance ──
+    var portfolioPerf = activeMFPortfolios.map(function(p) {
+      var ph = activeMFHoldings.filter(function(h) { return h.portfolioId === p.portfolioId; });
+      var invested = ph.reduce(function(s, h) { return s + (parseFloat(h.investment) || 0); }, 0);
+      var current = ph.reduce(function(s, h) { return s + (parseFloat(h.currentValue) || 0); }, 0);
+      return { portfolioId: p.portfolioId, portfolioName: (p.portfolioName || '').replace(/^PFL-/, ''),
+        ownerName: p.ownerName || '', invested: invested, current: current,
+        pl: current - invested, plPct: invested > 0 ? ((current - invested) / invested) * 100 : 0 };
+    }).filter(function(p) { return p.invested > 0; });
+    portfolioPerf.sort(function(a, b) { return b.plPct - a.plPct; });
+    var topPortfolios = portfolioPerf.filter(function(p) { return p.plPct > 0; }).slice(0, 5);
+    var bottomPortfolios = portfolioPerf.filter(function(p) { return p.plPct < 0; }).sort(function(a, b) { return a.plPct - b.plPct; }).slice(0, 5);
+
+    // ── 19. Goal Allocation Health ──
+    var EQUITY_CATS = { Equity: true, ELSS: true, Index: true };
+    var GLIDE_PATH = [
+      { maxYears: 1, equity: 10, label: 'Short-term' },
+      { maxYears: 3, equity: 30, label: 'Short-term' },
+      { maxYears: 5, equity: 50, label: 'Medium-term' },
+      { maxYears: 7, equity: 65, label: 'Medium-term' },
+      { maxYears: 10, equity: 75, label: 'Long-term' },
+      { maxYears: Infinity, equity: 85, label: 'Long-term' }
+    ];
+    var allGoalMappings = [];
+    try { allGoalMappings = getGoalPortfolioMappings() || []; } catch(e) { log('Goal mappings error: ' + e); }
+
+    var goalHealth = {};
+    activeGoals.forEach(function(g) {
+      if (g.status === 'Achieved') return;
+      var targetDate = new Date(g.targetDate);
+      var yearsLeft = Math.max(0, (targetDate - now) / (365.25 * 24 * 60 * 60 * 1000));
+      if (yearsLeft <= 0) return;
+
+      // Recommended allocation
+      var rec;
+      if (g.goalType === 'Emergency Fund') { rec = { equity: 0, debt: 100, label: 'Safety' }; }
+      else {
+        var step = GLIDE_PATH.find(function(s) { return yearsLeft <= s.maxYears; });
+        rec = { equity: step.equity, debt: 100 - step.equity, label: step.label };
+      }
+
+      // Actual allocation from mapped portfolios
+      var maps = allGoalMappings.filter(function(m) { return m.goalId === g.goalId; });
+      var totalVal = 0, eqVal = 0;
+      maps.forEach(function(m) {
+        activeMFHoldings.filter(function(h) { return h.portfolioId === m.portfolioId && h.units > 0; }).forEach(function(h) {
+          var v = (parseFloat(h.currentValue) || 0) * (m.allocationPct / 100);
+          totalVal += v;
+          if (EQUITY_CATS[h.category]) eqVal += v;
+          else if (h.category === 'Hybrid') eqVal += v * 0.65;
+          else if (h.category === 'Multi-Asset') eqVal += v * 0.50;
+        });
+      });
+      var actualEq = totalVal > 0 ? Math.round((eqVal / totalVal) * 100) : null;
+      var mismatch = maps.length > 0 && actualEq !== null ? Math.round(actualEq - rec.equity) : null;
+
+      // Live SIP/lumpsum needed
+      var gTarget = parseFloat(g.targetAmount) || 0;
+      var gCurrent = parseFloat(g.currentValue) || 0;
+      var cagr = parseFloat(g.expectedCAGR) || 0.12;
+      var monthlyRate = cagr / 12;
+      var months = Math.max(0, Math.round(yearsLeft * 12));
+      var fvCurrent = gCurrent * (months > 0 ? Math.pow(1 + monthlyRate, months) : 1);
+      var gapAtMat = Math.max(0, gTarget - fvCurrent);
+      var liveLumpsum = gapAtMat > 0 && months > 0 ? Math.round(gapAtMat / Math.pow(1 + monthlyRate, months)) : 0;
+      var liveSIP = gapAtMat > 0 && months > 0
+        ? (monthlyRate > 0 ? Math.ceil(gapAtMat / ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)) : Math.ceil(gapAtMat / months))
+        : 0;
+
+      goalHealth[g.goalId] = {
+        yearsLeft: yearsLeft, label: rec.label,
+        recommendedEquity: rec.equity, recommendedDebt: rec.debt,
+        actualEquity: actualEq, isMapped: maps.length > 0,
+        mismatch: mismatch, needsAttention: mismatch !== null && Math.abs(mismatch) > 15,
+        liveSIP: liveSIP, liveLumpsum: liveLumpsum
+      };
+    });
+
+    // ── 20. Build the result ──
     const generatedAt = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd MMM yyyy');
 
     const result = {
@@ -1102,7 +1205,12 @@ function buildDashboardReportData() {
       activeLiabilities: activeLiabilities,
       activeInsurance: activeInsurance,
       activeGoals: activeGoals,
+      goalHealth: goalHealth,
       upcomingReminders: upcomingReminders.slice(0, 10),
+      topGainers: topGainers,
+      topLosers: topLosers,
+      topPortfolios: topPortfolios,
+      bottomPortfolios: bottomPortfolios,
 
       // Bottom tables
       filteredMembers: activeMembers,

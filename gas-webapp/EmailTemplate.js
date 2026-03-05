@@ -446,8 +446,9 @@ function buildDashboardPDFHTML(data) {
     h += '<tr style="background:#f8fafc"><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Fund Name</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Portfolio</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Current%</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Target%</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Drift</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Action</th></tr>';
     for (var rbi = 0; rbi < rebalanceItems.length; rbi++) {
       var rb = rebalanceItems[rbi];
-      var rbAction = rb.drift > 0 ? 'SELL' : 'BUY';
-      var rbColor = rb.drift > 0 ? '#dc2626' : '#059669';
+      var rbBlocked = rb.lumpsumRestricted && rb.sipRestricted;
+      var rbAction = rb.drift > 0 ? 'SELL' : (rbBlocked ? 'BLOCKED' : rb.lumpsumRestricted ? 'SIP ONLY' : rb.sipRestricted ? 'LUMPSUM ONLY' : 'BUY');
+      var rbColor = rb.drift > 0 ? '#dc2626' : (rbBlocked ? '#dc2626' : (rb.lumpsumRestricted || rb.sipRestricted) ? '#d97706' : '#059669');
       h += '<tr' + (rbi < rebalanceItems.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
       h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b">' + _escHtml(rb.fundName) + '</td>';
       h += '<td style="padding:8px 10px;font-size:13px;color:#475569">' + _escHtml(rb.portfolioName) + '</td>';
@@ -531,48 +532,54 @@ function buildDashboardPDFHTML(data) {
         var psTPL = parseFloat(mp2.totalPL) || 0;
         var psTPP = parseFloat(mp2.totalPLPct) || (psI > 0 ? (psTPL / psI * 100) : 0);
 
-        h += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid #7c3aed;border-radius:10px;padding:16px;margin-bottom:16px">';
-        // Portfolio header: title left, 6 stats right
-        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:12px"><tbody><tr>';
-        h += '<td style="vertical-align:middle;width:40%">';
-        h += '<div style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:2px">' + _escHtml(mp2.portfolioName) + '</div>';
+        // ── Redesigned MF portfolio card ──
+        h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-top:3px solid #7c3aed;border-radius:10px;margin-bottom:16px;overflow:hidden">';
+        // Header: name + platform left | current value + returns badge right
+        h += '<div style="padding:14px 16px;border-bottom:1px solid #f1f5f9">';
+        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+        h += '<td style="vertical-align:middle">';
+        h += '<div style="font-size:16px;font-weight:700;color:#7c3aed">' + _escHtml(mp2.portfolioName) + '</div>';
         var iaD = [];
         if (mp2.platformBroker) iaD.push(_escHtml(mp2.platformBroker));
-        if (mpcid) iaD.push('<span style="font-family:monospace">' + _escHtml(mpcid) + '</span>');
+        if (mpcid) iaD.push('<span style="font-family:monospace;font-size:12px">' + _escHtml(mpcid) + '</span>');
         if (mpia && mpia.accountType) iaD.push(_escHtml(mpia.accountType));
-        if (mpia && mpia.email) iaD.push(_escHtml(mpia.email));
-        if (iaD.length > 0) h += '<div style="font-size:13px;color:#64748b">' + iaD.join(' &middot; ') + '</div>';
+        if (iaD.length > 0) h += '<div style="font-size:13px;color:#94a3b8;margin-top:3px">' + iaD.join(' &middot; ') + '</div>';
         h += '</td>';
-        h += '<td style="vertical-align:middle;width:60%">';
-        // 1x6 inline stats
-        var _stt = 'background:#f1f5f9;border-radius:4px;padding:4px 5px;text-align:center';
-        var statItems = [
-          { l: 'Invested', v: _fmtCurShort(psI), c: '#475569', b: false },
-          { l: 'Current', v: _fmtCurShort(psC), c: '#1e293b', b: true },
-          { l: 'Unr. P&amp;L', v: _plSign(psUPL) + _fmtCurShort(Math.abs(psUPL)), c: _plColor(psUPL), b: true },
-          { l: 'Real. P&amp;L', v: _plSign(psRPL) + _fmtCurShort(Math.abs(psRPL)), c: _plColor(psRPL), b: true },
-          { l: 'Total P&amp;L', v: _plSign(psTPL) + _fmtCurShort(Math.abs(psTPL)), c: _plColor(psTPL), b: true },
-          { l: 'Returns', v: _plSign(psTPP) + psTPP.toFixed(1) + '%', c: _plColor(psTPP), b: true }
+        var _mfRtColor = _plColor(psTPP), _mfRtSign = psTPP >= 0 ? '+' : '';
+        h += '<td align="right" style="vertical-align:middle;padding-left:12px">';
+        h += '<div style="font-size:20px;font-weight:700;color:#1e293b;line-height:1">' + _fmtCur(psC) + '</div>';
+        h += '<div style="margin-top:4px"><span style="display:inline-block;background:' + _hexBg(_mfRtColor, 0.1) + ';color:' + _mfRtColor + ';font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">' + _mfRtSign + psTPP.toFixed(1) + '% returns</span></div>';
+        h += '</td>';
+        h += '</tr></tbody></table></div>';
+        // Stats strip: Invested | Unr.P&L | Real.P&L | Total P&L
+        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-bottom:1px solid #f1f5f9"><tbody><tr>';
+        var _mfStats = [
+          { l: 'Invested', v: _fmtCurShort(psI), c: '#64748b' },
+          { l: 'Unr. P&amp;L', v: _plSign(psUPL) + _fmtCurShort(Math.abs(psUPL)), c: _plColor(psUPL) },
+          { l: 'Real. P&amp;L', v: _plSign(psRPL) + _fmtCurShort(Math.abs(psRPL)), c: _plColor(psRPL) },
+          { l: 'Total P&amp;L', v: _plSign(psTPL) + _fmtCurShort(Math.abs(psTPL)), c: _plColor(psTPL) }
         ];
-        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
-        for (var sti = 0; sti < statItems.length; sti++) {
-          if (sti > 0) h += '<td style="width:2px"></td>';
-          h += '<td style="' + _stt + '"><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">' + statItems[sti].l + '</div>';
-          h += '<div style="font-size:13px;font-weight:' + (statItems[sti].b ? '700' : '600') + ';color:' + statItems[sti].c + '">' + statItems[sti].v + '</div></td>';
+        for (var _msi = 0; _msi < _mfStats.length; _msi++) {
+          if (_msi > 0) h += '<td style="width:1px;background:#f1f5f9"></td>';
+          h += '<td style="padding:10px 14px;text-align:center;background:#fafafa">';
+          h += '<div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">' + _mfStats[_msi].l + '</div>';
+          h += '<div style="font-size:14px;font-weight:700;color:' + _mfStats[_msi].c + '">' + _mfStats[_msi].v + '</div>';
+          h += '</td>';
         }
-        h += '</tr></tbody></table></td></tr></tbody></table>';
-
+        h += '</tr></tbody></table>';
         // Fund holdings table
         if (mpF.length > 0) {
-          h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:6px"><tbody>';
-          h += '<tr style="background:#f1f5f9">';
-          h += '<th style="' + _thL + '">Fund Name</th>';
-          h += '<th style="' + _thR + '">Units</th>';
-          h += '<th style="padding:6px 8px;font-size:13px;font-weight:600;color:#64748b;text-align:right">NAV<br><span style="font-size:13px;font-weight:500;text-transform:none">Cur / Avg</span></th>';
-          h += '<th style="padding:6px 8px;font-size:13px;font-weight:600;color:#64748b;text-align:right">ATH<br><span style="font-size:13px;font-weight:500;text-transform:none">Below Peak</span></th>';
-          h += '<th style="padding:6px 8px;font-size:13px;font-weight:600;color:#64748b;text-align:right">Alloc %<br><span style="font-size:13px;font-weight:500;text-transform:none">Cur / Tgt</span></th>';
-          h += '<th style="padding:6px 8px;font-size:13px;font-weight:600;color:#64748b;text-align:right">Amount<br><span style="font-size:13px;font-weight:500;text-transform:none">Cur / Inv</span></th>';
-          h += '<th style="' + _thR + '">P&amp;L</th></tr>';
+          var _mfThS = 'padding:8px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f1f5f9;background:#fafafa';
+          h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody>';
+          h += '<tr>';
+          h += '<th style="' + _mfThS + ';text-align:left">Fund</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">Units</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">NAV (Cur/Avg)</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">ATH / Below Peak</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">Alloc (Cur/Tgt)</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">Amount (Cur/Inv)</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">P&amp;L</th>';
+          h += '</tr>';
           for (var fi = 0; fi < mpF.length; fi++) {
             var f = mpF[fi], fI = parseFloat(f.investment) || 0, fC = parseFloat(f.currentValue) || 0;
             var fPL = fC - fI, fPP = fI > 0 ? (fPL / fI * 100) : 0;
@@ -583,28 +590,29 @@ function buildDashboardPDFHTML(data) {
             var fTgtAlloc = parseFloat(f.targetAllocationPct) || 0;
             var fATH = parseFloat(f.athNav) || 0;
             var fBelowATH = parseFloat(f.belowATHPct) || 0;
-            var fATHColor = fBelowATH >= 20 ? '#c62828' : fBelowATH >= 10 ? '#d84315' : fBelowATH >= 5 ? '#e67e00' : fBelowATH >= 1 ? '#fde68a' : '#64748b';
-            var fATHW = fBelowATH >= 10 ? '700' : '600';
-            h += '<tr' + (fi < mpF.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
-            h += '<td style="padding:6px 8px;font-size:13px;color:#1e293b;max-width:200px">' + _escHtml(f.fundName);
-            if (f.planName) h += '<div style="font-size:13px;color:#64748b;margin-top:1px">' + _escHtml(f.planName) + '</div>';
+            var fATHColor = fBelowATH >= 20 ? '#b91c1c' : fBelowATH >= 10 ? '#c2410c' : fBelowATH >= 5 ? '#b45309' : fBelowATH >= 1 ? '#a16207' : '#94a3b8';
+            var fATHW = fBelowATH >= 5 ? '700' : '600';
+            var fPLColor = _plColor(fPL);
+            h += '<tr style="border-bottom:1px solid #f8fafc;' + (fi % 2 === 1 ? 'background:#fafafa' : '') + '">';
+            h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b;font-weight:500">' + _escHtml(f.fundName);
+            if (f.planName) h += '<div style="font-size:12px;color:#94a3b8;font-weight:400;margin-top:2px">' + _escHtml(f.planName) + '</div>';
             h += '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;color:#475569;text-align:right">' + fU.toFixed(2) + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;text-align:right"><div style="font-weight:600;color:#1e293b">\u20B9' + fCurNav.toFixed(2) + '</div><div style="font-size:13px;color:#64748b">\u20B9' + fAvgNav.toFixed(2) + '</div></td>';
-            h += '<td style="padding:6px 8px;font-size:13px;text-align:right">';
+            h += '<td style="padding:8px 10px;font-size:13px;color:#64748b;text-align:right">' + fU.toFixed(2) + '</td>';
+            h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:600;color:#1e293b">\u20B9' + fCurNav.toFixed(2) + '</div><div style="font-size:12px;color:#94a3b8">\u20B9' + fAvgNav.toFixed(2) + '</div></td>';
+            h += '<td style="padding:8px 10px;text-align:right">';
             if (fATH > 0) {
-              h += '<div style="font-weight:600;color:#1e293b">\u20B9' + fATH.toFixed(2) + '</div>';
-              if (fBelowATH > 0) h += '<div style="font-size:13px;font-weight:' + fATHW + ';color:' + fATHColor + '">\u2193' + fBelowATH.toFixed(1) + '%</div>';
-            } else { h += '<span style="color:#e2e8f0">-</span>'; }
+              h += '<div style="font-size:13px;font-weight:600;color:#1e293b">\u20B9' + fATH.toFixed(2) + '</div>';
+              if (fBelowATH > 0) h += '<div style="font-size:12px;font-weight:' + fATHW + ';color:' + fATHColor + '">\u2193' + fBelowATH.toFixed(1) + '%</div>';
+            } else { h += '<span style="font-size:12px;color:#e2e8f0">\u2014</span>'; }
             h += '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;text-align:right"><div style="font-weight:600;color:#1e293b">' + fCurAlloc.toFixed(1) + '%</div><div style="font-size:13px;color:#64748b">' + fTgtAlloc.toFixed(1) + '%</div></td>';
-            h += '<td style="padding:6px 8px;font-size:13px;text-align:right"><div style="font-weight:600;color:#1e293b">' + _fmtCur(fC) + '</div><div style="font-size:13px;color:#64748b">' + _fmtCur(fI) + '</div></td>';
-            h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:' + _plColor(fPL) + ';text-align:right">' + _plSign(fPL) + _fmtCur(Math.abs(fPL)) + '<br><span style="font-size:13px">' + _plSign(fPP) + fPP.toFixed(1) + '%</span></td>';
+            h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:600;color:#1e293b">' + fCurAlloc.toFixed(1) + '%</div><div style="font-size:12px;color:#94a3b8">' + fTgtAlloc.toFixed(1) + '%</div></td>';
+            h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:600;color:#1e293b">' + _fmtCur(fC) + '</div><div style="font-size:12px;color:#94a3b8">' + _fmtCur(fI) + '</div></td>';
+            h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:700;color:' + fPLColor + '">' + _plSign(fPL) + _fmtCur(Math.abs(fPL)) + '</div><div style="font-size:12px;font-weight:600;color:' + fPLColor + '">' + _plSign(fPP) + fPP.toFixed(1) + '%</div></td>';
             h += '</tr>';
           }
           h += '</tbody></table>';
         }
-        h += '</div>'; // close portfolio card
+        h += '</div>'; // close MF portfolio card
       }
     }
 
@@ -619,49 +627,65 @@ function buildDashboardPDFHTML(data) {
         var ssI = parseFloat(msp.totalInvestment) || 0, ssC = parseFloat(msp.currentValue) || 0;
         var ssPL = ssC - ssI, ssPP = ssI > 0 ? (ssPL / ssI * 100) : 0;
 
-        h += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid #2563eb;border-radius:10px;padding:16px;margin-bottom:16px">';
-        // Portfolio header: title left, 4 stats right
-        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:12px"><tbody><tr>';
-        h += '<td style="vertical-align:middle;width:40%">';
-        h += '<div style="font-size:14px;font-weight:700;color:#2563eb;margin-bottom:2px">' + _escHtml(msp.platformBroker || msp.portfolioName) + '</div>';
+        // ── Redesigned stock portfolio card ──
+        h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-top:3px solid #2563eb;border-radius:10px;margin-bottom:16px;overflow:hidden">';
+        // Header: name + platform left | current value + returns badge right
+        h += '<div style="padding:14px 16px;border-bottom:1px solid #f1f5f9">';
+        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
+        h += '<td style="vertical-align:middle">';
+        h += '<div style="font-size:16px;font-weight:700;color:#2563eb">' + _escHtml(msp.portfolioName || msp.platformBroker) + '</div>';
         var stkD = [];
         if (msp.platformBroker) stkD.push(_escHtml(msp.platformBroker));
-        if (mscid) stkD.push('<span style="font-family:monospace">' + _escHtml(mscid) + '</span>');
+        if (mscid) stkD.push('<span style="font-family:monospace;font-size:12px">' + _escHtml(mscid) + '</span>');
         if (msia && msia.accountType) stkD.push(_escHtml(msia.accountType));
-        if (msia && msia.email) stkD.push(_escHtml(msia.email));
-        if (stkD.length > 0) h += '<div style="font-size:13px;color:#64748b">' + stkD.join(' &middot; ') + '</div>';
+        if (stkD.length > 0) h += '<div style="font-size:13px;color:#94a3b8;margin-top:3px">' + stkD.join(' &middot; ') + '</div>';
         h += '</td>';
-        h += '<td style="vertical-align:middle;width:60%">';
-        var stkStats = [
-          { l: 'Invested', v: _fmtCurShort(ssI), c: '#475569' },
-          { l: 'Current', v: _fmtCurShort(ssC), c: '#1e293b' },
-          { l: 'P&amp;L', v: _plSign(ssPL) + _fmtCurShort(Math.abs(ssPL)), c: _plColor(ssPL) },
-          { l: 'Returns', v: _plSign(ssPP) + ssPP.toFixed(1) + '%', c: _plColor(ssPP) }
+        var _sRtColor = _plColor(ssPP), _sRtSign = ssPP >= 0 ? '+' : '';
+        h += '<td align="right" style="vertical-align:middle;padding-left:12px">';
+        h += '<div style="font-size:20px;font-weight:700;color:#1e293b;line-height:1">' + _fmtCur(ssC) + '</div>';
+        h += '<div style="margin-top:4px"><span style="display:inline-block;background:' + _hexBg(_sRtColor, 0.1) + ';color:' + _sRtColor + ';font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">' + _sRtSign + ssPP.toFixed(1) + '% returns</span></div>';
+        h += '</td>';
+        h += '</tr></tbody></table></div>';
+        // Stats strip: Invested | P&L
+        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-bottom:1px solid #f1f5f9"><tbody><tr>';
+        var _stkStats2 = [
+          { l: 'Invested', v: _fmtCurShort(ssI), c: '#64748b' },
+          { l: 'P&amp;L', v: _plSign(ssPL) + _fmtCurShort(Math.abs(ssPL)), c: _plColor(ssPL) }
         ];
-        h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
-        for (var ssti = 0; ssti < stkStats.length; ssti++) {
-          if (ssti > 0) h += '<td style="width:3px"></td>';
-          h += '<td style="background:#f1f5f9;border-radius:4px;padding:4px 6px;text-align:center">';
-          h += '<div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.3px">' + stkStats[ssti].l + '</div>';
-          h += '<div style="font-size:13px;font-weight:' + (ssti === 0 ? '600' : '700') + ';color:' + stkStats[ssti].c + '">' + stkStats[ssti].v + '</div></td>';
+        for (var _ssi = 0; _ssi < _stkStats2.length; _ssi++) {
+          if (_ssi > 0) h += '<td style="width:1px;background:#f1f5f9"></td>';
+          h += '<td style="padding:10px 14px;text-align:center;background:#fafafa">';
+          h += '<div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">' + _stkStats2[_ssi].l + '</div>';
+          h += '<div style="font-size:14px;font-weight:700;color:' + _stkStats2[_ssi].c + '">' + _stkStats2[_ssi].v + '</div>';
+          h += '</td>';
         }
-        h += '</tr></tbody></table></td></tr></tbody></table>';
-
+        h += '</tr></tbody></table>';
         // Stock holdings table
         if (msH.length > 0) {
-          h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:6px"><tbody>';
-          h += '<tr style="background:#f1f5f9"><th style="' + _thL + '">Stock</th><th style="' + _thL + '">Symbol</th><th style="' + _thR + '">Qty</th><th style="' + _thR + '">Avg Price</th><th style="' + _thR + '">LTP</th><th style="' + _thR + '">Current Value</th><th style="' + _thR + '">P&amp;L</th></tr>';
+          var _sthS = 'padding:8px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f1f5f9;background:#fafafa';
+          h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody>';
+          h += '<tr>';
+          h += '<th style="' + _sthS + ';text-align:left">Stock</th>';
+          h += '<th style="' + _sthS + ';text-align:left">Symbol</th>';
+          h += '<th style="' + _sthS + ';text-align:right">Qty</th>';
+          h += '<th style="' + _sthS + ';text-align:right">Avg Price</th>';
+          h += '<th style="' + _sthS + ';text-align:right">LTP</th>';
+          h += '<th style="' + _sthS + ';text-align:right">Current Value</th>';
+          h += '<th style="' + _sthS + ';text-align:right">P&amp;L</th>';
+          h += '</tr>';
           for (var shi = 0; shi < msH.length; shi++) {
             var sk = msH[shi], skI = parseFloat(sk.totalInvestment) || 0, skC = parseFloat(sk.currentValue) || 0;
             var skPL = parseFloat(sk.unrealizedPL) || (skC - skI), skPP = parseFloat(sk.unrealizedPLPct) || (skI > 0 ? (skPL / skI * 100) : 0);
-            h += '<tr' + (shi < msH.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
-            h += '<td style="padding:6px 8px;font-size:13px;color:#1e293b">' + _escHtml(sk.companyName) + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;font-family:monospace;color:#475569">' + _escHtml(sk.symbol) + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;color:#475569;text-align:right">' + (parseFloat(sk.quantity) || 0) + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;color:#475569;text-align:right">\u20B9' + (parseFloat(sk.avgBuyPrice) || 0).toLocaleString('en-IN') + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;color:#1e293b;text-align:right">\u20B9' + (parseFloat(sk.currentPrice) || 0).toLocaleString('en-IN') + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">' + _fmtCur(skC) + '</td>';
-            h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:' + _plColor(skPL) + ';text-align:right">' + _plSign(skPL) + _fmtCur(Math.abs(skPL)) + '<br><span style="font-size:13px">' + _plSign(skPP) + skPP.toFixed(1) + '%</span></td></tr>';
+            var skPLColor = _plColor(skPL);
+            h += '<tr style="border-bottom:1px solid #f8fafc;' + (shi % 2 === 1 ? 'background:#fafafa' : '') + '">';
+            h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b;font-weight:500">' + _escHtml(sk.companyName) + '</td>';
+            h += '<td style="padding:8px 10px;font-size:13px;font-family:monospace;font-weight:600;color:#475569">' + _escHtml(sk.symbol) + '</td>';
+            h += '<td style="padding:8px 10px;font-size:13px;color:#64748b;text-align:right">' + (parseFloat(sk.quantity) || 0) + '</td>';
+            h += '<td style="padding:8px 10px;font-size:13px;color:#64748b;text-align:right">\u20B9' + (parseFloat(sk.avgBuyPrice) || 0).toLocaleString('en-IN') + '</td>';
+            h += '<td style="padding:8px 10px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">\u20B9' + (parseFloat(sk.currentPrice) || 0).toLocaleString('en-IN') + '</td>';
+            h += '<td style="padding:8px 10px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">' + _fmtCur(skC) + '</td>';
+            h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:700;color:' + skPLColor + '">' + _plSign(skPL) + _fmtCur(Math.abs(skPL)) + '</div><div style="font-size:12px;font-weight:600;color:' + skPLColor + '">' + _plSign(skPP) + skPP.toFixed(1) + '%</div></td>';
+            h += '</tr>';
           }
           h += '</tbody></table>';
         }
@@ -672,9 +696,10 @@ function buildDashboardPDFHTML(data) {
     // ── Other Investments ──
     if (md2.otherInvestments.length > 0) {
       h += '<div style="font-size:11px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-left:2px">&#9679; Other Investments</div>';
-      h += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid #d97706;border-radius:10px;padding:16px;margin-bottom:16px">';
-      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px"><tbody>';
-      h += '<tr style="background:#f8fafc"><th style="' + _thL + '">Type</th><th style="' + _thL + '">Name</th><th style="' + _thL + '">Category</th><th style="' + _thR + '">Current Value</th></tr>';
+      h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-top:3px solid #d97706;border-radius:10px;margin-bottom:16px;overflow:hidden">';
+      var _oiThS = 'padding:8px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f1f5f9;background:#fafafa';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody>';
+      h += '<tr><th style="' + _oiThS + ';text-align:left">Type</th><th style="' + _oiThS + ';text-align:left">Name</th><th style="' + _oiThS + ';text-align:left">Category</th><th style="' + _oiThS + ';text-align:right">Current Value</th></tr>';
       var moiTotal = 0;
       for (var moi2 = 0; moi2 < md2.otherInvestments.length; moi2++) {
         var moiv = md2.otherInvestments[moi2];
@@ -682,23 +707,24 @@ function buildDashboardPDFHTML(data) {
         moiTotal += moiC2;
         var cat = moiv.assetClass || moiv.category || 'Other';
         var catColor = _ASSET_COLORS[cat] || '#94a3b8';
-        h += '<tr style="' + (moi2 < md2.otherInvestments.length - 1 ? _rowBd : '') + '">';
-        h += '<td style="' + _td + '">' + _escHtml(moiv.investmentType) + '</td>';
-        h += '<td style="padding:6px 8px;font-size:13px;color:#1e293b">' + _escHtml(moiv.investmentName) + '</td>';
-        h += '<td style="' + _td + '"><span style="background:' + _hexBg(catColor, 0.08) + ';color:' + catColor + ';font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px">' + _escHtml(cat) + '</span></td>';
-        h += '<td style="' + _tdB + '">' + _fmtCur(moiC2) + '</td></tr>';
+        h += '<tr style="border-bottom:1px solid #f8fafc;' + (moi2 % 2 === 1 ? 'background:#fafafa' : '') + '">';
+        h += '<td style="padding:8px 10px;font-size:13px;color:#64748b">' + _escHtml(moiv.investmentType) + '</td>';
+        h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b;font-weight:500">' + _escHtml(moiv.investmentName) + '</td>';
+        h += '<td style="padding:8px 10px"><span style="background:' + _hexBg(catColor, 0.08) + ';color:' + catColor + ';font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px">' + _escHtml(cat) + '</span></td>';
+        h += '<td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1e293b;text-align:right">' + _fmtCur(moiC2) + '</td></tr>';
       }
-      h += '<tr style="background:#f8fafc;border-top:2px solid #e2e8f0"><td colspan="3" style="padding:6px 8px;font-size:13px;font-weight:600;color:#1e293b">Total Other Investments</td>';
-      h += '<td style="padding:6px 8px;font-size:13px;font-weight:700;color:#1e293b;text-align:right">' + _fmtCur(moiTotal) + '</td></tr>';
+      h += '<tr style="background:#fafafa;border-top:2px solid #f1f5f9"><td colspan="3" style="padding:8px 10px;font-size:13px;font-weight:600;color:#64748b">Total Other Investments</td>';
+      h += '<td style="padding:8px 10px;font-size:14px;font-weight:700;color:#1e293b;text-align:right">' + _fmtCur(moiTotal) + '</td></tr>';
       h += '</tbody></table></div>';
     }
 
     // ── Liabilities (inside member card) ──
     if (md2.liabilities.length > 0) {
       h += '<div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-left:2px">&#9679; Liabilities</div>';
-      h += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid #dc2626;border-radius:10px;padding:16px;margin-bottom:16px">';
-      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px"><tbody>';
-      h += '<tr style="background:#f1f5f9"><th style="' + _thL + '">Type</th><th style="' + _thL + '">Lender</th><th style="' + _thL + '">Loan A/C</th><th style="' + _thR + '">Outstanding</th><th style="' + _thR + '">EMI</th><th style="' + _thR + '">Interest</th></tr>';
+      h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-top:3px solid #dc2626;border-radius:10px;margin-bottom:16px;overflow:hidden">';
+      var _lbThS = 'padding:8px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f1f5f9;background:#fafafa';
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody>';
+      h += '<tr><th style="' + _lbThS + ';text-align:left">Type</th><th style="' + _lbThS + ';text-align:left">Lender</th><th style="' + _lbThS + ';text-align:left">Loan A/C</th><th style="' + _lbThS + ';text-align:right">Outstanding</th><th style="' + _lbThS + ';text-align:right">EMI</th><th style="' + _lbThS + ';text-align:right">Interest</th></tr>';
       var mLiabTot = 0, mEmiTot = 0;
       for (var mli = 0; mli < md2.liabilities.length; mli++) {
         var mlb = md2.liabilities[mli];
@@ -706,19 +732,19 @@ function buildDashboardPDFHTML(data) {
         var mlEmi = parseFloat(mlb.emiAmount) || 0;
         mLiabTot += mlBal;
         mEmiTot += mlEmi;
-        h += '<tr' + (mli < md2.liabilities.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
-        h += '<td style="' + _td + '">' + _escHtml(mlb.liabilityType) + '</td>';
-        h += '<td style="padding:6px 8px;font-size:13px;color:#1e293b;font-weight:600">' + _escHtml(mlb.lenderName) + '</td>';
-        h += '<td style="' + _tdMono + '">' + _escHtml(mlb.loanAccountNumber || '-') + '</td>';
-        h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:#dc2626;text-align:right">' + _fmtCur(mlBal) + '</td>';
-        h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">' + (mlEmi > 0 ? _fmtCur(mlEmi) + '<div style="font-size:13px;color:#64748b;font-weight:400">/month</div>' : '-') + '</td>';
-        h += '<td style="padding:6px 8px;font-size:13px;color:#b45309;text-align:right">' + (mlb.interestRate ? mlb.interestRate + '%' : '-') + '</td></tr>';
+        h += '<tr style="border-bottom:1px solid #f8fafc;' + (mli % 2 === 1 ? 'background:#fafafa' : '') + '">';
+        h += '<td style="padding:8px 10px;font-size:13px;color:#64748b">' + _escHtml(mlb.liabilityType) + '</td>';
+        h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b;font-weight:600">' + _escHtml(mlb.lenderName) + '</td>';
+        h += '<td style="padding:8px 10px;font-size:13px;font-family:monospace;color:#64748b">' + _escHtml(mlb.loanAccountNumber || '\u2014') + '</td>';
+        h += '<td style="padding:8px 10px;font-size:13px;font-weight:700;color:#dc2626;text-align:right">' + _fmtCur(mlBal) + '</td>';
+        h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:600;color:#1e293b">' + (mlEmi > 0 ? _fmtCur(mlEmi) : '\u2014') + '</div>' + (mlEmi > 0 ? '<div style="font-size:11px;color:#94a3b8">/month</div>' : '') + '</td>';
+        h += '<td style="padding:8px 10px;font-size:13px;font-weight:600;color:#b45309;text-align:right">' + (mlb.interestRate ? mlb.interestRate + '%' : '\u2014') + '</td></tr>';
       }
-      h += '<tr style="background:#f1f5f9;border-top:2px solid #e2e8f0">';
-      h += '<td colspan="3" style="padding:6px 8px;font-size:13px;font-weight:600;color:#1e293b">Total Outstanding</td>';
-      h += '<td style="padding:6px 8px;font-size:13px;font-weight:700;color:#dc2626;text-align:right">' + _fmtCur(mLiabTot) + '</td>';
-      h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">' + (mEmiTot > 0 ? _fmtCur(mEmiTot) : '-') + '</td>';
-      h += '<td style="padding:6px 8px;font-size:13px;color:#64748b;text-align:right">' + md2.liabilities.length + ' loan' + (md2.liabilities.length !== 1 ? 's' : '') + '</td></tr>';
+      h += '<tr style="background:#fafafa;border-top:2px solid #f1f5f9">';
+      h += '<td colspan="3" style="padding:8px 10px;font-size:13px;font-weight:600;color:#64748b">Total Outstanding</td>';
+      h += '<td style="padding:8px 10px;font-size:14px;font-weight:700;color:#dc2626;text-align:right">' + _fmtCur(mLiabTot) + '</td>';
+      h += '<td style="padding:8px 10px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">' + (mEmiTot > 0 ? _fmtCur(mEmiTot) : '\u2014') + '</td>';
+      h += '<td style="padding:8px 10px;font-size:12px;color:#94a3b8;text-align:right">' + md2.liabilities.length + ' loan' + (md2.liabilities.length !== 1 ? 's' : '') + '</td></tr>';
       h += '</tbody></table></div>';
     }
 
@@ -726,13 +752,13 @@ function buildDashboardPDFHTML(data) {
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // 8. GOALS
+  // 8. GOALS (with allocation health + suggestions)
   // ══════════════════════════════════════════════════════════════════
+  var goalHealth = data.goalHealth || {};
   if (activeGoals.length > 0) {
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _cs + '"><tbody><tr><td style="padding:20px">';
-    h += _secH('Goals', '#7c3aed');
-    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px"><tbody>';
-    h += '<tr style="background:#f8fafc"><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Goal</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Type</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Target</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Current</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Status</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Target Date</th></tr>';
+    h += _secH('Financial Goals', '#7c3aed');
+
     for (var gi = 0; gi < activeGoals.length; gi++) {
       var g = activeGoals[gi];
       var gTarget = parseFloat(g.targetAmount) || 0;
@@ -740,15 +766,174 @@ function buildDashboardPDFHTML(data) {
       var gProgress = parseFloat(g.progressPercent) || (gTarget > 0 ? Math.min(100, (gCurrent / gTarget) * 100) : 0);
       var gColor = gProgress >= 100 ? '#059669' : gProgress >= 75 ? '#059669' : gProgress >= 40 ? '#d97706' : '#ea580c';
       var gLabel = gProgress >= 100 ? 'ACHIEVED' : gProgress >= 75 ? 'ALMOST' : gProgress >= 40 ? 'ON TRACK' : 'BEHIND';
-      h += '<tr' + (gi < activeGoals.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
-      h += '<td style="padding:8px 10px;font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(g.goalName) + '</td>';
-      h += '<td style="padding:8px 10px;font-size:13px;color:#475569">' + _escHtml(g.goalType) + '</td>';
-      h += '<td style="padding:8px 10px;font-size:13px;font-weight:600;color:#1e293b;text-align:right">' + _fmtCur(gTarget) + '</td>';
-      h += '<td style="padding:8px 10px;font-size:13px;color:#475569;text-align:right">' + _fmtCur(gCurrent) + '</td>';
-      h += '<td style="padding:8px 10px;text-align:right"><span style="background:' + _hexBg(gColor, 0.08) + ';color:' + gColor + ';font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:0.5px">' + gProgress.toFixed(0) + '% &middot; ' + gLabel + '</span></td>';
-      h += '<td style="padding:8px 10px;font-size:13px;color:#64748b">' + _fmtDate(g.targetDate) + '</td></tr>';
+      var gh = goalHealth[g.goalId];
+      var labelColor = gh ? (gh.label === 'Short-term' ? '#3b82f6' : gh.label === 'Medium-term' ? '#d97706' : gh.label === 'Long-term' ? '#059669' : '#64748b') : '#64748b';
+      var gap = Math.max(0, gTarget - gCurrent);
+
+      h += '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;' + (gi < activeGoals.length - 1 ? 'margin-bottom:12px' : '') + '">';
+
+      // Row 1: Name + Status badge
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      h += '<div>';
+      h += '<span style="font-size:14px;font-weight:700;color:#1e293b">' + _escHtml(g.goalName) + '</span>';
+      if (gh) h += ' <span style="font-size:10px;font-weight:700;color:' + labelColor + ';background:' + _hexBg(labelColor, 0.1) + ';padding:2px 6px;border-radius:10px;margin-left:4px">' + gh.label + '</span>';
+      h += '</div>';
+      h += '<span style="background:' + _hexBg(gColor, 0.08) + ';color:' + gColor + ';font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px">' + gProgress.toFixed(0) + '% &middot; ' + gLabel + '</span>';
+      h += '</div>';
+
+      // Row 2: Type + Target Date
+      h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">' + _escHtml(g.goalType) + ' &middot; Target: ' + _fmtDate(g.targetDate);
+      if (gh) h += ' &middot; ' + gh.yearsLeft.toFixed(1) + ' yrs left';
+      h += '</div>';
+
+      // Progress bar
+      h += '<div style="background:#f1f5f9;border-radius:4px;height:6px;margin-bottom:10px;overflow:hidden"><div style="height:6px;border-radius:4px;background:' + gColor + ';width:' + Math.min(gProgress, 100).toFixed(0) + '%"></div></div>';
+
+      // Stats row: Current | Target | Gap
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:8px"><tbody><tr>';
+      h += '<td style="font-size:11px;color:#64748b">Current<br><span style="font-size:13px;font-weight:600;color:#1e293b">' + _fmtCur(gCurrent) + '</span></td>';
+      h += '<td style="font-size:11px;color:#64748b;text-align:center">Target<br><span style="font-size:13px;font-weight:600;color:#1e293b">' + _fmtCur(gTarget) + '</span></td>';
+      h += '<td style="font-size:11px;color:#64748b;text-align:right">Gap<br><span style="font-size:13px;font-weight:600;color:' + (gap > 0 ? '#d97706' : '#059669') + '">' + (gap > 0 ? _fmtCur(gap) : 'On track') + '</span></td>';
+      h += '</tr></tbody></table>';
+
+      // Allocation health (if available)
+      if (gh) {
+        h += '<div style="background:#f8fafc;border-radius:6px;padding:8px 10px;margin-bottom:6px">';
+        h += '<div style="font-size:11px;color:#64748b;margin-bottom:4px">Recommended: <strong>' + gh.recommendedEquity + '% Equity</strong> &middot; <strong>' + gh.recommendedDebt + '% Debt</strong></div>';
+        if (gh.isMapped && gh.actualEquity !== null) {
+          // Allocation bar
+          h += '<div style="display:flex;align-items:center;gap:6px">';
+          var barBg = gh.needsAttention ? '#fef3c7' : '#f1f5f9';
+          var eqColor = gh.needsAttention ? '#ef4444' : '#8b5cf6';
+          var dtColor = gh.needsAttention ? '#d97706' : '#3b82f6';
+          h += '<div style="flex:1;height:5px;border-radius:3px;overflow:hidden;display:flex;background:' + barBg + '">';
+          h += '<div style="width:' + gh.actualEquity + '%;height:5px;background:' + eqColor + '"></div>';
+          h += '<div style="width:' + (100 - gh.actualEquity) + '%;height:5px;background:' + dtColor + '"></div>';
+          h += '</div>';
+          h += '<span style="font-size:11px;font-weight:600;color:' + (gh.needsAttention ? '#d97706' : '#64748b') + '">' + gh.actualEquity + '% Equity</span>';
+          h += '</div>';
+          if (gh.needsAttention && gh.mismatch > 0) {
+            h += '<div style="font-size:11px;color:#d97706;margin-top:4px">&#9888; ' + gh.mismatch + '% over recommended equity — consider shifting to debt</div>';
+          }
+          if (gh.needsAttention && gh.mismatch < 0) {
+            h += '<div style="font-size:11px;color:#3b82f6;margin-top:4px">&#8505; ' + Math.abs(gh.mismatch) + '% under equity — room for more growth</div>';
+          }
+        }
+        if (!gh.isMapped) {
+          h += '<div style="font-size:11px;color:#94a3b8">No investments linked yet</div>';
+        }
+        h += '</div>';
+
+        // SIP / Lumpsum suggestions
+        if (gap > 0 && gh.liveSIP > 0) {
+          h += '<div style="background:#f5f3ff;border-radius:6px;padding:8px 10px">';
+          h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody>';
+          h += '<tr><td style="font-size:11px;color:#64748b">SIP Needed</td><td style="font-size:12px;font-weight:700;color:#7c3aed;text-align:right">' + _fmtCur(gh.liveSIP) + '/mo</td></tr>';
+          h += '<tr><td style="font-size:11px;color:#64748b">Or Lumpsum Today</td><td style="font-size:12px;font-weight:700;color:#7c3aed;text-align:right">' + _fmtCur(gh.liveLumpsum) + '</td></tr>';
+          h += '</tbody></table>';
+          var cagr = parseFloat(g.expectedCAGR) || 0.12;
+          h += '<div style="font-size:10px;color:#94a3b8;margin-top:2px">at ' + (cagr * 100).toFixed(0) + '% expected return</div>';
+          h += '</div>';
+        }
+      }
+
+      h += '</div>'; // close goal card
     }
-    h += '</tbody></table></td></tr></tbody></table>';
+    h += '</td></tr></tbody></table>';
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 8b. FUND PERFORMANCE (Top Gainers + Losers)
+  // ══════════════════════════════════════════════════════════════════
+  var topGainers = data.topGainers || [];
+  var topLosers = data.topLosers || [];
+  var topPortfolios = data.topPortfolios || [];
+  var bottomPortfolios = data.bottomPortfolios || [];
+
+  if (topGainers.length > 0 || topLosers.length > 0 || topPortfolios.length > 0 || bottomPortfolios.length > 0) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _cs + '"><tbody><tr><td style="padding:20px">';
+
+    // Fund Performance
+    if (topGainers.length > 0 || topLosers.length > 0) {
+      h += _secH('Fund Performance', '#8b5cf6');
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:16px"><tbody>';
+
+      if (topGainers.length > 0) {
+        h += '<tr><td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.5px;background:#f0fdf4;border-radius:8px 8px 0 0">&#x2197; Top Gainers</td></tr>';
+        for (var tgi = 0; tgi < topGainers.length; tgi++) {
+          var tg = topGainers[tgi];
+          var tgName = _splitFundName ? _splitFundName(tg.fundName) : tg.fundName;
+          h += '<tr' + (tgi < topGainers.length - 1 || topLosers.length > 0 ? ' style="' + _rowBd + '"' : '') + '>';
+          h += '<td style="padding:8px 10px"><div style="font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(tgName) + '</div>';
+          if (tg.portfolios && tg.portfolios.length > 0) {
+            h += '<div style="margin-top:2px">';
+            for (var pi = 0; pi < tg.portfolios.length; pi++) {
+              h += '<span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:3px;margin-right:3px">' + _escHtml(tg.portfolios[pi]) + '</span>';
+            }
+            h += '</div>';
+          }
+          h += '</td>';
+          h += '<td style="padding:8px 10px;font-size:12px;color:#64748b;text-align:right">' + _fmtCur(tg.investment) + '</td>';
+          h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:700;color:#059669">+' + tg.plPct.toFixed(1) + '%</div><div style="font-size:11px;color:#059669">+' + _fmtCur(tg.pl) + '</div></td>';
+          h += '</tr>';
+        }
+      }
+
+      if (topLosers.length > 0) {
+        h += '<tr><td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;background:#fef2f2">&#x2198; Top Losers</td></tr>';
+        for (var tli = 0; tli < topLosers.length; tli++) {
+          var tl = topLosers[tli];
+          var tlName = _splitFundName ? _splitFundName(tl.fundName) : tl.fundName;
+          h += '<tr' + (tli < topLosers.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
+          h += '<td style="padding:8px 10px"><div style="font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(tlName) + '</div>';
+          if (tl.portfolios && tl.portfolios.length > 0) {
+            h += '<div style="margin-top:2px">';
+            for (var pli = 0; pli < tl.portfolios.length; pli++) {
+              h += '<span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:3px;margin-right:3px">' + _escHtml(tl.portfolios[pli]) + '</span>';
+            }
+            h += '</div>';
+          }
+          h += '</td>';
+          h += '<td style="padding:8px 10px;font-size:12px;color:#64748b;text-align:right">' + _fmtCur(tl.investment) + '</td>';
+          h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:700;color:#dc2626">' + tl.plPct.toFixed(1) + '%</div><div style="font-size:11px;color:#dc2626">' + _fmtCur(tl.pl) + '</div></td>';
+          h += '</tr>';
+        }
+      }
+      h += '</tbody></table>';
+    }
+
+    // Portfolio Performance
+    if (topPortfolios.length > 0 || bottomPortfolios.length > 0) {
+      h += _secH('Portfolio Performance', '#d97706');
+      h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px"><tbody>';
+
+      if (topPortfolios.length > 0) {
+        h += '<tr><td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.5px;background:#f0fdf4;border-radius:8px 8px 0 0">&#x2197; Top Performing</td></tr>';
+        for (var tpi = 0; tpi < topPortfolios.length; tpi++) {
+          var tp = topPortfolios[tpi];
+          h += '<tr' + (tpi < topPortfolios.length - 1 || bottomPortfolios.length > 0 ? ' style="' + _rowBd + '"' : '') + '>';
+          h += '<td style="padding:8px 10px"><div style="font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(tp.portfolioName) + '</div><div style="font-size:11px;color:#94a3b8">' + _escHtml(tp.ownerName) + '</div></td>';
+          h += '<td style="padding:8px 10px;font-size:12px;color:#64748b;text-align:right">' + _fmtCur(tp.invested) + '</td>';
+          h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:700;color:#059669">+' + tp.plPct.toFixed(1) + '%</div><div style="font-size:11px;color:#059669">+' + _fmtCur(tp.pl) + '</div></td>';
+          h += '</tr>';
+        }
+      }
+
+      if (bottomPortfolios.length > 0) {
+        h += '<tr><td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;background:#fef2f2">&#x2198; Underperforming</td></tr>';
+        for (var bpi = 0; bpi < bottomPortfolios.length; bpi++) {
+          var bp = bottomPortfolios[bpi];
+          h += '<tr' + (bpi < bottomPortfolios.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
+          h += '<td style="padding:8px 10px"><div style="font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(bp.portfolioName) + '</div><div style="font-size:11px;color:#94a3b8">' + _escHtml(bp.ownerName) + '</div></td>';
+          h += '<td style="padding:8px 10px;font-size:12px;color:#64748b;text-align:right">' + _fmtCur(bp.invested) + '</td>';
+          h += '<td style="padding:8px 10px;text-align:right"><div style="font-size:13px;font-weight:700;color:#dc2626">' + bp.plPct.toFixed(1) + '%</div><div style="font-size:11px;color:#dc2626">' + _fmtCur(bp.pl) + '</div></td>';
+          h += '</tr>';
+        }
+      }
+      h += '</tbody></table>';
+    }
+
+    h += '</td></tr></tbody></table>';
   }
 
   // ══════════════════════════════════════════════════════════════════

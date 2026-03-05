@@ -45,7 +45,7 @@ function getAllGoals() {
   const numRows = lastDataRow - 2; // Number of rows from row 3 to lastDataRow
   Logger.log('Reading ' + numRows + ' rows starting from row 3');
 
-  const data = sheet.getRange(3, 1, numRows, 21).getValues();
+  const data = sheet.getRange(3, 1, numRows, 22).getValues();
   const goals = [];
 
   data.forEach((row, index) => {
@@ -103,7 +103,8 @@ function getAllGoals() {
         expectedCAGR: Number(row[17]) || 0.12,       // R (hidden)
         monthlyExpenses: Number(row[18]) || null,    // S (for Retirement/Emergency Fund)
         emergencyMonths: Number(row[19]) || null,    // T (for Emergency Fund)
-        lumpsumInvested: Number(row[20]) || null      // U (user's committed lumpsum)
+        lumpsumInvested: Number(row[20]) || null,    // U (user's committed lumpsum)
+        initialCost: Number(row[21]) || null          // V (today's cost for non-Retirement/Emergency goals)
       });
     }
   });
@@ -331,7 +332,8 @@ function addGoal(goalData) {
       goalData.expectedCAGR || 0.12,             // R: Expected CAGR (hidden, default 12%)
       goalData.monthlyExpenses || null,          // S: Monthly Expenses (for Retirement/Emergency Fund)
       goalData.emergencyMonths || null,          // T: Emergency Months (for Emergency Fund)
-      lumpsumInvested || null                    // U: Lumpsum Invested (user's committed lumpsum)
+      lumpsumInvested || null,                   // U: Lumpsum Invested (user's committed lumpsum)
+      goalData.initialCost || null               // V: Initial (today's) cost for non-Retirement/Emergency goals
     ];
 
     sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
@@ -342,7 +344,7 @@ function addGoal(goalData) {
     setGoalFormulas(sheet, newRow);
 
     // Format the new row
-    applyDataRowFormatting(sheet, newRow, newRow, 21);
+    applyDataRowFormatting(sheet, newRow, newRow, 22);
 
     log(`Goal added: ${goalId} - ${goalData.goalName}`);
 
@@ -411,15 +413,16 @@ function editGoal(goalId, goalData) {
       goalData.priority || 'Medium'              // M: Priority
     ]]);
 
-    // O-U: Flags and hidden columns
-    sheet.getRange(rowIndex, 15, 1, 7).setValues([[
+    // O-V: Flags and hidden columns
+    sheet.getRange(rowIndex, 15, 1, 8).setValues([[
       goalData.isActive !== undefined ? goalData.isActive : true, // O: Is Active
       goalData.notes || '',                      // P: Notes
       goalData.expectedInflation || 0.06,        // Q: Expected Inflation
       goalData.expectedCAGR || 0.12,             // R: Expected CAGR
       goalData.monthlyExpenses || null,          // S: Monthly Expenses
       goalData.emergencyMonths || null,          // T: Emergency Months
-      goalData.lumpsumInvested || null           // U: Lumpsum Invested
+      goalData.lumpsumInvested || null,          // U: Lumpsum Invested
+      goalData.initialCost || null               // V: Initial (today's) cost
     ]]);
 
     // Re-write live formulas for calculated columns (G, H, I, J, K, N)

@@ -333,80 +333,7 @@ function GET_BASE_FUND_NAME(schemeCode) {
   }
 }
 
-/**
- * Extract base fund name without plan details (Growth/Direct/IDCW/etc)
- * Used by GET_BASE_FUND_NAME and other backend functions
- */
-function getBaseFundName(fullName) {
-  if (!fullName) return '';
-
-  // Plan keywords that usually appear at the end - remove these
-  // Ordered from most specific to least specific to match correctly
-  const planKeywords = [
-    // Direct Plan variations
-    ' - Direct Plan - Growth Option',
-    ' - Direct Plan - IDCW Option',
-    ' - Direct Plan - Dividend Option',
-    ' - Direct Plan - Monthly IDCW',
-    ' - Direct Plan - Quarterly IDCW',
-    ' - Direct Plan - Annual IDCW',
-    ' - Direct Plan - Weekly IDCW',
-    ' - Direct Plan - Half Yearly IDCW',
-    ' - Direct Plan - Periodic IDCW',
-    ' - Direct Plan - Bonus Option',
-    ' - Direct Plan - Growth',
-    ' - Direct Plan - IDCW',
-    ' - Direct Plan - Dividend',
-    ' - Direct Plan',
-
-    // Regular Plan variations
-    ' - Regular Plan - Growth Option',
-    ' - Regular Plan - IDCW Option',
-    ' - Regular Plan - Dividend Option',
-    ' - Regular Plan - Monthly IDCW',
-    ' - Regular Plan - Quarterly IDCW',
-    ' - Regular Plan - Annual IDCW',
-    ' - Regular Plan - Weekly IDCW',
-    ' - Regular Plan - Half Yearly IDCW',
-    ' - Regular Plan - Periodic IDCW',
-    ' - Regular Plan - Bonus Option',
-    ' - Regular Plan - Growth',
-    ' - Regular Plan - IDCW',
-    ' - Regular Plan - Dividend',
-    ' - Regular Plan',
-
-    // Other plan types
-    ' - Retail Plan - Growth Option',
-    ' - Retail Plan - Growth',
-    ' - Institutional Plan - Growth Option',
-    ' - Institutional Plan - Growth',
-
-    // Short forms
-    ' - Direct - IDCW',
-    ' - Direct - Growth',
-    ' - Regular - IDCW',
-    ' - Regular - Growth',
-
-    // Standalone options (rare, but just in case)
-    ' - Growth Option',
-    ' - IDCW Option',
-    ' - Dividend Option',
-    ' - Growth',
-    ' - IDCW',
-    ' - Dividend'
-  ];
-
-  // Try to remove plan keywords from the end
-  let baseName = fullName.trim();
-  for (const keyword of planKeywords) {
-    if (baseName.endsWith(keyword)) {
-      baseName = baseName.substring(0, baseName.length - keyword.length).trim();
-      break; // Only remove once
-    }
-  }
-
-  return baseName;
-}
+// getBaseFundName() lives in MutualFunds.js (single regex version)
 
 // ============================================================================
 // HEALTH CHECK API FUNCTIONS (for React App)
@@ -673,6 +600,39 @@ function unlinkAllInvestmentsFromLiability(liabilityId) {
   } catch (error) {
     Logger.log('Error in unlinkAllInvestmentsFromLiability: ' + error.message);
   }
+}
+
+// ============================================================================
+// SHARED HELPERS (used by multiple files)
+// ============================================================================
+
+/**
+ * Decode HTML entities from JSON strings
+ * @param {string} text - Text with HTML entities
+ * @returns {string} Decoded text
+ */
+function decodeHtmlEntities(text) {
+  if (!text) return '';
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} text - Raw text
+ * @returns {string} HTML-safe text
+ */
+function escapeHtml(text) {
+  if (!text) return '';
+  return text.toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // ============================================================================

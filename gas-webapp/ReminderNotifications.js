@@ -456,17 +456,7 @@ function formatDateForEmail(date) {
   });
 }
 
-/**
- * Escape HTML special characters
- */
-function escapeHtml(text) {
-  if (!text) return '';
-  return text.toString()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+// escapeHtml() lives in Utilities.js
 
 // ============================================================================
 // TEST FUNCTION

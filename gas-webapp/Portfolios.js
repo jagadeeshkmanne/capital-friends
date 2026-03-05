@@ -237,8 +237,11 @@ function createPortfolioSheet(portfolioName, portfolioId) {
   // T: Lumpsum Restricted (column 20) — static flag, set per fund
   portfolioSheet.getRange(3, 20).setValue("Lumpsum\nRestricted");
 
-  // Format header row with better styling (including ATH columns)
-  const headerRange = portfolioSheet.getRange(3, 1, 1, 19);  // Extended to column S
+  // U: SIP Restricted (column 21) — static flag, set per fund
+  portfolioSheet.getRange(3, 21).setValue("SIP\nRestricted");
+
+  // Format header row with better styling (including ATH + restriction columns)
+  const headerRange = portfolioSheet.getRange(3, 1, 1, 21);  // Extended to column U
   headerRange.setFontWeight("bold");
   headerRange.setBackground("#4a5568");
   headerRange.setFontColor("#ffffff");
@@ -306,6 +309,12 @@ function createPortfolioSheet(portfolioName, portfolioId) {
 
   // S: % Below ATH (110px - percentage)
   portfolioSheet.setColumnWidth(19, 110);
+
+  // T: Lumpsum Restricted (100px - boolean flag)
+  portfolioSheet.setColumnWidth(20, 100);
+
+  // U: SIP Restricted (100px - boolean flag)
+  portfolioSheet.setColumnWidth(21, 100);
 
   // Sample row 4 with formulas (row 1 = watermark, row 2 = group headers, row 3 = column headers)
   // New column order (16 columns total):
@@ -1290,6 +1299,9 @@ function addFundRowToPortfolio(sheet, row, portfolioId, schemeCode, targetPercen
 
   // Column T (20): Lumpsum Restricted - static flag, FALSE by default
   sheet.getRange(row, 20).setValue(false);
+
+  // Column U (21): SIP Restricted - static flag, FALSE by default
+  sheet.getRange(row, 21).setValue(false);
 
   // Apply formatting
   sheet.getRange(row, 1, 1, 16).setBorder(true, true, true, true, false, false);

@@ -192,6 +192,9 @@ function routeAction(action, params, userRecord) {
     case 'mf:redeem':
       return processRedeem(params);
 
+    case 'mf:redeem-bulk':
+      return processRedeemBulk(params);
+
     case 'mf:switch':
       return processSwitchFunds(params);
 
@@ -216,6 +219,9 @@ function routeAction(action, params, userRecord) {
 
     case 'mf:lumpsum-restricted':
       return toggleFundLumpsumRestricted(params.portfolioId, params.fundCode, params.restricted);
+
+    case 'mf:sip-restricted':
+      return toggleFundSipRestricted(params.portfolioId, params.fundCode, params.restricted);
 
     case 'funds:search':
       return searchFunds(params.query);
@@ -892,6 +898,9 @@ function checkUserTriggers() {
 
   result.hasDailySync = result.list.some(function(t) {
     return t.function === 'dailyUserSync';
+  });
+  result.hasEmailTrigger = result.list.some(function(t) {
+    return t.function === 'sendScheduledDailyEmail';
   });
   result.hasReminderTrigger = result.list.some(function(t) {
     return t.function === 'checkAndSendReminders';
