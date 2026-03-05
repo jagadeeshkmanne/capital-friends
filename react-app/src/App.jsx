@@ -22,6 +22,8 @@ import AboutPage from './pages/AboutPage'
 import TestPage from './pages/TestPage'
 import Dashboard from './pages/dashboard/Dashboard'
 import DonatePage from './pages/DonatePage'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsAndConditions from './pages/TermsAndConditions'
 
 export default function App() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
       <Route index element={<HomePage />} />
       <Route path="login" element={<LandingPage />} />
       <Route path="donate" element={<DonatePage />} />
+      <Route path="privacy" element={<PrivacyPolicy />} />
+      <Route path="terms" element={<TermsAndConditions />} />
 
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>

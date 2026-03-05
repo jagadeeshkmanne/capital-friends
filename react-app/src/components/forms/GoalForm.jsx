@@ -9,6 +9,22 @@ const GOAL_TYPES = [
   'Car', 'Travel', 'Wedding', 'Custom',
 ].map((t) => ({ value: t, label: t }))
 
+// Glide path: recommended equity % by years to goal
+const GLIDE_PATH = [
+  { maxYears: 1,  equity: 10, label: 'Short-term' },
+  { maxYears: 3,  equity: 30, label: 'Short-term' },
+  { maxYears: 5,  equity: 50, label: 'Medium-term' },
+  { maxYears: 7,  equity: 65, label: 'Medium-term' },
+  { maxYears: 10, equity: 75, label: 'Long-term' },
+  { maxYears: Infinity, equity: 85, label: 'Long-term' },
+]
+
+function getRecommendedAllocation(goalType, yearsLeft) {
+  if (goalType === 'Emergency Fund') return { equity: 0, debt: 100, label: 'Safety' }
+  const step = GLIDE_PATH.find(s => yearsLeft <= s.maxYears)
+  return { equity: step.equity, debt: 100 - step.equity, label: step.label }
+}
+
 const PRIORITIES = [
   { value: 'High', label: 'High' },
   { value: 'Medium', label: 'Medium' },
@@ -33,7 +49,7 @@ const STEPS = [
   { label: 'Review', icon: CheckCircle2 },
 ]
 
-export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
+export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent }) {
   const isEdit = !!initial
   const { activeMembers } = useData()
   const memberOptions = (activeMembers || []).map((m) => ({
@@ -44,16 +60,20 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(() => {
     if (isEdit) {
-      // Reverse-calculate today's cost from inflated target
       const inflation = (initial.expectedInflation || 0.06) * 100
       const cagr = (initial.expectedCAGR || 0.12) * 100
-      const yearsToGo = initial.targetDate
-        ? Math.max(0, (new Date(initial.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000))
-        : 0
-      const inflationRate = inflation / 100
-      let todaysCost = initial.targetAmount || 0
-      if (inflationRate > 0 && yearsToGo > 0 && initial.goalType !== 'Emergency Fund') {
-        todaysCost = initial.targetAmount / Math.pow(1 + inflationRate, yearsToGo)
+
+      // Use stored initialCost if available; fall back to reverse-calculating from inflated target
+      let todaysCost = initial.initialCost || 0
+      if (!todaysCost) {
+        const yearsToGo = initial.targetDate
+          ? Math.max(0, (new Date(initial.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000))
+          : 0
+        const inflationRate = inflation / 100
+        todaysCost = initial.targetAmount || 0
+        if (inflationRate > 0 && yearsToGo > 0 && initial.goalType !== 'Emergency Fund') {
+          todaysCost = initial.targetAmount / Math.pow(1 + inflationRate, yearsToGo)
+        }
       }
 
       // Look up memberId from familyMemberName (backend only stores the name, not the ID)
@@ -247,7 +267,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
         monthlyExpenses: (isRetirement || isEmergency) ? Number(form.monthlyExpenses) || 0 : undefined,
         emergencyMonths: isEmergency ? Number(form.emergencyMonths) || 6 : undefined,
         isRetirement: isRetirement,
-        currentCost: calc.todaysCost,
+        initialCost: (!isRetirement && !isEmergency) ? calc.todaysCost : undefined,
       })
     } finally { setSaving(false) }
   }
@@ -313,16 +333,29 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
           <InflatedInfo calc={calc} inflation={form.inflation} isRetirement={isRetirement} isEmergency={isEmergency} />
         )}
 
+        {/* SIP projection + Glide Path (edit mode) */}
+        {calc.hasTarget && calc.months > 0 && (
+          <ProjectionPanel calc={calc} lumpsum={form.lumpsum} compact />
+        )}
+        {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
+          <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
+        )}
+
+        {/* Linking section (passed from GoalsPage) */}
+        {linkingContent}
+
         <FormField label="Priority">
           <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
         </FormField>
         <FormField label="Notes">
           <FormTextarea value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." rows={2} />
         </FormField>
-        <div className="flex items-center justify-between">
-          {onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
-          <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Update Goal" loading={saving} />
-        </div>
+        {!linkingContent && (
+          <div className="flex items-center justify-between">
+            {onDelete ? <DeleteButton onClick={onDelete} /> : <div />}
+            <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Update Goal" loading={saving} />
+          </div>
+        )}
       </div>
     )
   }
@@ -457,6 +490,11 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
             <ProjectionPanel calc={calc} lumpsum={form.lumpsum} />
           )}
 
+          {/* Glide Path Recommendation */}
+          {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
+            <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
+          )}
+
           <FormField label="Notes">
             <FormTextarea value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." rows={2} />
           </FormField>
@@ -502,6 +540,11 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel }) {
           {/* Projection summary */}
           {calc.hasTarget && calc.months > 0 && (
             <ProjectionPanel calc={calc} lumpsum={form.lumpsum} compact />
+          )}
+
+          {/* Glide Path on review */}
+          {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
+            <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
           )}
         </div>
       )}
@@ -627,6 +670,53 @@ function ProjectionPanel({ calc, lumpsum, compact }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function GlidePathRecommendation({ goalType, yearsLeft }) {
+  const rec = getRecommendedAllocation(goalType, yearsLeft)
+  const labelColor = rec.label === 'Short-term' ? '#60a5fa'
+    : rec.label === 'Medium-term' ? '#fbbf24'
+    : rec.label === 'Long-term' ? '#34d399' : '#94a3b8'
+
+  return (
+    <div className="rounded-lg border p-3 space-y-2 bg-blue-500/5 border-blue-500/15">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={12} className="text-blue-400" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
+        </div>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: `${labelColor}15`, color: labelColor }}>
+          {rec.label}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-inset)' }}>
+          <div className="h-full rounded-l-full" style={{ width: `${rec.equity}%`, background: '#8b5cf6' }} />
+          <div className="h-full rounded-r-full" style={{ width: `${rec.debt}%`, background: '#60a5fa' }} />
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-violet-500" />
+            <span className="text-[10px] text-[var(--text-dim)]">Equity {rec.equity}%</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-blue-400" />
+            <span className="text-[10px] text-[var(--text-dim)]">Debt {rec.debt}%</span>
+          </div>
+        </div>
+        <span className="text-[10px] text-[var(--text-dim)]">{yearsLeft.toFixed(1)} yrs</span>
+      </div>
+      <p className="text-[10px] text-[var(--text-dim)]">
+        {rec.label === 'Safety' ? 'Keep in liquid/debt funds for instant access.' :
+         rec.label === 'Short-term' ? 'Focus on debt/hybrid funds to preserve capital.' :
+         rec.label === 'Medium-term' ? 'Balanced mix — gradually shift to debt as deadline nears.' :
+         'Growth-oriented — can take higher equity exposure.'}
+      </p>
     </div>
   )
 }

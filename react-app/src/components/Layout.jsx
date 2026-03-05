@@ -66,16 +66,20 @@ export default function Layout() {
               </Link>
               <span className="text-[var(--border)] text-[10px]">{'\u00B7'}</span>
               <p className="text-[10px] text-[var(--text-dim)]">
-                Made with {'\u2764\uFE0F'} by <span className="font-semibold text-[var(--text-muted)]">Jagadeesh</span>
+                Made with {'\u2764\uFE0F'} by <span className="font-semibold text-[var(--text-muted)]">Jagadeesh Manne</span>
               </p>
             </div>
-            {/* Donate */}
-            <button onClick={() => { setShowDonate(true); dismissBanner() }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors shrink-0"
-                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
-              <Heart size={12} className="text-amber-400" />
-              <span className="text-[11px] font-semibold text-amber-400">Donate</span>
-            </button>
+            {/* Links */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Link to="/privacy" className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Privacy</Link>
+              <Link to="/terms" className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Terms</Link>
+              <button onClick={() => { setShowDonate(true); dismissBanner() }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+                      style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                <Heart size={12} className="text-amber-400" />
+                <span className="text-[11px] font-semibold text-amber-400">Donate</span>
+              </button>
+            </div>
           </div>
         </footer>
       </main>

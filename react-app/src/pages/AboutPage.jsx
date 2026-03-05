@@ -16,7 +16,7 @@ export default function AboutPage() {
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-6 text-center">
         <img src={`${import.meta.env.BASE_URL}logo-new.png`} alt="Capital Friends" className="h-16 w-auto mx-auto mb-3" />
         <h1 className="text-lg font-bold text-[var(--text-primary)]" style={{ fontFamily: "'Poppins', sans-serif" }}>
-          <span>Capital</span><span className="text-emerald-400">Friends</span>
+          <span>Capital</span> <span className="text-emerald-400">Friends</span>
         </h1>
         <p className="text-xs text-[var(--text-dim)] mt-1">Family Portfolio Manager</p>
         <div className="flex items-center justify-center gap-3 mt-3">

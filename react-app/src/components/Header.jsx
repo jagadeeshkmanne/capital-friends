@@ -71,6 +71,7 @@ const NAV_ITEMS = [
   { label: 'Other Investments', path: '/investments/other', match: '/investments/other' },
   { label: 'Liabilities', path: '/liabilities', match: '/liabilities' },
   { label: 'Goals', path: '/goals', match: '/goals' },
+  { label: 'Reminders', path: '/reminders', match: '/reminders' },
 ]
 
 const SECTION_HEX = {
@@ -294,7 +295,7 @@ export default function Header() {
         <div className="flex items-center justify-between px-3 sm:px-4 h-14">
           {/* Left: logo (clickable → Dashboard) */}
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={LOGO_ICON} alt="CF" className="h-9 sm:h-12 w-auto" />
+            <img src={LOGO_ICON} alt="Capital Friends" className="h-9 sm:h-12 w-auto" />
             <span className="hidden sm:flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
               <span className="font-bold text-[var(--text-primary)]">Capital</span>
               <span className="font-extrabold text-emerald-400">Friends</span>

@@ -1,10 +1,15 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { ArrowDownCircle, AlertTriangle } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 
-export default function GoalWithdrawalPlan({ goal, onClose }) {
+export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal }) {
   const { goalPortfolioMappings, mfPortfolios, mfHoldings } = useData()
+
+  const today = new Date().toISOString().split('T')[0]
+  const [redeemDate, setRedeemDate] = useState(today)
+  const [actualNavs, setActualNavs] = useState({})   // schemeCode -> nav string
+  const [actualUnits, setActualUnits] = useState({})  // schemeCode -> units string
 
   const plan = useMemo(() => {
     const mappings = goalPortfolioMappings.filter((m) => m.goalId === goal.goalId)
@@ -17,22 +22,21 @@ export default function GoalWithdrawalPlan({ goal, onClose }) {
       const portfolioValue = holdings.reduce((s, h) => s + h.currentValue, 0)
       const linkedValue = (portfolioValue * m.allocationPct) / 100
 
-      // Proportional withdrawal from each fund
       const fundWithdrawals = holdings.map((h) => {
         const fundPct = portfolioValue > 0 ? h.currentValue / portfolioValue : 0
         const withdrawValue = linkedValue * fundPct
-        const withdrawUnits = h.currentNav > 0 ? withdrawValue / h.currentNav : 0
-        const taxableGain = withdrawValue - (withdrawUnits * h.avgNav)
+        const suggestedUnits = h.currentNav > 0 ? withdrawValue / h.currentNav : 0
         return {
           fundName: h.fundName,
+          schemeCode: h.schemeCode,
+          portfolioId: m.portfolioId,
           currentValue: h.currentValue,
-          withdrawValue,
-          withdrawUnits: Math.min(withdrawUnits, h.units),
+          suggestedUnits: Math.min(suggestedUnits, h.units),
           currentNav: h.currentNav,
-          taxableGain,
+          avgNav: h.avgNav,
           availableUnits: h.units,
         }
-      }).filter((f) => f.withdrawValue > 0)
+      }).filter((f) => f.suggestedUnits > 0)
 
       return {
         portfolioName: portfolio.portfolioName,
@@ -45,10 +49,7 @@ export default function GoalWithdrawalPlan({ goal, onClose }) {
     }).filter(Boolean)
 
     const totalLinked = portfolioDetails.reduce((s, p) => s + p.linkedValue, 0)
-    const totalTaxableGain = portfolioDetails.reduce((s, p) =>
-      s + p.fundWithdrawals.reduce((fs, f) => fs + f.taxableGain, 0), 0)
-
-    return { portfolioDetails, totalLinked, totalTaxableGain }
+    return { portfolioDetails, totalLinked }
   }, [goal, goalPortfolioMappings, mfPortfolios, mfHoldings])
 
   if (!plan) {
@@ -66,8 +67,52 @@ export default function GoalWithdrawalPlan({ goal, onClose }) {
 
   const progress = goal.targetAmount > 0 ? (plan.totalLinked / goal.targetAmount) * 100 : 0
 
+  // Compute per-fund redemption amounts using actual NAV (or current NAV as default)
+  function getNav(schemeCode, currentNav) {
+    const v = actualNavs[schemeCode]
+    return v !== undefined && v !== '' ? parseFloat(v) || currentNav : currentNav
+  }
+
+  function getUnits(schemeCode, suggestedUnits, availableUnits) {
+    const v = actualUnits[schemeCode]
+    if (v !== undefined && v !== '') {
+      const u = parseFloat(v)
+      return isNaN(u) ? suggestedUnits : Math.min(u, availableUnits)
+    }
+    return suggestedUnits
+  }
+
+  function buildRedemptions() {
+    const list = []
+    for (const pd of plan.portfolioDetails) {
+      for (const fw of pd.fundWithdrawals) {
+        const nav = getNav(fw.schemeCode, fw.currentNav)
+        const units = parseFloat(getUnits(fw.schemeCode, fw.suggestedUnits, fw.availableUnits).toFixed(4))
+        list.push({
+          portfolioId: fw.portfolioId,
+          fundCode: fw.schemeCode,
+          units,
+          salePrice: nav,
+          saleDate: redeemDate,
+          totalAmount: units * nav,
+        })
+      }
+    }
+    return list
+  }
+
   return (
     <div className="space-y-4">
+      {/* Redemption date */}
+      <div className="flex items-center gap-3 bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] px-4 py-3">
+        <span className="text-xs text-[var(--text-dim)] shrink-0">Redemption Date</span>
+        <input
+          type="date" value={redeemDate} max={today}
+          onChange={e => setRedeemDate(e.target.value)}
+          className="flex-1 text-xs font-semibold bg-transparent text-[var(--text-primary)] border-none outline-none text-right"
+        />
+      </div>
+
       {/* Summary */}
       <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] p-4 space-y-2">
         <div className="flex items-center justify-between">
@@ -84,15 +129,9 @@ export default function GoalWithdrawalPlan({ goal, onClose }) {
           </div>
           <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{progress.toFixed(0)}%</span>
         </div>
-        {plan.totalTaxableGain > 0 && (
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-[var(--text-dim)]">Estimated Taxable Gain</span>
-            <span className="text-xs font-semibold text-amber-400">{formatINR(plan.totalTaxableGain)}</span>
-          </div>
-        )}
       </div>
 
-      {/* Per-portfolio breakdown */}
+      {/* Per-portfolio breakdown with editable NAV */}
       {plan.portfolioDetails.map((pd) => (
         <div key={pd.portfolioName} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
           <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between">
@@ -102,39 +141,70 @@ export default function GoalWithdrawalPlan({ goal, onClose }) {
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)]">{formatINR(pd.linkedValue)}</span>
           </div>
-          <div className="px-4 py-2">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[var(--text-dim)]">
-                  <th className="text-left py-1 font-medium">Fund</th>
-                  <th className="text-right py-1 font-medium">Units</th>
-                  <th className="text-right py-1 font-medium">Amount</th>
-                  <th className="text-right py-1 font-medium">Gain</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pd.fundWithdrawals.map((fw) => (
-                  <tr key={fw.fundName} className="border-t border-[var(--border-light)]">
-                    <td className="py-1.5 text-[var(--text-secondary)] max-w-[180px]">
-                      <p className="truncate">{splitFundName(fw.fundName).main}</p>
+          <div className="px-4 py-2 space-y-3">
+            {pd.fundWithdrawals.map((fw) => {
+              const nav = getNav(fw.schemeCode, fw.currentNav)
+              const units = getUnits(fw.schemeCode, fw.suggestedUnits, fw.availableUnits)
+              const amount = units * nav
+              const gain = amount - (units * fw.avgNav)
+              return (
+                <div key={fw.schemeCode} className="space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-[var(--text-secondary)] truncate">{splitFundName(fw.fundName).main}</p>
                       {splitFundName(fw.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fw.fundName).plan}</p>}
-                    </td>
-                    <td className="py-1.5 text-right text-[var(--text-muted)] tabular-nums">{fw.withdrawUnits.toFixed(2)}</td>
-                    <td className="py-1.5 text-right text-[var(--text-primary)] font-semibold tabular-nums">{formatINR(fw.withdrawValue)}</td>
-                    <td className={`py-1.5 text-right tabular-nums font-semibold ${fw.taxableGain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(Math.abs(fw.taxableGain))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{formatINR(amount)}</p>
+                      <p className={`text-[10px] tabular-nums ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {gain >= 0 ? '+' : ''}{formatINR(gain)} gain
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5 flex-wrap">
+                    <span className="text-[10px] text-[var(--text-dim)] shrink-0">Units</span>
+                    <input
+                      type="number" step="0.0001" min="0.0001" max={fw.availableUnits}
+                      placeholder={fw.suggestedUnits.toFixed(4)}
+                      value={actualUnits[fw.schemeCode] ?? ''}
+                      onChange={e => setActualUnits(prev => ({ ...prev, [fw.schemeCode]: e.target.value }))}
+                      className="w-24 text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
+                    />
+                    <span className="text-[10px] text-[var(--text-dim)]">/ {fw.availableUnits.toFixed(4)} avail</span>
+                    <span className="text-[10px] text-[var(--text-dim)] shrink-0 ml-auto">NAV ₹</span>
+                    <input
+                      type="number" step="0.01" min="0.01"
+                      placeholder={fw.currentNav.toFixed(4)}
+                      value={actualNavs[fw.schemeCode] ?? ''}
+                      onChange={e => setActualNavs(prev => ({ ...prev, [fw.schemeCode]: e.target.value }))}
+                      className="w-20 text-xs text-right font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       ))}
 
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2 pt-4 border-t border-[var(--border-light)]">
+      <p className="text-[10px] text-[var(--text-dim)] px-1">
+        Units and NAV are pre-filled based on your portfolio allocation — edit both to match what you actually executed in your AMC/broker.
+        After confirming, redemptions will be recorded and remaining goal allocations will auto-adjust to 100%.
+      </p>
+
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-light)]">
         <button onClick={onClose} className="px-5 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
           Close
         </button>
+        {onConfirmWithdrawal && (
+          <button
+            onClick={() => onConfirmWithdrawal(buildRedemptions())}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors"
+          >
+            <ArrowDownCircle size={13} />
+            Confirm Redemption
+          </button>
+        )}
       </div>
     </div>
   )

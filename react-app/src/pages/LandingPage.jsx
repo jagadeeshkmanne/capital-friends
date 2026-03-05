@@ -577,7 +577,7 @@ export default function LandingPage() {
               onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
             <div style={{ display: 'none', width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 12, color: '#fff', flexShrink: 0 }}>CF</div>
             <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px' }}>
-              <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b><em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
+              <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b> <em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
             </span>
           </a>
           <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
@@ -832,7 +832,7 @@ export default function LandingPage() {
                 onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
               <div style={{ display: 'none', width: 24, height: 24, fontSize: 9, borderRadius: 5, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>CF</div>
               <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, opacity: 0.4 }}>
-                <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b><em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
+                <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b> <em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
               </span>
             </a>
             <div style={{ fontSize: 11.5, color: '#334155', textAlign: 'center' }}>

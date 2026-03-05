@@ -8,6 +8,7 @@ import {
   Package,
   CreditCard,
   Target,
+  Bell,
   Settings,
 } from 'lucide-react'
 
@@ -21,6 +22,7 @@ const navigation = [
   { label: 'Other Investments', icon: Package,    path: '/investments/other' },
   { label: 'Liabilities',       icon: CreditCard, path: '/liabilities' },
   { label: 'Goals',             icon: Target,     path: '/goals' },
+  { label: 'Reminders',         icon: Bell,       path: '/reminders' },
   { label: 'Settings',          icon: Settings,   path: '/settings' },
 ]
 

@@ -85,12 +85,13 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
       return { ...h, currentPct, drift, drifted, gap, normalSIP }
     })
 
-  const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0)
+  const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0 && !h.sipRestricted)
   const totalGap = driftedUnderweight.reduce((s, h) => s + h.gap, 0)
 
   const withSuggested = allFunds.map((h) => ({
     ...h,
-    suggestedSIP: h.drifted && h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * sipTarget
+    suggestedSIP: h.sipRestricted ? 0
+      : h.drifted && h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * sipTarget
       : h.drifted && h.gap <= 0 ? 0
       : h.normalSIP,
   }))
@@ -121,7 +122,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
               const isUnderweight = h.drifted && h.gap > 0
               const withinThreshold = !h.drifted
               return (
-                <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${withinThreshold ? 'opacity-50' : isOverweight ? 'opacity-60' : ''}`}>
+                <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${h.sipRestricted ? 'opacity-50' : withinThreshold ? 'opacity-50' : isOverweight ? 'opacity-60' : ''}`}>
                   <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
                     <p className="truncate">{splitFundName(h.fundName).main}</p>
                     {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
@@ -132,7 +133,9 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
                   </td>
                   <td className="py-2 px-2 text-right text-[var(--text-muted)] tabular-nums">{fmt(h.normalSIP)}</td>
                   <td className="py-2 px-2 text-right font-semibold tabular-nums">
-                    {isOverweight ? (
+                    {h.sipRestricted ? (
+                      <span className="text-amber-400/80 text-xs">Blocked</span>
+                    ) : isOverweight ? (
                       <span className="text-amber-400/70">₹0</span>
                     ) : isUnderweight ? (
                       <span className="text-blue-400">{fmt(h.suggestedSIP)}</span>
@@ -161,7 +164,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
           const isUnderweight = h.drifted && h.gap > 0
           const withinThreshold = !h.drifted
           return (
-            <FundCard key={h.holdingId} dimmed={withinThreshold || isOverweight}>
+            <FundCard key={h.holdingId} dimmed={h.sipRestricted || withinThreshold || isOverweight}>
               <FundCardName fundName={h.fundName} />
               <FundCardRow
                 label="Allocation"
@@ -175,8 +178,8 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
                 <div className="text-[var(--text-dim)] text-xs px-2">→</div>
                 <div className="text-center flex-1">
                   <p className="text-[9px] text-[var(--text-dim)] uppercase">Rebalance</p>
-                  <p className={`text-xs font-semibold tabular-nums ${isOverweight ? 'text-amber-400/70' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}`}>
-                    {isOverweight ? '₹0' : fmt(h.suggestedSIP)}
+                  <p className={`text-xs font-semibold tabular-nums ${h.sipRestricted ? 'text-amber-400/80' : isOverweight ? 'text-amber-400/70' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}`}>
+                    {h.sipRestricted ? 'Blocked' : isOverweight ? '₹0' : fmt(h.suggestedSIP)}
                   </p>
                 </div>
               </div>
@@ -315,8 +318,10 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
                     <td className="py-2 px-2 text-right font-semibold tabular-nums">
                       {h.isOverweight ? (
                         <span className="text-amber-400/70 text-xs">Overweight</span>
-                      ) : h.lumpsumRestricted && !h.isOverweight ? (
-                        <span className="text-amber-400/80 text-xs">🔒 SIP only</span>
+                      ) : h.lumpsumRestricted && h.sipRestricted ? (
+                        <span className="text-red-400/80 text-xs">Blocked</span>
+                      ) : h.lumpsumRestricted ? (
+                        <span className="text-amber-400/80 text-xs">SIP only</span>
                       ) : h.invest > 0 ? (
                         <span className="text-emerald-400">{fmt(h.invest)}</span>
                       ) : (
@@ -340,14 +345,16 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
           {/* Mobile cards */}
           <div className="sm:hidden space-y-2">
             {distribution.map((h) => (
-              <FundCard key={h.holdingId} dimmed={h.invest === 0 && !h.lumpsumRestricted}>
+              <FundCard key={h.holdingId} dimmed={h.invest === 0 && !h.lumpsumRestricted && !h.sipRestricted}>
                 <div className="flex items-start justify-between gap-2">
                   <FundCardName fundName={h.fundName} />
                   <div className="text-right shrink-0">
                     {h.isOverweight ? (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
-                    ) : h.lumpsumRestricted && !h.isOverweight ? (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">🔒 SIP only</span>
+                    ) : h.lumpsumRestricted && h.sipRestricted ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Blocked</span>
+                    ) : h.lumpsumRestricted ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">SIP only</span>
                     ) : h.invest > 0 ? (
                       <p className="text-xs font-bold text-emerald-400 tabular-nums">{fmt(h.invest)}</p>
                     ) : (
@@ -402,7 +409,7 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
     // Lumpsum restricted: show 0 for BUY (positive amount), SELL (negative) still allowed
     const amount = h.lumpsumRestricted && rawAmount > 0 ? 0 : rawAmount
     return { ...h, currentPct, amount, rawAmount, isExit }
-  }).filter((h) => Math.abs(h.amount) >= 500 || (h.lumpsumRestricted && h.rawAmount > 500))
+  }).filter((h) => Math.abs(h.amount) >= 500 || ((h.lumpsumRestricted || h.sipRestricted) && h.rawAmount > 500))
 
   if (buySellData.length === 0) return <p className="text-xs text-[var(--text-dim)] py-2">Portfolio is balanced</p>
 
@@ -431,10 +438,10 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
                     {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${h.targetAllocationPct.toFixed(1)}%`}
                   </td>
                   <td className="py-2 px-2 text-right">
-                    {h.lumpsumRestricted && h.rawAmount > 0 ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">
-                        🔒 SIP only
-                      </span>
+                    {h.lumpsumRestricted && h.sipRestricted && h.rawAmount > 0 ? (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Blocked</span>
+                    ) : h.lumpsumRestricted && h.rawAmount > 0 ? (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">SIP only</span>
                     ) : (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
                         {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
@@ -456,8 +463,10 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
             <FundCard key={h.schemeCode || h.fundCode}>
               <div className="flex items-start justify-between gap-2">
                 <FundCardName fundName={h.fundName} />
-                {h.lumpsumRestricted && h.rawAmount > 0 ? (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-amber-500/15 text-amber-400">🔒 SIP only</span>
+                {h.lumpsumRestricted && h.sipRestricted && h.rawAmount > 0 ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-red-500/15 text-red-400">Blocked</span>
+                ) : h.lumpsumRestricted && h.rawAmount > 0 ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-amber-500/15 text-amber-400">SIP only</span>
                 ) : (
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
                     {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}

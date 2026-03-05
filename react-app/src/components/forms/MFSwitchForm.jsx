@@ -15,7 +15,8 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
   }, [mfPortfolios, selectedMember])
 
   const [form, setForm] = useState({
-    portfolioId: portfolioId || '',
+    fromPortfolioId: portfolioId || '',
+    toPortfolioId: portfolioId || '',
     fromFundCode: '',
     fromFundName: '',
     toFundCode: '',
@@ -35,41 +36,45 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
     setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
-  function setPortfolio(val) {
-    setForm((f) => ({ ...f, portfolioId: val, fromFundCode: '', fromFundName: '', toFundCode: '', toFundName: '', units: '', fromPrice: '', toPrice: '', targetAllocation: '' }))
-    setErrors((e) => ({ ...e, portfolioId: undefined }))
+  function setFromPortfolio(val) {
+    setForm((f) => ({ ...f, fromPortfolioId: val, fromFundCode: '', fromFundName: '', units: '', fromPrice: '' }))
+    setErrors((e) => ({ ...e, fromPortfolioId: undefined }))
   }
 
-  const holdings = useMemo(() => {
-    if (!form.portfolioId) return []
-    return mfHoldings.filter((h) => h.portfolioId === form.portfolioId && h.units > 0)
-  }, [mfHoldings, form.portfolioId])
+  function setToPortfolio(val) {
+    setForm((f) => ({ ...f, toPortfolioId: val, toFundCode: '', toFundName: '', toPrice: '', targetAllocation: '' }))
+    setErrors((e) => ({ ...e, toPortfolioId: undefined }))
+  }
 
-  const fromHolding = holdings.find((h) => h.schemeCode === form.fromFundCode)
+  const fromHoldings = useMemo(() => {
+    if (!form.fromPortfolioId) return []
+    return mfHoldings.filter((h) => h.portfolioId === form.fromPortfolioId && h.units > 0)
+  }, [mfHoldings, form.fromPortfolioId])
 
-  // Check if the "to" fund already exists in this portfolio
+  const fromHolding = fromHoldings.find((h) => h.schemeCode === form.fromFundCode)
+
   const toHoldingExists = useMemo(() => {
-    if (!form.portfolioId || !form.toFundCode) return null
-    return mfHoldings.find((h) => h.portfolioId === form.portfolioId && h.schemeCode === form.toFundCode)
-  }, [mfHoldings, form.portfolioId, form.toFundCode])
+    if (!form.toPortfolioId || !form.toFundCode) return null
+    return mfHoldings.find((h) => h.portfolioId === form.toPortfolioId && h.schemeCode === form.toFundCode)
+  }, [mfHoldings, form.toPortfolioId, form.toFundCode])
 
   const isNewFund = form.toFundCode && !toHoldingExists
+  const isCrossPortfolio = form.fromPortfolioId && form.toPortfolioId && form.fromPortfolioId !== form.toPortfolioId
 
   function selectFromFund(code) {
-    const holding = holdings.find((h) => h.schemeCode === code)
+    const holding = fromHoldings.find((h) => h.schemeCode === code)
     setForm((f) => ({ ...f, fromFundCode: code, fromFundName: holding?.fundName || '', fromPrice: holding?.currentNav?.toString() || '' }))
     setErrors((e) => ({ ...e, fromFundCode: undefined }))
   }
 
   function selectToFund({ schemeCode, fundName }) {
-    // Auto-fill to-fund NAV if it already exists in portfolio
-    const existing = mfHoldings.find((h) => h.portfolioId === form.portfolioId && h.schemeCode === schemeCode)
+    const existing = mfHoldings.find((h) => h.portfolioId === form.toPortfolioId && h.schemeCode === schemeCode)
     setForm((f) => ({
       ...f,
       toFundCode: schemeCode,
       toFundName: fundName,
       toPrice: existing?.currentNav?.toString() || f.toPrice,
-      targetAllocation: '', // reset — only relevant for new funds
+      targetAllocation: '',
     }))
     setErrors((e) => ({ ...e, toFundCode: undefined }))
   }
@@ -80,10 +85,13 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
 
   function validate() {
     const e = {}
-    if (!form.portfolioId) e.portfolioId = 'Required'
+    if (!form.fromPortfolioId) e.fromPortfolioId = 'Required'
+    if (!form.toPortfolioId) e.toPortfolioId = 'Required'
     if (!form.fromFundCode) e.fromFundCode = 'Required'
     if (!form.toFundCode) e.toFundCode = 'Required'
-    if (form.fromFundCode && form.toFundCode && form.fromFundCode === form.toFundCode) e.toFundCode = 'Must be different from source fund'
+    if (form.fromFundCode && form.toFundCode && form.fromFundCode === form.toFundCode && !isCrossPortfolio) {
+      e.toFundCode = 'Must be different fund (or select a different portfolio)'
+    }
     if (!form.date) e.date = 'Required'
     if (!form.units || Number(form.units) <= 0) e.units = 'Must be > 0'
     if (fromHolding && Number(form.units) > fromHolding.units) e.units = `Max ${fromHolding.units.toFixed(2)} units`
@@ -104,56 +112,71 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
     const label = p.ownerName ? `${name} (${p.ownerName})` : name
     return { value: p.portfolioId, label }
   })
-  const holdingOptions = holdings.map((h) => ({ value: h.schemeCode, label: h.fundName }))
+
+  const fromHoldingOptions = fromHoldings.map((h) => ({ value: h.schemeCode, label: h.fundName }))
 
   return (
     <div className="space-y-4">
-      <FormField label="Portfolio" required error={errors.portfolioId}>
-        <FormSelect value={form.portfolioId} onChange={setPortfolio} options={portfolioOptions} placeholder="Select portfolio..." />
+      {/* From side */}
+      <FormField label="From Portfolio" required error={errors.fromPortfolioId}>
+        <FormSelect value={form.fromPortfolioId} onChange={setFromPortfolio} options={portfolioOptions} placeholder="Select source portfolio..." />
       </FormField>
 
-      {/* From Fund */}
       <FormField label="Switch From (Sell)" required error={errors.fromFundCode}>
-        <FormSelect value={form.fromFundCode} onChange={selectFromFund} options={holdingOptions} placeholder={form.portfolioId ? (holdings.length ? 'Select fund to switch from...' : 'No holdings') : 'Select portfolio first...'} />
+        <FormSelect
+          value={form.fromFundCode}
+          onChange={selectFromFund}
+          options={fromHoldingOptions}
+          placeholder={form.fromPortfolioId ? (fromHoldings.length ? 'Select fund to switch from...' : 'No holdings') : 'Select portfolio first...'}
+        />
       </FormField>
 
       {fromHolding && (
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
-          <div>
-            <p className="text-xs text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).main}</p>
-            {splitFundName(fromHolding.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).plan}</p>}
-          </div>
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).main}</p>
+          {splitFundName(fromHolding.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).plan}</p>}
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Available: <span className="font-semibold text-[var(--text-primary)]">{fromHolding.units.toFixed(2)}</span> units
-            @ ₹{fromHolding.avgNav.toFixed(2)} avg | Current NAV: ₹{fromHolding.currentNav.toFixed(2)}
+            @ ₹{fromHolding.avgNav.toFixed(2)} avg · Current NAV: ₹{fromHolding.currentNav.toFixed(2)}
           </p>
         </div>
       )}
 
-      {/* To Fund */}
+      {/* To side */}
+      <div className="flex items-center gap-2 pt-1">
+        <div className="flex-1 h-px bg-[var(--border-light)]" />
+        {isCrossPortfolio && (
+          <span className="text-[10px] font-semibold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full shrink-0">Cross-portfolio switch</span>
+        )}
+        <div className="flex-1 h-px bg-[var(--border-light)]" />
+      </div>
+
+      <FormField label="To Portfolio" required error={errors.toPortfolioId}>
+        <FormSelect value={form.toPortfolioId} onChange={setToPortfolio} options={portfolioOptions} placeholder="Select destination portfolio..." />
+      </FormField>
+
       <FormField label="Switch To (Buy)" required error={errors.toFundCode}>
         <FundSearchInput
           value={form.toFundCode ? { schemeCode: form.toFundCode, fundName: form.toFundName } : null}
           onSelect={selectToFund}
           placeholder="Search fund to switch into..."
-          disabled={!form.portfolioId}
+          disabled={!form.toPortfolioId}
         />
       </FormField>
 
-      {/* Show info when to-fund already exists in portfolio */}
       {toHoldingExists && (
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
           <p className="text-xs text-[var(--text-dim)]">Existing holding — units will be added, NAV averaged out</p>
           <p className="text-xs text-[var(--text-muted)]">
             Current: <span className="font-semibold text-[var(--text-primary)]">{toHoldingExists.units.toFixed(2)}</span> units
-            @ ₹{toHoldingExists.avgNav.toFixed(2)} avg | Alloc: {toHoldingExists.targetAllocationPct.toFixed(1)}%
+            @ ₹{toHoldingExists.avgNav.toFixed(2)} avg · Alloc: {toHoldingExists.targetAllocationPct.toFixed(1)}%
           </p>
         </div>
       )}
 
-      {isNewFund && form.toFundCode && (
+      {isNewFund && (
         <div className="bg-violet-500/10 rounded-lg px-3 py-2 border border-violet-500/20">
-          <p className="text-xs text-violet-400 font-semibold">New fund — will be added to portfolio</p>
+          <p className="text-xs text-violet-400 font-semibold">New fund — will be added to {isCrossPortfolio ? 'destination portfolio' : 'portfolio'}</p>
         </div>
       )}
 

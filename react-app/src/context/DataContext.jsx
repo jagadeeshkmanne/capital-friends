@@ -525,6 +525,12 @@ export function DataProvider({ children }) {
     return result
   }, [refreshMF])
 
+  const redeemMFBulk = useCallback(async (redemptions) => {
+    const result = await api.redeemMFBulk(redemptions)
+    await Promise.all([refreshMF(), refreshGoals()])
+    return result
+  }, [refreshMF, refreshGoals])
+
   const switchMF = useCallback(async (data) => {
     const result = await api.switchMF(data)
     await refreshMF()
@@ -538,6 +544,11 @@ export function DataProvider({ children }) {
 
   const toggleLumpsumRestricted = useCallback(async (portfolioId, fundCode, restricted) => {
     await api.toggleLumpsumRestricted(portfolioId, fundCode, restricted)
+    await refreshMF()
+  }, [refreshMF])
+
+  const toggleSipRestricted = useCallback(async (portfolioId, fundCode, restricted) => {
+    await api.toggleSipRestricted(portfolioId, fundCode, restricted)
     await refreshMF()
   }, [refreshMF])
 
@@ -624,7 +635,7 @@ export function DataProvider({ children }) {
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-      investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, deleteMFTransaction, editMFTransaction,
+      investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction,
       // Settings
       settings, updateSettings, refreshSettings,
       // Health Check

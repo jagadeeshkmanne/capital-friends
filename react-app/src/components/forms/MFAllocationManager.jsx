@@ -3,10 +3,12 @@ import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import FundSearchInput from './FundSearchInput'
 import { FormActions } from '../Modal'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, IndianRupee, Repeat } from 'lucide-react'
+import { useToast } from '../../context/ToastContext'
 
 export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
-  const { mfHoldings, mfPortfolios } = useData()
+  const { mfHoldings, mfPortfolios, toggleLumpsumRestricted, toggleSipRestricted } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
 
   const portfolio = mfPortfolios.find((p) => p.portfolioId === portfolioId)
   const existingHoldings = useMemo(() =>
@@ -22,6 +24,8 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
       currentValue: h.currentValue,
       currentAllocationPct: h.currentAllocationPct,
       targetAllocationPct: h.targetAllocationPct,
+      lumpsumRestricted: h.lumpsumRestricted || false,
+      sipRestricted: h.sipRestricted || false,
       isNew: false,
     }))
   )
@@ -76,6 +80,38 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
     } finally { setSaving(false) }
   }
 
+  async function handleToggleLumpsum(a) {
+    const newVal = !a.lumpsumRestricted
+    showBlockUI(newVal ? 'Restricting lumpsum...' : 'Enabling lumpsum...')
+    try {
+      await toggleLumpsumRestricted(portfolioId, a.schemeCode, newVal)
+      setAllocations((prev) => prev.map((x) =>
+        x.schemeCode === a.schemeCode ? { ...x, lumpsumRestricted: newVal } : x
+      ))
+      showToast(newVal ? 'Lumpsum restricted across all portfolios' : 'Lumpsum enabled across all portfolios')
+    } catch (err) {
+      showToast(err.message || 'Failed to update restriction', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleToggleSip(a) {
+    const newVal = !a.sipRestricted
+    showBlockUI(newVal ? 'Restricting SIP...' : 'Enabling SIP...')
+    try {
+      await toggleSipRestricted(portfolioId, a.schemeCode, newVal)
+      setAllocations((prev) => prev.map((x) =>
+        x.schemeCode === a.schemeCode ? { ...x, sipRestricted: newVal } : x
+      ))
+      showToast(newVal ? 'SIP restricted across all portfolios' : 'SIP enabled across all portfolios')
+    } catch (err) {
+      showToast(err.message || 'Failed to update restriction', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
   const sipTarget = portfolio?.sipTarget || 0
 
   return (
@@ -98,7 +134,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                 <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold whitespace-nowrap w-24">Amount</th>
                 <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold whitespace-nowrap w-20">Current %</th>
                 <th className="text-center py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold whitespace-nowrap w-24">Target %</th>
-                <th className="w-8 px-2"></th>
+                <th className="w-20 px-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -113,7 +149,10 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                 return (
                   <tr key={a.schemeCode} className="border-b border-[var(--border-light)] last:border-0">
                     <td className="py-2 px-2">
-                      <p className="text-xs text-[var(--text-primary)] leading-tight">{splitFundName(a.fundName).main}{a.isNew && <span className="text-violet-400 ml-1 text-[10px]">(new)</span>}</p>
+                      <p className="text-xs text-[var(--text-primary)] leading-tight">
+                        {splitFundName(a.fundName).main}
+                        {a.isNew && <span className="text-violet-400 text-[10px] ml-1">(new)</span>}
+                      </p>
                       {(sugLumpsum > 0 || sugSip > 0) && (
                         <p className="text-xs text-blue-400 mt-0.5">
                           Invest: {sugLumpsum > 0 && <span className="font-semibold">{formatINR(sugLumpsum)}</span>}
@@ -132,12 +171,32 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                         className="w-20 mx-auto block bg-[var(--bg-inset)] border border-[var(--border)] rounded px-2 py-1 text-xs text-center text-[var(--text-primary)] focus:outline-none focus:border-violet-500/50"
                       />
                     </td>
-                    <td className="py-2 px-2 text-center">
-                      {a.units === 0 && (
-                        <button onClick={() => removeZeroFund(a.schemeCode)} className="p-1 rounded hover:bg-rose-500/15 text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors">
-                          <Trash2 size={12} />
-                        </button>
-                      )}
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-center gap-1">
+                        {!a.isNew && (
+                          <>
+                            <button
+                              onClick={() => handleToggleLumpsum(a)}
+                              className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${a.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
+                              title={a.lumpsumRestricted ? 'Lumpsum restricted — click to allow' : 'Click to restrict lumpsum'}
+                            >
+                              <IndianRupee size={11} strokeWidth={2.5} />
+                            </button>
+                            <button
+                              onClick={() => handleToggleSip(a)}
+                              className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${a.sipRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
+                              title={a.sipRestricted ? 'SIP restricted — click to allow' : 'Click to restrict SIP'}
+                            >
+                              <Repeat size={11} strokeWidth={2.5} />
+                            </button>
+                          </>
+                        )}
+                        {a.units === 0 && (
+                          <button onClick={() => removeZeroFund(a.schemeCode)} className="p-1 rounded hover:bg-rose-500/15 text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -173,21 +232,44 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
             return (
               <div key={a.schemeCode} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-3.5 py-3 space-y-2">
-                {/* Fund name + delete */}
+                {/* Fund name + actions */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{splitFundName(a.fundName).main}{a.isNew && <span className="text-violet-400 ml-1 text-[10px] font-semibold">(new)</span>}</p>
+                    <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">
+                      {splitFundName(a.fundName).main}
+                      {a.isNew && <span className="text-violet-400 text-[10px] font-semibold ml-1">(new)</span>}
+                    </p>
                     <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[var(--text-dim)] flex-wrap">
                       {a.currentValue > 0 && <span className="tabular-nums">{formatINR(a.currentValue)}</span>}
                       {a.currentValue > 0 && <span>·</span>}
                       <span className="tabular-nums">Current {a.currentAllocationPct.toFixed(1)}%</span>
                     </div>
                   </div>
-                  {a.units === 0 && (
-                    <button onClick={() => removeZeroFund(a.schemeCode)} className="p-1.5 rounded-lg hover:bg-rose-500/15 text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors shrink-0">
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!a.isNew && (
+                      <>
+                        <button
+                          onClick={() => handleToggleLumpsum(a)}
+                          className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${a.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
+                          title={a.lumpsumRestricted ? 'Lumpsum restricted — click to allow' : 'Click to restrict lumpsum'}
+                        >
+                          <IndianRupee size={12} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          onClick={() => handleToggleSip(a)}
+                          className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${a.sipRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
+                          title={a.sipRestricted ? 'SIP restricted — click to allow' : 'Click to restrict SIP'}
+                        >
+                          <Repeat size={12} strokeWidth={2.5} />
+                        </button>
+                      </>
+                    )}
+                    {a.units === 0 && (
+                      <button onClick={() => removeZeroFund(a.schemeCode)} className="p-1.5 rounded-lg hover:bg-rose-500/15 text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Slider + value */}

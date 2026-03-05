@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Mail, Check, Loader2, Globe } from 'lucide-react'
+import { Download, Mail, Check, Loader2, Globe, Trophy, Star, TrendingUp, TrendingDown } from 'lucide-react'
 import * as api from '../../services/api'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useData } from '../../context/DataContext'
@@ -99,7 +99,7 @@ export default function Dashboard() {
     stockPortfolios, stockHoldings,
     otherInvList, liabilityList,
     banks, investmentAccounts, insurancePolicies,
-    reminderList, goalList,
+    reminderList, goalList, goalPortfolioMappings,
     assetAllocations,
     activeMembers, activeBanks, activeInvestmentAccounts,
   } = useData()
@@ -504,6 +504,98 @@ export default function Dashboard() {
       memberNetWorth[l.familyMemberId] = (memberNetWorth[l.familyMemberId] || 0) - l.outstandingBalance
     })
 
+    // ── Top Performing Funds (Gainers & Losers) — deduplicated by schemeCode ──
+    const fundMap = {}
+    activeMFHoldings.filter(h => h.investment > 0).forEach(h => {
+      const key = h.schemeCode || splitFundName(h.fundName).main
+      const pName = (activeMFPortfolios.find(p => p.portfolioId === h.portfolioId)?.portfolioName || '').replace(/^PFL-/, '')
+      if (!fundMap[key]) fundMap[key] = { fundName: splitFundName(h.fundName).main, investment: 0, currentValue: 0, portfolios: [] }
+      fundMap[key].investment += h.investment
+      fundMap[key].currentValue += h.currentValue
+      if (pName && !fundMap[key].portfolios.includes(pName)) fundMap[key].portfolios.push(pName)
+    })
+    const fundPerformance = Object.values(fundMap)
+      .map(f => ({ ...f, pl: f.currentValue - f.investment, plPct: ((f.currentValue - f.investment) / f.investment) * 100 }))
+      .sort((a, b) => b.plPct - a.plPct)
+    const topGainers = fundPerformance.filter(f => f.plPct > 0).slice(0, 3)
+    const topLosers = fundPerformance.filter(f => f.plPct < 0).sort((a, b) => a.plPct - b.plPct).slice(0, 3)
+
+    // ── Portfolio Leaderboard ──
+    const portfolioLeaderboard = activeMFPortfolios
+      .map(p => {
+        const ph = activeMFHoldings.filter(h => h.portfolioId === p.portfolioId)
+        const invested = ph.reduce((s, h) => s + h.investment, 0)
+        const current = ph.reduce((s, h) => s + h.currentValue, 0)
+        return { portfolioId: p.portfolioId, portfolioName: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName,
+          ownerName: p.ownerName, invested, current,
+          pl: current - invested, plPct: invested > 0 ? ((current - invested) / invested) * 100 : 0 }
+      })
+      .filter(p => p.invested > 0)
+      .sort((a, b) => b.plPct - a.plPct)
+
+    // ── SIP Tracker ──
+    const totalMonthlySIP = activeMFHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
+    const activeSIPCount = activeMFHoldings.filter(h => h.ongoingSIP > 0).length
+
+    // ── Near ATH Funds ──
+    const nearATHFunds = []
+    activeMFPortfolios.forEach(p => {
+      activeMFHoldings.filter(h => h.portfolioId === p.portfolioId).forEach(h => {
+        if (h.athNav > 0 && h.belowATHPct >= 0 && h.belowATHPct < 2) {
+          nearATHFunds.push({
+            fundName: splitFundName(h.fundName).main,
+            ownerName: p.ownerName, belowATHPct: h.belowATHPct,
+            isAtATH: h.belowATHPct === 0,
+          })
+        }
+      })
+    })
+    nearATHFunds.sort((a, b) => a.belowATHPct - b.belowATHPct)
+
+    // ── Goal Allocation Health (for dashboard goals section) ──
+    const EQUITY_CATS_G = new Set(['Equity', 'ELSS', 'Index'])
+    const GLIDE_PATH = [
+      { maxYears: 1, equity: 10, label: 'Short-term' }, { maxYears: 3, equity: 30, label: 'Short-term' },
+      { maxYears: 5, equity: 50, label: 'Medium-term' }, { maxYears: 7, equity: 65, label: 'Medium-term' },
+      { maxYears: 10, equity: 75, label: 'Long-term' }, { maxYears: Infinity, equity: 85, label: 'Long-term' },
+    ]
+    const nowGH = new Date()
+    const dashGoalHealth = {}
+    activeGoals.forEach(g => {
+      if (g.status === 'Achieved') return
+      const yearsLeft = (new Date(g.targetDate) - nowGH) / (365.25 * 24 * 60 * 60 * 1000)
+      if (yearsLeft <= 0) return
+      const rec = g.goalType === 'Emergency Fund'
+        ? { equity: 0, debt: 100, label: 'Safety' }
+        : (() => { const s = GLIDE_PATH.find(s => yearsLeft <= s.maxYears); return { equity: s.equity, debt: 100 - s.equity, label: s.label } })()
+      const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
+      let totalVal = 0, eqVal = 0
+      for (const m of maps) {
+        for (const h of activeMFHoldings.filter(h => h.portfolioId === m.portfolioId)) {
+          const v = h.currentValue * (m.allocationPct / 100)
+          totalVal += v
+          if (EQUITY_CATS_G.has(h.category)) eqVal += v
+          else if (h.category === 'Hybrid') eqVal += v * 0.65
+          else if (h.category === 'Multi-Asset') eqVal += v * 0.50
+        }
+      }
+      const actualEq = totalVal > 0 ? Math.round((eqVal / totalVal) * 100) : null
+      const mismatch = maps.length > 0 && actualEq !== null ? Math.round(actualEq - rec.equity) : null
+      // Live SIP/lumpsum
+      const cagr = g.expectedCAGR || 0.12, mr = cagr / 12
+      const months = Math.max(0, Math.round(yearsLeft * 12))
+      const fvCur = (g.currentValue || 0) * (months > 0 ? Math.pow(1 + mr, months) : 1)
+      const gap = Math.max(0, (g.targetAmount || 0) - fvCur)
+      const liveSIP = gap > 0 && months > 0 ? (mr > 0 ? Math.ceil(gap / ((Math.pow(1 + mr, months) - 1) / mr)) : Math.ceil(gap / months)) : 0
+      const liveLS = gap > 0 && months > 0 ? Math.round(gap / Math.pow(1 + mr, months)) : 0
+      dashGoalHealth[g.goalId] = {
+        yearsLeft, label: rec.label, recommendedEquity: rec.equity, recommendedDebt: rec.debt,
+        actualEquity: actualEq, isMapped: maps.length > 0,
+        mismatch, needsAttention: mismatch !== null && Math.abs(mismatch) > 15,
+        liveSIP, liveLumpsum: liveLS,
+      }
+    })
+
     return {
       mfCurrentValue, mfInvested, mfPL,
       stkCurrentValue, stkInvested, stkPL,
@@ -518,8 +610,11 @@ export default function Dashboard() {
       filteredBanks, filteredInvAccounts, filteredMembers,
       memberNetWorth,
       activeMFPortfolios, activeStockPortfolios,
+      topGainers, topLosers, portfolioLeaderboard,
+      totalMonthlySIP, activeSIPCount, totalEMI,
+      nearATHFunds, dashGoalHealth,
     }
-  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, reminderList, assetAllocations, activeMembers])
+  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, goalPortfolioMappings, reminderList, assetAllocations, activeMembers])
 
   // ── Action Items (computed from real data) ──
   const actionItems = useMemo(() => {
@@ -588,8 +683,40 @@ export default function Dashboard() {
       })
     })
 
+    // Goal allocation mismatches (de-risk alerts)
+    const EQUITY_CATS_DASH = new Set(['Equity', 'ELSS', 'Index'])
+    const nowD = new Date()
+    filterOwner((goalList || []).filter(g => g.isActive !== false), 'familyMemberId').forEach(g => {
+      if (g.status === 'Achieved') return
+      const yearsLeft = (new Date(g.targetDate) - nowD) / (365.25 * 24 * 60 * 60 * 1000)
+      if (yearsLeft <= 0) return
+      const rec = g.goalType === 'Emergency Fund' ? 0
+        : yearsLeft <= 1 ? 10 : yearsLeft <= 3 ? 30 : yearsLeft <= 5 ? 50
+        : yearsLeft <= 7 ? 65 : yearsLeft <= 10 ? 75 : 85
+      const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
+      if (!maps.length) return
+      let total = 0, eq = 0
+      for (const m of maps) {
+        for (const h of (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)) {
+          const v = h.currentValue * (m.allocationPct / 100)
+          total += v
+          if (EQUITY_CATS_DASH.has(h.category)) eq += v
+          else if (h.category === 'Hybrid') eq += v * 0.65
+          else if (h.category === 'Multi-Asset') eq += v * 0.50
+        }
+      }
+      const actual = total > 0 ? Math.round((eq / total) * 100) : null
+      if (actual !== null && actual - rec > 15) {
+        items.push({
+          type: 'warning', title: `${g.goalName}: De-risk needed`,
+          description: `${actual}% equity, recommended max ${rec}%. ${Math.round(yearsLeft)} yrs to target — shift to debt.`,
+          action: 'View Goal', navigateTo: '/goals',
+        })
+      }
+    })
+
     return items.slice(0, 6)
-  }, [selectedMember, insurancePolicies, goalList, reminderList])
+  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, mfHoldings])
 
   // ── Upcoming Reminders (sorted by due date) ──
   const upcomingReminders = useMemo(() => {
@@ -908,7 +1035,7 @@ export default function Dashboard() {
 
         {/* ═══ BUY OPPORTUNITIES (left) ═══ */}
         {data.buyOpportunities.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.rebalanceItems.length === 0 ? 'md:col-span-2' : ''}`}
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.nearATHFunds.length === 0 ? 'md:col-span-2' : ''}`}
                onClick={() => navigate('/investments/mutual-funds')}>
             <SectionHeader label="Buy Opportunities" color="#34d399" badge={data.buyOpportunities.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
@@ -946,9 +1073,48 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ═══ REBALANCE NEEDED (right) ═══ */}
-        {data.rebalanceItems.length > 0 && (
+        {/* ═══ PROFIT BOOKING (right, paired with Buy Opportunities) ═══ */}
+        {data.nearATHFunds.length > 0 && (
           <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.buyOpportunities.length === 0 ? 'md:col-span-2' : ''}`}
+               onClick={() => navigate('/investments/mutual-funds')}>
+            <SectionHeader label="Profit Booking" color="#f59e0b" badge={data.nearATHFunds.length}
+                           linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
+            <div className="text-xs text-[var(--text-dim)] mb-2.5">Funds at or near All-Time High — consider booking profits</div>
+
+            {data.nearATHFunds.map((f, idx) => (
+              <div key={idx} className="flex items-center justify-between py-2.5"
+                   style={{ borderBottom: idx < data.nearATHFunds.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
+                       style={{ background: f.isAtATH ? 'rgba(251,191,36,0.15)' : 'rgba(245,158,11,0.08)' }}>
+                    <Star size={13} className="text-amber-400" fill={f.isAtATH ? '#fbbf24' : 'none'} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{f.fundName}</div>
+                    <div className="text-xs text-[var(--text-dim)] mt-1">{f.ownerName}</div>
+                  </div>
+                </div>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold shrink-0 ml-2"
+                      style={{
+                        background: f.isAtATH ? 'rgba(251,191,36,0.12)' : 'rgba(245,158,11,0.06)',
+                        color: f.isAtATH ? '#fbbf24' : '#f59e0b',
+                      }}>
+                  {f.isAtATH ? 'At ATH' : `${f.belowATHPct.toFixed(1)}% below`}
+                </span>
+              </div>
+            ))}
+
+            <div className="mt-3.5 py-3 px-3.5 rounded-r-md text-[11px] text-[var(--text-muted)] leading-relaxed"
+                 style={{ background: 'rgba(245,158,11,0.06)', borderLeft: '3px solid rgba(245,158,11,0.3)' }}
+                 onClick={(e) => e.stopPropagation()}>
+              <span className="text-amber-400 font-semibold">Note:</span> Funds at ATH are performing well. Partial profit booking can lock in gains, but exiting too early may miss further upside.
+            </div>
+          </div>
+        )}
+
+        {/* ═══ REBALANCE NEEDED ═══ */}
+        {data.rebalanceItems.length > 0 && (
+          <div className="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors"
                onClick={() => navigate('/investments/mutual-funds')}>
             <SectionHeader label="Rebalance Needed" color="#a78bfa" badge={data.rebalanceItems.length}
                            linkText="Portfolios" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
@@ -974,136 +1140,154 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ═══ INVESTMENTS TABLE ═══ */}
-        {data.investmentRows.length > 0 && (
-          <div className="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors"
-               onClick={() => navigate('/investments/mutual-funds')}>
-            <SectionHeader label="Investments" color="var(--text-muted)"
-                           linkText="View All" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                        style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Type</th>
-                    <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                        style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Platform</th>
-                    <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                        style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Owner</th>
-                    <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                        style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Invested</th>
-                    <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                        style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Current</th>
-                    <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-right pb-2"
-                        style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>P&L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.investmentRows.map((row, idx) => {
-                    const plVal = row.pl
-                    const plPctVal = row.invested > 0 && plVal != null ? (plVal / row.invested) * 100 : null
+        {/* ═══ FUND PERFORMANCE (left) ═══ */}
+        {(data.topGainers.length > 0 || data.topLosers.length > 0) && (
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 ${data.portfolioLeaderboard.length === 0 ? 'md:col-span-2' : ''}`}>
+            <SectionHeader label="Fund Performance" color="#8b5cf6" badge={data.topGainers.length + data.topLosers.length} />
+
+            {data.topGainers.length > 0 && (
+              <>
+                <div className="flex items-center gap-1.5 mb-2 mt-1">
+                  <TrendingUp size={12} className="text-emerald-400" />
+                  <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Top Gainers</span>
+                </div>
+                {data.topGainers.map((f, idx) => (
+                  <div key={`g-${idx}`} className="flex items-center justify-between py-2"
+                       style={{ borderBottom: '1px solid rgba(128,128,128,0.04)' }}>
+                    <div className="min-w-0">
+                      <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{f.fundName}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {f.portfolios.map(p => (
+                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
+                        ))}
+                        <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <div className="text-[13px] font-semibold text-emerald-400 tabular-nums">+{f.plPct.toFixed(1)}%</div>
+                      <div className="text-xs text-emerald-400/70 tabular-nums">+{formatINR(f.pl)}</div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {data.topLosers.length > 0 && (
+              <>
+                <div className={`flex items-center gap-1.5 mb-2 ${data.topGainers.length > 0 ? 'mt-4 pt-3 border-t border-[var(--border)]' : 'mt-1'}`}>
+                  <TrendingDown size={12} className="text-red-400" />
+                  <span className="text-[11px] font-semibold text-red-400 uppercase tracking-wider">Top Losers</span>
+                </div>
+                {data.topLosers.map((f, idx) => (
+                  <div key={`l-${idx}`} className="flex items-center justify-between py-2"
+                       style={{ borderBottom: idx < data.topLosers.length - 1 ? '1px solid rgba(128,128,128,0.04)' : 'none' }}>
+                    <div className="min-w-0">
+                      <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{f.fundName}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {f.portfolios.map(p => (
+                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
+                        ))}
+                        <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <div className="text-[13px] font-semibold text-red-400 tabular-nums">{f.plPct.toFixed(1)}%</div>
+                      <div className="text-xs text-red-400/70 tabular-nums">{formatINR(f.pl)}</div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ═══ PORTFOLIO PERFORMANCE (right) ═══ */}
+        {data.portfolioLeaderboard.length > 0 && (() => {
+          const topPortfolios = data.portfolioLeaderboard.filter(p => p.plPct > 0).slice(0, 3)
+          const bottomPortfolios = data.portfolioLeaderboard.filter(p => p.plPct < 0).sort((a, b) => a.plPct - b.plPct).slice(0, 3)
+          if (topPortfolios.length === 0 && bottomPortfolios.length === 0) return null
+          return (
+            <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 ${data.topGainers.length === 0 && data.topLosers.length === 0 ? 'md:col-span-2' : ''}`}>
+              <SectionHeader label="Portfolio Performance" color="#fbbf24" badge={topPortfolios.length + bottomPortfolios.length} />
+
+              {topPortfolios.length > 0 && (
+                <>
+                  <div className="flex items-center gap-1.5 mb-2 mt-1">
+                    <TrendingUp size={12} className="text-emerald-400" />
+                    <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Top Performing</span>
+                  </div>
+                  {topPortfolios.map((p, idx) => {
+                    const medal = idx === 0 ? '#fbbf24' : idx === 1 ? '#94a3b8' : idx === 2 ? '#cd7f32' : null
                     return (
-                      <tr key={idx}>
-                        <td className="text-[13px] font-medium text-[var(--text-primary)] py-3.5"
-                            style={{ borderBottom: idx < data.investmentRows.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {row.type}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] py-3.5"
-                            style={{ borderBottom: idx < data.investmentRows.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {row.platform || '\u2014'}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] py-3.5"
-                            style={{ borderBottom: idx < data.investmentRows.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {row.owner}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] py-3.5 tabular-nums"
-                            style={{ borderBottom: idx < data.investmentRows.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {row.invested > 0 ? formatINR(row.invested) : '\u2014'}
-                        </td>
-                        <td className="text-[13px] font-semibold text-[var(--text-primary)] py-3.5 tabular-nums"
-                            style={{ borderBottom: idx < data.investmentRows.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {formatINR(row.current)}
-                        </td>
-                        <td className="text-[13px] py-3.5 text-right tabular-nums"
-                            style={{ borderBottom: idx < data.investmentRows.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {plVal != null && row.invested > 0 ? (
-                            <span className={`font-semibold ${plColor(plVal)}`}>
-                              {plPrefix(plVal)}{formatINR(Math.abs(plVal))}
-                              {plPctVal != null && (
-                                <span className="text-[var(--text-dim)] font-normal ml-1">
-                                  ({plPrefix(plVal)}{plPctVal.toFixed(1)}%)
-                                </span>
-                              )}
-                            </span>
+                      <div key={p.portfolioId} className="flex items-center justify-between py-2"
+                           style={{ borderBottom: '1px solid rgba(128,128,128,0.04)' }}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {medal ? (
+                            <div className="w-[24px] h-[24px] rounded-full flex items-center justify-center shrink-0"
+                                 style={{ background: `${medal}18`, border: `1px solid ${medal}30` }}>
+                              <Trophy size={12} style={{ color: medal }} />
+                            </div>
                           ) : (
-                            <span className="text-[var(--text-dim)]">&mdash;</span>
+                            <div className="w-[24px] h-[24px] rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-[var(--text-dim)]"
+                                 style={{ background: 'rgba(128,128,128,0.08)' }}>
+                              {idx + 1}
+                            </div>
                           )}
-                        </td>
-                      </tr>
+                          <div className="min-w-0">
+                            <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{p.portfolioName}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {p.ownerName && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
+                              <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <div className="text-[13px] font-semibold text-emerald-400 tabular-nums">+{p.plPct.toFixed(1)}%</div>
+                          <div className="text-xs text-emerald-400/70 tabular-nums">+{formatINR(p.pl)}</div>
+                        </div>
+                      </div>
                     )
                   })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                </>
+              )}
 
-        {/* ═══ LIABILITIES (left) ═══ */}
-        {data.activeLiabilities.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${upcomingReminders.length === 0 ? 'md:col-span-2' : ''}`}
-               onClick={() => navigate('/liabilities')}>
-            <SectionHeader label="Liabilities" color="#f87171"
-                           linkText="View" onClick={(e) => { e.stopPropagation(); navigate('/liabilities') }} />
-
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[22px] font-bold text-red-400 tabular-nums">{formatINR(data.totalLiabilities)}</div>
-              {data.totalEMI > 0 && (
-                <div className="text-xs text-right">
-                  <span className="text-[var(--text-dim)]">Total EMI:</span>{' '}
-                  <span className="text-red-400 font-semibold tabular-nums">{formatINR(data.totalEMI)}/m</span>
-                </div>
+              {bottomPortfolios.length > 0 && (
+                <>
+                  <div className={`flex items-center gap-1.5 mb-2 ${topPortfolios.length > 0 ? 'mt-4 pt-3 border-t border-[var(--border)]' : 'mt-1'}`}>
+                    <TrendingDown size={12} className="text-red-400" />
+                    <span className="text-[11px] font-semibold text-red-400 uppercase tracking-wider">Underperforming</span>
+                  </div>
+                  {bottomPortfolios.map((p, idx) => (
+                    <div key={p.portfolioId} className="flex items-center justify-between py-2"
+                         style={{ borderBottom: idx < bottomPortfolios.length - 1 ? '1px solid rgba(128,128,128,0.04)' : 'none' }}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-[24px] h-[24px] rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-red-400/70"
+                             style={{ background: 'rgba(239,68,68,0.08)' }}>
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{p.portfolioName}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {p.ownerName && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
+                            <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <div className="text-[13px] font-semibold text-red-400 tabular-nums">{p.plPct.toFixed(1)}%</div>
+                        <div className="text-xs text-red-400/70 tabular-nums">{formatINR(p.pl)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
+          )
+        })()}
 
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Loan</th>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>EMI</th>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-right pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.activeLiabilities.map((l, idx) => (
-                  <tr key={l.liabilityId || idx}>
-                    <td className="py-3.5" style={{ borderBottom: idx < data.activeLiabilities.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                      <div className="text-[13px] font-medium text-[var(--text-primary)]">{l.lenderName} {l.liabilityType}</div>
-                      <div className="text-xs text-[var(--text-dim)] mt-1.5">
-                        {l.familyMemberName}
-                        {l.notes ? ` \u00B7 ${l.notes}` : ''}
-                      </div>
-                    </td>
-                    <td className="text-xs text-[var(--text-secondary)] py-3.5 tabular-nums"
-                        style={{ borderBottom: idx < data.activeLiabilities.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                      {l.emiAmount > 0 ? `${formatINR(l.emiAmount)}/m` : '\u2014'}
-                    </td>
-                    <td className="text-sm font-semibold text-red-400 py-3.5 text-right tabular-nums"
-                        style={{ borderBottom: idx < data.activeLiabilities.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                      {formatINR(l.outstandingBalance)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ═══ UPCOMING REMINDERS (right) ═══ */}
+        {/* ═══ UPCOMING REMINDERS ═══ */}
         {upcomingReminders.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.activeLiabilities.length === 0 ? 'md:col-span-2' : ''}`}
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.activeGoals.length === 0 ? 'md:col-span-2' : ''}`}
                onClick={() => navigate('/reminders')}>
             <SectionHeader label="Upcoming Reminders" color="var(--text-muted)" badge={upcomingReminders.length}
                            linkText="View All" onClick={(e) => { e.stopPropagation(); navigate('/reminders') }} />
@@ -1144,89 +1328,16 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ═══ INSURANCE COVERAGE (left) ═══ */}
-        {data.activeInsurance.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.activeGoals.length === 0 ? 'md:col-span-2' : ''}`}
-               onClick={() => navigate('/insurance')}>
-            <SectionHeader label="Insurance Coverage" color="var(--text-muted)"
-                           linkText="View All" onClick={(e) => { e.stopPropagation(); navigate('/insurance') }} />
-
-            {/* Summary row */}
-            <div className="flex gap-3 mb-4 flex-wrap">
-              {data.lifeCover > 0 && (
-                <div className="flex items-center gap-1 text-[13px]">
-                  <span className="text-[var(--text-dim)]">Life:</span>
-                  <span className="font-semibold text-cyan-400">{formatINR(data.lifeCover)}</span>
-                </div>
-              )}
-              {data.healthCover > 0 && (
-                <div className="flex items-center gap-1 text-[13px]">
-                  <span className="text-[var(--text-dim)]">Health:</span>
-                  <span className="font-semibold text-emerald-400">{formatINR(data.healthCover)}</span>
-                </div>
-              )}
-              {data.totalPremium > 0 && (
-                <div className="flex items-center gap-1 text-[13px]">
-                  <span className="text-[var(--text-dim)]">Premium:</span>
-                  <span className="font-medium text-[var(--text-muted)]">{formatINR(data.totalPremium)}/yr</span>
-                </div>
-              )}
-            </div>
-
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Policy</th>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Nominee</th>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Policy No.</th>
-                  <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-right pb-2"
-                      style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Cover</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.activeInsurance.map((p, idx) => {
-                  const coverColor = p.policyType === 'Term Life' ? '#22d3ee'
-                    : p.policyType === 'Health' ? '#34d399'
-                    : '#94a3b8'
-                  return (
-                    <tr key={p.policyId || idx}>
-                      <td className="py-3.5" style={{ borderBottom: idx < data.activeInsurance.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                        <div className="text-[13px] font-medium text-[var(--text-primary)]">{p.policyName}</div>
-                        <div className="text-xs text-[var(--text-dim)] mt-1.5">{p.policyType} &middot; {p.insuredMember}</div>
-                      </td>
-                      <td className="text-xs text-[var(--text-secondary)] py-3.5"
-                          style={{ borderBottom: idx < data.activeInsurance.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                        {p.nominee || '\u2014'}
-                      </td>
-                      <td className="text-xs text-[var(--text-secondary)] font-medium py-3.5 tabular-nums"
-                          style={{ borderBottom: idx < data.activeInsurance.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                        {mv(p.policyNumber, 'policy')}
-                      </td>
-                      <td className="text-sm font-semibold py-3.5 text-right tabular-nums"
-                          style={{ color: coverColor, borderBottom: idx < data.activeInsurance.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                        {formatINR(p.sumAssured)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ═══ GOALS (right) ═══ */}
+        {/* ═══ GOALS ═══ */}
         {data.activeGoals.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.activeInsurance.length === 0 ? 'md:col-span-2' : ''}`}
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${upcomingReminders.length === 0 ? 'md:col-span-2' : ''}`}
                onClick={() => navigate('/goals')}>
             <SectionHeader label="Financial Goals" color="var(--text-muted)"
                            linkText="View All" onClick={(e) => { e.stopPropagation(); navigate('/goals') }} />
 
             {data.activeGoals.map((g, idx) => {
               const pct = g.targetAmount > 0 ? Math.min((g.currentValue / g.targetAmount) * 100, 100) : 0
-              const year = g.targetDate ? new Date(g.targetDate).getFullYear() : null
+              const gh = data.dashGoalHealth[g.goalId]
 
               let statusColor, statusText
               if (pct >= 100) {
@@ -1239,168 +1350,98 @@ export default function Dashboard() {
                 statusColor = '#a78bfa'; statusText = g.status || 'In Progress'
               }
 
+              const labelColor = gh?.label === 'Short-term' ? '#60a5fa'
+                : gh?.label === 'Medium-term' ? '#fbbf24'
+                : gh?.label === 'Long-term' ? '#34d399' : '#94a3b8'
+              const gap = Math.max(0, (g.targetAmount || 0) - (g.currentValue || 0))
+
               return (
-                <div key={g.goalId || idx} className={idx < data.activeGoals.length - 1 ? 'mb-4' : ''}>
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="font-medium text-[var(--text-secondary)]">{g.goalName}</span>
-                    <span className="text-[var(--text-muted)] font-medium tabular-nums">
-                      {formatINR(g.currentValue)} <span className="text-[var(--text-dim)] font-normal">/ {formatINR(g.targetAmount)}</span>
+                <div key={g.goalId || idx} className={idx < data.activeGoals.length - 1 ? 'mb-4 pb-4 border-b border-[var(--border-light)]' : ''}>
+                  {/* Header: Name + Status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[13px] font-medium text-[var(--text-secondary)] truncate">{g.goalName}</span>
+                      {gh && (
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                              style={{ background: `${labelColor}15`, color: labelColor }}>
+                          {gh.label}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ml-2"
+                          style={{ background: `${statusColor}15`, color: statusColor }}>
+                      {statusText}
                     </span>
                   </div>
+
+                  {/* Progress bar */}
                   <div className="h-[5px] rounded-[3px] overflow-hidden mt-2" style={{ background: 'var(--bg-inset)' }}>
                     <div className="h-full rounded-[3px]" style={{ width: `${pct}%`, background: statusColor }} />
                   </div>
-                  <div className="flex items-center justify-between text-xs mt-2">
-                    <span className="font-medium" style={{ color: statusColor }}>{statusText}</span>
+
+                  {/* Stats: Current/Target + Progress */}
+                  <div className="flex items-center justify-between text-xs mt-1.5">
+                    <span className="text-[var(--text-muted)] tabular-nums">
+                      {formatINR(g.currentValue)} <span className="text-[var(--text-dim)]">/ {formatINR(g.targetAmount)}</span>
+                    </span>
                     <span className="text-[var(--text-dim)] tabular-nums">
-                      {pct.toFixed(pct >= 100 ? 0 : 1)}%{year ? ` \u00B7 ${year}` : ''}
+                      {pct.toFixed(0)}%{gh ? ` · ${gh.yearsLeft.toFixed(1)} yrs` : ''}
                     </span>
                   </div>
+
+                  {/* Allocation health + Suggestion */}
+                  {gh && pct < 100 && (
+                    <div className="mt-2 space-y-1.5">
+                      {/* Recommended vs Actual table */}
+                      <div className="bg-[var(--bg-inset)] rounded-md px-2.5 py-1.5">
+                        <div className="flex items-center justify-between text-[10px] mb-1">
+                          <span className="text-[var(--text-dim)]">Recommended</span>
+                          <span className="text-[var(--text-muted)] font-semibold tabular-nums">{gh.recommendedEquity}% Equity · {gh.recommendedDebt}% Debt</span>
+                        </div>
+                        {gh.isMapped && gh.actualEquity !== null ? (
+                          <>
+                            <div className="flex items-center justify-between text-[10px] mb-1">
+                              <span className="text-[var(--text-dim)]">Actual</span>
+                              <span className="text-[var(--text-muted)] font-semibold tabular-nums">{gh.actualEquity}% Equity · {100 - gh.actualEquity}% Debt</span>
+                            </div>
+                            {gh.mismatch !== null && gh.mismatch !== 0 && (
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-[var(--text-dim)]">Difference</span>
+                                <span className={`font-bold tabular-nums ${gh.needsAttention ? (gh.mismatch > 0 ? 'text-amber-400' : 'text-blue-400') : 'text-emerald-400'}`}>
+                                  {gh.mismatch > 0 ? '+' : ''}{gh.mismatch}% Equity
+                                  {gh.needsAttention && gh.mismatch > 0 && ' — shift to debt'}
+                                  {gh.needsAttention && gh.mismatch < 0 && ' — room for growth'}
+                                  {!gh.needsAttention && ' ✓'}
+                                </span>
+                              </div>
+                            )}
+                            {gh.mismatch === 0 && (
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-[var(--text-dim)]">Difference</span>
+                                <span className="text-emerald-400 font-bold">Perfectly aligned ✓</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-[10px] font-semibold text-amber-400">⚠ No investments linked — at risk</div>
+                        )}
+                      </div>
+                      {/* SIP / Lumpsum suggestion */}
+                      {gh.liveSIP > 0 && gap > 0 && (
+                        <div className="flex items-center gap-3 text-[10px]">
+                          <span className="text-violet-400 font-semibold tabular-nums">SIP {formatINR(gh.liveSIP)}/mo</span>
+                          <span className="text-[var(--text-dim)]">or</span>
+                          <span className="text-violet-400 font-semibold tabular-nums">Lumpsum {formatINR(gh.liveLumpsum)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
         )}
 
-        {/* ═══ BOTTOM 3 TABLES ═══ */}
-        <div className="md:col-span-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-            {/* FAMILY MEMBERS */}
-            {data.filteredMembers.length > 0 && (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors"
-                   onClick={() => navigate('/family')}>
-                <SectionHeader label="Family Members" color="var(--text-muted)"
-                               linkText="View" onClick={(e) => { e.stopPropagation(); navigate('/family') }} />
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Member</th>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Role</th>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-right pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Net Worth</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.filteredMembers.map((m, idx) => {
-                      const nw = data.memberNetWorth[m.memberId] || 0
-                      const totalNW = data.netWorth || 1
-                      const nwPct = totalNW > 0 ? Math.round((nw / totalNW) * 100) : 0
-                      const roleStyle = ROLE_COLORS[m.relationship] || ROLE_COLORS.Child
-                      return (
-                        <tr key={m.memberId}>
-                          <td className="py-3.5" style={{ borderBottom: idx < data.filteredMembers.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                                   style={{ background: AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length] }}>
-                                {m.memberName?.charAt(0) || '?'}
-                              </div>
-                              <span className="text-[13px] font-medium text-[var(--text-primary)]">{m.memberName}</span>
-                            </div>
-                          </td>
-                          <td className="py-3.5" style={{ borderBottom: idx < data.filteredMembers.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                                  style={{ background: roleStyle.bg, color: roleStyle.color }}>
-                              {m.relationship}
-                            </span>
-                          </td>
-                          <td className="text-[13px] font-semibold text-[var(--text-primary)] py-3.5 text-right tabular-nums"
-                              style={{ borderBottom: idx < data.filteredMembers.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                            {formatINR(nw)}
-                            {data.filteredMembers.length > 1 && (
-                              <span className="text-[var(--text-dim)] font-normal ml-1">({nwPct}%)</span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* BANK ACCOUNTS */}
-            {data.filteredBanks.length > 0 && (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors"
-                   onClick={() => navigate('/accounts/bank')}>
-                <SectionHeader label="Bank Accounts" color="var(--text-muted)"
-                               linkText="View" onClick={(e) => { e.stopPropagation(); navigate('/accounts/bank') }} />
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Account</th>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Owner</th>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-right pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>A/C Number</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.filteredBanks.map((b, idx) => (
-                      <tr key={b.accountId || idx}>
-                        <td className="text-[13px] font-medium text-[var(--text-primary)] py-3.5"
-                            style={{ borderBottom: idx < data.filteredBanks.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {b.accountName}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] py-3.5"
-                            style={{ borderBottom: idx < data.filteredBanks.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {b.memberName}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] font-medium py-3.5 text-right tabular-nums"
-                            style={{ borderBottom: idx < data.filteredBanks.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {mv(b.accountNumber, 'account')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* INVESTMENT ACCOUNTS */}
-            {data.filteredInvAccounts.length > 0 && (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors"
-                   onClick={() => navigate('/accounts/investment')}>
-                <SectionHeader label="Investment Accounts" color="var(--text-muted)"
-                               linkText="View" onClick={(e) => { e.stopPropagation(); navigate('/accounts/investment') }} />
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Platform</th>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-left pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Owner</th>
-                      <th className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide text-right pb-2"
-                          style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>Client ID</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.filteredInvAccounts.map((a, idx) => (
-                      <tr key={a.accountId || idx}>
-                        <td className="text-[13px] font-medium text-[var(--text-primary)] py-3.5"
-                            style={{ borderBottom: idx < data.filteredInvAccounts.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {a.platformBroker}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] py-3.5"
-                            style={{ borderBottom: idx < data.filteredInvAccounts.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {a.memberName}
-                        </td>
-                        <td className="text-[13px] text-[var(--text-secondary)] font-medium py-3.5 text-right tabular-nums"
-                            style={{ borderBottom: idx < data.filteredInvAccounts.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                          {mv(a.accountClientId, 'clientId')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-          </div>
-        </div>
 
         {/* ═══ PDF-ONLY FOOTER — hidden on web, revealed during PDF capture ═══ */}
         <div ref={pdfFooterRef} className="md:col-span-2 mt-4 rounded-xl border border-[var(--border)] overflow-hidden"

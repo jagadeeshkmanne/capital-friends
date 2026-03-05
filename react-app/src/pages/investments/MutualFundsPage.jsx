@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Minus, Pencil, TrendingUp, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen } from 'lucide-react'
+import { Plus, Minus, Pencil, TrendingUp, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -73,6 +73,26 @@ function parseDate(d) {
   return isNaN(parsed.getTime()) ? null : parsed
 }
 
+// XIRR calculator — Newton-Raphson on cash flows [{ date, amount }]
+function computeXIRR(cashFlows) {
+  if (cashFlows.length < 2) return null
+  const d0 = cashFlows[0].date
+  const days = cashFlows.map(cf => (cf.date - d0) / (365.25 * 86400000))
+  const f = (r) => cashFlows.reduce((s, cf, i) => s + cf.amount / Math.pow(1 + r, days[i]), 0)
+  const df = (r) => cashFlows.reduce((s, cf, i) => s + (-days[i] * cf.amount) / Math.pow(1 + r, days[i] + 1), 0)
+  let rate = 0.1
+  for (let i = 0; i < 100; i++) {
+    const fVal = f(rate)
+    const dfVal = df(rate)
+    if (Math.abs(dfVal) < 1e-10) break
+    const newRate = rate - fVal / dfVal
+    if (Math.abs(newRate - rate) < 1e-7) return newRate
+    rate = newRate
+    if (rate < -0.99) return null
+  }
+  return Math.abs(f(rate)) < 1 ? rate : null
+}
+
 // ATH color coding (matching email report)
 function athColor(pct) {
   if (pct >= 20) return { color: '#c62828', fontWeight: 700 }
@@ -88,7 +108,7 @@ export default function MutualFundsPage() {
     mfPortfolios, mfHoldings, mfTransactions,
     activeMembers, activeInvestmentAccounts,
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-    investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted,
+    investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, toggleSipRestricted,
     deleteMFTransaction, editMFTransaction,
     assetAllocations, updateAssetAllocation,
   } = useData()
@@ -353,6 +373,49 @@ export default function MutualFundsPage() {
     return Object.values(map).sort((a, b) => a.fundName.localeCompare(b.fundName))
   }, [holdings])
 
+  // Portfolio insights — XIRR, ATH drawdown, top/bottom performers, concentration
+  const insights = useMemo(() => {
+    if (!holdings.length) return null
+    const activeHoldings = enrichedHoldings.filter(h => h.units > 0)
+    const totalValue = activeHoldings.reduce((s, h) => s + h.currentValue, 0)
+    if (totalValue === 0) return null
+
+    // ATH Analysis — weighted average drawdown
+    const athHoldings = activeHoldings.filter(h => h.athNav > 0 && h.belowATHPct > 0)
+    const weightedDrawdown = athHoldings.length > 0
+      ? athHoldings.reduce((s, h) => s + (h.belowATHPct * h.currentValue), 0) / totalValue
+      : 0
+    const athSorted = [...athHoldings].sort((a, b) => b.belowATHPct - a.belowATHPct)
+
+    // Top/Bottom performers by P&L%
+    const withPL = activeHoldings.filter(h => h.investment > 0)
+    const topPerformers = [...withPL].sort((a, b) => b.plPct - a.plPct).slice(0, 5)
+    const bottomPerformers = [...withPL].sort((a, b) => a.plPct - b.plPct).slice(0, 5)
+
+    // Concentration — top 5 holdings by value
+    const byConcen = [...activeHoldings].sort((a, b) => b.currentValue - a.currentValue)
+    const top5Value = byConcen.slice(0, 5).reduce((s, h) => s + h.currentValue, 0)
+    const top5Pct = totalValue > 0 ? (top5Value / totalValue) * 100 : 0
+    const concentration = byConcen.slice(0, 5).map(h => ({
+      ...h, pctOfTotal: totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+    }))
+
+    // XIRR from transactions
+    const relevantTxns = allFilteredTxns.filter(t => {
+      const d = parseDate(t.date)
+      return d && t.totalAmount > 0
+    })
+    const cashFlows = relevantTxns.map(t => ({
+      date: parseDate(t.date),
+      amount: t.type === 'SELL' ? t.totalAmount : -t.totalAmount
+    }))
+    cashFlows.push({ date: new Date(), amount: totalValue })
+    cashFlows.sort((a, b) => a.date - b.date)
+    const xirr = cashFlows.length >= 2 ? computeXIRR(cashFlows) : null
+
+    return { weightedDrawdown, athSorted, topPerformers, bottomPerformers, concentration, top5Pct, xirr, totalValue }
+  }, [enrichedHoldings, holdings, allFilteredTxns])
+
   // Loading state — after all hooks
   if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading mutual funds" cards={5} />
 
@@ -492,7 +555,20 @@ export default function MutualFundsPage() {
     showBlockUI(newVal ? 'Restricting lumpsum...' : 'Enabling lumpsum...')
     try {
       await toggleLumpsumRestricted(h.portfolioId, h.fundCode || h.schemeCode, newVal)
-      showToast(newVal ? 'Lumpsum buy restricted for this fund' : 'Lumpsum buy enabled for this fund')
+      showToast(newVal ? 'Lumpsum restricted across all portfolios' : 'Lumpsum enabled across all portfolios')
+    } catch (err) {
+      showToast(err.message || 'Failed to update restriction', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  async function handleToggleSipRestricted(h) {
+    const newVal = !h.sipRestricted
+    showBlockUI(newVal ? 'Restricting SIP...' : 'Enabling SIP...')
+    try {
+      await toggleSipRestricted(h.portfolioId, h.fundCode || h.schemeCode, newVal)
+      showToast(newVal ? 'SIP restricted across all portfolios' : 'SIP enabled across all portfolios')
     } catch (err) {
       showToast(err.message || 'Failed to update restriction', 'error')
     } finally {
@@ -886,6 +962,16 @@ export default function MutualFundsPage() {
               >
                 <PieChartIcon size={12} /> Fund Breakdown ({uniqueFunds.length})
               </button>
+              <button
+                onClick={() => setSubTab('insights')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
+                  subTab === 'insights'
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <TrendingUp size={12} /> Insights
+              </button>
             </div>
             <div className="flex items-center gap-1.5 ml-auto shrink-0">
               <button
@@ -1001,7 +1087,9 @@ export default function MutualFundsPage() {
                                     <span className="flex items-center gap-1.5 flex-wrap">
                                       {splitFundName(h.fundName).main}
                                       {isPlanned && <span className="text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
-                                      {h.lumpsumRestricted && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />SIP only</span>}
+                                      {h.lumpsumRestricted && h.sipRestricted && <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />Blocked</span>}
+                                      {h.lumpsumRestricted && !h.sipRestricted && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />SIP only</span>}
+                                      {!h.lumpsumRestricted && h.sipRestricted && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />Lumpsum only</span>}
                                     </span>
                                     {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)] font-normal mt-0.5">{splitFundName(h.fundName).plan}</p>}
                                   </button>
@@ -1100,9 +1188,16 @@ export default function MutualFundsPage() {
                                       <button
                                         onClick={(e) => { e.stopPropagation(); handleToggleLumpsumRestricted(h) }}
                                         className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                                        title={h.lumpsumRestricted ? 'Lumpsum restricted (SIP only) — click to allow' : 'Click to restrict lumpsum buy (SIP only)'}
+                                        title={h.lumpsumRestricted ? 'Lumpsum restricted — click to allow' : 'Click to restrict lumpsum'}
                                       >
-                                        {h.lumpsumRestricted ? <Lock size={11} strokeWidth={2.5} /> : <LockOpen size={11} strokeWidth={2.5} />}
+                                        <IndianRupee size={11} strokeWidth={2.5} className={h.lumpsumRestricted ? 'line-through' : ''} />
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleToggleSipRestricted(h) }}
+                                        className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.sipRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
+                                        title={h.sipRestricted ? 'SIP restricted — click to allow' : 'Click to restrict SIP'}
+                                      >
+                                        <Repeat size={11} strokeWidth={2.5} className={h.sipRestricted ? 'line-through' : ''} />
                                       </button>
                                     </>
                                   )}
@@ -1161,7 +1256,9 @@ export default function MutualFundsPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
-                                {h.lumpsumRestricted && <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />SIP only</span>}
+                                {h.lumpsumRestricted && h.sipRestricted && <span className="text-[9px] font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Blocked</span>}
+                                {h.lumpsumRestricted && !h.sipRestricted && <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />SIP only</span>}
+                                {!h.lumpsumRestricted && h.sipRestricted && <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Lumpsum only</span>}
                               </div>
                               {splitFundName(h.fundName).plan && <p className="text-[9px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                             </div>
@@ -1383,6 +1480,165 @@ export default function MutualFundsPage() {
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
                   <PieChartIcon size={28} className="text-[var(--text-dim)]" />
                   <p className="text-sm text-[var(--text-muted)]">No funds to configure</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Insights Tab ── */}
+          {subTab === 'insights' && (
+            <>
+              {insights ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* XIRR Card */}
+                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Portfolio Return</p>
+                    {insights.xirr !== null ? (
+                      <div>
+                        <div className="flex items-baseline gap-2">
+                          <p className={`text-2xl font-bold tabular-nums ${insights.xirr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {(insights.xirr * 100).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-[var(--text-dim)]">XIRR p.a.</p>
+                        </div>
+                        <div className="flex items-center gap-3 mt-2 text-[10px] tabular-nums">
+                          <span className="text-[var(--text-dim)]">Invested {mv(formatINR(stats.invested), 'value')}</span>
+                          <span className="text-[var(--text-dim)]">Current {mv(formatINR(stats.current), 'value')}</span>
+                        </div>
+                        <p className={`text-[10px] mt-1 ${insights.xirr >= 0.12 ? 'text-emerald-400' : insights.xirr >= 0.08 ? 'text-[var(--text-dim)]' : 'text-amber-400'}`}>
+                          {insights.xirr >= 0.12 ? 'Strong returns — stay the course' : insights.xirr >= 0.08 ? 'Decent returns — review periodically' : insights.xirr >= 0 ? 'Below expectations — review fund selection' : 'Negative returns — consider rebalancing'}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[var(--text-dim)]">N/A</p>
+                    )}
+                  </div>
+
+                  {/* Buy Opportunities Card */}
+                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Buy Opportunities</p>
+                    {insights.athSorted.length > 0 ? (
+                      <div>
+                        <p className="text-[10px] text-[var(--text-dim)] mb-3">
+                          {insights.athSorted.filter(h => h.belowATHPct >= 10).length} funds 10%+ below peak — consider adding
+                        </p>
+                        <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                          {insights.athSorted.map(h => {
+                            const { shortName } = splitFundName(h.fundName)
+                            return (
+                              <div key={h._key} className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] text-[var(--text-secondary)] truncate flex-1">{shortName}</p>
+                                <span className="text-[10px] font-semibold tabular-nums shrink-0" style={athColor(h.belowATHPct)}>
+                                  -{h.belowATHPct.toFixed(1)}%
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-emerald-400">All funds at or near peak — no dips to buy</p>
+                    )}
+                  </div>
+
+                  {/* Needs Review Card */}
+                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Needs Review</p>
+                    {insights.bottomPerformers.some(h => h.plPct < 0) ? (
+                      <div className="space-y-3">
+                        <p className="text-[10px] text-amber-400">
+                          {insights.bottomPerformers.filter(h => h.plPct < 0).length} fund{insights.bottomPerformers.filter(h => h.plPct < 0).length > 1 ? 's' : ''} in loss — evaluate if you should hold, add more, or exit
+                        </p>
+                        <div className="space-y-1.5">
+                          {insights.bottomPerformers.filter(h => h.plPct < 0).map(h => {
+                            const { shortName } = splitFundName(h.fundName)
+                            return (
+                              <div key={h._key} className="flex items-center justify-between gap-2">
+                                <p className="text-[10px] text-[var(--text-secondary)] truncate flex-1">{shortName}</p>
+                                <span className="text-[10px] font-semibold tabular-nums shrink-0 text-rose-400">
+                                  {h.plPct.toFixed(1)}%
+                                </span>
+                                <span className="text-[10px] tabular-nums shrink-0 text-rose-400/70">
+                                  {mv(formatINR(Math.abs(h.pl)), 'value')}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {/* Top gainers for context */}
+                        {insights.topPerformers.some(h => h.plPct > 0) && (
+                          <div>
+                            <p className="text-[9px] font-semibold text-emerald-400/70 uppercase mb-1">Top performers</p>
+                            <div className="space-y-1">
+                              {insights.topPerformers.filter(h => h.plPct > 0).slice(0, 3).map(h => {
+                                const { shortName } = splitFundName(h.fundName)
+                                return (
+                                  <div key={h._key} className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] text-[var(--text-dim)] truncate flex-1">{shortName}</p>
+                                    <span className="text-[10px] font-semibold tabular-nums shrink-0 text-emerald-400/70">
+                                      +{h.plPct.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-emerald-400">All holdings in profit — no action needed</p>
+                    )}
+                  </div>
+
+                  {/* Concentration Card */}
+                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Concentration Risk</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-lg font-bold tabular-nums text-[var(--text-primary)]">
+                        {insights.top5Pct.toFixed(0)}%
+                      </p>
+                      <p className="text-[10px] text-[var(--text-dim)]">in top 5 holdings</p>
+                      {insights.top5Pct > 60 && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400">High</span>
+                      )}
+                    </div>
+                    <p className={`text-[10px] mb-3 ${insights.top5Pct > 70 ? 'text-amber-400' : insights.top5Pct > 50 ? 'text-[var(--text-dim)]' : 'text-emerald-400'}`}>
+                      {insights.top5Pct > 70 ? 'Very concentrated — consider diversifying across more funds' : insights.top5Pct > 50 ? 'Moderately concentrated — acceptable for focused portfolios' : 'Well diversified'}
+                    </p>
+                    {/* Stacked bar */}
+                    <div className="h-2 rounded-full overflow-hidden flex mb-3" style={{ background: 'var(--bg-inset)' }}>
+                      {insights.concentration.map((h, i) => (
+                        <div key={h._key || i} className="h-full" style={{
+                          width: `${h.pctOfTotal}%`,
+                          background: ['#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4'][i] || '#94a3b8',
+                        }} />
+                      ))}
+                    </div>
+                    <div className="space-y-1.5">
+                      {insights.concentration.map((h, i) => {
+                        const { shortName } = splitFundName(h.fundName)
+                        return (
+                          <div key={h._key || i} className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{
+                              background: ['#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4'][i] || '#94a3b8'
+                            }} />
+                            <p className="text-[10px] text-[var(--text-secondary)] truncate flex-1">{shortName}</p>
+                            <span className="text-[10px] font-semibold tabular-nums text-[var(--text-muted)] shrink-0">
+                              {h.pctOfTotal.toFixed(1)}%
+                            </span>
+                            <span className="text-[10px] tabular-nums text-[var(--text-dim)] shrink-0">
+                              {mv(formatINR(h.currentValue), 'value')}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
+                  <TrendingUp size={28} className="text-[var(--text-dim)]" />
+                  <p className="text-sm text-[var(--text-muted)]">No holdings to analyze</p>
                 </div>
               )}
             </>
