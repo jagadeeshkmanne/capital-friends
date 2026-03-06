@@ -24,65 +24,150 @@
         }
       })();
     </script>
-    <style>#crawler-content{display:none}</style>
-    <script type="module" crossorigin src="/assets/index-BLdRK43Y.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DA2TltmK.css">
+    <script type="module" crossorigin src="/assets/index-BLuiPnaS.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DiJl8ViA.css">
   </head>
-  <body class="bg-slate-50 antialiased">
-    <noscript>
-      <div style="font-family:'Inter',sans-serif;color:#333">
-        <div style="background:#080d1a;color:#e2e8f0;padding:24px 20px 48px;text-align:center">
-          <h1 style="font-family:'Poppins',sans-serif;font-size:28px;font-weight:800;color:#fff;margin:0 0 8px">Capital Friends</h1>
-          <p style="font-size:18px;color:#fff;margin:0 0 16px">One dashboard for your family's entire wealth</p>
-          <p style="font-size:15px;color:#94a3b8;max-width:600px;margin:0 auto;line-height:1.7">Capital Friends is a free, open-source family portfolio tracker built by Jagadeesh Manne. Track mutual funds, stocks, FDs, gold, insurance, loans, and goals for your entire family — all stored privately in your Google Drive. No servers, no database, no tracking.</p>
-        </div>
-        <div style="max-width:700px;margin:0 auto;padding:32px 20px">
-          <p style="margin:24px 0;font-size:14px">
-            <a href="https://capitalfriends.in/privacy" style="color:#7c3aed;margin-right:16px">Privacy Policy</a>
-            <a href="https://capitalfriends.in/terms" style="color:#7c3aed">Terms &amp; Conditions</a>
-          </p>
-        </div>
-      </div>
-    </noscript>
+  <body style="margin:0;padding:0;background:#f8fafc">
     <div id="root">
-      <!-- Static content for crawlers (hidden from users, visible to non-JS crawlers via noscript). React replaces #root on mount. -->
-      <div id="crawler-content" style="font-family:'Inter',sans-serif;color:#333">
-        <div style="background:#080d1a;color:#e2e8f0;padding:24px 20px 48px;text-align:center">
-          <h1 style="font-family:'Poppins',sans-serif;font-size:28px;font-weight:800;color:#fff;margin:0 0 8px">Capital Friends</h1>
-          <p style="font-size:18px;color:#fff;margin:0 0 16px">One dashboard for your family's entire wealth</p>
-          <p style="font-size:15px;color:#94a3b8;max-width:600px;margin:0 auto;line-height:1.7">
-            Capital Friends is a free, open-source family portfolio tracker built by Jagadeesh Manne.
-            Track mutual funds, stocks, FDs, gold, insurance, loans, and goals for your entire family
-            — all stored privately in your Google Drive. No servers, no database, no tracking.
+      <!-- Static shell matching React landing page exactly — no flash on React load -->
+      <div id="cf-shell" style="font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased">
+
+        <!-- Header — matches React exactly -->
+        <header style="position:sticky;top:0;z-index:100;background:rgba(10,15,31,0.98);border-bottom:1px solid rgba(255,255,255,0.06)">
+          <div style="max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px">
+            <a href="#" style="display:flex;align-items:center;gap:8px;text-decoration:none">
+              <img src="/logo-new.png" alt="" style="height:44px;width:auto" onerror="this.style.display='none'" />
+              <span style="font-family:'Poppins',sans-serif;font-size:17px;letter-spacing:-0.3px">
+                <b style="color:#fff;font-weight:700">Capital</b> <em style="color:#34d399;font-weight:800;font-style:normal">Friends</em>
+              </span>
+            </a>
+            <button style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer">
+              Sign In
+            </button>
+          </div>
+        </header>
+
+        <!-- Hero — matches React exactly -->
+        <section style="background:#fff;border-bottom:1px solid #e2e8f0;padding:24px 20px 20px;text-align:center">
+          <h1 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.03em;line-height:1.3;margin:0 0 10px">
+            One dashboard for your family's <span style="color:#16a34a">entire wealth</span>
+          </h1>
+          <p style="font-size:13.5px;color:#475569;margin:0 auto 14px;max-width:520px;line-height:1.5">
+            Track mutual funds, stocks, insurance, loans for every family member — stored privately in your own Google Drive.
           </p>
-        </div>
-        <div style="max-width:700px;margin:0 auto;padding:32px 20px">
-          <h2 style="font-size:22px;font-weight:700;margin:0 0 16px">What makes Capital Friends different</h2>
-          <ul style="line-height:2;padding-left:20px;color:#475569">
-            <li><strong>ATH Tracking</strong> — See how far each mutual fund is from its All-Time High NAV. Spot buying opportunities when quality funds dip below ATH.</li>
-            <li><strong>Smart Rebalancing</strong> — Set target allocation for each fund. Get exact buy/sell/SIP adjustment amounts when your portfolio drifts.</li>
-            <li><strong>Goal-Based Investing</strong> — Link portfolios to goals like retirement, education, or emergency fund. Track progress with on-track indicators.</li>
-            <li><strong>Family Dashboard</strong> — Track wealth for your entire family. Switch between members, see combined or individual net worth.</li>
-            <li><strong>Your Data, Your Drive</strong> — Everything stored in a Google Spreadsheet in your own Google Drive. No external servers, no database.</li>
-            <li><strong>Email Reports &amp; Reminders</strong> — Scheduled portfolio summaries sent from your Gmail. SIP reminders, insurance renewals, goal check-ins.</li>
-          </ul>
-          <h2 style="font-size:22px;font-weight:700;margin:32px 0 16px">How it works</h2>
-          <ol style="line-height:2;padding-left:20px;color:#475569">
-            <li>Sign in with your Google account — no registration, no passwords</li>
-            <li>Capital Friends creates a private spreadsheet in your Google Drive</li>
-            <li>Start tracking — add family members, portfolios, goals, insurance, loans</li>
-          </ol>
-          <p style="margin:32px 0 16px;color:#475569;line-height:1.7">
-            <strong>No bank credentials needed</strong> — manual entry means you control what goes in.
-            <strong>Always free</strong>, no ads, no premium plans.
-            <a href="https://github.com/jagadeeshkmanne/capital-friends" style="color:#7c3aed">Open source on GitHub</a>.
-          </p>
-          <p style="margin:24px 0;font-size:14px">
-            <a href="https://capitalfriends.in/privacy" style="color:#7c3aed;margin-right:16px">Privacy Policy</a>
-            <a href="https://capitalfriends.in/terms" style="color:#7c3aed">Terms &amp; Conditions</a>
-          </p>
-          <p style="font-size:13px;color:#94a3b8">Contact: jagadeesh.k.manne@gmail.com</p>
-        </div>
+          <button style="display:inline-flex;align-items:center;gap:8px;padding:9px 20px;border-radius:9px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer">
+            Sign in with Google — it's free
+          </button>
+          <div style="margin-top:10px;font-size:11.5px;color:#94a3b8">
+            Free · Open source · No bank credentials · Data stays in your Google Drive
+          </div>
+        </section>
+
+        <!-- Showcase placeholder — matches background of the tab section -->
+        <section style="background:#fff;border-bottom:1px solid #e2e8f0;overflow:hidden">
+          <!-- Tab bar placeholder -->
+          <div style="border-bottom:1px solid #e2e8f0;height:41px;background:#fff"></div>
+          <!-- Content area placeholder -->
+          <div style="background:#f1f5f9;min-height:360px"></div>
+        </section>
+
+        <!-- Dark "why CF" section -->
+        <section style="background:#080d1a;border-top:1px solid rgba(255,255,255,.06);padding:40px 24px 48px">
+          <div style="max-width:960px;margin:0 auto">
+            <h2 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#f1f5f9;text-align:center;margin:0 0 22px;letter-spacing:-.02em;line-height:1.3">
+              What happens to your family's finances if something happens to <span style="color:#f87171">you?</span>
+            </h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div style="padding:20px 22px;border-radius:12px;background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.2)">
+                <div style="font-size:12.5px;font-weight:700;color:#fca5a5;margin-bottom:10px">Without a tracker</div>
+                <ul style="list-style:none;padding:0;margin:0;font-size:12.5px;color:#64748b;line-height:2">
+                  <li>No one knows which MFs you hold or where to redeem</li>
+                  <li>Insurance policies expire unrenewed — premiums lapse</li>
+                  <li>Loan EMIs missed — credit score damaged</li>
+                </ul>
+              </div>
+              <div style="padding:20px 22px;border-radius:12px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.2)">
+                <div style="font-size:12.5px;font-weight:700;color:#34d399;margin-bottom:10px">With Capital Friends</div>
+                <ul style="list-style:none;padding:0;margin:0;font-size:12.5px;color:#64748b;line-height:2">
+                  <li>Complete MF, stock, FD, gold, insurance &amp; loan ledger</li>
+                  <li>Monthly email report auto-sent to spouse &amp; parents</li>
+                  <li>Goals tracked — retirement, education, emergency fund</li>
+                </ul>
+              </div>
+            </div>
+            <div style="margin-top:28px;text-align:center;font-size:12.5px;color:#34d399;font-weight:500">
+              ✓ Always Free &nbsp;·&nbsp; ✓ No Credit Card &nbsp;·&nbsp; ✓ Open Source &nbsp;·&nbsp; ✓ Your Data stays in Google Drive
+            </div>
+          </div>
+        </section>
+
+        <!-- Features section -->
+        <section style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:36px 24px">
+          <div style="max-width:1280px;margin:0 auto">
+            <div style="font-family:'Poppins',sans-serif;font-size:26px;font-weight:700;color:#0f172a;text-align:center;letter-spacing:-0.02em;margin-bottom:4px">Your family's complete financial OS</div>
+            <div style="font-size:13px;color:#94a3b8;text-align:center;margin-bottom:24px">Built for Indian families · Track everything in one place</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#10b981;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Mutual Funds</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Track all your MF holdings, NAV, returns, ATH distance and rebalancing needs across portfolios.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#7c3aed;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Smart Rebalancing ★</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Get exact buy/sell/SIP amounts when your portfolio drifts from target allocation.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#0891b2;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Goal-Based Investing ★</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Link portfolios to goals. Track retirement, education, emergency fund with on-track indicators.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#f59e0b;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Family Dashboard</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Track wealth for your entire family. Switch between members, see combined or individual net worth.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#3b82f6;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Your Data, Your Drive</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Everything stored in a Google Spreadsheet in YOUR Google Drive. No servers, no database.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#f43f5e;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Email Reports ★</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Scheduled portfolio summaries sent to you and your family. SIP reminders, insurance renewals, goal check-ins.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CTA + Footer -->
+        <section style="background:#080d1a;border-top:1px solid rgba(255,255,255,.06);padding:28px 24px 0;text-align:center">
+          <div style="max-width:600px;margin:0 auto;padding-bottom:20px">
+            <h2 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#fff;letter-spacing:-.02em;margin:0 0 6px">Start managing your family's wealth today</h2>
+            <p style="font-size:13px;color:#475569;margin:0 0 16px">No registration form. No bank linking. Just your Google account.</p>
+            <button style="display:inline-flex;align-items:center;gap:8px;padding:9px 24px;border-radius:9px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13.5px;font-weight:600;border:none;cursor:pointer">
+              Sign in with Google — it's free
+            </button>
+            <div style="margin-top:10px;font-size:11.5px;color:#475569">No bank credentials · Data stays in your Google Drive · Always free · Open source</div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,.06);padding:12px 0">
+            <div style="max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-wrap:wrap;gap:8px">
+              <span style="font-family:'Poppins',sans-serif;font-size:14px;opacity:0.4">
+                <b style="color:#fff;font-weight:700">Capital</b> <em style="color:#34d399;font-weight:800;font-style:normal">Friends</em>
+              </span>
+              <span style="font-size:11.5px;color:#334155">
+                Built with <span style="color:#f43f5e">♥</span> by <span style="color:#475569;font-weight:600">Jagadeesh Manne</span> · Free &amp; open source
+              </span>
+              <span>
+                <a href="https://capitalfriends.in/privacy" style="font-size:12px;color:#64748b;text-decoration:none;padding:4px 10px">Privacy Policy</a>
+                <span style="color:#1e293b;font-size:12px">·</span>
+                <a href="https://capitalfriends.in/terms" style="font-size:12px;color:#64748b;text-decoration:none;padding:4px 10px">Terms &amp; Conditions</a>
+              </span>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
   </body>
