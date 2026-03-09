@@ -80,11 +80,14 @@ export function AuthProvider({ children }) {
       api.setTokenRefreshFn(silentRefresh)
 
       // If we have a valid stored token, restore session.
-      // Otherwise try a silent token refresh (no consent screen) for returning users.
+      // If token expired but user profile is cached, try silent refresh (returning user).
+      // Otherwise show login page (first-time user).
       if (api.isTokenValid()) {
         restoreSession()
-      } else {
+      } else if (getCachedUser()) {
         trySilentRefresh()
+      } else {
+        setLoading(false)
       }
     }
 
