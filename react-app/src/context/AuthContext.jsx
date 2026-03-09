@@ -79,11 +79,12 @@ export function AuthProvider({ children }) {
       // Register token refresh function with api module
       api.setTokenRefreshFn(silentRefresh)
 
-      // If we have a valid stored token, try to restore session
+      // If we have a valid stored token, restore session.
+      // Otherwise try a silent token refresh (no consent screen) for returning users.
       if (api.isTokenValid()) {
         restoreSession()
       } else {
-        setLoading(false)
+        trySilentRefresh()
       }
     }
 
@@ -162,6 +163,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Try silent refresh on page load — avoids showing consent screen for returning users
+  async function trySilentRefresh() {
+    try {
+      await silentRefresh()
+      await restoreSession()
+    } catch {
+      // Silent failed (first-time user or consent revoked) — show login page
+      setLoading(false)
+    }
+  }
+
   // Silent token refresh (called by api.js when token expires)
   function silentRefresh() {
     return new Promise((resolve, reject) => {
@@ -187,12 +199,23 @@ export function AuthProvider({ children }) {
     })
   }
 
-  // Manual sign-in trigger
+  // Manual sign-in trigger — try silent first, fall back to consent screen
   const signIn = useCallback(() => {
-    if (tokenClientRef.current) {
-      setError(null)
-      tokenClientRef.current.requestAccessToken()
+    if (!tokenClientRef.current) return
+    setError(null)
+    const client = tokenClientRef.current
+    const originalCallback = client.callback
+    // Try silent auth first (no consent screen for returning users)
+    client.callback = (response) => {
+      client.callback = originalCallback // restore for future calls
+      if (response.error === 'interaction_required' || response.error === 'access_denied') {
+        // Silent failed — show full consent screen
+        client.requestAccessToken({ prompt: 'consent' })
+      } else {
+        originalCallback(response)
+      }
     }
+    client.requestAccessToken({ prompt: '' })
   }, [])
 
   // Sign out
