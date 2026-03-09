@@ -193,6 +193,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
     if (memberDOB) {
       // Preferred: calculate from DOB
+      const curAge = Math.floor((Date.now() - memberDOB.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      if (retAge <= curAge) return  // retire age must be in the future
       const d = new Date(memberDOB)
       d.setFullYear(d.getFullYear() + retAge)
       setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
