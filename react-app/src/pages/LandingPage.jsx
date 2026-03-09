@@ -532,6 +532,12 @@ export default function LandingPage() {
   const [paused, setPaused] = useState(false)
   const timerRef = useRef(null)
   const N = 5
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -557,14 +563,6 @@ export default function LandingPage() {
     if (isAuthenticated) navigate('/dashboard', { replace: true })
   }, [isAuthenticated, navigate])
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080d1a' }}>
-        <img src={LOGO_ICON} alt="" style={{ height: 64, width: 'auto' }} />
-      </div>
-    )
-  }
-
   const slide = SLIDES[activeSlide]
 
   return (
@@ -588,8 +586,8 @@ export default function LandingPage() {
       </header>
 
       {/* ─── HERO ─── */}
-      <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '20px 24px 16px', textAlign: 'center' }}>
-        <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 26, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 7 }}>
+      <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '24px 20px 20px' : '20px 24px 16px', textAlign: 'center' }}>
+        <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 22 : 26, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1.3, marginBottom: 10 }}>
           One dashboard for your family's <span style={{ color: '#16a34a' }}>entire wealth</span>
         </h1>
         <p style={{ fontSize: 13.5, color: '#475569', marginBottom: 14, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
@@ -631,10 +629,10 @@ export default function LandingPage() {
         </nav>
 
         {/* Show area */}
-        <div style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', height: 'calc(100vh - 295px)', overflow: 'hidden' }}>
-          <div style={{ maxWidth: 1360, margin: '0 auto', padding: '16px 24px', height: '100%', display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, alignItems: 'stretch' }}>
+        <div style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', height: isMobile ? 'auto' : 'calc(100vh - 295px)', overflow: isMobile ? 'visible' : 'hidden' }}>
+          <div style={{ maxWidth: 1360, margin: '0 auto', padding: isMobile ? '12px 16px 16px' : '16px 24px', height: isMobile ? 'auto' : '100%', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '300px 1fr', gap: 16, alignItems: 'stretch' }}>
             {/* Left feature panel */}
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: isMobile ? 18 : 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
                 <span style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '3px 10px', borderRadius: 100, marginBottom: 14, ...slide.tagStyle }}>
                   {slide.tag}
@@ -659,7 +657,7 @@ export default function LandingPage() {
             </div>
 
             {/* Right: mock browser window */}
-            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 8px 32px rgba(15,23,42,.18),0 2px 8px rgba(15,23,42,.1)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 8px 32px rgba(15,23,42,.18),0 2px 8px rgba(15,23,42,.1)', display: 'flex', flexDirection: 'column', height: isMobile ? 300 : '100%' }}>
               <WinBar url={slide.url} />
               <slide.MockUI />
             </div>
@@ -668,7 +666,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── WHY CF ─── */}
-      <section style={{ background: '#080d1a', borderTop: '1px solid rgba(255,255,255,.06)', padding: '40px 24px 48px' }}>
+      <section style={{ background: '#080d1a', borderTop: '1px solid rgba(255,255,255,.06)', padding: isMobile ? '32px 16px 36px' : '40px 24px 48px' }}>
         <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
           {/* Question badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
@@ -683,7 +681,7 @@ export default function LandingPage() {
           </h2>
 
           {/* Before / After grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
             {/* Without tracker */}
             <div style={{ padding: '20px 22px', borderRadius: 12, background: 'rgba(248,113,113,.04)', border: '1px solid rgba(248,113,113,.2)' }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: '#fca5a5' }}>
@@ -732,7 +730,7 @@ export default function LandingPage() {
 
           {/* Trust strip */}
           <div style={{ marginTop: 28, textAlign: 'center' }}>
-            <span style={{ display: 'inline-flex', gap: 20, fontSize: 12.5, color: '#34d399', fontWeight: 500 }}>
+            <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: isMobile ? 10 : 20, fontSize: 12.5, color: '#34d399', fontWeight: 500, justifyContent: 'center' }}>
               <span>✓ Always Free</span>
               <span style={{ color: '#1e293b' }}>·</span>
               <span>✓ No Credit Card</span>
@@ -748,7 +746,7 @@ export default function LandingPage() {
             <span style={{ display: 'block', textAlign: 'center', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: '#a78bfa', marginBottom: 24 }}>
               Up and running in under a minute
             </span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 0, position: 'relative' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 24 : 0, position: 'relative' }}>
               {[
                 { n: '1', h: 'Sign in with Google', p: 'No forms, no bank linking. Just your Google account.' },
                 { n: '2', h: 'Spreadsheet created in your Drive', p: 'A private Google Sheet is set up automatically. Your data never leaves your account.' },
@@ -793,7 +791,7 @@ export default function LandingPage() {
           </div>
 
           {/* Feature cards grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: 12 }}>
             {(featTab === 0 ? TRACK_CARDS : SMART_CARDS).map(card => (
               <div key={card.title} style={{ padding: '22px 24px', borderRadius: 10, background: '#fff', border: '1px solid #e2e8f0' }}>
                 <div style={{ height: 3, borderRadius: 2, width: 30, marginBottom: 11, background: card.color }} />
@@ -826,7 +824,7 @@ export default function LandingPage() {
 
         {/* Footer */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', padding: '12px 0' }}>
-          <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '0 24px' }}>
+          <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'center' : 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 10, flexWrap: 'wrap', padding: '0 24px', textAlign: isMobile ? 'center' : 'left' }}>
             <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
               <img src={LOGO_ICON} alt="" style={{ height: 28 }}
                 onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
@@ -841,9 +839,9 @@ export default function LandingPage() {
               <span style={{ color: '#334155' }}>Free &amp; open source</span>
             </div>
             <div>
-              <Link to="/privacy" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Privacy Policy</Link>
+              <a href="https://capitalfriends.in/privacy" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Privacy Policy</a>
               <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>
-              <Link to="/terms" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Terms &amp; Conditions</Link>
+              <a href="https://capitalfriends.in/terms" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Terms &amp; Conditions</a>
             </div>
           </div>
         </div>
