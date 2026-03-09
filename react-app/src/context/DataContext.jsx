@@ -201,6 +201,7 @@ export function DataProvider({ children }) {
   const refreshSettings = useCallback(async () => {
     const data = await api.getSettings()
     setSettings(data || {})
+    if (data) idb.put('settings', data)
     idb.put('settings', data || {})
   }, [])
 
@@ -310,12 +311,13 @@ export function DataProvider({ children }) {
           refreshSettings().catch(() => {})
           return // ProtectedRoute will redirect to /health-check
         } else {
-          // Returning user on fresh browser — resolve health check status
+          // Returning user on fresh browser — load settings first so HC resolves from IDB (no extra API call)
           setLoading(false)
-          refreshSettings().catch(() => {})
           if (cachedHC === null) {
-            resolveHealthCheck().catch(() => {})
-            // ProtectedRoute shows loading (null) until resolveHealthCheck completes
+            // Await settings so IDB is populated before resolveHealthCheck checks it
+            refreshSettings().then(() => resolveHealthCheck()).catch(() => resolveHealthCheck())
+          } else {
+            refreshSettings().catch(() => {})
           }
         }
       }
