@@ -194,7 +194,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     if (memberDOB) {
       // Preferred: calculate from DOB
       const curAge = Math.floor((Date.now() - memberDOB.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-      if (retAge <= curAge) return  // retire age must be in the future
+      if (retAge < curAge) return  // can't retire in the past
       const d = new Date(memberDOB)
       d.setFullYear(d.getFullYear() + retAge)
       setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
@@ -273,8 +273,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     const lumpsumCoversGoal = lumpsum > 0 && fvLumpsum >= inflatedTarget
 
     // Lumpsum-only path: what single amount today would reach the target (no SIP)
-    const requiredLumpsum = inflatedTarget > 0 && months > 0
-      ? Math.round(inflatedTarget / Math.pow(1 + monthlyRate, months))
+    // If months = 0 (retire now), the required lumpsum = inflated target itself
+    const requiredLumpsum = inflatedTarget > 0
+      ? (months > 0 ? Math.round(inflatedTarget / Math.pow(1 + monthlyRate, months)) : inflatedTarget)
       : 0
 
     const retAge = isRetirement ? (Number(form.retirementAge) || 60) : null
@@ -306,7 +307,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         const retAge = Number(form.retirementAge)
         const curAge = memberCurrentAge || Number(form.currentAge) || 0
         if (!form.retirementAge || retAge <= 0) e.retirementAge = 'Required'
-        else if (curAge > 0 && retAge <= curAge) e.retirementAge = `Must be greater than current age (${curAge})`
+        else if (curAge > 0 && retAge < curAge) e.retirementAge = `Cannot retire in the past (current age: ${curAge})`
         if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
       } else if (isEmergency) {
         if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
@@ -327,7 +328,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       const retAge = Number(form.retirementAge)
       const curAge = memberCurrentAge || Number(form.currentAge) || 0
       if (!form.retirementAge || retAge <= 0) e.retirementAge = 'Required'
-      else if (curAge > 0 && retAge <= curAge) e.retirementAge = `Must be greater than current age (${curAge})`
+      else if (curAge > 0 && retAge < curAge) e.retirementAge = `Cannot retire in the past (current age: ${curAge})`
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
     } else if (isEmergency) {
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
