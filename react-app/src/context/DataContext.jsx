@@ -8,11 +8,11 @@ const DataContext = createContext()
 const HC_SESSION_KEY = 'cf_hc_done'
 
 function getHCSession() {
-  try { return sessionStorage.getItem(HC_SESSION_KEY) === '1' ? true : null } catch { return null }
+  try { return localStorage.getItem(HC_SESSION_KEY) === '1' ? true : null } catch { return null }
 }
 
 function setHCSession(val) {
-  try { sessionStorage.setItem(HC_SESSION_KEY, val ? '1' : '0') } catch {}
+  try { localStorage.setItem(HC_SESSION_KEY, val ? '1' : '0') } catch {}
 }
 
 export function DataProvider({ children }) {
@@ -21,6 +21,7 @@ export function DataProvider({ children }) {
 
   // ── Loading & Error State ──
   const [loading, setLoading] = useState(true)
+  const [isSetupLoading, setIsSetupLoading] = useState(false) // true only during new-user sheet creation
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
 
@@ -208,27 +209,26 @@ export function DataProvider({ children }) {
     await refreshSettings()
   }, [refreshSettings])
 
-  // Resolve health check by looking for answers: IDB first, then API
+  // Resolve health check using HealthCheckAnswered flag in Settings sheet.
+  // IDB settings cache is checked first (fast), API is fallback.
   const resolveHealthCheck = useCallback(async () => {
     try {
-      // Step 1: Check IDB for cached answers
-      const cached = await idb.get('healthCheckAnswers')
-      if (cached && Object.keys(cached).length > 0) {
+      // Step 1: Check IDB settings cache for the flag (fastest — set when saveHealthCheck runs)
+      const cachedSettings = await idb.get('settings')
+      if (cachedSettings?.HealthCheckAnswered === 'true') {
         setHealthCheckCompleted(true)
-        setHealthCheckAnswers(cached)
         setHCSession(true)
         return
       }
 
-      // Step 2: Fetch answers from API (new browser / cleared cache)
-      const answers = await api.getHealthCheckAnswers()
-      if (answers && Object.keys(answers).length > 0) {
+      // Step 2: Fetch settings from API (new browser / cleared cache)
+      const settingsData = await api.getSettings()
+      if (settingsData?.HealthCheckAnswered === 'true') {
         setHealthCheckCompleted(true)
-        setHealthCheckAnswers(answers)
         setHCSession(true)
-        idb.put('healthCheckAnswers', answers)
+        // Update IDB settings cache with the flag so next login is fast
+        idb.put('settings', settingsData)
       } else {
-        // No answers anywhere — user hasn't completed health check
         setHealthCheckCompleted(false)
         setHCSession(false)
       }
@@ -244,7 +244,11 @@ export function DataProvider({ children }) {
       setHealthCheckCompleted(true)
       setHealthCheckAnswers(answers)
       setHCSession(true)
+      // Cache answers for form pre-population on next visit
       idb.put('healthCheckAnswers', answers)
+      // Update IDB settings cache with the HealthCheckAnswered flag so next login is instant
+      const cachedSettings = await idb.get('settings') || {}
+      idb.put('settings', { ...cachedSettings, HealthCheckAnswered: 'true' })
     }
     return result
   }, [])
@@ -259,28 +263,71 @@ export function DataProvider({ children }) {
     didInitRef.current = true
 
     async function init() {
+      // Show loading immediately — before any await to avoid blank flash
+      setLoading(true)
+
       // Step 1: Hydrate from IndexedDB (~5-20ms)
       const cached = await idb.getAll()
-      const hasCache = Object.keys(cached).length > 0
-      if (hasCache) {
+      // 'members' key in IDB means loadAllData() ran before → user completed health check
+      // (new users who are mid-onboarding only have 'settings' in IDB, not 'members')
+      const hasAppData = 'members' in cached
+
+      if (hasAppData) {
+        // ── FAST PATH: returning user ──
+        // Show cached dashboard immediately, no API calls before render
         hydrateState(cached)
-        // Health check: if answers exist in IDB, user is verified
-        if (cached.healthCheckAnswers && Object.keys(cached.healthCheckAnswers).length > 0) {
-          setHealthCheckCompleted(true)
-          setHealthCheckAnswers(cached.healthCheckAnswers)
-          setHCSession(true)
+        setHealthCheckCompleted(true)
+        setHCSession(true)
+        setLoading(false)
+        // Silent background refresh (non-blocking)
+        refreshSettings().catch(() => {})
+        // data refreshed below in Step 3
+      } else {
+        // ── SLOW PATH: no app data — new user or fresh browser ──
+        // Must call data:init to detect new vs returning user
+        let isNewUser = false
+        try {
+          const initResult = await api.initUser()
+          isNewUser = initResult?.isNewUser === true
+        } catch (e) {
+          // ignore — loadAllData will call getOrCreateUser as fallback
         }
-        setLoading(false) // UI renders instantly with cached data
+
+        if (isNewUser) {
+          // Brand new account — show setup progress screen, then redirect to health check
+          setIsSetupLoading(true)
+          await idb.clearAll()
+          hydrateState({
+            members: [], bankAccounts: [], investments: [], insurancePolicies: [],
+            liabilities: [], otherInvestments: [], stockPortfolios: [], stockHoldings: [],
+            stockTransactions: [], mfPortfolios: [], mfHoldings: [], mfTransactions: [],
+            goals: [], reminders: [], goalPortfolioMappings: [], assetAllocations: []
+          })
+          setHealthCheckCompleted(false)
+          setHCSession(false)
+          setLoading(false)
+          setIsSetupLoading(false)
+          refreshSettings().catch(() => {})
+          return // ProtectedRoute will redirect to /health-check
+        } else {
+          // Returning user on fresh browser — resolve health check status
+          setLoading(false)
+          refreshSettings().catch(() => {})
+          if (cachedHC === null) {
+            resolveHealthCheck().catch(() => {})
+            // ProtectedRoute shows loading (null) until resolveHealthCheck completes
+          }
+        }
       }
 
-      // Step 2: Fresh data from API (background if we had cache)
+      // Step 3: Fresh data from API — runs in background for cache users, foreground for fresh browser
       try {
-        if (hasCache) setIsRefreshing(true)
+        setIsRefreshing(true)
         const data = await api.loadAllData()
         hydrateState(data)
         persistToIDB(data)
       } catch (err) {
-        if (!hasCache) setError(err.message)
+        if (!hasAppData) setError(err.message)
       } finally {
         setLoading(false)
         setIsRefreshing(false)
@@ -288,17 +335,14 @@ export function DataProvider({ children }) {
     }
 
     init()
-    refreshSettings().catch(() => {})
-    // If no session cache for health check, resolve by checking IDB → API
-    if (cachedHC === null) {
-      resolveHealthCheck().catch(() => {})
-    }
   }, [isAuthenticated, hydrateState, persistToIDB, refreshSettings, resolveHealthCheck])
 
-  // Reset init ref when user logs out so re-login triggers fresh init
+  // On logout: clear all cached data so a different user logging in starts fresh.
+  // Do NOT clear HC flag — it's stored in the spreadsheet permanently, no need to re-ask.
   useEffect(() => {
     if (!isAuthenticated) {
       didInitRef.current = false
+      idb.clearAll()
     }
   }, [isAuthenticated])
 
@@ -603,7 +647,7 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider value={{
       // Loading state
-      loading, isRefreshing, error, refreshData,
+      loading, isSetupLoading, isRefreshing, error, refreshData,
       // Data
       members, banks, investmentAccounts, insurancePolicies, liabilityList, otherInvList,
       // Filtered

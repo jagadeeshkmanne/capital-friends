@@ -218,16 +218,13 @@ export function AuthProvider({ children }) {
     client.requestAccessToken({ prompt: '' })
   }, [])
 
-  // Sign out
+  // Sign out — clear local state only, do NOT revoke OAuth grant.
+  // Revoking the grant forces a full consent screen (with unverified warning) on next login.
+  // Without revoke, silent refresh works on next login since Google still has the consent.
   const signOut = useCallback(() => {
-    const token = api.getStoredToken()
-    if (token && window.google?.accounts?.oauth2) {
-      window.google.accounts.oauth2.revoke(token)
-    }
     api.clearToken()
     clearCachedUser()
     idb.clearAll()
-    sessionStorage.removeItem('cf_health_check')
     setUser(null)
   }, [])
 
