@@ -49,6 +49,27 @@ const STEPS = [
   { label: 'Review', icon: CheckCircle2 },
 ]
 
+// Safe Withdrawal Rate based on post-retirement duration (assumes life expectancy 85)
+const LIFE_EXPECTANCY = 85
+function getSWR(retirementAge) {
+  const postRet = Math.max(5, LIFE_EXPECTANCY - (retirementAge || 60))
+  if (postRet >= 40) return { rate: 0.030, pct: '3.0', multiplier: 33, label: 'Very early retirement' }
+  if (postRet >= 35) return { rate: 0.033, pct: '3.3', multiplier: 30, label: 'Early retirement' }
+  if (postRet >= 25) return { rate: 0.040, pct: '4.0', multiplier: 25, label: 'Standard (Trinity study)' }
+  if (postRet >= 18) return { rate: 0.050, pct: '5.0', multiplier: 20, label: 'Late retirement' }
+  return { rate: 0.060, pct: '6.0', multiplier: 17, label: 'Very late retirement' }
+}
+
+// Extract DOB from member dynamicFields (checks common key names)
+const DOB_KEYS = ['dob', 'date of birth', 'dateofbirth', 'birthday', 'birth date', 'date_of_birth']
+function getMemberDOB(member) {
+  if (!member?.dynamicFields) return null
+  const key = Object.keys(member.dynamicFields).find(k => DOB_KEYS.includes(k.toLowerCase().trim()))
+  if (!key) return null
+  const d = new Date(member.dynamicFields[key])
+  return isNaN(d.getTime()) ? null : d
+}
+
 export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent }) {
   const isEdit = !!initial
   const { activeMembers } = useData()
@@ -79,6 +100,21 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       // Look up memberId from familyMemberName (backend only stores the name, not the ID)
       const matchedMember = activeMembers.find((m) => m.memberName === initial.familyMemberName)
 
+      // Back-calculate retirement age from targetDate + member DOB (retirementAge is not stored in GAS)
+      let storedRetirementAge = ''
+      if (initial.goalType === 'Retirement' && initial.targetDate) {
+        const dob = getMemberDOB(matchedMember)
+        if (dob) {
+          const calculatedAge = Math.round((new Date(initial.targetDate) - dob) / (365.25 * 24 * 60 * 60 * 1000))
+          if (calculatedAge > 0) storedRetirementAge = calculatedAge.toString()
+        }
+      }
+      let editCurrentAge = ''
+      if (storedRetirementAge && initial.targetDate) {
+        const yearsLeft = Math.round((new Date(initial.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000))
+        editCurrentAge = Math.max(0, Number(storedRetirementAge) - yearsLeft).toString()
+      }
+
       return {
         goalType: initial.goalType || '',
         goalName: initial.goalName || '',
@@ -94,6 +130,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         // Retirement / Emergency specific
         monthlyExpenses: (initial.monthlyExpenses || '').toString(),
         emergencyMonths: (initial.emergencyMonths || 6).toString(),
+        // Retirement age
+        retirementAge: storedRetirementAge.toString(),
+        currentAge: editCurrentAge,
       }
     }
 
@@ -111,6 +150,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       notes: '',
       monthlyExpenses: '',
       emergencyMonths: '6',
+      retirementAge: '60',
+      currentAge: '',
     }
   })
   const [errors, setErrors] = useState({})
@@ -135,6 +176,38 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
   const isRetirement = form.goalType === 'Retirement'
   const isEmergency = form.goalType === 'Emergency Fund'
 
+  // Retirement: derive member DOB + age for auto date calculation
+  const selectedMember = isRetirement
+    ? (activeMembers || []).find(m => m.memberId === form.familyMemberId)
+    : null
+  const memberDOB = selectedMember ? getMemberDOB(selectedMember) : null
+  const memberCurrentAge = memberDOB
+    ? Math.floor((Date.now() - memberDOB.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null
+
+  // Auto-set targetDate for Retirement when age inputs or member change
+  useEffect(() => {
+    if (!isRetirement) return
+    const retAge = Number(form.retirementAge)
+    if (!retAge || retAge <= 0) return
+
+    if (memberDOB) {
+      // Preferred: calculate from DOB
+      const d = new Date(memberDOB)
+      d.setFullYear(d.getFullYear() + retAge)
+      setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
+    } else {
+      // Fallback: calculate from current age input
+      const curAge = Number(form.currentAge)
+      if (!curAge || curAge <= 0 || retAge <= curAge) return
+      const years = retAge - curAge
+      const d = new Date()
+      d.setFullYear(d.getFullYear() + years)
+      setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.retirementAge, form.currentAge, form.familyMemberId, isRetirement])
+
   // ── Calculations ──
   const calc = useMemo(() => {
     const inflationRate = (Number(form.inflation) || 0) / 100
@@ -155,8 +228,10 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     let inflatedTarget = 0
 
     if (isRetirement) {
+      const retAge = Number(form.retirementAge) || 60
+      const swr = getSWR(retAge)
       const annualExp = monthlyExp * 12
-      todaysCost = annualExp * 25
+      todaysCost = annualExp / swr.rate   // e.g. 25x for 4% SWR, 33x for 3% SWR
       inflatedTarget = todaysCost * Math.pow(1 + inflationRate, yearsToGo)
     } else if (isEmergency) {
       todaysCost = monthlyExp * emoMonths
@@ -195,16 +270,26 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     const planReturns = Math.round(inflatedTarget - planTotalInvested)
     const lumpsumCoversGoal = lumpsum > 0 && fvLumpsum >= inflatedTarget
 
+    // Lumpsum-only path: what single amount today would reach the target (no SIP)
+    const requiredLumpsum = inflatedTarget > 0 && months > 0
+      ? Math.round(inflatedTarget / Math.pow(1 + monthlyRate, months))
+      : 0
+
+    const retAge = isRetirement ? (Number(form.retirementAge) || 60) : null
+    const swr = isRetirement ? getSWR(retAge) : null
+    const postRetYears = isRetirement ? Math.max(5, LIFE_EXPECTANCY - retAge) : null
+
     return {
       todaysCost, inflatedTarget, yearsToGo, months,
       fvLumpsum: Math.round(fvLumpsum),
       requiredSIP, fvRequiredSIP: Math.round(fvRequiredSIP),
-      planTotalInvested, planReturns, lumpsumCoversGoal,
+      planTotalInvested, planReturns, lumpsumCoversGoal, requiredLumpsum,
       hasTarget: inflatedTarget > 0,
+      swr, postRetYears,
     }
   }, [form.todaysCost, form.targetDate, form.lumpsum,
       form.inflation, form.cagr, form.monthlyExpenses, form.emergencyMonths,
-      isRetirement, isEmergency])
+      form.retirementAge, isRetirement, isEmergency])
 
   // ── Validation ──
   function validateStep(s) {
@@ -215,7 +300,13 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     }
     if (s === 1) {
       if (!form.targetDate) e.targetDate = 'Required'
-      if (isRetirement || isEmergency) {
+      if (isRetirement) {
+        const retAge = Number(form.retirementAge)
+        const curAge = memberCurrentAge || Number(form.currentAge) || 0
+        if (!form.retirementAge || retAge <= 0) e.retirementAge = 'Required'
+        else if (curAge > 0 && retAge <= curAge) e.retirementAge = `Must be greater than current age (${curAge})`
+        if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
+      } else if (isEmergency) {
         if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
       } else {
         if (!form.todaysCost || Number(form.todaysCost) <= 0) e.todaysCost = 'Must be > 0'
@@ -230,7 +321,13 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     if (!form.goalType) e.goalType = 'Required'
     if (!form.goalName.trim()) e.goalName = 'Required'
     if (!form.targetDate) e.targetDate = 'Required'
-    if (isRetirement || isEmergency) {
+    if (isRetirement) {
+      const retAge = Number(form.retirementAge)
+      const curAge = memberCurrentAge || Number(form.currentAge) || 0
+      if (!form.retirementAge || retAge <= 0) e.retirementAge = 'Required'
+      else if (curAge > 0 && retAge <= curAge) e.retirementAge = `Must be greater than current age (${curAge})`
+      if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
+    } else if (isEmergency) {
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
     } else {
       if (!form.todaysCost || Number(form.todaysCost) <= 0) e.todaysCost = 'Must be > 0'
@@ -293,7 +390,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           <FormField label="For" error={errors.familyMemberId}>
             <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
           </FormField>
-          <FormField label="Target Date" required error={errors.targetDate}>
+          <FormField label={isRetirement ? 'Target Date (auto-calculated)' : 'Target Date'} required error={errors.targetDate}>
             <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
           </FormField>
         </div>
@@ -301,6 +398,23 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         {/* Type-specific fields */}
         {(isRetirement || isEmergency) ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {isRetirement && (
+              <>
+                <FormField label="Retire at Age" required error={errors.retirementAge}>
+                  <FormInput type="number" value={form.retirementAge} onChange={(v) => set('retirementAge', v)} placeholder="60" />
+                </FormField>
+                {memberDOB ? (
+                  <div className="flex flex-col justify-center px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                    <p className="text-xs font-semibold text-emerald-400">DOB detected</p>
+                    <p className="text-xs text-[var(--text-muted)]">Currently {memberCurrentAge} yrs · {Math.round(calc.yearsToGo)} yrs to retirement</p>
+                  </div>
+                ) : (
+                  <FormField label="Current Age">
+                    <FormInput type="number" value={form.currentAge} onChange={(v) => set('currentAge', v)} placeholder="e.g., 35" />
+                  </FormField>
+                )}
+              </>
+            )}
             <FormField label="Monthly Expenses" required error={errors.monthlyExpenses}>
               <FormInput type="number" value={form.monthlyExpenses} onChange={(v) => set('monthlyExpenses', v)} placeholder="e.g., 50000" />
             </FormField>
@@ -308,6 +422,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
               <FormField label="Emergency Months">
                 <FormInput type="number" value={form.emergencyMonths} onChange={(v) => set('emergencyMonths', v)} placeholder="6" />
               </FormField>
+            )}
+            {isRetirement && calc.swr && (
+              <SWRPanel swr={calc.swr} postRetYears={calc.postRetYears} />
             )}
           </div>
         ) : (
@@ -377,7 +494,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
                   isActive ? 'text-violet-400' : isDone ? 'text-emerald-400 cursor-pointer' : 'text-[var(--text-dim)]'
                 }`}
               >
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
                   isActive ? 'border-violet-400 bg-violet-500/15' : isDone ? 'border-emerald-400 bg-emerald-500/15' : 'border-[var(--border)] bg-[var(--bg-inset)]'
                 }`}>
                   {isDone ? <CheckCircle2 size={12} /> : <Icon size={12} />}
@@ -402,9 +519,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           {form.goalType && (
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)]">
               <TrendingUp size={12} className="text-[var(--text-dim)] shrink-0" />
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Default: {TYPE_DEFAULTS[form.goalType]?.inflation || 6}% inflation, {TYPE_DEFAULTS[form.goalType]?.cagr || 12}% CAGR
-                {isRetirement && ' · Uses 25x annual expenses rule'}
+                {isRetirement && ' · SWR-based corpus calculation'}
                 {isEmergency && ' · No inflation applied'}
               </p>
             </div>
@@ -435,23 +552,44 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           {/* Target Date + Type-specific primary fields */}
           {(isRetirement || isEmergency) ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Target Date" required error={errors.targetDate}>
-                <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
-              </FormField>
-              <FormField label="Monthly Expenses (Today)" required error={errors.monthlyExpenses}>
-                <FormInput type="number" value={form.monthlyExpenses} onChange={(v) => set('monthlyExpenses', v)} placeholder="e.g., 50000" />
-              </FormField>
-              {isEmergency && (
-                <FormField label="Emergency Fund (Months)">
-                  <FormInput type="number" value={form.emergencyMonths} onChange={(v) => set('emergencyMonths', v)} placeholder="6" />
-                </FormField>
-              )}
-              {isRetirement && (
-                <div className="sm:col-span-2">
-                  <p className="text-[11px] text-[var(--text-dim)]">
-                    Corpus = Monthly Expenses x 12 x 25 = {formatINR(calc.todaysCost)} (today)
-                  </p>
-                </div>
+              {isRetirement ? (
+                <>
+                  {/* Retire at Age + Current Age (if no DOB) */}
+                  <FormField label="Retire at Age" required error={errors.retirementAge}>
+                    <FormInput type="number" value={form.retirementAge} onChange={(v) => set('retirementAge', v)} placeholder="60" />
+                  </FormField>
+                  {memberDOB ? (
+                    <div className="flex flex-col justify-center px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                      <p className="text-xs font-semibold text-emerald-400">DOB detected</p>
+                      <p className="text-xs text-[var(--text-muted)]">Currently {memberCurrentAge} yrs · Retiring in {Math.round(calc.yearsToGo)} yrs</p>
+                    </div>
+                  ) : (
+                    <FormField label="Current Age" error={errors.currentAge}>
+                      <FormInput type="number" value={form.currentAge} onChange={(v) => set('currentAge', v)} placeholder="e.g., 35" />
+                    </FormField>
+                  )}
+                  <FormField label="Target Date (auto-calculated)" error={errors.targetDate}>
+                    <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
+                  </FormField>
+                  <FormField label="Monthly Expenses (Today)" required error={errors.monthlyExpenses}>
+                    <FormInput type="number" value={form.monthlyExpenses} onChange={(v) => set('monthlyExpenses', v)} placeholder="e.g., 50000" />
+                  </FormField>
+                  {calc.swr && (
+                    <SWRPanel swr={calc.swr} postRetYears={calc.postRetYears} />
+                  )}
+                </>
+              ) : (
+                <>
+                  <FormField label="Target Date" required error={errors.targetDate}>
+                    <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
+                  </FormField>
+                  <FormField label="Monthly Expenses (Today)" required error={errors.monthlyExpenses}>
+                    <FormInput type="number" value={form.monthlyExpenses} onChange={(v) => set('monthlyExpenses', v)} placeholder="e.g., 50000" />
+                  </FormField>
+                  <FormField label="Emergency Fund (Months)">
+                    <FormInput type="number" value={form.emergencyMonths} onChange={(v) => set('emergencyMonths', v)} placeholder="6" />
+                  </FormField>
+                </>
               )}
             </div>
           ) : (
@@ -517,6 +655,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             <div className="border-t border-[var(--border-light)] pt-3 space-y-2">
               {(isRetirement || isEmergency) && (
                 <ReviewRow label="Monthly Expenses" value={formatINR(Number(form.monthlyExpenses) || 0)} />
+              )}
+              {isRetirement && calc.swr && (
+                <ReviewRow label="SWR" value={`${calc.swr.pct}% (${calc.swr.multiplier}x · ${calc.postRetYears} yrs)`} color="violet" />
               )}
               {isEmergency && (
                 <ReviewRow label="Emergency Months" value={form.emergencyMonths} />
@@ -591,20 +732,63 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
     )
   }
 
+  if (isRetirement && calc.swr) {
+    const annualExp = Math.round((calc.todaysCost * calc.swr.rate))
+    const monthlyExp = Math.round(annualExp / 12)
+    return (
+      <div className="rounded-lg bg-violet-500/5 border border-violet-500/15 p-3 space-y-2.5">
+        <p className="text-xs font-bold uppercase tracking-wider text-violet-400">How we calculated your corpus</p>
+        {/* Step 1 */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[var(--text-dim)]">
+            <span className="text-[var(--text-muted)] font-semibold">Step 1</span> — Annual expenses
+            <span className="text-[var(--text-dim)]"> ({formatINR(monthlyExp)}/mo × 12)</span>
+          </span>
+          <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(annualExp)}</span>
+        </div>
+        {/* Step 2 */}
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <span className="text-xs text-[var(--text-muted)] font-semibold">Step 2</span>
+            <span className="text-xs text-[var(--text-dim)]"> — Divide by {calc.swr.pct}% SWR = corpus today</span>
+            <p className="text-xs text-[var(--text-dim)] mt-0.5 leading-snug">
+              Retiring at {LIFE_EXPECTANCY - calc.postRetYears}, your money must last ~{calc.postRetYears} years (until age {LIFE_EXPECTANCY}).
+              A {calc.swr.pct}% withdrawal rate is safe for this duration ({calc.swr.label}).
+            </p>
+          </div>
+          <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(calc.todaysCost)}</span>
+        </div>
+        {/* Step 3 */}
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <span className="text-xs text-[var(--text-muted)] font-semibold">Step 3</span>
+            <span className="text-xs text-[var(--text-dim)]"> — Inflate by {inflation}% for {calc.yearsToGo.toFixed(0)} yrs</span>
+            <p className="text-xs text-[var(--text-dim)] mt-0.5 leading-snug">
+              Today's ₹1 lakh will cost ~{formatINR(Math.round(100000 * Math.pow(1 + Number(inflation)/100, calc.yearsToGo)))} at retirement.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-violet-400 tabular-nums shrink-0">{formatINR(calc.inflatedTarget)}</span>
+        </div>
+        <div className="border-t border-violet-500/15 pt-2 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-violet-400">Target corpus at retirement</span>
+          <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.inflatedTarget)}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-violet-500/5 border border-violet-500/15">
       <div>
-        <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-          {isRetirement ? 'Corpus Today' : "Today's Cost"}
-        </p>
+        <p className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Today's Cost</p>
         <p className="text-xs font-semibold text-[var(--text-secondary)]">{formatINR(calc.todaysCost)}</p>
       </div>
       <div className="text-center">
-        <p className="text-[10px] text-[var(--text-dim)]">{inflation}% x {calc.yearsToGo.toFixed(1)}yrs</p>
+        <p className="text-xs text-[var(--text-dim)]">{inflation}% x {calc.yearsToGo.toFixed(1)}yrs</p>
         <ChevronRight size={12} className="text-violet-400 mx-auto" />
       </div>
       <div className="text-right">
-        <p className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">Future Value</p>
+        <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Future Value</p>
         <p className="text-xs font-bold text-[var(--text-primary)]">{formatINR(calc.inflatedTarget)}</p>
       </div>
     </div>
@@ -617,59 +801,123 @@ function ProjectionPanel({ calc, lumpsum, compact }) {
   if (compact) {
     return (
       <div className="rounded-lg border p-3 bg-violet-500/5 border-violet-500/15">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-dim)]">Required Monthly SIP</span>
-          <span className="text-sm font-bold text-violet-400 tabular-nums">
-            {calc.lumpsumCoversGoal ? '₹0' : formatINR(calc.requiredSIP)}/mo
-          </span>
-        </div>
-        {calc.lumpsumCoversGoal && (
-          <p className="text-[10px] text-emerald-400 mt-1">Lumpsum alone covers this goal!</p>
+        {calc.lumpsumCoversGoal ? (
+          <p className="text-sm font-bold text-emerald-400">Lumpsum alone covers this goal!</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="text-center">
+              <p className="text-xs text-violet-400 font-semibold mb-0.5">SIP Required</p>
+              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal">/mo</span></p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-amber-400 font-semibold mb-0.5">Lumpsum Today</p>
+              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
+            </div>
+          </div>
         )}
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border p-3 space-y-2 bg-violet-500/5 border-violet-500/15">
+    <div className="rounded-lg border p-4 space-y-3 bg-violet-500/5 border-violet-500/15">
+
+      {/* Two options: SIP vs Lumpsum */}
       {calc.lumpsumCoversGoal ? (
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 size={12} className="text-emerald-400" />
-          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Lumpsum Covers Goal</p>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 size={14} className="text-emerald-400" />
+          <p className="text-sm font-bold text-emerald-400">Lumpsum alone covers this goal!</p>
         </div>
       ) : (
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-violet-400">Required Monthly SIP</p>
-          <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}/mo</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg p-3 bg-violet-500/10 border border-violet-500/20 text-center">
+            <p className="text-xs text-violet-400 font-semibold mb-1">SIP Required</p>
+            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal text-[var(--text-dim)]">/mo</span></p>
+          </div>
+          <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/20 text-center">
+            <p className="text-xs text-amber-400 font-semibold mb-1">Lumpsum Today</p>
+            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
+          </div>
         </div>
       )}
 
+      {/* Breakdown */}
       {calc.planTotalInvested > 0 && (
-        <div className="border-t border-[var(--border-light)] pt-2 space-y-1">
+        <div className="border-t border-[var(--border-light)] pt-3 space-y-1.5">
           {lsNum > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[var(--text-dim)]">Lumpsum {formatINR(lsNum)} grows to</span>
-              <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">{formatINR(calc.fvLumpsum)}</span>
+              <span className="text-xs text-[var(--text-dim)]">Lumpsum {formatINR(lsNum)} grows to</span>
+              <span className="text-xs font-semibold text-emerald-400 tabular-nums">{formatINR(calc.fvLumpsum)}</span>
             </div>
           )}
           {calc.requiredSIP > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[var(--text-dim)]">SIP {formatINR(calc.requiredSIP)}/mo x {calc.months} months</span>
-              <span className="text-[11px] font-semibold text-blue-400 tabular-nums">{formatINR(calc.fvRequiredSIP)}</span>
+              <span className="text-xs text-[var(--text-dim)]">SIP {formatINR(calc.requiredSIP)}/mo × {calc.months} months</span>
+              <span className="text-xs font-semibold text-blue-400 tabular-nums">{formatINR(calc.fvRequiredSIP)}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[var(--text-dim)]">Total You Invest</span>
-            <span className="text-[11px] font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(calc.planTotalInvested)}</span>
+            <span className="text-xs text-[var(--text-dim)]">Total You Invest</span>
+            <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(calc.planTotalInvested)}</span>
           </div>
           {calc.planReturns > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[var(--text-dim)]">Wealth Created</span>
-              <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">+{formatINR(calc.planReturns)}</span>
+              <span className="text-xs text-[var(--text-dim)]">Wealth Created</span>
+              <span className="text-xs font-semibold text-emerald-400 tabular-nums">+{formatINR(calc.planReturns)}</span>
             </div>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+const SWR_TIERS = [
+  { label: 'Retire ≤45', ageRange: '≤45', postRet: 40, rate: '3.0%', multiplier: '33×', note: 'Very early' },
+  { label: 'Retire 46–50', ageRange: '46–50', postRet: 35, rate: '3.3%', multiplier: '30×', note: 'Early' },
+  { label: 'Retire 51–60', ageRange: '51–60', postRet: 25, rate: '4.0%', multiplier: '25×', note: 'Standard' },
+  { label: 'Retire 61–67', ageRange: '61–67', postRet: 18, rate: '5.0%', multiplier: '20×', note: 'Late' },
+  { label: 'Retire 68+', ageRange: '68+', postRet: 0, rate: '6.0%', multiplier: '17×', note: 'Very late' },
+]
+
+function SWRPanel({ swr, postRetYears }) {
+  return (
+    <div className="sm:col-span-2 rounded-lg bg-violet-500/5 border border-violet-500/15 px-3 py-2.5 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-wider text-violet-400">Why this corpus size?</p>
+        <span className="text-xs font-bold text-[var(--text-primary)]">{swr.pct}% SWR · {swr.multiplier}×</span>
+      </div>
+      <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+        Your corpus must last <span className="text-[var(--text-muted)] font-semibold">~{postRetYears} years</span> (retire → age {LIFE_EXPECTANCY}).
+        Research shows <span className="text-[var(--text-muted)] font-semibold">{swr.pct}%</span> is a safe annual withdrawal for this duration — so you need <span className="text-[var(--text-muted)] font-semibold">{swr.multiplier}×</span> your annual expenses as corpus today.
+        {swr.multiplier !== 25 && <span className="text-violet-400"> (Standard 4% / 25× is only for 25-yr retirements.)</span>}
+      </p>
+
+      {/* SWR reference table */}
+      <div className="border-t border-violet-500/15 pt-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Safe Withdrawal Rate by retirement age</p>
+        <div className="space-y-0.5">
+          {SWR_TIERS.map((tier) => {
+            const isActive = postRetYears >= tier.postRet &&
+              postRetYears < (SWR_TIERS[SWR_TIERS.indexOf(tier) - 1]?.postRet ?? Infinity)
+            return (
+              <div key={tier.ageRange}
+                className={`flex items-center justify-between px-2 py-1 rounded text-xs transition-colors ${
+                  isActive ? 'bg-violet-500/20 text-[var(--text-primary)]' : 'text-[var(--text-dim)]'
+                }`}>
+                <span className={isActive ? 'font-semibold' : ''}>{tier.ageRange}</span>
+                <span className="flex items-center gap-3">
+                  <span className={isActive ? 'text-violet-400 font-bold' : ''}>{tier.rate}</span>
+                  <span className={isActive ? 'font-bold' : ''}>{tier.multiplier} annual exp</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-violet-500/30 text-violet-300' : 'bg-[var(--bg-inset)] text-[var(--text-dim)]'}`}>
+                    {tier.note}
+                  </span>
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -685,9 +933,9 @@ function GlidePathRecommendation({ goalType, yearsLeft }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp size={12} className="text-blue-400" />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+        <span className="text-xs font-bold px-2 py-0.5 rounded-full"
               style={{ background: `${labelColor}15`, color: labelColor }}>
           {rec.label}
         </span>
@@ -702,16 +950,16 @@ function GlidePathRecommendation({ goalType, yearsLeft }) {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-violet-500" />
-            <span className="text-[10px] text-[var(--text-dim)]">Equity {rec.equity}%</span>
+            <span className="text-xs text-[var(--text-dim)]">Equity {rec.equity}%</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-blue-400" />
-            <span className="text-[10px] text-[var(--text-dim)]">Debt {rec.debt}%</span>
+            <span className="text-xs text-[var(--text-dim)]">Debt {rec.debt}%</span>
           </div>
         </div>
-        <span className="text-[10px] text-[var(--text-dim)]">{yearsLeft.toFixed(1)} yrs</span>
+        <span className="text-xs text-[var(--text-dim)]">{yearsLeft.toFixed(1)} yrs</span>
       </div>
-      <p className="text-[10px] text-[var(--text-dim)]">
+      <p className="text-xs text-[var(--text-dim)]">
         {rec.label === 'Safety' ? 'Keep in liquid/debt funds for instant access.' :
          rec.label === 'Short-term' ? 'Focus on debt/hybrid funds to preserve capital.' :
          rec.label === 'Medium-term' ? 'Balanced mix — gradually shift to debt as deadline nears.' :
