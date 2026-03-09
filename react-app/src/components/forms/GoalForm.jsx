@@ -194,14 +194,22 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     if (memberDOB) {
       // Preferred: calculate from DOB
       const curAge = Math.floor((Date.now() - memberDOB.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-      if (retAge < curAge) return  // can't retire in the past
+      if (retAge <= curAge) {
+        // Retire now — set target date to today
+        setForm(f => ({ ...f, targetDate: new Date().toISOString().split('T')[0] }))
+        return
+      }
       const d = new Date(memberDOB)
       d.setFullYear(d.getFullYear() + retAge)
       setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
     } else {
       // Fallback: calculate from current age input
       const curAge = Number(form.currentAge)
-      if (!curAge || curAge <= 0 || retAge <= curAge) return
+      if (!curAge || curAge <= 0) return
+      if (retAge <= curAge) {
+        setForm(f => ({ ...f, targetDate: new Date().toISOString().split('T')[0] }))
+        return
+      }
       const years = retAge - curAge
       const d = new Date()
       d.setFullYear(d.getFullYear() + years)
@@ -304,10 +312,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     if (s === 1) {
       if (!form.targetDate) e.targetDate = 'Required'
       if (isRetirement) {
-        const retAge = Number(form.retirementAge)
-        const curAge = memberCurrentAge || Number(form.currentAge) || 0
-        if (!form.retirementAge || retAge <= 0) e.retirementAge = 'Required'
-        else if (curAge > 0 && retAge < curAge) e.retirementAge = `Cannot retire in the past (current age: ${curAge})`
+        if (!form.retirementAge || Number(form.retirementAge) <= 0) e.retirementAge = 'Required'
         if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
       } else if (isEmergency) {
         if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
@@ -325,10 +330,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     if (!form.goalName.trim()) e.goalName = 'Required'
     if (!form.targetDate) e.targetDate = 'Required'
     if (isRetirement) {
-      const retAge = Number(form.retirementAge)
-      const curAge = memberCurrentAge || Number(form.currentAge) || 0
-      if (!form.retirementAge || retAge <= 0) e.retirementAge = 'Required'
-      else if (curAge > 0 && retAge < curAge) e.retirementAge = `Cannot retire in the past (current age: ${curAge})`
+      if (!form.retirementAge || Number(form.retirementAge) <= 0) e.retirementAge = 'Required'
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
     } else if (isEmergency) {
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
