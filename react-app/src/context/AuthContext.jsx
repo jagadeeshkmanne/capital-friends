@@ -79,11 +79,17 @@ export function AuthProvider({ children }) {
       // Register token refresh function with api module
       api.setTokenRefreshFn(silentRefresh)
 
-      // If we have a valid stored token, restore session.
-      // Otherwise show login page — never auto-popup on page load.
+      const explicitLogout = localStorage.getItem('cf_idb_stale') === '1'
+
       if (api.isTokenValid()) {
+        // Valid token in storage — restore session immediately (page refresh)
         restoreSession()
+      } else if (getCachedUser() && !explicitLogout) {
+        // User previously logged in and didn't explicitly log out (tab/browser closed).
+        // Try silent auth — like Gmail, auto-login without any button click.
+        trySilentRefresh()
       } else {
+        // Explicit logout or first-time user — show login page
         setLoading(false)
       }
     }
