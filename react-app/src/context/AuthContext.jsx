@@ -218,13 +218,12 @@ export function AuthProvider({ children }) {
     client.requestAccessToken({ prompt: '' })
   }, [])
 
-  // Sign out — clear local state only, do NOT revoke OAuth grant.
-  // Revoking the grant forces a full consent screen (with unverified warning) on next login.
-  // Without revoke, silent refresh works on next login since Google still has the consent.
+  // Sign out — clear local token state, do NOT revoke OAuth grant (avoids consent screen on re-login).
+  // Mark IDB for clearing so next init wipes financial data from the browser.
   const signOut = useCallback(() => {
     api.clearToken()
     clearCachedUser()
-    idb.clearAll()
+    try { localStorage.setItem('cf_idb_stale', '1') } catch {}
     setUser(null)
   }, [])
 

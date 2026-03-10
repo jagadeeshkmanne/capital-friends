@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext'
 const DataContext = createContext()
 
 const HC_SESSION_KEY = 'cf_hc_done'
+const IDB_OWNER_KEY = 'cf_idb_owner'
 
 function getHCSession() {
   try { return localStorage.getItem(HC_SESSION_KEY) === '1' ? true : null } catch { return null }
@@ -15,8 +16,16 @@ function setHCSession(val) {
   try { localStorage.setItem(HC_SESSION_KEY, val ? '1' : '0') } catch {}
 }
 
+function getIDBOwner() {
+  try { return localStorage.getItem(IDB_OWNER_KEY) || null } catch { return null }
+}
+
+function setIDBOwner(email) {
+  try { localStorage.setItem(IDB_OWNER_KEY, email) } catch {}
+}
+
 export function DataProvider({ children }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const cachedHC = isAuthenticated ? getHCSession() : null
 
   // ── Loading & Error State ──
@@ -95,7 +104,9 @@ export function DataProvider({ children }) {
       goalPortfolioMappings: data.goalPortfolioMappings || [],
       assetAllocations: data.assetAllocations || [],
     })
-  }, [])
+    // Tag IDB with current user so a different user on same device gets a clean cache
+    if (user?.email) setIDBOwner(user.email)
+  }, [user?.email])
 
   // ── Load All Data from API ──
   const refreshData = useCallback(async (background = false) => {
@@ -268,6 +279,16 @@ export function DataProvider({ children }) {
       setLoading(true)
 
       // Step 1: Hydrate from IndexedDB (~5-20ms)
+      // Security: clear IDB if user explicitly logged out, or if a different user is logging in
+      const currentEmail = user?.email
+      const idbOwner = getIDBOwner()
+      const idbStale = localStorage.getItem('cf_idb_stale') === '1'
+      if (idbStale || (idbOwner && currentEmail && idbOwner !== currentEmail)) {
+        await idb.clearAll()
+        localStorage.removeItem('cf_idb_stale')
+        if (idbOwner !== currentEmail) setHCSession(false)
+      }
+
       const cached = await idb.getAll()
       // 'members' key in IDB means loadAllData() ran before → user completed health check
       // (new users who are mid-onboarding only have 'settings' in IDB, not 'members')
@@ -341,12 +362,11 @@ export function DataProvider({ children }) {
     init()
   }, [isAuthenticated, hydrateState, persistToIDB, refreshSettings, resolveHealthCheck])
 
-  // On logout: clear all cached data so a different user logging in starts fresh.
-  // Do NOT clear HC flag — it's stored in the spreadsheet permanently, no need to re-ask.
+  // On logout: reset init flag so next login re-runs init.
+  // IDB is kept for fast re-login; init() checks cf_idb_owner to clear if a different user logs in.
   useEffect(() => {
     if (!isAuthenticated) {
       didInitRef.current = false
-      idb.clearAll()
     }
   }, [isAuthenticated])
 
