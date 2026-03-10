@@ -280,11 +280,13 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     const planReturns = Math.round(inflatedTarget - planTotalInvested)
     const lumpsumCoversGoal = lumpsum > 0 && fvLumpsum >= inflatedTarget
 
-    // Lumpsum-only path: what single amount today would reach the target (no SIP)
-    // If months = 0 (retire now), the required lumpsum = inflated target itself
-    const requiredLumpsum = inflatedTarget > 0
+    // Lumpsum-only path: total lumpsum today that reaches the target (no SIP)
+    // If months = 0 (retire now), need the full corpus now
+    const totalRequiredLumpsum = inflatedTarget > 0
       ? (months > 0 ? Math.round(inflatedTarget / Math.pow(1 + monthlyRate, months)) : inflatedTarget)
       : 0
+    // Net of what user already plans to invest as lumpsum
+    const requiredLumpsum = Math.max(0, totalRequiredLumpsum - lumpsum)
 
     const retAge = isRetirement ? (Number(form.retirementAge) || 60) : null
     const swr = isRetirement ? getSWR(retAge) : null
@@ -815,7 +817,7 @@ function ProjectionPanel({ calc, lumpsum, compact }) {
               <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal">/mo</span></p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-amber-400 font-semibold mb-0.5">Lumpsum Today</p>
+              <p className="text-xs text-amber-400 font-semibold mb-0.5">{lsNum > 0 ? 'Additional Lumpsum' : 'Lumpsum Today'}</p>
               <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
             </div>
           </div>
@@ -840,7 +842,7 @@ function ProjectionPanel({ calc, lumpsum, compact }) {
             <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal text-[var(--text-dim)]">/mo</span></p>
           </div>
           <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/20 text-center">
-            <p className="text-xs text-amber-400 font-semibold mb-1">Lumpsum Today</p>
+            <p className="text-xs text-amber-400 font-semibold mb-1">{lsNum > 0 ? 'Additional Lumpsum' : 'Lumpsum Today'}</p>
             <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
           </div>
         </div>
