@@ -205,18 +205,26 @@ export function AuthProvider({ children }) {
     })
   }
 
-  // Manual sign-in trigger — use silent prompt to avoid consent/unverified screen.
-  // With unverified app + restricted scopes, any non-silent prompt triggers the warning.
-  // Falls back to consent screen only if silent fails (first-time user, Google session expired).
+  // Manual sign-in trigger.
+  // After explicit logout → show account picker so user can switch accounts.
+  // Otherwise → try silent first (no screen), fall back to account picker only if needed.
   const signIn = useCallback(() => {
     if (!tokenClientRef.current) return
     setError(null)
     const client = tokenClientRef.current
+    const explicitLogout = localStorage.getItem('cf_idb_stale') === '1'
+
+    if (explicitLogout) {
+      // User explicitly logged out — show account picker so they can switch if needed
+      client.requestAccessToken({ prompt: 'select_account' })
+      return
+    }
+
+    // Not an explicit logout (token expired, tab closed) — try silent first
     const originalCallback = client.callback
     client.callback = (response) => {
       client.callback = originalCallback
       if (response.error === 'interaction_required' || response.error === 'access_denied') {
-        // Silent failed — must show consent screen (unavoidable for first-time / session expired)
         client.requestAccessToken({ prompt: 'select_account' })
       } else {
         originalCallback(response)
