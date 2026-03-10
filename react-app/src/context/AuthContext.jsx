@@ -205,13 +205,24 @@ export function AuthProvider({ children }) {
     })
   }
 
-  // Manual sign-in trigger — show account picker so user can choose/switch Google account.
-  // 'select_account' shows the account chooser without forcing a consent screen if already granted.
-  // Only shows consent/unverified screen for truly first-time accounts.
+  // Manual sign-in trigger — use silent prompt to avoid consent/unverified screen.
+  // With unverified app + restricted scopes, any non-silent prompt triggers the warning.
+  // Falls back to consent screen only if silent fails (first-time user, Google session expired).
   const signIn = useCallback(() => {
     if (!tokenClientRef.current) return
     setError(null)
-    tokenClientRef.current.requestAccessToken({ prompt: 'select_account' })
+    const client = tokenClientRef.current
+    const originalCallback = client.callback
+    client.callback = (response) => {
+      client.callback = originalCallback
+      if (response.error === 'interaction_required' || response.error === 'access_denied') {
+        // Silent failed — must show consent screen (unavoidable for first-time / session expired)
+        client.requestAccessToken({ prompt: 'select_account' })
+      } else {
+        originalCallback(response)
+      }
+    }
+    client.requestAccessToken({ prompt: '' })
   }, [])
 
   // Sign out — clear local token state, do NOT revoke OAuth grant (avoids consent screen on re-login).
