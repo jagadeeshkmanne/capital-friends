@@ -317,6 +317,8 @@ export function DataProvider({ children }) {
             // Await settings so IDB is populated before resolveHealthCheck checks it
             refreshSettings().then(() => resolveHealthCheck()).catch(() => resolveHealthCheck())
           } else {
+            // cachedHC is true/false from localStorage — apply it directly so ProtectedRoute doesn't block
+            setHealthCheckCompleted(cachedHC)
             refreshSettings().catch(() => {})
           }
         }
