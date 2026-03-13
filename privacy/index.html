@@ -80,10 +80,10 @@
       </div>
 
       <div class="scope">
-        <span class="scope-code">auth/drive</span>
-        <div class="scope-name">Google Drive <span style="font-size:0.7rem;color:#f43f5e;background:rgba(244,63,94,0.1);padding:1px 6px;border-radius:4px;margin-left:6px">Restricted</span></div>
-        <div class="scope-desc">See, edit, create and delete all of your Google Drive files</div>
-        <p class="scope-why"><strong>Why we need this:</strong> Required because Google Apps Script's <code>SpreadsheetApp.create()</code> needs the Drive scope to create a new spreadsheet. This is a Google API limitation — there is no narrower scope available for spreadsheet creation. <strong>We only use this to create one spreadsheet during first-time setup.</strong> We do not list, access, read, or modify any other files in your Drive.</p>
+        <span class="scope-code">auth/drive.file</span>
+        <div class="scope-name">Google Drive (App-Created Files) <span style="font-size:0.7rem;color:#10b981;background:rgba(16,185,129,0.1);padding:1px 6px;border-radius:4px;margin-left:6px">Non-Sensitive</span></div>
+        <div class="scope-desc">See, edit, create and delete only files created by this app</div>
+        <p class="scope-why"><strong>Why we need this:</strong> Used to create your Capital Friends spreadsheet via <code>SpreadsheetApp.create()</code> during first-time setup. This scope only grants access to the single spreadsheet the app creates — <strong>we cannot access any other files in your Google Drive.</strong></p>
       </div>
 
       <div class="scope">
