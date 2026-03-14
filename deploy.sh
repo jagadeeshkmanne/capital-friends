@@ -30,8 +30,11 @@ cp -r "$DIST_TMP/assets" .
 cp -r "$DIST_TMP/privacy" .
 cp -r "$DIST_TMP/terms" .
 
+echo "📄 Ensuring CNAME is present..."
+cp "$REPO_DIR/CNAME" . 2>/dev/null || true
+
 echo "🚀 Committing and pushing..."
-git add -A index.html 404.html assets/ privacy/ terms/
+git add -A index.html 404.html assets/ privacy/ terms/ CNAME
 git commit -m "Deploy: $(date '+%Y-%m-%d %H:%M')" --allow-empty
 git push origin gh-pages
 
