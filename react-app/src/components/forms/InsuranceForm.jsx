@@ -51,7 +51,7 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
     if (!form.company.trim()) e.company = 'Required'
     if (!form.policyNumber.trim()) e.policyNumber = 'Required'
     if (!form.policyName.trim()) e.policyName = 'Required'
-    if (!form.memberId) e.memberId = 'Required'
+    if (activeMembers.length > 0 && !form.memberId) e.memberId = 'Required'
     if (!form.sumAssured || Number(form.sumAssured) <= 0) e.sumAssured = 'Must be > 0'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -86,7 +86,7 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Insured Member" required error={errors.memberId}>
+        <FormField label="Insured Member" required={activeMembers.length > 0} error={errors.memberId}>
           <FormSelect value={form.memberId} onChange={setMember} options={memberOptions} placeholder="Select member..." />
         </FormField>
         <FormField label="Nominee">

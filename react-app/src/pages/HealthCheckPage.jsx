@@ -2,6 +2,9 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardCheck, CheckCircle, AlertTriangle, XCircle, ArrowRight, Save, Loader2 } from 'lucide-react'
 import { useData } from '../context/DataContext'
+import { useToast } from '../context/ToastContext'
+import Modal from '../components/Modal'
+import InsuranceForm from '../components/forms/InsuranceForm'
 import * as api from '../services/api'
 import * as idb from '../services/idb'
 
@@ -17,24 +20,26 @@ const QUESTIONS = [
 
 export default function HealthCheckPage() {
   const navigate = useNavigate()
-  const { members, insurancePolicies, goalList, otherInvList, healthCheckCompleted, completeHealthCheck } = useData()
-  const activeMembers = members.filter((m) => m.status === 'Active')
+  const { members, insurancePolicies, goalList, otherInvList, healthCheckCompleted, completeHealthCheck, addInsurance } = useData()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
+  const activeMembers = (members || []).filter((m) => m.status === 'Active')
   const isFirstTime = healthCheckCompleted === false
   const [saving, setSaving] = useState(false)
+  const [addInsType, setAddInsType] = useState(null) // 'Health' | 'Term Life' | null
   const [loadingPrevious, setLoadingPrevious] = useState(true)
   const [previousAnswers, setPreviousAnswers] = useState(null)
 
   // Auto-detect answers from existing data
   const autoDetected = useMemo(() => {
     const hints = {}
-    const healthPolicies = insurancePolicies.filter((p) => p.policyType === 'Health' && p.status === 'Active')
+    const healthPolicies = (insurancePolicies || []).filter((p) => p.policyType === 'Health' && p.status === 'Active')
     hints.healthIns = healthPolicies.length > 0
-    const termPolicies = insurancePolicies.filter((p) => p.policyType === 'Term Life' && p.status === 'Active')
+    const termPolicies = (insurancePolicies || []).filter((p) => p.policyType === 'Term Life' && p.status === 'Active')
     hints.termLife = termPolicies.length > 0
-    const emergencyGoals = goalList.filter((g) => g.goalType === 'Emergency Fund' && g.isActive)
-    const emergencyInv = otherInvList.filter((i) => i.investmentType === 'FD' || i.investmentType === 'PPF')
+    const emergencyGoals = (goalList || []).filter((g) => g.goalType === 'Emergency Fund' && g.isActive)
+    const emergencyInv = (otherInvList || []).filter((i) => i.investmentType === 'FD' || i.investmentType === 'PPF')
     hints.emergencyFund = emergencyGoals.length > 0 || emergencyInv.length > 0
-    hints.goals = goalList.filter((g) => g.isActive).length >= 2
+    hints.goals = (goalList || []).filter((g) => g.isActive).length >= 2
     return hints
   }, [insurancePolicies, goalList, otherInvList])
 
@@ -83,7 +88,6 @@ export default function HealthCheckPage() {
       setAnswers((prev) => {
         const merged = { ...prev }
         QUESTIONS.forEach((q) => {
-          // Policy-based questions always use autoDetected, ignore saved answers
           if (q.autoFromPolicies) {
             merged[q.id] = autoDetected[q.id] ? 'yes' : 'no'
           } else {
@@ -126,6 +130,19 @@ export default function HealthCheckPage() {
     if (answers.goals !== 'yes') recs.push({ severity: 'info', text: 'Define clear financial goals', action: 'Use the Goal Planner to set targets' })
     return recs
   }, [answers])
+
+  const handleAddInsurance = useCallback(async (data) => {
+    showBlockUI('Saving...')
+    try {
+      await addInsurance(data)
+      showToast(`${data.policyType} policy added`)
+      setAddInsType(null)
+    } catch (err) {
+      showToast(err.message || 'Failed to save policy', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }, [addInsurance, showToast, showBlockUI, hideBlockUI])
 
   const handleSave = useCallback(async () => {
     if (!allAnswered) return
@@ -186,13 +203,14 @@ export default function HealthCheckPage() {
       {/* Questions */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Health Check Questions</h3>
+          <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Health Check Questions</h3>
         </div>
         <div className="divide-y divide-[var(--border-light)]">
           {QUESTIONS.map((q, idx) => {
             const isReadonly = q.autoFromPolicies
+            const insType = q.id === 'healthIns' ? 'Health' : q.id === 'termLife' ? 'Term Life' : null
             return (
-              <div key={q.id} className={`px-4 py-3 ${isReadonly ? 'opacity-80' : ''}`}>
+              <div key={q.id} className="px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <p className="text-sm text-[var(--text-primary)]">
@@ -203,13 +221,15 @@ export default function HealthCheckPage() {
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
-                      onClick={() => !isReadonly && setAnswers((a) => ({ ...a, [q.id]: 'yes' }))}
-                      disabled={isReadonly}
+                      onClick={() => {
+                        if (insType) setAddInsType(insType)
+                        else if (!isReadonly) setAnswers((a) => ({ ...a, [q.id]: 'yes' }))
+                      }}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                         answers[q.id] === 'yes'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border)] hover:text-[var(--text-primary)]'
-                      } ${isReadonly ? 'cursor-not-allowed' : ''}`}
+                      }`}
                     >
                       Yes
                     </button>
@@ -228,7 +248,11 @@ export default function HealthCheckPage() {
                 </div>
                 {isReadonly && (
                   <p className="text-xs text-violet-400 mt-1 ml-5">
-                    {autoDetected[q.id] ? 'Auto-detected: policy found in your data' : 'Auto-set: add a policy under Insurance to update'}
+                    {autoDetected[q.id]
+                      ? 'Auto-detected: policy found in your data'
+                      : insType
+                        ? `Click Yes to add a ${insType} policy`
+                        : 'Auto-set: add a policy under Insurance to update'}
                   </p>
                 )}
               </div>
@@ -241,7 +265,7 @@ export default function HealthCheckPage() {
       {recommendations.length > 0 && allAnswered && (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-            <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Recommendations</h3>
+            <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Recommendations</h3>
           </div>
           <div className="divide-y divide-[var(--border-light)]">
             {recommendations.map((r, idx) => {
@@ -261,6 +285,22 @@ export default function HealthCheckPage() {
           </div>
         </div>
       )}
+
+      {/* Add Insurance Modal (triggered from Yes button on auto-detected questions) */}
+      <Modal
+        open={!!addInsType}
+        onClose={() => setAddInsType(null)}
+        title={addInsType === 'Health' ? 'Add Health Insurance Policy' : 'Add Term Life Insurance Policy'}
+        wide
+      >
+        {addInsType && (
+          <InsuranceForm
+            initial={{ policyType: addInsType }}
+            onSave={handleAddInsurance}
+            onCancel={() => setAddInsType(null)}
+          />
+        )}
+      </Modal>
 
       {/* Save Button */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">

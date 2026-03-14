@@ -423,6 +423,9 @@ function saveHealthCheck(params) {
       questionnaireSheet.getRange(lastRow, 1, 1, 10).setValues([row]);
     }
 
+    // Persist a simple flag in Settings so clients can check without loading the Questionnaire sheet
+    try { updateSetting('HealthCheckAnswered', 'true'); } catch (e) { log('Warning: could not set HealthCheckAnswered flag: ' + e); }
+
     log('Health check saved: ' + params.score + '/' + params.total);
 
     return {

@@ -3,27 +3,12 @@ import { ChevronRight, ChevronLeft, Target, DollarSign, CheckCircle2, TrendingUp
 import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
+import { getRecommendedAllocation } from '../../data/glidePath'
 
 const GOAL_TYPES = [
   'Retirement', 'Emergency Fund', 'Child Education', 'Home Purchase',
   'Car', 'Travel', 'Wedding', 'Custom',
 ].map((t) => ({ value: t, label: t }))
-
-// Glide path: recommended equity % by years to goal
-const GLIDE_PATH = [
-  { maxYears: 1,  equity: 10, label: 'Short-term' },
-  { maxYears: 3,  equity: 30, label: 'Short-term' },
-  { maxYears: 5,  equity: 50, label: 'Medium-term' },
-  { maxYears: 7,  equity: 65, label: 'Medium-term' },
-  { maxYears: 10, equity: 75, label: 'Long-term' },
-  { maxYears: Infinity, equity: 85, label: 'Long-term' },
-]
-
-function getRecommendedAllocation(goalType, yearsLeft) {
-  if (goalType === 'Emergency Fund') return { equity: 0, debt: 100, label: 'Safety' }
-  const step = GLIDE_PATH.find(s => yearsLeft <= s.maxYears)
-  return { equity: step.equity, debt: 100 - step.equity, label: step.label }
-}
 
 const PRIORITIES = [
   { value: 'High', label: 'High' },
@@ -109,10 +94,10 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           if (calculatedAge > 0) storedRetirementAge = calculatedAge.toString()
         }
       }
-      let editCurrentAge = ''
-      if (storedRetirementAge && initial.targetDate) {
-        const yearsLeft = Math.round((new Date(initial.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000))
-        editCurrentAge = Math.max(0, Number(storedRetirementAge) - yearsLeft).toString()
+      let editDob = ''
+      if (initial.goalType === 'Retirement' && matchedMember) {
+        const dob = getMemberDOB(matchedMember)
+        if (dob) editDob = dob.toISOString().split('T')[0]
       }
 
       return {
@@ -131,8 +116,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         monthlyExpenses: (initial.monthlyExpenses || '').toString(),
         emergencyMonths: (initial.emergencyMonths || 6).toString(),
         // Retirement age
-        retirementAge: storedRetirementAge.toString(),
-        currentAge: editCurrentAge,
+        retirementAge: storedRetirementAge || '60',
+        dob: editDob,
       }
     }
 
@@ -151,7 +136,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       monthlyExpenses: '',
       emergencyMonths: '6',
       retirementAge: '60',
-      currentAge: '',
+      dob: '',
     }
   })
   const [errors, setErrors] = useState({})
@@ -181,8 +166,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     ? (activeMembers || []).find(m => m.memberId === form.familyMemberId)
     : null
   const memberDOB = selectedMember ? getMemberDOB(selectedMember) : null
-  const memberCurrentAge = memberDOB
-    ? Math.floor((Date.now() - memberDOB.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+  const effectiveDOB = memberDOB || (form.dob ? new Date(form.dob) : null)
+  const memberCurrentAge = effectiveDOB
+    ? Math.floor((Date.now() - effectiveDOB.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : null
 
   // Auto-set targetDate for Retirement when age inputs or member change
@@ -203,20 +189,20 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       d.setFullYear(d.getFullYear() + retAge)
       setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
     } else {
-      // Fallback: calculate from current age input
-      const curAge = Number(form.currentAge)
-      if (!curAge || curAge <= 0) return
+      // Fallback: calculate from DOB input in form
+      if (!form.dob) return
+      const dobDate = new Date(form.dob)
+      const curAge = Math.floor((Date.now() - dobDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
       if (retAge <= curAge) {
         setForm(f => ({ ...f, targetDate: new Date().toISOString().split('T')[0] }))
         return
       }
-      const years = retAge - curAge
-      const d = new Date()
-      d.setFullYear(d.getFullYear() + years)
+      const d = new Date(dobDate)
+      d.setFullYear(d.getFullYear() + retAge)
       setForm(f => ({ ...f, targetDate: d.toISOString().split('T')[0] }))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.retirementAge, form.currentAge, form.familyMemberId, isRetirement])
+  }, [form.retirementAge, form.dob, form.familyMemberId, isRetirement])
 
   // ── Calculations ──
   const calc = useMemo(() => {
@@ -381,6 +367,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     ? activeMembers.find((m) => m.memberId === form.familyMemberId)?.memberName || 'Family'
     : 'Family'
 
+  // ── Link-only mode: skip form, show just the linking content ──
+  if (linkingContent) return <>{linkingContent}</>
+
   // ── Edit mode: single form ──
   if (isEdit) {
     return (
@@ -398,7 +387,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Family (Default)" />
           </FormField>
           <FormField label={isRetirement ? 'Target Date (auto-calculated)' : 'Target Date'} required error={errors.targetDate}>
-            <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
+            {isRetirement
+              ? <p className="text-sm font-semibold text-[var(--text-primary)] px-3 py-2 rounded-lg bg-[var(--bg-inset)]">{form.targetDate ? form.targetDate.split('T')[0] : '—'}</p>
+              : <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />}
           </FormField>
         </div>
 
@@ -412,12 +403,12 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
                 </FormField>
                 {memberDOB ? (
                   <div className="flex flex-col justify-center px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                    <p className="text-xs font-semibold text-emerald-400">DOB detected</p>
-                    <p className="text-xs text-[var(--text-muted)]">Currently {memberCurrentAge} yrs · {Math.round(calc.yearsToGo)} yrs to retirement</p>
+                    <p className="text-xs font-semibold text-emerald-400">DOB: {memberDOB.toISOString().split('T')[0]}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Age {memberCurrentAge} · Retiring in {Math.round(calc.yearsToGo)} yrs</p>
                   </div>
                 ) : (
-                  <FormField label="Current Age">
-                    <FormInput type="number" value={form.currentAge} onChange={(v) => set('currentAge', v)} placeholder="e.g., 35" />
+                  <FormField label="Date of Birth">
+                    <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
                   </FormField>
                 )}
               </>
@@ -429,9 +420,6 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
               <FormField label="Emergency Months">
                 <FormInput type="number" value={form.emergencyMonths} onChange={(v) => set('emergencyMonths', v)} placeholder="6" />
               </FormField>
-            )}
-            {isRetirement && calc.swr && (
-              <SWRPanel swr={calc.swr} postRetYears={calc.postRetYears} />
             )}
           </div>
         ) : (
@@ -458,8 +446,10 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         )}
 
         {/* SIP projection + Glide Path (edit mode) */}
-        {calc.hasTarget && calc.months > 0 && (
+        {calc.hasTarget && calc.months > 0 ? (
           <ProjectionPanel calc={calc} lumpsum={form.lumpsum} compact />
+        ) : (
+          <MissingFieldsHint form={form} isRetirement={isRetirement} isEmergency={isEmergency} calc={calc} />
         )}
         {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
           <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
@@ -571,19 +561,16 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
                       <p className="text-xs text-[var(--text-muted)]">Currently {memberCurrentAge} yrs · Retiring in {Math.round(calc.yearsToGo)} yrs</p>
                     </div>
                   ) : (
-                    <FormField label="Current Age" error={errors.currentAge}>
-                      <FormInput type="number" value={form.currentAge} onChange={(v) => set('currentAge', v)} placeholder="e.g., 35" />
+                    <FormField label="Date of Birth">
+                      <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
                     </FormField>
                   )}
                   <FormField label="Target Date (auto-calculated)" error={errors.targetDate}>
-                    <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
+                    <p className="text-sm font-semibold text-[var(--text-primary)] px-3 py-2 rounded-lg bg-[var(--bg-inset)]">{form.targetDate ? form.targetDate.split('T')[0] : '—'}</p>
                   </FormField>
                   <FormField label="Monthly Expenses (Today)" required error={errors.monthlyExpenses}>
                     <FormInput type="number" value={form.monthlyExpenses} onChange={(v) => set('monthlyExpenses', v)} placeholder="e.g., 50000" />
                   </FormField>
-                  {calc.swr && (
-                    <SWRPanel swr={calc.swr} postRetYears={calc.postRetYears} />
-                  )}
                 </>
               ) : (
                 <>
@@ -631,8 +618,10 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           </FormField>
 
           {/* Required SIP Panel */}
-          {calc.hasTarget && calc.months > 0 && (
+          {calc.hasTarget && calc.months > 0 ? (
             <ProjectionPanel calc={calc} lumpsum={form.lumpsum} />
+          ) : (
+            <MissingFieldsHint form={form} isRetirement={isRetirement} isEmergency={isEmergency} calc={calc} />
           )}
 
           {/* Glide Path Recommendation */}
@@ -740,45 +729,77 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
   }
 
   if (isRetirement && calc.swr) {
-    const annualExp = Math.round((calc.todaysCost * calc.swr.rate))
-    const monthlyExp = Math.round(annualExp / 12)
+    // Derive monthly expense figures from calc (avoids needing form prop)
+    const monthlyExpNow = Math.round(calc.todaysCost * calc.swr.rate / 12)
+    const monthlyExpAtRetirement = Math.round(calc.inflatedTarget * calc.swr.rate / 12)
+    const annualExpAtRetirement = monthlyExpAtRetirement * 12
+    const retireAge = LIFE_EXPECTANCY - calc.postRetYears
+    const isRetireNow = calc.yearsToGo < 0.1
     return (
-      <div className="rounded-lg bg-violet-500/5 border border-violet-500/15 p-3 space-y-2.5">
-        <p className="text-xs font-bold uppercase tracking-wider text-violet-400">How we calculated your corpus</p>
-        {/* Step 1 */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-dim)]">
-            <span className="text-[var(--text-muted)] font-semibold">Step 1</span> — Annual expenses
-            <span className="text-[var(--text-dim)]"> ({formatINR(monthlyExp)}/mo × 12)</span>
-          </span>
-          <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(annualExp)}</span>
+      <div className="rounded-lg bg-violet-500/5 border border-violet-500/15 p-3 space-y-3">
+        <p className="text-sm font-bold uppercase tracking-wider text-violet-400">Your Retirement Corpus</p>
+
+        {/* Expense flow */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--text-dim)]">Monthly expenses <span className="text-[var(--text-muted)]">today</span></span>
+            <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(monthlyExpNow)}/mo</span>
+          </div>
+          {!isRetireNow && (
+            <>
+              <div className="flex items-center gap-2 px-1">
+                <div className="flex-1 border-t border-dashed border-violet-500/30" />
+                <span className="text-xs text-violet-400 whitespace-nowrap">{inflation}% inflation × {calc.yearsToGo.toFixed(0)} yrs</span>
+                <div className="flex-1 border-t border-dashed border-violet-500/30" />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[var(--text-dim)]">Monthly expenses <span className="text-[var(--text-muted)]">at retirement (age {retireAge})</span></span>
+                <span className="text-xs font-semibold text-amber-400 tabular-nums">{formatINR(monthlyExpAtRetirement)}/mo</span>
+              </div>
+            </>
+          )}
         </div>
-        {/* Step 2 */}
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <span className="text-xs text-[var(--text-muted)] font-semibold">Step 2</span>
-            <span className="text-xs text-[var(--text-dim)]"> — Divide by {calc.swr.pct}% SWR = corpus today</span>
-            <p className="text-xs text-[var(--text-dim)] mt-0.5 leading-snug">
-              Retiring at {LIFE_EXPECTANCY - calc.postRetYears}, your money must last ~{calc.postRetYears} years (until age {LIFE_EXPECTANCY}).
-              A {calc.swr.pct}% withdrawal rate is safe for this duration ({calc.swr.label}).
+
+        {/* Corpus calc */}
+        <div className="border-t border-violet-500/15 pt-2.5 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Corpus needed at retirement</p>
+            <span className="text-sm font-bold text-violet-400 tabular-nums shrink-0">{formatINR(calc.inflatedTarget)}</span>
+          </div>
+          <div className="rounded-lg bg-violet-500/10 border border-violet-500/20 p-3 space-y-2">
+            <p className="text-sm font-bold text-violet-400 uppercase tracking-wider">What is Safe Withdrawal Rate (SWR)?</p>
+            <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+              At retirement, your corpus is invested and earns returns. You withdraw{' '}
+              <span className="text-violet-300 font-semibold">{calc.swr.pct}% per year</span> as income
+              — that's <span className="text-amber-400 font-semibold">{formatINR(annualExpAtRetirement)}/yr</span>.{' '}
+              The remaining corpus keeps growing, so the money lasts the full{' '}
+              <span className="text-[var(--text-muted)] font-semibold">{calc.postRetYears} years</span> (age {retireAge}→{LIFE_EXPECTANCY}) without running out.
+            </p>
+            <p className="text-xs text-[var(--text-dim)]">
+              Corpus = {formatINR(annualExpAtRetirement)}/yr ÷ {calc.swr.pct}% ={' '}
+              <span className="text-violet-400 font-bold">{formatINR(calc.inflatedTarget)}</span>{' '}
+              <span className="text-[var(--text-dim)]">({calc.swr.multiplier}× your annual expenses)</span>
             </p>
           </div>
-          <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(calc.todaysCost)}</span>
         </div>
-        {/* Step 3 */}
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <span className="text-xs text-[var(--text-muted)] font-semibold">Step 3</span>
-            <span className="text-xs text-[var(--text-dim)]"> — Inflate by {inflation}% for {calc.yearsToGo.toFixed(0)} yrs</span>
-            <p className="text-xs text-[var(--text-dim)] mt-0.5 leading-snug">
-              Today's ₹1 lakh will cost ~{formatINR(Math.round(100000 * Math.pow(1 + Number(inflation)/100, calc.yearsToGo)))} at retirement.
-            </p>
+
+        {/* SWR reference table — compact grid */}
+        <div className="border-t border-violet-500/15 pt-2">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-2">SWR by retirement age — the earlier you retire, the safer you must be</p>
+          <div className="grid grid-cols-5 gap-1 text-center">
+            {SWR_TIERS.map((tier) => {
+              const isActive = calc.postRetYears >= tier.postRet &&
+                calc.postRetYears < (SWR_TIERS[SWR_TIERS.indexOf(tier) - 1]?.postRet ?? Infinity)
+              return (
+                <div key={tier.ageRange} className={`rounded px-1 py-1.5 text-xs space-y-0.5 ${
+                  isActive ? 'bg-violet-500/20' : ''}`}>
+                  <div className={`font-semibold ${isActive ? 'text-violet-300' : 'text-[var(--text-dim)]'}`}>{tier.ageRange}</div>
+                  <div className={`font-bold ${isActive ? 'text-violet-400' : 'text-[var(--text-dim)]'}`}>{tier.rate}</div>
+                  <div className={isActive ? 'text-[var(--text-muted)]' : 'text-[var(--text-dim)]'}>{tier.multiplier}×</div>
+                </div>
+              )
+            })}
           </div>
-          <span className="text-xs font-bold text-violet-400 tabular-nums shrink-0">{formatINR(calc.inflatedTarget)}</span>
-        </div>
-        <div className="border-t border-violet-500/15 pt-2 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-violet-400">Target corpus at retirement</span>
-          <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.inflatedTarget)}</span>
         </div>
       </div>
     )
@@ -787,7 +808,7 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-violet-500/5 border border-violet-500/15">
       <div>
-        <p className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Today's Cost</p>
+        <p className="text-sm font-semibold text-[var(--text-dim)] uppercase tracking-wider">Today's Cost</p>
         <p className="text-xs font-semibold text-[var(--text-secondary)]">{formatINR(calc.todaysCost)}</p>
       </div>
       <div className="text-center">
@@ -795,9 +816,33 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
         <ChevronRight size={12} className="text-violet-400 mx-auto" />
       </div>
       <div className="text-right">
-        <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Future Value</p>
+        <p className="text-sm font-semibold text-violet-400 uppercase tracking-wider">Future Value</p>
         <p className="text-xs font-bold text-[var(--text-primary)]">{formatINR(calc.inflatedTarget)}</p>
       </div>
+    </div>
+  )
+}
+
+function MissingFieldsHint({ form, isRetirement, isEmergency, calc }) {
+  const missing = []
+  if (!form.targetDate) missing.push('Target Date')
+  if (isRetirement) {
+    if (!form.retirementAge || Number(form.retirementAge) <= 0) missing.push('Retirement Age')
+    if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) missing.push('Monthly Expenses')
+  } else if (isEmergency) {
+    if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) missing.push('Monthly Expenses')
+  } else {
+    if (!form.todaysCost || Number(form.todaysCost) <= 0) missing.push("Today's Cost")
+  }
+  if (!form.inflation && form.inflation !== 0) missing.push('Inflation %')
+  if (!form.cagr && form.cagr !== 0) missing.push('Expected CAGR %')
+
+  if (missing.length === 0) return null
+  return (
+    <div className="rounded-lg border border-dashed border-[var(--border-light)] p-3 text-center">
+      <p className="text-xs text-[var(--text-dim)]">
+        Enter <span className="text-[var(--text-muted)] font-medium">{missing.join(', ')}</span> to see SIP &amp; lumpsum projection
+      </p>
     </div>
   )
 }
@@ -891,7 +936,7 @@ function SWRPanel({ swr, postRetYears }) {
   return (
     <div className="sm:col-span-2 rounded-lg bg-violet-500/5 border border-violet-500/15 px-3 py-2.5 space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-wider text-violet-400">Why this corpus size?</p>
+        <p className="text-sm font-bold uppercase tracking-wider text-violet-400">Why this corpus size?</p>
         <span className="text-xs font-bold text-[var(--text-primary)]">{swr.pct}% SWR · {swr.multiplier}×</span>
       </div>
       <p className="text-xs text-[var(--text-dim)] leading-relaxed">
@@ -902,7 +947,7 @@ function SWRPanel({ swr, postRetYears }) {
 
       {/* SWR reference table */}
       <div className="border-t border-violet-500/15 pt-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Safe Withdrawal Rate by retirement age</p>
+        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Safe Withdrawal Rate by retirement age</p>
         <div className="space-y-0.5">
           {SWR_TIERS.map((tier) => {
             const isActive = postRetYears >= tier.postRet &&
@@ -916,7 +961,7 @@ function SWRPanel({ swr, postRetYears }) {
                 <span className="flex items-center gap-3">
                   <span className={isActive ? 'text-violet-400 font-bold' : ''}>{tier.rate}</span>
                   <span className={isActive ? 'font-bold' : ''}>{tier.multiplier} annual exp</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-violet-500/30 text-violet-300' : 'bg-[var(--bg-inset)] text-[var(--text-dim)]'}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${isActive ? 'bg-violet-500/30 text-violet-300' : 'bg-[var(--bg-inset)] text-[var(--text-dim)]'}`}>
                     {tier.note}
                   </span>
                 </span>
@@ -940,7 +985,7 @@ function GlidePathRecommendation({ goalType, yearsLeft }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp size={12} className="text-blue-400" />
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
         </div>
         <span className="text-xs font-bold px-2 py-0.5 rounded-full"
               style={{ background: `${labelColor}15`, color: labelColor }}>

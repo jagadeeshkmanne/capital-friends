@@ -39,7 +39,7 @@ export default function Sidebar({ open, onClose }) {
       `}>
         {/* Header with close button */}
         <div className="flex items-center justify-between px-3 h-12 border-b border-[var(--border)] shrink-0">
-          <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Menu</p>
+          <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Menu</p>
           <button onClick={onClose} className="p-1.5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={16} /></button>
         </div>
 
@@ -53,7 +53,7 @@ export default function Sidebar({ open, onClose }) {
               >
                 <TrendingDown size={14} />
                 <span className="flex-1 text-left">Buy Opportunities</span>
-                <span className="text-[11px] bg-emerald-500/25 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
+                <span className="text-xs bg-emerald-500/25 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
               </button>
             )}
             {rebalanceCount > 0 && (
@@ -63,7 +63,7 @@ export default function Sidebar({ open, onClose }) {
               >
                 <RefreshCw size={14} />
                 <span className="flex-1 text-left">Rebalance Alerts</span>
-                <span className="text-[11px] bg-violet-500/25 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
+                <span className="text-xs bg-violet-500/25 px-1.5 py-0.5 rounded-full">{rebalanceCount}</span>
               </button>
             )}
           </div>

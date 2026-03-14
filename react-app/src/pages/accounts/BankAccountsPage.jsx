@@ -35,7 +35,14 @@ export default function BankAccountsPage() {
   }, [banks, selectedMember])
 
   const uniqueBanks = useMemo(() => new Set(filtered.map((a) => a.bankName)).size, [filtered])
-  const savingsCount = useMemo(() => filtered.filter((a) => a.accountType === 'Savings' || a.accountType === 'Savings Account' || a.accountType === 'Salary').length, [filtered])
+  const typeCounts = useMemo(() => {
+    const counts = {}
+    filtered.forEach((a) => {
+      const t = a.accountType || 'Other'
+      counts[t] = (counts[t] || 0) + 1
+    })
+    return counts
+  }, [filtered])
 
   async function handleSave(data) {
     showBlockUI('Saving...')
@@ -79,10 +86,12 @@ export default function BankAccountsPage() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Total Accounts" value={filtered.length} />
             <StatCard label="Banks" value={uniqueBanks} />
-            <StatCard label="Savings / Salary" value={savingsCount} />
+            {Object.entries(typeCounts).map(([type, count]) => (
+              <StatCard key={type} label={type} value={count} />
+            ))}
           </div>
 
           {/* Header with Add */}

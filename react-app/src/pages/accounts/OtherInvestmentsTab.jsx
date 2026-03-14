@@ -158,7 +158,7 @@ export default function OtherInvestmentsTab() {
                                 {loans.map(loan => (
                                   <div key={loan.liabilityId}>
                                     <p className="text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(loan.outstandingBalance)}</p>
-                                    <p className="text-[10px] text-[var(--text-dim)]">{loan.liabilityType}</p>
+                                    <p className="text-xs text-[var(--text-dim)]">{loan.liabilityType}</p>
                                   </div>
                                 ))}
                               </div>
@@ -184,8 +184,8 @@ export default function OtherInvestmentsTab() {
                 const up = pl >= 0
                 return (
                   <div key={i.investmentId} onClick={() => setModal({ edit: i })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate mr-2">{i.investmentName}</p>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-sm font-medium text-[var(--text-primary)] break-words min-w-0 leading-snug">{i.investmentName}</p>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${catBadge[i.investmentCategory] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                         {i.investmentCategory}
                       </span>

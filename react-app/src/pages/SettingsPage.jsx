@@ -140,13 +140,13 @@ export default function SettingsPage() {
               <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${masked ? 'left-[18px] bg-white' : 'left-0.5 bg-[var(--text-dim)]'}`} />
             </button>
           </Row>
-          <p className="text-[11px] text-[var(--text-dim)]">
+          <p className="text-xs text-[var(--text-dim)]">
             Hides PAN, Aadhaar, mobile, email & account numbers. Use the {masked ? <EyeOff size={10} className="inline text-amber-400" /> : <Eye size={10} className="inline" />} icon in the header to quickly toggle.
           </p>
           {masked && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <EyeOff size={13} className="text-amber-400 shrink-0" />
-              <p className="text-[11px] text-amber-400 font-medium">Data masking active — safe for screen sharing</p>
+              <p className="text-xs text-amber-400 font-medium">Data masking active — safe for screen sharing</p>
             </div>
           )}
         </div>
@@ -160,7 +160,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-[var(--text-primary)]">Sync App Data</p>
-              <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Re-fetch all data from your Google Sheet</p>
+              <p className="text-xs text-[var(--text-dim)] mt-0.5">Re-fetch all data from your Google Sheet</p>
             </div>
             <button
               onClick={() => refreshData(true)}
@@ -179,7 +179,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-[var(--text-primary)]">Refresh Market Data</p>
-                <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Update MF NAVs, ATH & Stock prices</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">Update MF NAVs, ATH & Stock prices</p>
               </div>
               <button
                 onClick={handleRefresh}
@@ -190,10 +190,10 @@ export default function SettingsPage() {
                 {refreshing ? 'Refreshing...' : 'Refresh Now'}
               </button>
             </div>
-            <div className="flex items-center gap-4 text-[11px] text-[var(--text-dim)]">
+            <div className="flex items-center gap-4 text-xs text-[var(--text-dim)]">
               <span>Last: <span className="font-medium text-[var(--text-muted)]">{formatLastSync(settings.masterDataLastSync)}</span></span>
               {settings._stale && (
-                <span className="font-bold text-amber-600 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-[10px]">STALE</span>
+                <span className="font-bold text-amber-600 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-xs">STALE</span>
               )}
               {settings._navDataDate && (
                 <span>NAV: <span className="font-medium text-[var(--text-muted)]">{settings._navDataDate}</span></span>
@@ -261,7 +261,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-[var(--text-secondary)]">Send Report Now</p>
-                <p className="text-[11px] text-[var(--text-dim)]">Send wealth report to all enabled members</p>
+                <p className="text-xs text-[var(--text-dim)]">Send wealth report to all enabled members</p>
               </div>
               <button
                 onClick={async () => {
@@ -303,11 +303,11 @@ export default function SettingsPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-[var(--text-primary)]">Financial Health Check</p>
-            <p className="text-[11px] text-[var(--text-dim)]">
+            <p className="text-xs text-[var(--text-dim)]">
               {healthCheckCompleted ? 'Completed — update your answers' : 'Take the health check questionnaire'}
             </p>
           </div>
-          {healthCheckCompleted && <span className="text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 shrink-0">Done</span>}
+          {healthCheckCompleted && <span className="text-xs font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 shrink-0">Done</span>}
           <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
         </div>
       </button>
@@ -324,7 +324,7 @@ export default function SettingsPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-amber-400">Support the Developer</p>
-            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Capital Friends is free. If it helps your family, consider a small donation!</p>
+            <p className="text-xs text-[var(--text-dim)] mt-0.5">Capital Friends is free. If it helps your family, consider a small donation!</p>
           </div>
         </div>
       </button>
@@ -349,7 +349,7 @@ function CardHeader({ icon, title }) {
     <div className="px-4 py-2.5 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
       <div className="flex items-center gap-2">
         <span className="text-[var(--text-muted)]">{icon}</span>
-        <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{title}</h3>
+        <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">{title}</h3>
       </div>
     </div>
   )
@@ -407,11 +407,11 @@ function MemberEmailToggle({ member, onToggle }) {
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2 min-w-0">
         <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
-          <span className="text-[10px] font-bold text-violet-600">{member.memberName?.charAt(0)?.toUpperCase()}</span>
+          <span className="text-xs font-bold text-violet-600">{member.memberName?.charAt(0)?.toUpperCase()}</span>
         </div>
         <div className="min-w-0">
           <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{mv(member.memberName, 'name')}</p>
-          {member.email && <p className="text-[10px] text-[var(--text-dim)] truncate">{mv(member.email, 'email')}</p>}
+          {member.email && <p className="text-xs text-[var(--text-dim)] truncate">{mv(member.email, 'email')}</p>}
         </div>
       </div>
       <button

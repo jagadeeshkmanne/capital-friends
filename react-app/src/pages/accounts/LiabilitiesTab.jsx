@@ -158,7 +158,7 @@ export default function LiabilitiesTab() {
                           return (
                             <div>
                               <p className="text-xs text-[var(--text-primary)]">{linked.investmentName}</p>
-                              <p className="text-[10px] text-[var(--text-dim)]">{linked.investmentType}</p>
+                              <p className="text-xs text-[var(--text-dim)]">{linked.investmentType}</p>
                             </div>
                           )
                         })()}

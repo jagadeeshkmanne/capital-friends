@@ -32,13 +32,13 @@ export default function ActionStrip() {
               <button
                 key={t.key}
                 onClick={() => setDialogKey(isActive ? null : t.key)}
-                className={`flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap shrink-0 px-2.5 py-1 rounded-full transition-all ${
+                className={`flex items-center gap-1 text-xs font-semibold whitespace-nowrap shrink-0 px-2.5 py-1 rounded-full transition-all ${
                   isActive ? t.active : t.idle
                 }`}
               >
                 <Icon size={11} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{t.label}</span>
-                <span className={`text-[10px] ${isActive ? 'opacity-80' : 'opacity-50'}`}>{counts[t.key]}</span>
+                <span className={`text-xs ${isActive ? 'opacity-80' : 'opacity-50'}`}>{counts[t.key]}</span>
               </button>
             )
           })}

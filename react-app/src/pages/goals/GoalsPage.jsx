@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, Trash2, AlertTriangle, Wallet, TrendingUp, HelpCircle } from 'lucide-react'
+import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, Trash2, AlertTriangle, Wallet, TrendingUp } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
+import { getRecommendedAllocation } from '../../data/glidePath'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
@@ -28,38 +29,35 @@ const priorityBadge = {
   Low: 'bg-blue-500/15 text-[var(--accent-blue)]',
 }
 
-// Glide path: recommended equity % by years to goal
-const GLIDE_PATH = [
-  { maxYears: 1,  equity: 10, label: 'Short-term' },
-  { maxYears: 3,  equity: 30, label: 'Short-term' },
-  { maxYears: 5,  equity: 50, label: 'Medium-term' },
-  { maxYears: 7,  equity: 65, label: 'Medium-term' },
-  { maxYears: 10, equity: 75, label: 'Long-term' },
-  { maxYears: Infinity, equity: 85, label: 'Long-term' },
-]
-
-function getRecommendedAllocation(goalType, yearsLeft) {
-  if (goalType === 'Emergency Fund') return { equity: 0, debt: 100, label: 'Safety' }
-  const step = GLIDE_PATH.find(s => yearsLeft <= s.maxYears)
-  return { equity: step.equity, debt: 100 - step.equity, label: step.label }
+// Derive DOB from member dynamicFields (canonical key "DOB" or common variants)
+const DOB_KEYS = ['dob', 'date of birth', 'dateofbirth', 'birthday', 'birth date', 'date_of_birth']
+function getMemberDOB(member) {
+  if (!member?.dynamicFields) return null
+  const key = Object.keys(member.dynamicFields).find(k => DOB_KEYS.includes(k.toLowerCase().trim()))
+  if (!key) return null
+  const d = new Date(member.dynamicFields[key])
+  return isNaN(d.getTime()) ? null : d
 }
 
 // Equity categories for allocation analysis
 const EQUITY_CATS = new Set(['Equity', 'ELSS', 'Index'])
 
-function classifyPortfolio(portfolioId, holdings) {
+function classifyPortfolio(portfolioId, holdings, allocMap) {
   const ph = holdings.filter(h => h.portfolioId === portfolioId && h.units > 0)
   let total = 0, equity = 0
   for (const h of ph) {
     total += h.currentValue
-    if (EQUITY_CATS.has(h.category)) equity += h.currentValue
+    const detailed = allocMap?.[h.schemeCode || h.fundCode]
+    if (detailed) {
+      equity += h.currentValue * ((detailed.Equity || 0) / 100)
+    } else if (EQUITY_CATS.has(h.category)) equity += h.currentValue
     else if (h.category === 'Hybrid') equity += h.currentValue * 0.65
     else if (h.category === 'Multi-Asset') equity += h.currentValue * 0.50
   }
   return total > 0 ? Math.round((equity / total) * 100) : null
 }
 
-function findBestPortfolios(recommendedEquity, portfolios, holdings, mappings, excludeGoalId) {
+function findBestPortfolios(recommendedEquity, portfolios, holdings, mappings, excludeGoalId, allocMap) {
   const usedByOthers = {}
   for (const m of (mappings || [])) {
     if (m.goalId === excludeGoalId) continue
@@ -69,7 +67,7 @@ function findBestPortfolios(recommendedEquity, portfolios, holdings, mappings, e
   // Classify all available portfolios
   const classified = []
   for (const p of portfolios) {
-    const eq = classifyPortfolio(p.portfolioId, holdings)
+    const eq = classifyPortfolio(p.portfolioId, holdings, allocMap)
     if (eq === null) continue
     const available = 100 - (usedByOthers[p.portfolioId] || 0)
     if (available <= 0) continue
@@ -129,11 +127,11 @@ export default function GoalsPage() {
   const [goalDirty, setGoalDirty] = useState(false)
   const [goalSaving, setGoalSaving] = useState(false)
 
+  const allActiveGoals = useMemo(() => (goalList || []).filter(g => g.isActive !== false), [goalList])
+
   const filtered = useMemo(() => {
-    if (!goalList) return []
-    const active = goalList.filter((g) => g.isActive !== false)
-    return selectedMember === 'all' ? active : active.filter((g) => g.familyMemberId === selectedMember)
-  }, [goalList, selectedMember])
+    return selectedMember === 'all' ? allActiveGoals : allActiveGoals.filter((g) => g.familyMemberId === selectedMember)
+  }, [allActiveGoals, selectedMember])
 
   function memberLabel(g) {
     if (!g.familyMemberName || g.familyMemberName === 'Family') return g.familyMemberName || 'Family'
@@ -141,20 +139,46 @@ export default function GoalsPage() {
     return m?.relationship ? `${g.familyMemberName} (${m.relationship})` : g.familyMemberName
   }
 
-  const totalTarget = filtered.reduce((s, g) => s + (g.targetAmount || 0), 0)
-  const totalCurrent = filtered.reduce((s, g) => s + (g.currentValue || 0), 0)
-  const totalSIP = filtered.reduce((s, g) => s + (g.monthlyInvestment || 0), 0)
-  const totalLumpsum = filtered.reduce((s, g) => s + (g.lumpsumNeeded || 0), 0)
+  const _now = new Date()
+  // Stats always computed from ALL active goals regardless of member filter
+  const totalTarget = allActiveGoals.reduce((s, g) => s + (g.targetAmount || 0), 0)
+  const totalCurrent = allActiveGoals.reduce((s, g) => s + (g.currentValue || 0), 0)
+  const totalSIP = allActiveGoals.reduce((s, g) => {
+    const yearsLeft = g.targetDate ? (new Date(g.targetDate) - _now) / (365.25 * 24 * 60 * 60 * 1000) : 0
+    return yearsLeft > 0 ? s + (g.monthlyInvestment || 0) : s
+  }, 0)
+  const totalLumpsum = allActiveGoals.reduce((s, g) => {
+    const yearsLeft = g.targetDate ? (new Date(g.targetDate) - _now) / (365.25 * 24 * 60 * 60 * 1000) : 0
+    return yearsLeft > 0 ? s + (g.lumpsumNeeded || 0) : s
+  }, 0)
+  const overdueTotal = allActiveGoals.reduce((s, g) => {
+    const yearsLeft = g.targetDate ? (new Date(g.targetDate) - _now) / (365.25 * 24 * 60 * 60 * 1000) : 0
+    if (yearsLeft <= 0 && g.status !== 'Achieved') {
+      return s + Math.max(0, (g.targetAmount || 0) - (g.currentValue || 0))
+    }
+    return s
+  }, 0)
   const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0
-  const needsAttention = filtered.filter((g) => g.status === 'Needs Attention').length
-  const achieved = filtered.filter((g) => g.status === 'Achieved').length
+  const needsAttention = allActiveGoals.filter((g) => g.status === 'Needs Attention').length
+  const achieved = allActiveGoals.filter((g) => g.status === 'Achieved').length
 
   // Allocation health for ALL goals (replaces old deRiskAlerts that only checked 0-3 years)
+  // Build fund breakdown lookup for accurate equity/debt split
+  const goalAllocMap = useMemo(() => {
+    const m = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        if (a.assetAllocation) m[a.fundCode] = a.assetAllocation
+      }
+    }
+    return m
+  }, [assetAllocations])
+
   const allocationHealth = useMemo(() => {
-    if (!filtered.length || !mfHoldings?.length) return {}
+    if (!allActiveGoals.length || !mfHoldings?.length) return {}
     const now = new Date()
     const health = {}
-    for (const g of filtered) {
+    for (const g of allActiveGoals) {
       if (g.status === 'Achieved') continue
       const yearsLeft = (new Date(g.targetDate) - now) / (365.25 * 24 * 60 * 60 * 1000)
       if (yearsLeft <= 0) continue
@@ -166,7 +190,10 @@ export default function GoalsPage() {
         for (const h of holdings) {
           const val = h.currentValue * (m.allocationPct / 100)
           totalValue += val
-          if (EQUITY_CATS.has(h.category)) equityValue += val
+          const detailed = goalAllocMap[h.schemeCode || h.fundCode]
+          if (detailed) {
+            equityValue += val * ((detailed.Equity || 0) / 100)
+          } else if (EQUITY_CATS.has(h.category)) equityValue += val
           else if (h.category === 'Hybrid') equityValue += val * 0.65
           else if (h.category === 'Multi-Asset') equityValue += val * 0.50
         }
@@ -191,11 +218,11 @@ export default function GoalsPage() {
       health[g.goalId] = { yearsLeft, label: recommended.label, recommendedEquity: recommended.equity, recommendedDebt: recommended.debt, actualEquity, isMapped, mismatch, needsAttention, liveLumpsum, liveSIP }
     }
     return health
-  }, [filtered, goalPortfolioMappings, mfHoldings])
+  }, [allActiveGoals, goalPortfolioMappings, mfHoldings, goalAllocMap])
 
-  // Live totals from allocationHealth (based on actual portfolio progress)
-  const liveTotalSIP = filtered.reduce((s, g) => s + (allocationHealth[g.goalId]?.liveSIP || 0), 0)
-  const liveTotalLumpsum = filtered.reduce((s, g) => s + (allocationHealth[g.goalId]?.liveLumpsum || 0), 0)
+  // Live totals from allocationHealth — always from all goals
+  const liveTotalSIP = allActiveGoals.reduce((s, g) => s + (allocationHealth[g.goalId]?.liveSIP || 0), 0)
+  const liveTotalLumpsum = allActiveGoals.reduce((s, g) => s + (allocationHealth[g.goalId]?.liveLumpsum || 0), 0)
 
   // De-risk alerts derived from allocationHealth (over-equity goals)
   const deRiskAlerts = useMemo(() => {
@@ -319,7 +346,7 @@ export default function GoalsPage() {
         const yearsLeft = (new Date(goal.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000)
         if (yearsLeft > 0) {
           const rec = getRecommendedAllocation(goal.goalType, yearsLeft)
-          const suggestions = findBestPortfolios(rec.equity, activeMFPortfolios, mfHoldings, goalPortfolioMappings, goalId)
+          const suggestions = findBestPortfolios(rec.equity, activeMFPortfolios, mfHoldings, goalPortfolioMappings, goalId, goalAllocMap)
           if (suggestions.length > 0) {
             setLocalMappings(suggestions.map(s => ({ portfolioId: s.portfolioId, allocationPct: s.availablePct, investmentType: 'MF' })))
             setLinkingGoalId(goalId)
@@ -406,7 +433,7 @@ export default function GoalsPage() {
           const yearsLeft = (new Date(data.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000)
           if (yearsLeft > 0) {
             const rec = getRecommendedAllocation(data.goalType, yearsLeft)
-            const suggestions = findBestPortfolios(rec.equity, activeMFPortfolios, mfHoldings, goalPortfolioMappings, newGoalId)
+            const suggestions = findBestPortfolios(rec.equity, activeMFPortfolios, mfHoldings, goalPortfolioMappings, newGoalId, goalAllocMap)
             if (suggestions.length > 0) {
               setLocalMappings(suggestions.map(s => ({ portfolioId: s.portfolioId, allocationPct: s.availablePct, investmentType: 'MF' })))
               setLinkingGoalId(newGoalId)
@@ -521,93 +548,33 @@ export default function GoalsPage() {
             <StatCard
               label="Progress"
               value={`${overallProgress.toFixed(1)}%`}
-              sub={`${filtered.length} goal${filtered.length !== 1 ? 's' : ''}${achieved > 0 ? ` · ${achieved} done` : ''}${
-                (() => { const mc = filtered.filter(g => allocationHealth[g.goalId]?.needsAttention).length; return mc > 0 ? ` · ${mc} misaligned` : '' })()
-              }`}
+              sub={`${allActiveGoals.length} goal${allActiveGoals.length !== 1 ? 's' : ''}${achieved > 0 ? ` · ${achieved} done` : ''}${
+                (() => { const mc = allActiveGoals.filter(g => allocationHealth[g.goalId]?.needsAttention).length; return mc > 0 ? ` · ${mc} misaligned` : '' })()
+              }${selectedMember !== 'all' ? ' · all members' : ''}`}
               positive={overallProgress >= 50}
               bold
             />
-            <StatCard label="SIP Needed" value={formatINR(liveTotalSIP || totalSIP)} sub={needsAttention > 0 ? `${needsAttention} need attention` : 'per month'} />
-            <StatCard label="Lumpsum Needed" value={formatINR(liveTotalLumpsum || totalLumpsum)} sub="one-time today" />
-          </div>
-
-          {/* Goal Timeline */}
-          {(() => {
-            const now = new Date()
-            const timelineGoals = filtered
-              .filter(g => g.targetDate && g.status !== 'Achieved')
-              .map(g => {
-                const start = g.createdDate ? new Date(g.createdDate) : now
-                const target = new Date(g.targetDate)
-                const elapsed = now - start
-                const yearsLeft = Math.max(0, (target - now) / (365.25 * 24 * 60 * 60 * 1000))
-                const fundedPct = g.targetAmount > 0 ? Math.min(((g.currentValue || 0) / g.targetAmount) * 100, 100) : 0
-                const gap = Math.max(0, (g.targetAmount || 0) - (g.currentValue || 0))
-
-                // Is this goal on track? Compare actual value vs where plan says you should be
-                const cagr = g.expectedCAGR || 0.12
-                const monthlyRate = cagr / 12
-                const elapsedMonths = Math.max(0, Math.round(elapsed / (30.44 * 24 * 60 * 60 * 1000)))
-                const sip = g.monthlyInvestment || 0
-                const ls = g.lumpsumInvested || 0
-                const fvLs = ls > 0 && monthlyRate > 0 && elapsedMonths > 0 ? ls * Math.pow(1 + monthlyRate, elapsedMonths) : ls
-                const fvSIP = sip > 0 && monthlyRate > 0 && elapsedMonths > 0
-                  ? sip * ((Math.pow(1 + monthlyRate, elapsedMonths) - 1) / monthlyRate) : sip * elapsedMonths
-                const expectedNow = Math.round(fvLs + fvSIP)
-                const onTrack = (g.currentValue || 0) >= expectedNow || gap === 0
-                const shortfall = expectedNow > 0 && elapsedMonths > 0 ? Math.max(0, expectedNow - (g.currentValue || 0)) : 0
-
-                return { ...g, targetTime: target.getTime(), yearsLeft, fundedPct, gap, onTrack, expectedNow, shortfall, elapsedMonths }
-              })
-              .sort((a, b) => a.targetTime - b.targetTime)
-            if (timelineGoals.length === 0) return null
-
-            return (
-              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Goal Timeline</p>
-                <div className="space-y-3">
-                  {timelineGoals.map(g => {
-                    const color = g.onTrack ? '#10b981' : g.fundedPct >= 15 ? '#f59e0b' : '#ef4444'
-                    return (
-                      <div key={g.goalId}>
-                        {/* Row 1: Name + status badge + funded/target + years */}
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <p className="text-[11px] font-semibold text-[var(--text-primary)] truncate">{g.goalName}</p>
-                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
-                                  style={{ background: `${color}15`, color }}>
-                              {g.onTrack ? 'On track' : 'Behind'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-[var(--text-dim)] tabular-nums shrink-0 ml-2">{g.yearsLeft.toFixed(1)} yrs</span>
-                        </div>
-                        {/* Row 2: Progress bar */}
-                        <div className="h-[8px] bg-[var(--bg-inset)] rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all"
-                               style={{ width: `${Math.max(g.fundedPct, 1)}%`, background: color }} />
-                        </div>
-                        {/* Row 3: Current + expected status */}
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(g.currentValue || 0)}</span>
-                          <span className="text-[10px] font-bold tabular-nums" style={{ color }}>{g.fundedPct.toFixed(0)}%</span>
-                          {g.gap === 0 ? (
-                            <span className="text-[10px] text-emerald-400 font-semibold">Funded</span>
-                          ) : g.shortfall > 0 && g.elapsedMonths > 0 ? (
-                            <span className="text-[10px] tabular-nums flex items-center gap-0.5" style={{ color }}
-                              title={`Expected ${formatINR(g.expectedNow)} by now based on your SIP + lumpsum plan`}>
-                              {formatINR(g.shortfall)} behind <HelpCircle size={9} className="shrink-0 cursor-help" />
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-[var(--text-dim)] tabular-nums">Target {formatINR(g.targetAmount)}</span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+            {/* SIP vs Lumpsum — two alternative paths, not both required */}
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 col-span-2 sm:col-span-1 lg:col-span-2">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">SIP / Month</p>
+                  <p className="text-sm font-bold tabular-nums text-violet-400">{formatINR(liveTotalSIP || totalSIP)}</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5">for active goals</p>
+                </div>
+                <span className="text-xs font-bold text-[var(--text-dim)] mt-3 shrink-0">OR</span>
+                <div className="flex-1 min-w-0 text-right">
+                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Lumpsum Today</p>
+                  <p className="text-sm font-bold tabular-nums text-amber-400">{formatINR(liveTotalLumpsum || totalLumpsum)}</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5">for active goals</p>
                 </div>
               </div>
-            )
-          })()}
+              {overdueTotal > 0 && (
+                <p className="text-xs text-rose-400 font-semibold mt-1.5">+ {formatINR(overdueTotal)} needed now · overdue</p>
+              )}
+            </div>
+          </div>
+
 
           {/* Celebration banner */}
           {showCelebration && (
@@ -634,7 +601,7 @@ export default function GoalsPage() {
             <div className="bg-[var(--bg-card)] rounded-xl border border-amber-500/20 p-4 space-y-2">
               <div className="flex items-center gap-2 mb-1">
                 <ShieldAlert size={14} className="text-amber-400" />
-                <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">De-risking Alerts</p>
+                <p className="text-sm font-bold text-amber-400 uppercase tracking-wider">De-risking Alerts</p>
               </div>
               <p className="text-xs text-[var(--text-dim)] mb-2">
                 These goals are approaching their deadline with high equity exposure. Consider moving funds to debt/liquid for capital protection.
@@ -644,15 +611,15 @@ export default function GoalsPage() {
                   <div key={a.goalId} className="flex items-center justify-between bg-amber-500/5 rounded-lg px-3 py-2 gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-[var(--text-primary)]">{a.goalName}</p>
-                      <p className="text-[10px] text-[var(--text-dim)]">{a.yearsLeft} yrs left</p>
+                      <p className="text-xs text-[var(--text-dim)]">{a.yearsLeft} yrs left</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-amber-400">{a.equityPct}% equity</p>
-                      <p className="text-[10px] text-[var(--text-dim)]">Recommended max {a.maxEquity}%</p>
+                      <p className="text-xs text-[var(--text-dim)]">Recommended max {a.maxEquity}%</p>
                     </div>
                     <button
                       onClick={() => setRebalanceGoal(filtered.find(g => g.goalId === a.goalId))}
-                      className="shrink-0 px-3 py-1.5 text-[10px] font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors"
+                      className="shrink-0 px-3 py-1.5 text-xs font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors"
                     >
                       Rebalance
                     </button>
@@ -667,12 +634,12 @@ export default function GoalsPage() {
             <div className="bg-[var(--bg-card)] rounded-xl border border-yellow-500/20 p-4 space-y-1.5">
               <div className="flex items-center gap-2 mb-1">
                 <Wallet size={14} className="text-yellow-400" />
-                <p className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Unlinked Allocations</p>
+                <p className="text-sm font-bold text-yellow-400 uppercase tracking-wider">Unlinked Allocations</p>
               </div>
               {underAllocatedPortfolios.map(p => (
                 <div key={p.portfolioId} className="flex items-center justify-between bg-yellow-500/5 rounded-lg px-3 py-2">
                   <p className="text-xs text-[var(--text-primary)]">{p.name}</p>
-                  <p className="text-[10px] font-semibold text-yellow-400">{p.unlinked}% not linked to any goal</p>
+                  <p className="text-xs font-semibold text-yellow-400">{p.unlinked}% not linked to any goal</p>
                 </div>
               ))}
             </div>
@@ -690,280 +657,223 @@ export default function GoalsPage() {
             {filtered.map((g) => {
               const progress = getProgress(g)
               const yearsLeft = getYearsLeft(g)
+              const _cardGap = Math.max(0, (g.targetAmount || 0) - (g.currentValue || 0))
+              const isPastDue = yearsLeft === '0' && _cardGap > 0 && g.status !== 'Achieved'
               const goalMaps = (goalPortfolioMappings || []).filter((m) => m.goalId === g.goalId)
               const linkedCount = goalMaps.length
+              const h = allocationHealth[g.goalId]
+
+              // Retirement age badge
+              const retirementInfo = (() => {
+                if (g.goalType !== 'Retirement' || !g.targetDate) return null
+                const retireYear = new Date(g.targetDate).getFullYear()
+                const member = (activeMembers || []).find(m => m.memberName === g.familyMemberName)
+                const dob = getMemberDOB(member)
+                const retireAge = dob
+                  ? Math.round((new Date(g.targetDate) - dob) / (365.25 * 24 * 60 * 60 * 1000))
+                  : null
+                return { retireYear, retireAge }
+              })()
+
+              // Track status
+              const actual = g.currentValue || 0
+              const elapsed = new Date() - (g.createdDate ? new Date(g.createdDate) : new Date())
+              const cagr = g.expectedCAGR || 0.12
+              const monthlyRate = cagr / 12
+              const elapsedMonths = Math.max(0, Math.round(elapsed / (30.44 * 24 * 60 * 60 * 1000)))
+              const sipPlanned = g.monthlyInvestment || 0
+              const lsPlanned = g.lumpsumInvested || 0
+              const fvLs = lsPlanned > 0 && monthlyRate > 0 && elapsedMonths > 0 ? lsPlanned * Math.pow(1 + monthlyRate, elapsedMonths) : lsPlanned
+              const fvSIP = sipPlanned > 0 && monthlyRate > 0 && elapsedMonths > 0
+                ? sipPlanned * ((Math.pow(1 + monthlyRate, elapsedMonths) - 1) / monthlyRate) : sipPlanned * elapsedMonths
+              const expectedNow = Math.round(fvLs + fvSIP)
+              const trackStatus = !isPastDue && (_cardGap === 0 || actual >= expectedNow || g.status === 'Achieved')
+              const color = _cardGap === 0 ? '#10b981' : isPastDue ? '#ef4444' : trackStatus ? '#10b981' : progress >= 15 ? '#f59e0b' : '#ef4444'
+              const statusText = _cardGap === 0 ? 'Funded' : isPastDue ? 'Overdue' : (actual === 0 && _cardGap > 0) ? 'Not started' : trackStatus ? 'On track' : 'Behind'
+
+              // SIP/Lumpsum: live (portfolio-based) > stored plan
+              const sipVal = h?.liveSIP > 0 ? h.liveSIP : g.monthlyInvestment || 0
+              const lsVal = h?.liveLumpsum > 0 ? h.liveLumpsum : g.lumpsumNeeded || 0
+              const hasPlan = sipVal > 0 || lsVal > 0
+              const investmentsCovered = h && _cardGap > 0 && !h.liveSIP && h.yearsLeft > 0
+
+              const dateStr = g.targetDate
+                ? new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+                : '—'
+              const labelColor = h?.label === 'Short-term' ? '#60a5fa'
+                : h?.label === 'Medium-term' ? '#fbbf24'
+                : h?.label === 'Long-term' ? '#34d399' : '#94a3b8'
 
               return (
-                <div key={g.goalId} className="bg-[var(--bg-card)] rounded-xl border overflow-hidden transition-colors border-[var(--border)]">
-                  {/* Card Body */}
-                  <div className="p-4">
-                    {/* Header: Name + Status */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{g.goalName}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-[var(--text-muted)]">{memberLabel(g)}</span>
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${priorityBadge[g.priority] || ''}`}>{g.priority}</span>
+                <div key={g.goalId} className="bg-[var(--bg-card)] rounded-xl border overflow-hidden border-[var(--border)] flex flex-col">
+
+                  {/* ── Header ── */}
+                  <div className="px-4 pt-4 pb-3 border-b border-[var(--border-light)]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <p className="text-sm font-bold text-[var(--text-primary)]">{g.goalName}</p>
+                          {isPastDue ? (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-[var(--accent-rose)]">Overdue</span>
+                          ) : (
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${priorityBadge[g.priority] || ''}`}>{g.priority}</span>
+                          )}
+                          {retirementInfo && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                              {retirementInfo.retireAge ? `Age ${retirementInfo.retireAge}` : retirementInfo.retireYear}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs text-[var(--text-dim)]">{memberLabel(g)} · {g.goalType}</span>
+                          {h?.label && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+                                  style={{ background: `${labelColor}15`, color: labelColor }}>{h.label}</span>
+                          )}
                         </div>
                       </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                         {g.status}
                       </span>
                     </div>
+                  </div>
 
-                    {/* Bucket label + Allocation Health */}
-                    {(() => {
-                      const h = allocationHealth[g.goalId]
-                      if (!h) return null
-                      const labelColor = h.label === 'Short-term' ? '#60a5fa'
-                        : h.label === 'Medium-term' ? '#fbbf24'
-                        : h.label === 'Long-term' ? '#34d399' : '#94a3b8'
-                      return (
-                        <div className="mb-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                  style={{ background: `${labelColor}15`, color: labelColor }}>
-                              {h.label}
-                            </span>
-                            <span className="text-xs text-[var(--text-muted)]">
-                              {h.recommendedEquity}% Equity · {h.recommendedDebt}% Debt
-                            </span>
-                          </div>
-                          {h.isMapped && h.actualEquity !== null && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[9px] text-[var(--text-dim)] uppercase w-12 shrink-0">Actual</span>
-                              <div className="flex-1 h-1.5 rounded-full overflow-hidden flex"
-                                   style={{ background: 'var(--bg-inset)' }}>
-                                <div className="h-full" style={{
-                                  width: `${h.actualEquity}%`,
-                                  background: h.needsAttention ? '#f87171' : '#8b5cf6'
-                                }} />
-                                <div className="h-full" style={{
-                                  width: `${100 - h.actualEquity}%`,
-                                  background: h.needsAttention ? '#fbbf24' : '#60a5fa'
-                                }} />
-                              </div>
-                              <span className={`text-xs font-semibold tabular-nums ${
-                                h.needsAttention ? 'text-amber-400' : 'text-[var(--text-muted)]'
-                              }`}>
-                                {h.actualEquity}% Equity
-                              </span>
-                            </div>
-                          )}
-                          {h.needsAttention && h.mismatch > 0 && (
-                            <p className="text-[10px] text-amber-400 mt-1">
-                              ⚠ {h.mismatch}% over recommended equity — consider shifting to debt
-                            </p>
-                          )}
-                          {h.needsAttention && h.mismatch < 0 && (
-                            <p className="text-[10px] text-blue-400 mt-1">
-                              ℹ {Math.abs(h.mismatch)}% under equity — room for more growth
-                            </p>
-                          )}
-                          {!h.isMapped && (
-                            <p className="text-[10px] text-[var(--text-dim)]">No investments linked yet</p>
-                          )}
-                        </div>
-                      )
-                    })()}
+                  {/* ── Progress ── */}
+                  <div className="px-4 py-3">
+                    <div className="flex items-end justify-between mb-2">
+                      <div>
+                        <p className="text-xs text-[var(--text-dim)] uppercase mb-0.5">Saved</p>
+                        <p className="text-lg font-bold text-[var(--text-primary)] tabular-nums leading-none">{formatINR(actual)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-[var(--text-dim)] uppercase mb-0.5">
+                          Target · {yearsLeft && yearsLeft !== '0' ? `${yearsLeft}y left` : dateStr}
+                        </p>
+                        <p className="text-lg font-bold text-[var(--text-muted)] tabular-nums leading-none">{formatINR(g.targetAmount)}</p>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-[var(--bg-inset)] rounded-full overflow-hidden mb-1.5">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(progress, 1)}%`, background: color }} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold" style={{ color }}>{progress.toFixed(0)}% · {statusText}</span>
+                      {isPastDue && _cardGap > 0 && (
+                        <span className="text-xs tabular-nums text-rose-400">{formatINR(_cardGap)} still needed</span>
+                      )}
+                    </div>
+                  </div>
 
-                    {/* Progress */}
-                    {(() => {
-                      const h = allocationHealth[g.goalId]
-                      const gap = Math.max(0, (g.targetAmount || 0) - (g.currentValue || 0))
-                      const onTrack = gap === 0 || g.status === 'Achieved'
-                      const actual = g.currentValue || 0
-
-                      // On track = actual >= where plan says you should be today
-                      const start = g.createdDate ? new Date(g.createdDate) : new Date()
-                      const elapsed = new Date() - start
-                      const cagr = g.expectedCAGR || 0.12
-                      const monthlyRate = cagr / 12
-                      const elapsedMonths = Math.max(0, Math.round(elapsed / (30.44 * 24 * 60 * 60 * 1000)))
-                      const sip = g.monthlyInvestment || 0
-                      const ls = g.lumpsumInvested || 0
-                      const fvLs = ls > 0 && monthlyRate > 0 && elapsedMonths > 0 ? ls * Math.pow(1 + monthlyRate, elapsedMonths) : ls
-                      const fvSIP = sip > 0 && monthlyRate > 0 && elapsedMonths > 0
-                        ? sip * ((Math.pow(1 + monthlyRate, elapsedMonths) - 1) / monthlyRate) : sip * elapsedMonths
-                      const expectedNow = Math.round(fvLs + fvSIP)
-                      const trackStatus = onTrack || actual >= expectedNow
-                      const color = trackStatus ? '#10b981' : progress >= 15 ? '#f59e0b' : '#ef4444'
-                      const shortfall = expectedNow > 0 ? Math.max(0, expectedNow - actual) : 0
-                      const hasExpected = expectedNow > 0 && elapsedMonths > 0
-
-                      return (
-                        <>
-                          {/* Current / Target row */}
-                          <div className="flex items-end justify-between mb-1.5">
-                            <div>
-                              <p className="text-[10px] text-[var(--text-dim)] uppercase">Current</p>
-                              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(actual)}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] text-[var(--text-dim)] uppercase">Target · {yearsLeft ? `${yearsLeft}y` : '—'}</p>
-                              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(g.targetAmount)}</p>
-                            </div>
-                          </div>
-                          {/* Progress bar */}
-                          <div className="h-[6px] bg-[var(--bg-inset)] rounded-full overflow-hidden mb-1">
-                            <div className="h-full rounded-full transition-all"
-                                 style={{ width: `${Math.max(progress, 1)}%`, background: color }} />
-                          </div>
-                          {/* Status line: show expected vs actual when behind */}
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold tabular-nums" style={{ color }}>
-                                {progress.toFixed(0)}% · {gap === 0 ? 'Funded' : trackStatus ? 'On track' : 'Behind'}
-                              </span>
-                              {hasExpected && !trackStatus && shortfall > 0 && (
-                                <span className="text-[10px] tabular-nums" style={{ color }}>
-                                  {formatINR(shortfall)} behind plan
-                                </span>
-                              )}
-                            </div>
-                            {hasExpected && !trackStatus && (
-                              <p className="text-[10px] text-[var(--text-dim)] mt-0.5 flex items-center gap-1">
-                                Should be {formatINR(expectedNow)} by now
-                                <HelpCircle size={10} className="text-[var(--text-dim)] shrink-0 cursor-help"
-                                  title={`Based on your planned SIP of ${formatINR(sip)}/mo${ls > 0 ? ` + ${formatINR(ls)} lumpsum` : ''} at ${(cagr * 100).toFixed(0)}% expected return over ${elapsedMonths} months since goal creation`} />
-                              </p>
-                            )}
-                          </div>
-                          {/* Actionable suggestions based on live progress + portfolio mapping */}
-                          {h && !onTrack && h.liveSIP > 0 && (() => {
-                            const savedMaps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
-                            const hasMappings = savedMaps.length > 0
-                            const totalAllocPct = savedMaps.reduce((s, m) => s + (m.allocationPct || 0), 0)
-                            return (
-                              <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 mb-3 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] text-[var(--text-dim)] uppercase">SIP needed</span>
-                                  <span className="text-xs font-bold text-violet-400 tabular-nums">{formatINR(h.liveSIP)}/mo</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] text-[var(--text-dim)] uppercase">Or lumpsum today</span>
-                                  <span className="text-xs font-bold text-violet-400 tabular-nums">{formatINR(h.liveLumpsum)}</span>
-                                </div>
-                                {/* Per-portfolio + fund breakdown (rebalance-aware) */}
-                                {hasMappings && totalAllocPct > 0 && (
-                                  <div className="pt-1.5 mt-1 border-t border-[var(--border-light)] space-y-2">
-                                    <p className="text-[10px] text-[var(--text-dim)] uppercase font-semibold">Where to invest</p>
-                                    {savedMaps.map(m => {
-                                      const inv = investments[m.portfolioId]
-                                      if (!inv) return null
-                                      const share = m.allocationPct / totalAllocPct
-                                      const sipShare = Math.round(h.liveSIP * share)
-                                      const lsShare = Math.round(h.liveLumpsum * share)
-                                      // Get funds with target allocation — use rebalance logic
-                                      const pFunds = (mfHoldings || []).filter(f =>
-                                        f.portfolioId === m.portfolioId && f.targetAllocationPct > 0
-                                      )
-                                      const pValue = pFunds.reduce((s, f) => s + f.currentValue, 0)
-                                      // Rebalance-aware lumpsum distribution (same as MFRebalanceDialog)
-                                      const newTotal = pValue + lsShare
-                                      const fundDist = pFunds.map(f => {
-                                        const targetVal = (f.targetAllocationPct / 100) * newTotal
-                                        let invest = Math.max(0, targetVal - f.currentValue)
-                                        if (f.lumpsumRestricted) invest = 0
-                                        return { ...f, invest }
-                                      })
-                                      const totalRaw = fundDist.reduce((s, f) => s + f.invest, 0)
-                                      // Scale to match lsShare exactly
-                                      const scaled = totalRaw > 0 ? fundDist.map(f => ({
-                                        ...f, invest: f.invest > 0 ? Math.round(f.invest * lsShare / totalRaw) : 0
-                                      })) : fundDist
-                                      // SIP: use target allocation % (same as rebalance SIP logic)
-                                      const totalTargetPct = pFunds.reduce((s, f) => s + f.targetAllocationPct, 0)
-                                      const sipDist = pFunds.map(f => {
-                                        if (f.sipRestricted) return { schemeCode: f.schemeCode, sip: 0 }
-                                        const normalSIP = totalTargetPct > 0 ? Math.round(sipShare * f.targetAllocationPct / totalTargetPct) : 0
-                                        return { schemeCode: f.schemeCode, sip: normalSIP }
-                                      })
-                                      const showFunds = scaled.some(f => f.invest > 0) || sipDist.some(f => f.sip > 0)
-                                      return (
-                                        <div key={m.portfolioId}>
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-semibold text-[var(--text-secondary)]">{inv.name} ({m.allocationPct}%)</span>
-                                            <span className="text-[10px] font-semibold text-violet-400 tabular-nums shrink-0 ml-2">
-                                              {formatINR(sipShare)}/mo · {formatINR(lsShare)}
-                                            </span>
-                                          </div>
-                                          {showFunds && (
-                                            <div className="ml-2 mt-0.5 space-y-0.5">
-                                              {scaled.map(f => {
-                                                const sd = sipDist.find(s => s.schemeCode === f.schemeCode)
-                                                const fundSIP = sd?.sip || 0
-                                                if (f.invest === 0 && fundSIP === 0) return null
-                                                const isOverweight = pValue > 0 && (f.currentValue / pValue) * 100 > f.targetAllocationPct + 2
-                                                return (
-                                                  <div key={f.schemeCode} className="flex items-center justify-between">
-                                                    <span className={`text-[9px] truncate mr-2 ${isOverweight ? 'text-amber-400/70' : 'text-[var(--text-dim)]'}`}>
-                                                      {splitFundName(f.fundName).main}
-                                                      {isOverweight ? ' (overweight)' : ` (${f.targetAllocationPct}%)`}
-                                                    </span>
-                                                    <span className="text-[9px] text-violet-400/80 tabular-nums shrink-0">
-                                                      {fundSIP > 0 ? `${formatINR(fundSIP)}/mo` : ''}
-                                                      {fundSIP > 0 && f.invest > 0 ? ' · ' : ''}
-                                                      {f.invest > 0 ? formatINR(f.invest) : ''}
-                                                    </span>
-                                                  </div>
-                                                )
-                                              })}
-                                            </div>
-                                          )}
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                                {!hasMappings && (
-                                  <p className="text-[10px] text-amber-400 pt-1">
-                                    Link portfolios to see where to invest
-                                  </p>
-                                )}
-                                <p className="text-[10px] text-[var(--text-dim)] italic">
-                                  at {((g.expectedCAGR || 0.12) * 100).toFixed(0)}% expected return
+                  {/* ── What to do ── */}
+                  {isPastDue && _cardGap > 0 && g.status !== 'Achieved' && (
+                    <div className="px-4 pb-3">
+                      <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-3 py-2.5 flex items-center justify-between gap-2">
+                        <p className="text-xs text-rose-300">Goal overdue — invest now to fund it</p>
+                        <p className="text-sm font-bold text-rose-400 tabular-nums shrink-0">{formatINR(_cardGap)}</p>
+                      </div>
+                    </div>
+                  )}
+                  {g.status !== 'Achieved' && !isPastDue && (
+                    <div className="px-4 pb-3 space-y-2">
+                      {investmentsCovered ? (
+                        <p className="text-xs text-emerald-400 font-semibold">✓ Current investments will cover this goal by target date</p>
+                      ) : !hasPlan ? (
+                        <p className="text-xs text-[var(--text-dim)] italic">Edit goal to set your investment plan</p>
+                      ) : (() => {
+                        const isBehind = elapsedMonths > 0 && expectedNow > 0 && !trackStatus
+                        const catchUp = isBehind ? Math.max(0, expectedNow - actual) : 0
+                        const savedMaps = linkedCount > 0 ? (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId) : []
+                        const totalAllocPct = savedMaps.reduce((s, m) => s + (m.allocationPct || 0), 0)
+                        return (
+                          <>
+                            {isBehind && catchUp > 0 && sipPlanned > 0 && (
+                              <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 px-2.5 py-2">
+                                <p className="text-xs text-[var(--text-dim)] mb-1">Should be <span className="text-[var(--text-muted)] font-semibold">{formatINR(expectedNow)}</span> today — behind by <span className="font-semibold" style={{ color }}>{formatINR(catchUp)}</span></p>
+                                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                                  Option A: invest <span className="text-amber-400">{formatINR(catchUp)}</span> now + continue <span className="text-violet-400">{formatINR(sipPlanned)}/mo</span>
                                 </p>
                               </div>
-                            )
-                          })()}
-                          {h && !onTrack && !h.liveSIP && h.yearsLeft > 0 && (
-                            <div className="bg-emerald-500/5 rounded-lg px-3 py-2 mb-3">
-                              <p className="text-[10px] text-emerald-400 font-semibold">
-                                Current investments will cover this goal by target date
-                              </p>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 rounded-lg bg-violet-500/10 border border-violet-500/20 px-2.5 py-2 text-center">
+                                <p className="text-xs text-violet-400 font-semibold mb-0.5">{isBehind ? 'Option B · SIP only' : 'SIP / Month'}</p>
+                                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(sipVal)}</p>
+                              </div>
+                              <span className="text-xs font-bold text-[var(--text-dim)] shrink-0">OR</span>
+                              <div className="flex-1 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2.5 py-2 text-center">
+                                <p className="text-xs text-amber-400 font-semibold mb-0.5">{isBehind ? 'Option C · Lumpsum' : 'Lumpsum Today'}</p>
+                                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(lsVal)}</p>
+                              </div>
                             </div>
-                          )}
-                        </>
-                      )
-                    })()}
-
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 pt-2 border-t border-[var(--border-light)]">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); startLinking(g.goalId) }}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${
-                          linkedCount > 0 ? 'text-violet-400 hover:bg-violet-500/10' : 'text-amber-400 hover:bg-amber-500/10'
-                        }`}
-                      >
-                        <Link2 size={11} />
-                        {linkedCount > 0 ? `${linkedCount} linked` : 'Link'}
-                        {linkedCount === 0 && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />}
-                      </button>
-                      {g.status === 'Achieved' && g.goalType !== 'Retirement' && (
-                        <button onClick={() => setWithdrawalGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-dim)] hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
-                          <ArrowDownCircle size={11} /> Withdraw
-                        </button>
-                      )}
-                      {g.goalType === 'Retirement' && (
-                        <button onClick={() => setBucketGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
-                          <Wallet size={11} /> Buckets
-                        </button>
-                      )}
-                      <button onClick={() => setModal({ edit: g })} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-white/5 rounded-lg transition-colors ml-auto">
-                        <Pencil size={11} /> Edit
-                      </button>
+                            {h?.liveSIP > 0 && totalAllocPct > 0 && (
+                              <div className="space-y-1 pl-1">
+                                {savedMaps.map(m => {
+                                  const inv = investments[m.portfolioId]
+                                  if (!inv) return null
+                                  const share = m.allocationPct / totalAllocPct
+                                  return (
+                                    <div key={m.portfolioId} className="flex items-center justify-between text-xs">
+                                      <span className="text-[var(--text-dim)] truncate mr-2">{inv.name} ({m.allocationPct}%)</span>
+                                      <span className="text-violet-400 font-semibold tabular-nums shrink-0">
+                                        {formatINR(Math.round(h.liveSIP * share))}/mo · {formatINR(Math.round(h.liveLumpsum * share))}
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                     </div>
+                  )}
+
+                  {/* ── Allocation Health ── */}
+                  {h?.isMapped && h.actualEquity !== null && (
+                    <div className="mx-4 mb-3 rounded-lg bg-[var(--bg-inset)] px-3 py-2 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[var(--text-dim)] uppercase shrink-0 w-10">Equity</span>
+                        <div className="flex-1 h-1.5 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-card)' }}>
+                          <div className="h-full" style={{ width: `${h.actualEquity}%`, background: h.needsAttention ? '#f87171' : '#8b5cf6' }} />
+                          <div className="h-full" style={{ width: `${100 - h.actualEquity}%`, background: '#60a5fa' }} />
+                        </div>
+                        <span className={`text-xs font-semibold tabular-nums shrink-0 ${h.needsAttention ? 'text-amber-400' : 'text-[var(--text-muted)]'}`}>
+                          {h.actualEquity}% <span className="text-[var(--text-dim)] font-normal">/ rec {h.recommendedEquity}%</span>
+                        </span>
+                      </div>
+                      {h.needsAttention && h.mismatch > 0 && (
+                        <p className="text-xs text-amber-400">⚠ {h.mismatch}% over equity — consider shifting to debt</p>
+                      )}
+                      {h.needsAttention && h.mismatch < 0 && (
+                        <p className="text-xs text-blue-400">ℹ {Math.abs(h.mismatch)}% under equity — room for growth</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Action Footer ── */}
+                  <div className="mt-auto border-t border-[var(--border)] px-4 py-2 flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); startLinking(g.goalId) }}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                        linkedCount > 0 ? 'text-violet-400 hover:bg-violet-500/10' : 'text-amber-400 hover:bg-amber-500/10'
+                      }`}
+                    >
+                      <Link2 size={11} />
+                      {linkedCount > 0 ? `${linkedCount} linked` : 'Link'}
+                      {linkedCount === 0 && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />}
+                    </button>
+                    {g.status === 'Achieved' && g.goalType !== 'Retirement' && (
+                      <button onClick={() => setWithdrawalGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
+                        <ArrowDownCircle size={11} /> Withdraw
+                      </button>
+                    )}
+                    {g.goalType === 'Retirement' && (isPastDue || g.status === 'Achieved' || parseFloat(yearsLeft) <= 3) && (
+                      <button onClick={() => setBucketGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
+                        <Wallet size={11} /> Buckets
+                      </button>
+                    )}
+                    <button onClick={() => setModal({ edit: g })} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-white/5 rounded-lg transition-colors ml-auto">
+                      <Pencil size={11} /> Edit
+                    </button>
                   </div>
 
                 </div>
@@ -976,14 +886,14 @@ export default function GoalsPage() {
             <div className="bg-[var(--bg-card)] rounded-xl border border-emerald-500/20 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Trophy size={14} className="text-yellow-400" />
-                <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Achieved Goals</p>
+                <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">Achieved Goals</p>
               </div>
               <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
                 {filtered.filter((g) => g.status === 'Achieved').map((g) => (
                   <div key={g.goalId} className="shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 min-w-[160px]">
                     <p className="text-xs font-semibold text-emerald-400">{g.goalName}</p>
                     <p className="text-sm font-bold text-[var(--text-primary)] mt-1">{formatINR(g.targetAmount)}</p>
-                    <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{memberLabel(g)}</p>
+                    <p className="text-xs text-[var(--text-dim)] mt-0.5">{memberLabel(g)}</p>
                   </div>
                 ))}
               </div>
@@ -1028,9 +938,9 @@ export default function GoalsPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <TrendingUp size={12} className="text-blue-400" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
+                            <span className="text-sm font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
                           </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                                 style={{ background: `${labelColor}15`, color: labelColor }}>
                             {h.label}
                           </span>
@@ -1043,17 +953,17 @@ export default function GoalsPage() {
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-violet-500" />
-                              <span className="text-[10px] text-[var(--text-dim)]">Equity {h.recommendedEquity}%</span>
+                              <span className="text-xs text-[var(--text-dim)]">Equity {h.recommendedEquity}%</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-blue-400" />
-                              <span className="text-[10px] text-[var(--text-dim)]">Debt {h.recommendedDebt}%</span>
+                              <span className="text-xs text-[var(--text-dim)]">Debt {h.recommendedDebt}%</span>
                             </div>
                           </div>
                         </div>
-                        <p className="text-[10px] text-[var(--text-dim)]">{advice}</p>
-                        {goalDirty && localMappings.length === 1 && (
-                          <p className="text-[10px] text-violet-400">Auto-suggested — adjust if needed</p>
+                        <p className="text-xs text-[var(--text-dim)]">{advice}</p>
+                        {goalDirty && localMappings.length > 0 && (
+                          <p className="text-xs text-violet-400">Auto-suggested — adjust if needed</p>
                         )}
                       </div>
                     )
@@ -1070,7 +980,7 @@ export default function GoalsPage() {
                     <div className="bg-[var(--bg-inset)] rounded-lg p-4 text-center space-y-2">
                       <Wallet size={24} className="text-[var(--text-dim)] mx-auto" />
                       <p className="text-xs text-[var(--text-secondary)]">No investment portfolios yet</p>
-                      <p className="text-[10px] text-[var(--text-dim)]">Create a Mutual Fund portfolio first, then come back to link it to this goal.</p>
+                      <p className="text-xs text-[var(--text-dim)]">Create a Mutual Fund portfolio first, then come back to link it to this goal.</p>
                       <button
                         onClick={() => { stopLinking(); navigate('/investments/mutual-funds') }}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors"
@@ -1096,7 +1006,7 @@ export default function GoalsPage() {
                               {mfItems.map((p) => {
                                 const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
                                 const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
-                                const eqPct = classifyPortfolio(p.id, mfHoldings || [])
+                                const eqPct = classifyPortfolio(p.id, mfHoldings || [], goalAllocMap)
                                 const freePct = 100 - (otherGoalAllocs[p.id]?.total || 0)
                                 return (
                                   <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
@@ -1134,13 +1044,13 @@ export default function GoalsPage() {
                           )}
                         </select>
                         {otherTotal > 0 && (
-                          <div className={`text-[10px] px-2 py-1 rounded ${combined > 100 ? 'bg-rose-500/10 text-rose-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                          <div className={`text-xs px-2 py-1 rounded ${combined > 100 ? 'bg-rose-500/10 text-rose-400' : 'bg-blue-500/10 text-blue-400'}`}>
                             {other.goals.map((g2) => `${g2.goalName} (${g2.pct}%)`).join(', ')} — <span className="font-bold">Available: {Math.max(0, available)}%</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-[var(--text-dim)]">Allocation</span>
+                            <span className="text-xs text-[var(--text-dim)]">Allocation</span>
                             <input type="number" value={m.allocationPct} onChange={(e) => updateLocalMapping(idx, 'allocationPct', e.target.value)}
                               className="w-16 px-2 py-1 text-xs text-center bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-[var(--text-primary)] focus:outline-none focus:border-[var(--sidebar-active-text)]" min="0" max={available} />
                             <span className="text-xs text-[var(--text-dim)]">%</span>
@@ -1148,7 +1058,7 @@ export default function GoalsPage() {
                               <Trash2 size={12} />
                             </button>
                           </div>
-                          {item && <p className="text-[10px] text-[var(--text-dim)]">Contributes {formatINR((item.value * m.allocationPct) / 100)}</p>}
+                          {item && <p className="text-xs text-[var(--text-dim)]">Contributes {formatINR((item.value * m.allocationPct) / 100)}</p>}
                         </div>
                       </div>
                     )
@@ -1159,10 +1069,10 @@ export default function GoalsPage() {
                     <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 space-y-1">
                       <div className="flex items-center gap-1.5">
                         <AlertTriangle size={12} className="text-rose-400 shrink-0" />
-                        <span className="text-[10px] font-bold text-rose-400 uppercase">Over-allocated</span>
+                        <span className="text-xs font-bold text-rose-400 uppercase">Over-allocated</span>
                       </div>
                       {overAllocated.map((o, i) => (
-                        <p key={i} className="text-[10px] text-rose-300">{o.name}: {o.combined}% total (exceeds by {o.excess}%)</p>
+                        <p key={i} className="text-xs text-rose-300">{o.name}: {o.combined}% total (exceeds by {o.excess}%)</p>
                       ))}
                     </div>
                   )}
@@ -1203,6 +1113,7 @@ export default function GoalsPage() {
             goalPortfolioMappings={goalPortfolioMappings}
             mfHoldings={mfHoldings}
             mfPortfolios={mfPortfolios}
+            assetAllocations={assetAllocations}
             onClose={() => setRebalanceGoal(null)}
             onConfirmRebalance={handleConfirmRebalance}
           />

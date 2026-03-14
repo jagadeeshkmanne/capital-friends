@@ -225,7 +225,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
       {/* Metal Weight & Purity fields */}
       {isMetalType(form.investmentType) && (
         <div className="p-3 bg-[var(--bg-inset)] rounded-lg space-y-3">
-          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+          <p className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">
             {isGoldType(form.investmentType) ? 'Gold' : 'Silver'} Details
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -262,7 +262,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
       {/* Linked Loans */}
       {(LOAN_SUGGESTIONS[form.investmentType]) && (
         <div className="border-t border-[var(--border-light)] pt-4">
-          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Linked Loans</p>
+          <p className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Linked Loans</p>
 
           {/* Show already linked loans */}
           {form.linkedLiabilityIds.length > 0 && (
@@ -320,7 +320,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
 
           {showQuickLoan && (
             <div className="mt-3 p-3 bg-[var(--bg-inset)] rounded-lg space-y-3">
-              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Quick Loan</p>
+              <p className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Quick Loan</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField label="Lender" required error={errors.qlLender}>
                   <FormInput value={quickLoan.lenderName} onChange={(v) => setQL('lenderName', v)} placeholder="e.g., HDFC Bank" />

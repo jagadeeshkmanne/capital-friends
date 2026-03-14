@@ -46,8 +46,8 @@ function FundCardName({ fundName }) {
   const { main, plan } = splitFundName(fundName)
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">{main}</p>
-      {plan && <p className="text-[9px] text-[var(--text-dim)]">{plan}</p>}
+      <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{main}</p>
+      {plan && <p className="text-xs text-[var(--text-dim)]">{plan}</p>}
     </div>
   )
 }
@@ -55,8 +55,8 @@ function FundCardName({ fundName }) {
 function FundCardRow({ label, value, valueClass }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] text-[var(--text-dim)]">{label}</span>
-      <span className={`text-[11px] tabular-nums font-medium ${valueClass || 'text-[var(--text-secondary)]'}`}>{value}</span>
+      <span className="text-xs text-[var(--text-dim)]">{label}</span>
+      <span className={`text-xs tabular-nums font-medium ${valueClass || 'text-[var(--text-secondary)]'}`}>{value}</span>
     </div>
   )
 }
@@ -73,25 +73,32 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
   if (sipTarget <= 0) return <p className="text-xs text-[var(--text-dim)] py-2">No SIP target set for this portfolio</p>
 
+  // Rescale targets among active (non-restricted) funds so they sum to 100%
+  const activeTargetSum = holdings.filter((h) => h.targetAllocationPct > 0 && !h.sipRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
+  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
+
   const allFunds = holdings
     .filter((h) => h.targetAllocationPct > 0)
     .map((h) => {
       const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-      const drift = Math.abs(currentPct - h.targetAllocationPct)
+      const effectiveTarget = h.sipRestricted ? h.targetAllocationPct : h.targetAllocationPct * rescale
+      const drift = Math.abs(currentPct - effectiveTarget)
       const drifted = drift > threshold
-      const targetValue = (h.targetAllocationPct / 100) * totalValue
+      const targetValue = (effectiveTarget / 100) * totalValue
       const gap = targetValue - h.currentValue
-      const normalSIP = (h.targetAllocationPct / 100) * sipTarget
-      return { ...h, currentPct, drift, drifted, gap, normalSIP }
+      const normalSIP = (effectiveTarget / 100) * sipTarget
+      return { ...h, currentPct, effectiveTarget, drift, drifted, gap, normalSIP }
     })
 
   const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0 && !h.sipRestricted)
   const totalGap = driftedUnderweight.reduce((s, h) => s + h.gap, 0)
+  // Only use the non-restricted funds' share of SIP
+  const activeSIPTotal = allFunds.filter((h) => !h.sipRestricted).reduce((s, h) => s + h.normalSIP, 0)
 
   const withSuggested = allFunds.map((h) => ({
     ...h,
     suggestedSIP: h.sipRestricted ? 0
-      : h.drifted && h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * sipTarget
+      : h.drifted && h.gap > 0 && totalGap > 0 ? (h.gap / totalGap) * activeSIPTotal
       : h.drifted && h.gap <= 0 ? 0
       : h.normalSIP,
   }))
@@ -99,11 +106,24 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   const hasDrift = allFunds.some((h) => h.drifted)
   if (!hasDrift) return <p className="text-xs text-[var(--text-dim)] py-2">SIPs are balanced (within {threshold.toFixed(0)}% threshold)</p>
 
+  const blockedFunds = allFunds.filter((h) => h.sipRestricted)
+  const blockedSIPAmount = blockedFunds.reduce((s, h) => s + h.normalSIP, 0)
+
   return (
     <div className="space-y-2">
       <p className="text-xs text-[var(--text-dim)] px-1">
         Funds drifted &gt;{threshold.toFixed(0)}%: overweight → ₹0, underweight → extra SIP. Others keep normal SIP.
       </p>
+      {blockedFunds.length > 0 && (
+        <div className="px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 space-y-0.5">
+          <p className="text-xs text-amber-400">
+            {blockedFunds.length} fund{blockedFunds.length > 1 ? 's' : ''} blocked from SIP ({formatINR(blockedSIPAmount)}/mo excluded)
+          </p>
+          <p className="text-xs text-amber-400/70">
+            Targets rescaled among active funds: {allFunds.filter((h) => !h.sipRestricted).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
+          </p>
+        </div>
+      )}
 
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
@@ -125,11 +145,11 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
                 <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${h.sipRestricted ? 'opacity-50' : withinThreshold ? 'opacity-50' : isOverweight ? 'opacity-60' : ''}`}>
                   <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
                     <p className="truncate">{splitFundName(h.fundName).main}</p>
-                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                    {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                   </td>
                   <td className="py-2 px-2 text-right tabular-nums">
                     <span className={isOverweight ? 'text-amber-400' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
-                    <span className="text-[var(--text-dim)]"> / {h.targetAllocationPct.toFixed(1)}%</span>
+                    <span className="text-[var(--text-dim)]"> / {(h.effectiveTarget || h.targetAllocationPct).toFixed(1)}%</span>
                   </td>
                   <td className="py-2 px-2 text-right text-[var(--text-muted)] tabular-nums">{fmt(h.normalSIP)}</td>
                   <td className="py-2 px-2 text-right font-semibold tabular-nums">
@@ -151,7 +171,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
             <tr className="border-t border-[var(--border)]">
               <td className="py-1.5 px-2 text-xs font-bold text-[var(--text-primary)]" colSpan={2}>Total</td>
               <td className="py-1.5 px-2 text-right text-xs font-bold text-[var(--text-primary)] tabular-nums">{fmt(sipTarget)}</td>
-              <td className="py-1.5 px-2 text-right text-xs font-bold text-blue-400 tabular-nums">{fmt(sipTarget)}</td>
+              <td className="py-1.5 px-2 text-right text-xs font-bold text-blue-400 tabular-nums">{fmt(withSuggested.reduce((s, h) => s + h.suggestedSIP, 0))}</td>
             </tr>
           </tfoot>
         </table>
@@ -168,16 +188,16 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
               <FundCardName fundName={h.fundName} />
               <FundCardRow
                 label="Allocation"
-                value={<><span className={isOverweight ? 'text-amber-400' : isUnderweight ? 'text-blue-400' : ''}>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">/ {h.targetAllocationPct.toFixed(1)}%</span></>}
+                value={<><span className={isOverweight ? 'text-amber-400' : isUnderweight ? 'text-blue-400' : ''}>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">/ {(h.effectiveTarget || h.targetAllocationPct).toFixed(1)}%</span></>}
               />
               <div className="flex items-center justify-between pt-1 border-t border-[var(--border-light)]">
                 <div className="text-center flex-1">
-                  <p className="text-[9px] text-[var(--text-dim)] uppercase">Normal</p>
+                  <p className="text-xs text-[var(--text-dim)] uppercase">Normal</p>
                   <p className="text-xs text-[var(--text-muted)] tabular-nums">{fmt(h.normalSIP)}</p>
                 </div>
                 <div className="text-[var(--text-dim)] text-xs px-2">→</div>
                 <div className="text-center flex-1">
-                  <p className="text-[9px] text-[var(--text-dim)] uppercase">Rebalance</p>
+                  <p className="text-xs text-[var(--text-dim)] uppercase">Rebalance</p>
                   <p className={`text-xs font-semibold tabular-nums ${h.sipRestricted ? 'text-amber-400/80' : isOverweight ? 'text-amber-400/70' : isUnderweight ? 'text-blue-400' : 'text-[var(--text-dim)]'}`}>
                     {h.sipRestricted ? 'Blocked' : isOverweight ? '₹0' : fmt(h.suggestedSIP)}
                   </p>
@@ -193,7 +213,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
           <div className="flex items-center gap-3">
             <span className="text-xs text-[var(--text-muted)] tabular-nums">{fmt(sipTarget)}</span>
             <span className="text-[var(--text-dim)]">→</span>
-            <span className="text-xs font-bold text-blue-400 tabular-nums">{fmt(sipTarget)}</span>
+            <span className="text-xs font-bold text-blue-400 tabular-nums">{fmt(withSuggested.reduce((s, h) => s + h.suggestedSIP, 0))}</span>
           </div>
         </div>
       </div>
@@ -212,19 +232,26 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
 
   if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
 
+  // Rescale targets among active (non-restricted) funds so they sum to 100%
+  const activeTargetSum = holdings.filter((h) => h.targetAllocationPct > 0 && !h.lumpsumRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
+  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
+
   const enriched = holdings.filter((h) => h.targetAllocationPct > 0).map((h) => {
     const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-    return { ...h, currentPct }
+    const effectiveTarget = h.lumpsumRestricted ? h.targetAllocationPct : h.targetAllocationPct * rescale
+    return { ...h, currentPct, effectiveTarget }
   })
 
   const suggestedAmount = useMemo(() => {
     if (totalValue <= 0 || enriched.length === 0) return 0
+    // Exclude restricted funds — they can't receive lumpsum investments
     const underweight = enriched.filter((h) => {
-      const targetVal = (h.targetAllocationPct / 100) * totalValue
+      if (h.lumpsumRestricted) return false
+      const targetVal = (h.effectiveTarget / 100) * totalValue
       return h.currentValue < targetVal
     })
     if (underweight.length === 0) return 0
-    const pUnder = underweight.reduce((s, h) => s + h.targetAllocationPct, 0)
+    const pUnder = underweight.reduce((s, h) => s + h.effectiveTarget, 0)
     if (pUnder >= 100) return 0
     const cvUnder = underweight.reduce((s, h) => s + h.currentValue, 0)
     const amount = (pUnder / 100 * totalValue - cvUnder) / (1 - pUnder / 100)
@@ -236,38 +263,56 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
   const distribution = useMemo(() => {
     const newTotal = lumpsumAmount > 0 ? totalValue + lumpsumAmount : totalValue
     const all = enriched.map((h) => {
-      const targetVal = (h.targetAllocationPct / 100) * newTotal
+      const targetVal = (h.effectiveTarget / 100) * newTotal
       let invest = lumpsumAmount > 0 ? Math.max(0, targetVal - h.currentValue) : 0
       // Lumpsum restricted: block BUY (invest > 0) but allow display of SELL candidates
       if (h.lumpsumRestricted && invest > 0) invest = 0
-      const newPct = newTotal > 0 ? ((h.currentValue + invest) / newTotal) * 100 : 0
       const isOverweight = h.currentValue > targetVal + 1
-      return { ...h, invest, newPct, isOverweight }
+      return { ...h, invest, isOverweight }
     })
     const totalRaw = all.reduce((s, h) => s + h.invest, 0)
+    // Scale when user enters custom amount that differs from calculated need
+    let final = all
     if (lumpsumAmount > 0 && totalRaw > 0 && Math.abs(totalRaw - lumpsumAmount) > 1) {
       const scale = lumpsumAmount / totalRaw
-      return all.map((h) => ({
+      final = all.map((h) => ({
         ...h,
         invest: h.invest > 0 ? h.invest * scale : 0,
-        newPct: newTotal > 0 ? ((h.currentValue + (h.invest > 0 ? h.invest * scale : 0)) / newTotal) * 100 : 0,
       }))
     }
-    return all
+    // Calculate newPct based on actual investments (not assumed lumpsumAmount)
+    const actualInvested = final.reduce((s, h) => s + h.invest, 0)
+    const actualTotal = totalValue + actualInvested
+    return final.map((h) => ({
+      ...h,
+      newPct: actualTotal > 0 ? ((h.currentValue + h.invest) / actualTotal) * 100 : 0,
+    }))
   }, [enriched, lumpsumAmount, totalValue])
 
   const totalInvest = distribution.reduce((s, h) => s + h.invest, 0)
   const hasOverweight = distribution.some((h) => h.isOverweight)
+  const blockedLumpsum = enriched.filter((h) => h.lumpsumRestricted)
   const customAmount = Number(lumpsumInput)
   const isPartial = customAmount > 0 && suggestedAmount > 0 && customAmount < suggestedAmount
 
   return (
     <div className="space-y-2">
+      {/* Blocked funds info */}
+      {blockedLumpsum.length > 0 && (
+        <div className="px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 space-y-0.5">
+          <p className="text-xs text-amber-400">
+            {blockedLumpsum.length} fund{blockedLumpsum.length > 1 ? 's' : ''} blocked from lumpsum — excluded from suggested amount
+          </p>
+          <p className="text-xs text-amber-400/70">
+            Targets rescaled among active funds: {enriched.filter((h) => !h.lumpsumRestricted).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
+          </p>
+        </div>
+      )}
       {/* Minimum needed banner */}
       {suggestedAmount > 0 && (
         <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
           <p className="text-xs text-emerald-400">
-            <span className="font-bold">{formatINR(suggestedAmount)}</span> needed to bring all underweight funds to target %
+            <span className="font-bold">{formatINR(suggestedAmount)}</span> needed to bring {blockedLumpsum.length > 0 ? 'active' : 'all'} underweight funds to target %
           </p>
         </div>
       )}
@@ -309,7 +354,7 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
                   <tr key={h.holdingId} className={`border-b border-[var(--border-light)] last:border-0 ${h.invest === 0 ? 'opacity-50' : ''}`}>
                     <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
                       <p className="truncate">{splitFundName(h.fundName).main}</p>
-                      {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                      {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                     </td>
                     <td className="py-2 px-2 text-right tabular-nums">
                       <span className={h.isOverweight ? 'text-amber-400' : h.invest > 0 ? 'text-blue-400' : 'text-[var(--text-dim)]'}>{h.currentPct.toFixed(1)}%</span>
@@ -350,15 +395,15 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
                   <FundCardName fundName={h.fundName} />
                   <div className="text-right shrink-0">
                     {h.isOverweight ? (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
                     ) : h.lumpsumRestricted && h.sipRestricted ? (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Blocked</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Blocked</span>
                     ) : h.lumpsumRestricted ? (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">SIP only</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">SIP only</span>
                     ) : h.invest > 0 ? (
                       <p className="text-xs font-bold text-emerald-400 tabular-nums">{fmt(h.invest)}</p>
                     ) : (
-                      <span className="text-[10px] text-[var(--text-dim)]">Balanced</span>
+                      <span className="text-xs text-[var(--text-dim)]">Balanced</span>
                     )}
                   </div>
                 </div>
@@ -400,21 +445,43 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
 
   if (!hasTargets && !hasExitCandidates) return <NoTargetsMessage />
 
-  const buySellData = holdings.filter((h) => h.targetAllocationPct > 0 || h.units > 0).map((h) => {
-    const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+  // Rescale targets among active (non-blocked) funds so they sum to 100%
+  const allWithBlocked = holdings.filter((h) => h.targetAllocationPct > 0 || h.units > 0).map((h) => {
     const isExit = h.targetAllocationPct === 0 && h.units > 0
-    const drifted = isExit || Math.abs(currentPct - h.targetAllocationPct) > threshold
-    const targetVal = (h.targetAllocationPct / 100) * totalValue
+    const isBlocked = h.lumpsumRestricted && !isExit
+    return { ...h, isExit, isBlocked }
+  })
+  const activeTargetSum = allWithBlocked.filter((h) => !h.isBlocked && !h.isExit && h.targetAllocationPct > 0).reduce((s, h) => s + h.targetAllocationPct, 0)
+  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
+
+  const buySellRaw = allWithBlocked.map((h) => {
+    const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+    const effectiveTarget = h.isBlocked ? h.targetAllocationPct : h.targetAllocationPct * rescale
+    const drifted = h.isExit || Math.abs(currentPct - effectiveTarget) > threshold
+    const targetVal = (effectiveTarget / 100) * totalValue
     const rawAmount = drifted ? targetVal - h.currentValue : 0
-    // Lumpsum restricted: show 0 for BUY (positive amount), SELL (negative) still allowed
-    const amount = h.lumpsumRestricted && rawAmount > 0 ? 0 : rawAmount
-    return { ...h, currentPct, amount, rawAmount, isExit }
-  }).filter((h) => Math.abs(h.amount) >= 500 || ((h.lumpsumRestricted || h.sipRestricted) && h.rawAmount > 500))
+    const amount = h.isBlocked && rawAmount > 0 ? 0 : rawAmount
+    return { ...h, currentPct, amount, rawAmount, effectiveTarget, isBlocked: h.isBlocked && rawAmount > 0 }
+  })
+
+  const buySellData = buySellRaw.filter((h) => Math.abs(h.amount) >= 500 || (h.isBlocked && h.rawAmount > 500))
 
   if (buySellData.length === 0) return <p className="text-xs text-[var(--text-dim)] py-2">Portfolio is balanced</p>
 
+  const blockedBuySell = buySellRaw.filter((h) => h.isBlocked)
+
   return (
     <>
+      {blockedBuySell.length > 0 && (
+        <div className="px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 mb-2 space-y-0.5">
+          <p className="text-xs text-amber-400">
+            {blockedBuySell.length} fund{blockedBuySell.length > 1 ? 's' : ''} blocked — rebalancing among active funds only
+          </p>
+          <p className="text-xs text-amber-400/70">
+            Targets rescaled: {buySellRaw.filter((h) => !h.isBlocked && !h.isExit && h.targetAllocationPct > 0).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
+          </p>
+        </div>
+      )}
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
@@ -432,16 +499,14 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
                 <tr key={h.schemeCode || h.fundCode} className="border-b border-[var(--border-light)] last:border-0">
                   <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[180px]">
                     <p className="truncate">{splitFundName(h.fundName).main}</p>
-                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                    {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                   </td>
                   <td className="py-2 px-2 text-right text-[var(--text-dim)] tabular-nums">
-                    {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${h.targetAllocationPct.toFixed(1)}%`}
+                    {h.isExit ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span> : `${h.currentPct.toFixed(1)}% → ${(h.effectiveTarget || h.targetAllocationPct).toFixed(1)}%`}
                   </td>
                   <td className="py-2 px-2 text-right">
-                    {h.lumpsumRestricted && h.sipRestricted && h.rawAmount > 0 ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Blocked</span>
-                    ) : h.lumpsumRestricted && h.rawAmount > 0 ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">SIP only</span>
+                    {h.isBlocked ? (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Blocked</span>
                     ) : (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
                         {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
@@ -463,12 +528,10 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
             <FundCard key={h.schemeCode || h.fundCode}>
               <div className="flex items-start justify-between gap-2">
                 <FundCardName fundName={h.fundName} />
-                {h.lumpsumRestricted && h.sipRestricted && h.rawAmount > 0 ? (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-red-500/15 text-red-400">Blocked</span>
-                ) : h.lumpsumRestricted && h.rawAmount > 0 ? (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-amber-500/15 text-amber-400">SIP only</span>
+                {h.isBlocked ? (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 bg-amber-500/15 text-amber-400">Blocked</span>
                 ) : (
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-[var(--accent-rose)]'}`}>
                     {isBuy ? 'Buy' : h.isExit ? 'Exit' : 'Sell'} {fmt(Math.abs(h.amount))}
                   </span>
                 )}
@@ -477,7 +540,7 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
                 label="Drift"
                 value={h.isExit
                   ? <span className="text-[var(--accent-rose)]">{h.currentPct.toFixed(1)}% → Exit</span>
-                  : <><span>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">→ {h.targetAllocationPct.toFixed(1)}%</span></>
+                  : <><span>{h.currentPct.toFixed(1)}%</span> <span className="text-[var(--text-dim)]">→ {(h.effectiveTarget || h.targetAllocationPct).toFixed(1)}%</span></>
                 }
                 valueClass={isBuy ? 'text-emerald-400' : 'text-amber-400'}
               />
@@ -497,10 +560,10 @@ export default function MFRebalanceDialog() {
   const [mode, setMode] = useState('buysell')
 
   const portfolioGroups = useMemo(() => {
-    return mfPortfolios
-      .filter((p) => p.status !== 'Inactive')
+    return (mfPortfolios || [])
+      .filter((p) => p.status !== 'Inactive' && !p.skipRebalance)
       .map((p) => {
-        const pHoldings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
+        const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
         const threshold = (p.rebalanceThreshold || 0.05) * 100
         const driftedCount = pHoldings.filter((h) => {
@@ -516,7 +579,7 @@ export default function MFRebalanceDialog() {
   }, [mfPortfolios, mfHoldings])
 
   if (portfolioGroups.length === 0) {
-    const anyTargets = mfHoldings.some((h) => h.targetAllocationPct > 0)
+    const anyTargets = (mfHoldings || []).some((h) => h.targetAllocationPct > 0)
     return (
       <div className="py-8 text-center">
         {anyTargets ? (
@@ -595,10 +658,10 @@ export default function MFRebalanceDialog() {
                 <p className="text-sm font-bold text-[var(--text-primary)] flex-1 min-w-0 truncate">{p.portfolioName}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap pl-7">
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)] tabular-nums">{formatINR(p.totalValue)}</span>
-                <span className="text-[10px] text-[var(--text-dim)]">{p.ownerName}</span>
-                {p.driftedCount > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
-                {p.exitCount > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
+                <span className="text-xs font-semibold text-[var(--text-secondary)] tabular-nums">{formatINR(p.totalValue)}</span>
+                <span className="text-xs text-[var(--text-dim)]">{p.ownerName}</span>
+                {p.driftedCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
+                {p.exitCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
               </div>
             </div>
           </div>

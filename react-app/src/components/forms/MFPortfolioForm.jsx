@@ -15,6 +15,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
     sipTarget: initial?.sipTarget || '',
     lumpsumTarget: initial?.lumpsumTarget || '',
     rebalanceThreshold: initial ? (initial.rebalanceThreshold * 100) : 5,
+    skipRebalance: initial?.skipRebalance || false,
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -60,6 +61,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
         sipTarget: Number(form.sipTarget) || 0,
         lumpsumTarget: Number(form.lumpsumTarget) || 0,
         rebalanceThreshold: Number(form.rebalanceThreshold),  // Send as percentage — GAS divides by 100
+        skipRebalance: form.skipRebalance,
       })
     } finally { setSaving(false) }
   }
@@ -96,11 +98,27 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
             value={form.rebalanceThreshold}
             onChange={(e) => set('rebalanceThreshold', e.target.value)}
             placeholder="5"
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] text-center focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
+            disabled={form.skipRebalance}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] text-center focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors disabled:opacity-40"
           />
         </div>
         <span className="text-xs text-[var(--text-dim)]">%</span>
       </div>
+
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <div
+          role="switch"
+          aria-checked={form.skipRebalance}
+          onClick={() => set('skipRebalance', !form.skipRebalance)}
+          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${form.skipRebalance ? 'bg-amber-500' : 'bg-[var(--border-input)]'}`}
+        >
+          <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.skipRebalance ? 'translate-x-4' : ''}`} />
+        </div>
+        <div>
+          <span className="text-xs font-semibold text-[var(--text-muted)]">Skip Rebalance Alerts</span>
+          <p className="text-[10px] text-[var(--text-dim)] mt-0.5">Hide this portfolio from rebalance alerts on dashboard and MF page</p>
+        </div>
+      </label>
 
       {!isEdit && (
         <FormField label="Initial Investment (₹)">

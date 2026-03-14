@@ -10,7 +10,7 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
   const { selectedMember } = useFamily()
 
   const activePortfolios = useMemo(() => {
-    const active = mfPortfolios.filter((p) => p.status === 'Active')
+    const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [mfPortfolios, selectedMember])
 
@@ -48,7 +48,7 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
 
   const fromHoldings = useMemo(() => {
     if (!form.fromPortfolioId) return []
-    return mfHoldings.filter((h) => h.portfolioId === form.fromPortfolioId && h.units > 0)
+    return (mfHoldings || []).filter((h) => h.portfolioId === form.fromPortfolioId && h.units > 0)
   }, [mfHoldings, form.fromPortfolioId])
 
   const fromHolding = fromHoldings.find((h) => h.schemeCode === form.fromFundCode)
@@ -134,7 +134,7 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
       {fromHolding && (
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
           <p className="text-xs text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).main}</p>
-          {splitFundName(fromHolding.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).plan}</p>}
+          {splitFundName(fromHolding.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(fromHolding.fundName).plan}</p>}
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Available: <span className="font-semibold text-[var(--text-primary)]">{fromHolding.units.toFixed(2)}</span> units
             @ ₹{fromHolding.avgNav.toFixed(2)} avg · Current NAV: ₹{fromHolding.currentNav.toFixed(2)}
@@ -146,7 +146,7 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
       <div className="flex items-center gap-2 pt-1">
         <div className="flex-1 h-px bg-[var(--border-light)]" />
         {isCrossPortfolio && (
-          <span className="text-[10px] font-semibold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full shrink-0">Cross-portfolio switch</span>
+          <span className="text-xs font-semibold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full shrink-0">Cross-portfolio switch</span>
         )}
         <div className="flex-1 h-px bg-[var(--border-light)]" />
       </div>

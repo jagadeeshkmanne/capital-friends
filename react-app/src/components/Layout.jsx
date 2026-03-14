@@ -53,31 +53,31 @@ export default function Layout() {
 
         {/* Global footer — all pages */}
         <footer className="border-t border-[var(--border-light)] mt-4">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3">
             {/* Branding */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap justify-center sm:justify-start">
               <Link to="/about" className="flex items-center gap-1.5 no-underline shrink-0">
                 <img src={`${import.meta.env.BASE_URL}logo-new.png`} alt="Capital Friends" className="h-5 w-auto" />
                 <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '11px' }}>
                   <span className="font-bold text-[var(--text-primary)]">Capital</span>
                   <span className="font-extrabold text-emerald-400">Friends</span>
                 </span>
-                <span className="text-[9px] font-semibold text-[var(--text-dim)] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] border border-[var(--border-light)]">v1.0</span>
+                <span className="text-xs font-semibold text-[var(--text-dim)] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] border border-[var(--border-light)]">v1.0</span>
               </Link>
-              <span className="text-[var(--border)] text-[10px]">{'\u00B7'}</span>
-              <p className="text-[10px] text-[var(--text-dim)]">
+              <span className="text-[var(--border)] text-xs hidden sm:inline">{'\u00B7'}</span>
+              <p className="text-xs text-[var(--text-dim)] hidden sm:block">
                 Made with {'\u2764\uFE0F'} by <span className="font-semibold text-[var(--text-muted)]">Jagadeesh Manne</span>
               </p>
             </div>
             {/* Links */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <Link to="/privacy" className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Privacy</Link>
-              <Link to="/terms" className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Terms</Link>
+            <div className="flex items-center gap-3">
+              <Link to="/privacy" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Privacy</Link>
+              <Link to="/terms" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Terms</Link>
               <button onClick={() => { setShowDonate(true); dismissBanner() }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors shrink-0"
                       style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
                 <Heart size={12} className="text-amber-400" />
-                <span className="text-[11px] font-semibold text-amber-400">Donate</span>
+                <span className="text-xs font-semibold text-amber-400">Donate</span>
               </button>
             </div>
           </div>
@@ -102,11 +102,11 @@ export default function Layout() {
                 <Heart size={20} className="text-amber-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-[var(--text-dim)]">
+                <p className="text-xs text-[var(--text-dim)]">
                   Built with <span className="text-amber-400">{'\u2764'}</span> by Jagadeesh Manne
                 </p>
                 <p className="text-sm font-semibold text-amber-400 mt-0.5">Support the Developer</p>
-                <p className="text-[11px] text-[var(--text-dim)] mt-0.5">If Capital Friends helps you, consider buying me a chai!</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">If Capital Friends helps you, consider buying me a chai!</p>
               </div>
             </div>
           </div>

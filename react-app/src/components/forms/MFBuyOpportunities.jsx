@@ -23,7 +23,7 @@ export default function MFBuyOpportunities() {
     return mfPortfolios
       .filter((p) => p.status !== 'Inactive')
       .map((p) => {
-        const pHoldings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
+        const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
         const opps = pHoldings
           .filter((h) => h.athNav > 0 && h.belowATHPct >= 1)
@@ -84,13 +84,13 @@ export default function MFBuyOpportunities() {
                   <tr key={h.holdingId} className="border-b border-[var(--border-light)] last:border-0">
                     <td className="py-2 px-2 text-[var(--text-secondary)] max-w-[200px]">
                       <p className="truncate">{splitFundName(h.fundName).main}</p>
-                      {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                      {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                     </td>
                     <td className="py-2 px-2 text-center">
                       {signal ? (
-                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${signal.cls}`}>{signal.label}</span>
+                        <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${signal.cls}`}>{signal.label}</span>
                       ) : (
-                        <span className="text-[10px] text-[var(--text-dim)]">Watch</span>
+                        <span className="text-xs text-[var(--text-dim)]">Watch</span>
                       )}
                     </td>
                     <td className="py-2 px-2 text-right">
@@ -117,10 +117,10 @@ export default function MFBuyOpportunities() {
                 <div className="flex items-start justify-between mb-1">
                   <div className="flex-1 mr-2">
                     <p className="text-xs text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
-                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                    {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {signal && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${signal.cls}`}>{signal.label}</span>}
+                    {signal && <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${signal.cls}`}>{signal.label}</span>}
                     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${belowColor(h.belowATHPct)}`}>
                       −{h.belowATHPct.toFixed(1)}%
                     </span>

@@ -62,10 +62,52 @@ function saveUserRecord(email, record) {
  * - If user exists and is active/pending → return record (activate if pending)
  * - If user doesn't exist → create new spreadsheet and register as owner
  */
+/**
+ * Create a brand-new spreadsheet for a user, register it, and set up all sheets.
+ * Lock must NOT be held when this is called — createAllSheets() is slow (minutes).
+ */
+function createNewUser(email, name) {
+  email = email.toLowerCase();
+
+  var spreadsheet = SpreadsheetApp.create('Capital Friends - ' + name);
+  var spreadsheetId = spreadsheet.getId();
+
+  var record = {
+    spreadsheetId: spreadsheetId,
+    role: 'owner',
+    displayName: name,
+    invitedBy: '',
+    createdDate: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+    status: 'Active'
+  };
+  saveUserRecord(email, record); // register immediately so concurrent calls see it
+  log('Registered new user: ' + email + ' → ' + spreadsheetId);
+
+  _currentUserSpreadsheetId = spreadsheetId;
+  try {
+    createAllSheets();
+    log('All sheets created for: ' + email);
+    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var sheet1 = ss.getSheetByName('Sheet1');
+    if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
+  } catch (e) {
+    log('Warning: createAllSheets failed for ' + email + ': ' + e.toString());
+  }
+
+  try { installDailyTriggerForUser(); } catch (e) { log('Warning: trigger: ' + e); }
+  try { installReminderTrigger(); } catch (e) { log('Warning: reminder trigger: ' + e); }
+
+  record.email = email;
+  record.isNew = true; // signal to client that this is a fresh account
+  return record;
+}
+
 function getOrCreateUser(email, name) {
   email = email.toLowerCase();
-  var existing = findUserByEmail(email);
 
+  // Fast path: check without lock first (existing users — majority of calls)
+  var existing = findUserByEmail(email);
   if (existing) {
     // Verify the spreadsheet still exists (user may have deleted it from Drive)
     try {
@@ -74,6 +116,18 @@ function getOrCreateUser(email, name) {
       // Spreadsheet deleted or inaccessible — recreate for this user
       log('Spreadsheet missing for ' + email + ' (id: ' + existing.spreadsheetId + '). Recreating...');
       return createNewUser(email, existing.displayName || name);
+    }
+
+    // Heal any missing sheets if setup was interrupted on first login
+    // Only runs createAllSheets if a required sheet is absent (cheap check first)
+    _currentUserSpreadsheetId = existing.spreadsheetId;
+    try {
+      if (!sheetExists('FamilyMembers') || !sheetExists('Goals') || !sheetExists('AllPortfolios')) {
+        log('Missing sheets detected for ' + email + ' — running createAllSheets to heal');
+        createAllSheets();
+      }
+    } catch (e) {
+      log('Warning: sheet healing failed for ' + email + ': ' + e.toString());
     }
 
     // Update last login
@@ -88,83 +142,63 @@ function getOrCreateUser(email, name) {
     return existing;
   }
 
-  // New user — create their spreadsheet
-  return createNewUser(email, name);
+  // New user — acquire lock briefly: just to prevent duplicate creation from concurrent calls.
+  // Lock is held only during the re-check + record save (~2s). createNewUser runs outside.
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+
+    // Re-check inside the lock — another concurrent call may have just created the user
+    existing = findUserByEmail(email);
+    if (existing) {
+      existing.lastLogin = new Date().toISOString();
+      saveUserRecord(email, existing);
+      return existing;
+    }
+
+    // Save a placeholder record first so any concurrent call finds it immediately
+    var spreadsheet = SpreadsheetApp.create('Capital Friends - ' + name);
+    var spreadsheetId = spreadsheet.getId();
+    var record = {
+      spreadsheetId: spreadsheetId,
+      role: 'owner',
+      displayName: name,
+      invitedBy: '',
+      createdDate: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      status: 'Active'
+    };
+    saveUserRecord(email, record);
+    log('Registered new user in lock: ' + email + ' → ' + spreadsheetId);
+
+    lock.releaseLock(); // release before slow sheet setup
+
+    // Set up sheets outside the lock
+    _currentUserSpreadsheetId = spreadsheetId;
+    try {
+      createAllSheets();
+      log('All sheets created for: ' + email);
+      var ss = SpreadsheetApp.openById(spreadsheetId);
+      var sheet1 = ss.getSheetByName('Sheet1');
+      if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
+    } catch (e) {
+      log('Warning: createAllSheets failed for ' + email + ': ' + e.toString());
+    }
+
+    try { installDailyTriggerForUser(); } catch (e) { log('Warning: trigger: ' + e); }
+    try { installReminderTrigger(); } catch (e) { log('Warning: reminder trigger: ' + e); }
+
+    record.email = email;
+    record.isNew = true; // signal to client that this is a fresh account
+    return record;
+  } catch (e) {
+    // Lock timeout or unexpected error — try creating without lock as last resort
+    log('Lock/create error for ' + email + ': ' + e.toString() + ' — attempting direct create');
+    try { lock.releaseLock(); } catch (_) {}
+    return createNewUser(email, name);
+  }
 }
 
-/**
- * Create a new user with their own spreadsheet.
- * Creates a fresh spreadsheet in the user's Drive and sets up all sheets.
- * No template needed — createAllSheets() builds everything from code.
- * With Execution API, create() runs as the user → spreadsheet goes to THEIR Drive.
- */
-function createNewUser(email, name) {
-  email = email.toLowerCase();
-
-  // Create a fresh spreadsheet in the user's Drive (no template needed)
-  var spreadsheet = SpreadsheetApp.create('Capital Friends - ' + name);
-  var spreadsheetId = spreadsheet.getId();
-
-  // Delete the default "Sheet1" that comes with every new spreadsheet
-  try {
-    var defaultSheet = spreadsheet.getSheetByName('Sheet1');
-    if (defaultSheet && spreadsheet.getSheets().length > 0) {
-      // Can't delete the only sheet — createAllSheets will add sheets first
-      // We'll delete it after setup
-    }
-  } catch (e) {
-    // Ignore — will be cleaned up after setup
-  }
-
-  // Create all required sheets from code (always latest structure)
-  _currentUserSpreadsheetId = spreadsheetId;
-  try {
-    createAllSheets();
-    log('All sheets created for new user: ' + email);
-
-    // Now delete the default "Sheet1" if it still exists
-    var ss = SpreadsheetApp.openById(spreadsheetId);
-    var sheet1 = ss.getSheetByName('Sheet1');
-    if (sheet1 && ss.getSheets().length > 1) {
-      ss.deleteSheet(sheet1);
-    }
-  } catch (e) {
-    log('Warning: createAllSheets failed for ' + email + ': ' + e.toString());
-  }
-
-  // Save user record in Script Properties
-  var record = {
-    spreadsheetId: spreadsheetId,
-    role: 'owner',
-    displayName: name,
-    invitedBy: '',
-    createdDate: new Date().toISOString(),
-    lastLogin: new Date().toISOString(),
-    status: 'Active'
-  };
-  saveUserRecord(email, record);
-
-  // Install daily trigger for this user (auto-refresh master data + email alerts)
-  try {
-    installDailyTriggerForUser();
-    log('Daily trigger installed for ' + email);
-  } catch (e) {
-    log('Warning: Could not install daily trigger for ' + email + ': ' + e.toString());
-  }
-
-  // Install reminder notification trigger (daily check at 8 AM)
-  try {
-    installReminderTrigger();
-    log('Reminder trigger installed for ' + email);
-  } catch (e) {
-    log('Warning: Could not install reminder trigger for ' + email + ': ' + e.toString());
-  }
-
-  log('Created new user: ' + email + ' → Spreadsheet: ' + spreadsheetId);
-
-  record.email = email;
-  return record;
-}
 
 // ============================================================================
 // FAMILY SHARING

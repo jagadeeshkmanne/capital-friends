@@ -93,7 +93,7 @@ export default function InsurancePage() {
 
           {/* Coverage Adequacy */}
           <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Coverage Adequacy</p>
+            <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Coverage Adequacy</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <AdequacyItem
                 label="Life Insurance"
@@ -167,8 +167,8 @@ export default function InsurancePage() {
             <div className="sm:hidden divide-y divide-[var(--border-light)]">
               {filtered.map((p) => (
                 <div key={p.policyId} onClick={() => setModal({ edit: p })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate mr-2">{p.policyName}</p>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="text-sm font-medium text-[var(--text-primary)] break-words min-w-0 leading-snug">{p.policyName}</p>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${typeBadge[p.policyType] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                       {p.policyType}
                     </span>
@@ -216,7 +216,7 @@ function AdequacyItem({ label, current, recommended, tip }) {
         )}
       </div>
       <p className="text-xs text-[var(--text-dim)]">Recommended: {recommended}</p>
-      <p className="text-[10px] text-[var(--text-dim)] mt-0.5 italic">{tip}</p>
+      <p className="text-xs text-[var(--text-dim)] mt-0.5 italic">{tip}</p>
     </div>
   )
 }

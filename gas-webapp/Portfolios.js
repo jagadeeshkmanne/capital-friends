@@ -108,7 +108,8 @@ function processAddPortfolio(formData) {
       realizedPLPercentFormula,   // M: Realized P&L (%)
       totalPLAmountFormula,       // N: Total P&L (₹)
       totalPLPercentFormula,      // O: Total P&L (%)
-      "Active"                    // P: Status
+      "Active",                   // P: Status
+      ''                           // Q: Skip Rebalance (empty = false)
     ]);
 
     // Apply formatting to the new row
@@ -645,7 +646,7 @@ function getAllPortfolios() {
       return []; // No portfolios yet (Row 1=Watermark, Row 2=Group Headers, Row 3=Column Headers)
     }
 
-    const data = sheet.getRange(4, 1, lastRow - 3, 16).getValues();
+    const data = sheet.getRange(4, 1, lastRow - 3, 17).getValues(); // A-Q (17 cols, Q=skipRebalance)
     log('Data rows read: ' + data.length);
 
     const portfolios = [];
@@ -666,12 +667,13 @@ function getAllPortfolios() {
           rebalanceThreshold: row[7],         // Column H
           currentValue: row[8],               // Column I
           unrealizedPL: row[9],               // Column J (React: unrealizedPL)
-          unrealizedPLPct: row[10],           // Column K (React: unrealizedPLPct)
+          unrealizedPLPct: (row[10] || 0) * 100, // Column K — decimal→% (React: unrealizedPLPct)
           realizedPL: row[11],                // Column L (React: realizedPL)
-          realizedPLPct: row[12],             // Column M (React: realizedPLPct)
+          realizedPLPct: (row[12] || 0) * 100, // Column M — decimal→% (React: realizedPLPct)
           totalPL: row[13],                   // Column N (React: totalPL)
-          totalPLPct: row[14],                // Column O (React: totalPLPct)
-          status: row[15]                     // Column P
+          totalPLPct: (row[14] || 0) * 100,   // Column O — decimal→% (React: totalPLPct)
+          status: row[15],                    // Column P
+          skipRebalance: row[16] === true || row[16] === 'TRUE'  // Column Q (safe for existing users without col Q)
         });
       }
     });
@@ -760,8 +762,8 @@ function updatePortfolio(data) {
     // Convert rebalance threshold to decimal
     const rebalanceThreshold = parseFloat(data.rebalanceThreshold) / 100;
 
-    // Update portfolio — all 16 columns A-P, preserving formula columns
-    sheet.getRange(rowIndex, 1, 1, 16).setValues([[
+    // Update portfolio — 17 columns A-Q, preserving formula columns
+    sheet.getRange(rowIndex, 1, 1, 17).setValues([[
       data.portfolioId,                   // Column A: Portfolio ID
       portfolioName,                      // Column B: Portfolio Name (with PFL- prefix)
       data.investmentAccount,             // Column C: Investment Account
@@ -777,7 +779,8 @@ function updatePortfolio(data) {
       realizedPLPercentFormula,           // Column M: Realized P&L % (formula)
       totalPLAmountFormula,              // Column N: Total P&L ₹ (formula)
       totalPLPercentFormula,             // Column O: Total P&L % (formula)
-      data.status || 'Active'             // Column P: Status
+      data.status || 'Active',            // Column P: Status
+      data.skipRebalance === true || data.skipRebalance === 'true' ? true : ''  // Column Q: Skip Rebalance
     ]]);
 
     log(`Portfolio updated: ${data.portfolioId} - ${portfolioName}`);
@@ -1297,11 +1300,11 @@ function addFundRowToPortfolio(sheet, row, portfolioId, schemeCode, targetPercen
     `=IF(A${row}="","",IFERROR(VLOOKUP(A${row}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
   );
 
-  // Column T (20): Lumpsum Restricted - static flag, FALSE by default
-  sheet.getRange(row, 20).setValue(false);
-
-  // Column U (21): SIP Restricted - static flag, FALSE by default
-  sheet.getRange(row, 21).setValue(false);
+  // Column T (20): Lumpsum Restricted / U (21): SIP Restricted
+  // Copy restriction flags from existing portfolios if the fund is already restricted elsewhere
+  var existingRestrictions = getFundRestrictionsFromOtherPortfolios(schemeCode, portfolioId);
+  sheet.getRange(row, 20).setValue(existingRestrictions.lumpsumRestricted);
+  sheet.getRange(row, 21).setValue(existingRestrictions.sipRestricted);
 
   // Apply formatting
   sheet.getRange(row, 1, 1, 16).setBorder(true, true, true, true, false, false);

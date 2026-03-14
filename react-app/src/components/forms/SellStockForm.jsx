@@ -10,7 +10,7 @@ export default function SellStockForm({ portfolioId, onSave, onCancel }) {
 
   // Filter portfolios by header's selected member
   const activePortfolios = useMemo(() => {
-    const active = stockPortfolios.filter((p) => p.status === 'Active')
+    const active = (stockPortfolios || []).filter((p) => p.status === 'Active')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [stockPortfolios, selectedMember])
 
@@ -35,7 +35,7 @@ export default function SellStockForm({ portfolioId, onSave, onCancel }) {
   // Holdings for selected portfolio
   const holdings = useMemo(() => {
     if (!form.portfolioId) return []
-    return stockHoldings.filter((h) => h.portfolioId === form.portfolioId && h.quantity > 0)
+    return (stockHoldings || []).filter((h) => h.portfolioId === form.portfolioId && h.quantity > 0)
   }, [stockHoldings, form.portfolioId])
 
   const selectedHolding = holdings.find((h) => h.symbol === form.symbol)

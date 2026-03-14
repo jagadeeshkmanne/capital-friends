@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR, splitFundName } from '../../data/familyData'
@@ -17,7 +17,7 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
   const { selectedMember } = useFamily()
 
   const activePortfolios = useMemo(() => {
-    const active = mfPortfolios.filter((p) => p.status === 'Active')
+    const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [mfPortfolios, selectedMember])
 
@@ -64,7 +64,7 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
   // All holdings for selected portfolio (including planned funds with 0 units)
   const portfolioHoldings = useMemo(() => {
     if (!form.portfolioId) return []
-    return mfHoldings.filter((h) => h.portfolioId === form.portfolioId)
+    return (mfHoldings || []).filter((h) => h.portfolioId === form.portfolioId)
       .sort((a, b) => b.currentValue - a.currentValue)
   }, [mfHoldings, form.portfolioId])
 
@@ -75,6 +75,23 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
   }, [mfHoldings, form.portfolioId, form.fundCode])
 
   const isNewFund = form.fundCode && !existingHolding
+
+  // Filter transaction types based on fund restrictions
+  const availableInvestTypes = useMemo(() => {
+    if (!existingHolding) return INVEST_TYPES
+    return INVEST_TYPES.filter((t) => {
+      if (t.value === 'SIP' && existingHolding.sipRestricted) return false
+      if (t.value === 'LUMPSUM' && existingHolding.lumpsumRestricted) return false
+      return true
+    })
+  }, [existingHolding])
+
+  // Auto-switch transaction type if current selection is restricted
+  useEffect(() => {
+    if (availableInvestTypes.length > 0 && !availableInvestTypes.some((t) => t.value === form.transactionType)) {
+      set('transactionType', availableInvestTypes[0].value)
+    }
+  }, [availableInvestTypes, form.transactionType])
 
   const totalAmount = useMemo(() => {
     return (Number(form.units) || 0) * (Number(form.price) || 0)
@@ -121,7 +138,7 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
           <FormSelect value={form.portfolioId} onChange={(v) => { set('portfolioId', v); if (!initialFundCode) { set('fundCode', ''); set('fundName', ''); setShowSearch(false) } }} options={portfolioOptions} placeholder="Select portfolio..." />
         </FormField>
         <FormField label="Transaction Type" required>
-          <FormSelect value={form.transactionType} onChange={(v) => set('transactionType', v)} options={INVEST_TYPES} />
+          <FormSelect value={form.transactionType} onChange={(v) => set('transactionType', v)} options={availableInvestTypes} />
         </FormField>
       </div>
 
@@ -133,7 +150,7 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
             <div className="flex-1 min-w-0">
               <div>
                 <p className="text-sm font-medium text-[var(--text-primary)] truncate">{splitFundName(form.fundName).main}</p>
-                {splitFundName(form.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(form.fundName).plan}</p>}
+                {splitFundName(form.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(form.fundName).plan}</p>}
               </div>
               <p className="text-xs text-[var(--text-dim)]">{form.fundCode}{form.nav > 0 && <span className="ml-2 text-emerald-400">NAV: ₹{form.nav.toFixed(2)}</span>}</p>
             </div>
@@ -150,7 +167,7 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
           <div className="space-y-3">
             {portfolioHoldings.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Portfolio Funds</p>
+                <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Portfolio Funds</p>
                 <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-inset)] overflow-hidden max-h-44 overflow-y-auto">
                   {portfolioHoldings.map((h) => (
                     <button
@@ -162,9 +179,9 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
                       <div className="flex-1 min-w-0">
                         <div>
                           <p className="text-xs font-medium text-[var(--text-primary)] truncate group-hover:text-white transition-colors">{splitFundName(h.fundName).main}</p>
-                          {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                          {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                         </div>
-                        <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
+                        <p className="text-xs text-[var(--text-dim)] mt-0.5">
                           {h.units > 0 ? `${h.units.toFixed(0)} units · ${formatINR(h.currentValue)}` : 'Planned'}
                         </p>
                       </div>
@@ -176,7 +193,7 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
             )}
             <div>
               {portfolioHoldings.length > 0 && (
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5 flex items-center gap-1">
+                <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5 flex items-center gap-1">
                   <Search size={10} /> Or search new fund
                 </p>
               )}
@@ -199,6 +216,18 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
             {existingHolding.targetAllocationPct > 0 && (
               <span> · Target: {existingHolding.targetAllocationPct.toFixed(1)}%</span>
             )}
+          </p>
+        </div>
+      )}
+
+      {existingHolding && (existingHolding.lumpsumRestricted || existingHolding.sipRestricted) && (
+        <div className="bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+          <p className="text-xs text-amber-400 font-semibold">
+            {existingHolding.lumpsumRestricted && existingHolding.sipRestricted
+              ? 'This fund is blocked from both SIP and Lumpsum investments'
+              : existingHolding.lumpsumRestricted
+                ? 'Lumpsum restricted — only SIP investment allowed'
+                : 'SIP restricted — only Lumpsum investment allowed'}
           </p>
         </div>
       )}

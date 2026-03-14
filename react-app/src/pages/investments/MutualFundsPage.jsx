@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Minus, Pencil, TrendingUp, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -102,6 +102,168 @@ function athColor(pct) {
   return { color: 'var(--text-dim)', fontWeight: 400 }
 }
 
+// Reusable Investment Journey chart with dot-only tooltip positioned at dot center
+function JourneyChart({ data, gradientId, height = 220 }) {
+  const [hoveredIdx, setHoveredIdx] = useState(null)
+  const [dotPos, setDotPos] = useState(null) // { x, y } screen coords
+  const chartRef = useRef(null)
+  const tooltipRef = useRef(null)
+  const dotMouseEnter = useCallback((e, index) => {
+    setHoveredIdx(index)
+    const rect = e.target.getBoundingClientRect()
+    setDotPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+  }, [])
+  const dotMouseLeave = useCallback(() => { setHoveredIdx(null); setDotPos(null) }, [])
+  const lastPoint = data[data.length - 1]
+
+  // Viewport-aware tooltip positioning — works on mobile & desktop
+  const [tooltipStyle, setTooltipStyle] = useState({ position: 'fixed', left: -9999, top: -9999, pointerEvents: 'none' })
+  useMemo(() => {
+    if (!dotPos) { setTooltipStyle({ position: 'fixed', left: -9999, top: -9999, pointerEvents: 'none' }); return }
+    // Double rAF to ensure content is rendered and measurable
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = tooltipRef.current
+      if (!el) return
+      const tw = el.offsetWidth || 300
+      const th = el.offsetHeight || 200
+      const vw = window.innerWidth
+      const pad = 12
+      const gap = 12
+      let left = dotPos.x - tw / 2
+      if (left + tw > vw - pad) left = vw - tw - pad
+      if (left < pad) left = pad
+      let top = dotPos.y - th - gap
+      if (top < pad) top = dotPos.y + gap
+      setTooltipStyle({
+        position: 'fixed', zIndex: 9999, pointerEvents: 'none',
+        left, top,
+      })
+    }))
+  }, [dotPos])
+
+  return (
+    <div style={{ height, position: 'relative' }} ref={chartRef}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
+          onMouseLeave={() => { setHoveredIdx(null); setDotPos(null) }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" />
+          <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-dim)' }} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)' }} tickFormatter={v => v >= 10000000 ? `${(v / 10000000).toFixed(1)}Cr` : v >= 100000 ? `${(v / 100000).toFixed(1)}L` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v} width={50} />
+          <Tooltip content={() => null} cursor={false} isAnimationActive={false} />
+          <Area type="monotone" dataKey="invested" stroke="#8b5cf6" fill={`url(#${gradientId})`} strokeWidth={2} name="Net Invested" isAnimationActive={false}
+            dot={(props) => {
+              const { cx, cy, payload, index } = props
+              if (!cx || !cy) return null
+              // Show current value as a larger green dot on the last point
+              const isLast = index === data.length - 1 && lastPoint?.currentValue
+              return (
+                <g>
+                  <circle cx={cx} cy={cy} r={hoveredIdx === index ? 6 : 4}
+                    fill={payload.hasSell ? '#fb7185' : '#34d399'}
+                    stroke={hoveredIdx === index ? '#8b5cf6' : 'none'} strokeWidth={hoveredIdx === index ? 2 : 0}
+                    style={{ cursor: 'pointer', transition: 'r 0.15s' }}
+                    onMouseEnter={(e) => dotMouseEnter(e, index)}
+                    onMouseLeave={dotMouseLeave}
+                  />
+                  {isLast && (
+                    <circle cx={cx} cy={cy} r={6} fill="#34d399" stroke="#34d399" strokeWidth={1} opacity={0.5} pointerEvents="none" />
+                  )}
+                </g>
+              )
+            }}
+            activeDot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      {createPortal(
+        <div style={tooltipStyle} ref={tooltipRef}>
+          {hoveredIdx !== null && data[hoveredIdx] && <JourneyTooltipContent data={data[hoveredIdx]} />}
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
+// Tooltip content for Investment Journey chart
+function JourneyTooltipContent({ data: d }) {
+  if (!d || !d.txns || !d.txns.length) return null
+  // Group by portfolio
+  const byPortfolio = {}
+  d.txns.forEach(t => {
+    const key = t.portfolioName || '_'
+    if (!byPortfolio[key]) byPortfolio[key] = []
+    byPortfolio[key].push(t)
+  })
+  const portfolioKeys = Object.keys(byPortfolio)
+  const showPortfolios = portfolioKeys.length > 1 || (portfolioKeys.length === 1 && portfolioKeys[0] !== '_')
+
+  const TxnRow = ({ t }) => (
+    <div className="py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.isBuy ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+          <span className="text-white/80 truncate">{t.fundName}</span>
+        </div>
+        <span className={`font-semibold tabular-nums shrink-0 ${t.isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>
+          {t.isBuy ? '+' : '-'}{formatINR(t.amount)}
+        </span>
+      </div>
+      <div className="flex items-center gap-3 ml-[14px] mt-0.5 text-[11px]">
+        <span className="text-white/30">{t.txnType}</span>
+        {t.units > 0 && <span className="text-white/30 tabular-nums">{t.isBuy ? '+' : '-'}{t.units} units</span>}
+        {t.realizedPL !== null && t.realizedPL !== 0 && (
+          <span className={`tabular-nums font-medium ${t.realizedPL >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>
+            P&L {t.realizedPL >= 0 ? '+' : ''}{formatINR(t.realizedPL)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="bg-[var(--bg-dropdown)] rounded-xl shadow-2xl text-xs overflow-hidden" style={{ minWidth: 220, maxWidth: 'min(340px, calc(100vw - 24px))' }}>
+      {/* Header */}
+      <div className="px-3.5 py-2 bg-[var(--bg-inset)] border-b border-[var(--border-light)]">
+        <span className="font-bold text-[var(--text-primary)] text-sm">{d.date}</span>
+      </div>
+      {/* Transactions */}
+      <div className="px-3.5 py-1">
+        {showPortfolios ? (
+          portfolioKeys.map((pName, pi) => (
+            <div key={pName}>
+              {pi > 0 && <div className="border-t border-[var(--border-light)] my-1" />}
+              <p className="text-[var(--text-dim)] font-semibold text-[10px] uppercase tracking-wider pt-1.5 pb-0.5">{pName}</p>
+              {byPortfolio[pName].map((t, i) => <TxnRow key={i} t={t} />)}
+            </div>
+          ))
+        ) : (
+          d.txns.map((t, i) => <TxnRow key={i} t={t} />)
+        )}
+      </div>
+      {/* Footer */}
+      <div className="px-3.5 py-2 bg-[var(--bg-inset)] border-t border-[var(--border-light)]">
+        <div className="flex items-center justify-between">
+          <span className="text-[var(--text-dim)]">Total Invested</span>
+          <span className="font-bold text-violet-400 tabular-nums">{formatINR(d.invested)}</span>
+        </div>
+        {d.currentValue && (
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[var(--text-dim)]">Current Value</span>
+            <span className="font-bold text-emerald-400 tabular-nums">{formatINR(d.currentValue)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function MutualFundsPage() {
   const { selectedMember } = useFamily()
   const {
@@ -109,7 +271,7 @@ export default function MutualFundsPage() {
     activeMembers, activeInvestmentAccounts,
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
     investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, toggleSipRestricted,
-    deleteMFTransaction, editMFTransaction,
+    deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
     assetAllocations, updateAssetAllocation,
   } = useData()
 
@@ -122,7 +284,7 @@ export default function MutualFundsPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [txnFundFilter, setTxnFundFilter] = useState('all')
   const [txnMenuOpen, setTxnMenuOpen] = useState(null) // transactionId of open menu
-  const [breakdownOpen, setBreakdownOpen] = useState(false)
+  const [breakdownOpen, setBreakdownOpen] = useState(true)
   const [fundDetailHolding, setFundDetailHolding] = useState(null) // holding object for fund detail modal
 
   // Enrich portfolios: resolve investmentAccountId, ownerId & ownerName from investment accounts
@@ -259,8 +421,10 @@ export default function MutualFundsPage() {
       let rebalance = 0
       pHoldings.forEach((h) => {
         if (h.athNav > 0 && h.belowATHPct >= 5) buyOpp++
-        const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-        if (h.targetAllocationPct > 0 && Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
+        if (!p.skipRebalance) {
+          const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+          if (h.targetAllocationPct > 0 && Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
+        }
       })
       indicators[p.portfolioId] = { buyOpp, rebalance }
     })
@@ -291,16 +455,19 @@ export default function MutualFundsPage() {
     const geo = { India: 0, Global: 0 }
     let totalValue = 0
     let hasDetailedAlloc = false
-    let configuredCount = 0
+    const seenFundCodes = new Set()
+    const configuredFundCodes = new Set()
 
     for (const h of holdings) {
       if (h.units <= 0) continue
       totalValue += h.currentValue
-      const alloc = allocMap[h.fundCode || h.schemeCode]
+      const code = h.fundCode || h.schemeCode
+      seenFundCodes.add(code)
+      const alloc = allocMap[code]
 
       if (alloc?.asset) {
         hasDetailedAlloc = true
-        configuredCount++
+        configuredFundCodes.add(code)
         for (const [cls, pct] of Object.entries(alloc.asset)) {
           const val = h.currentValue * (pct / 100)
           if (cls in asset) asset[cls] += val
@@ -358,7 +525,7 @@ export default function MutualFundsPage() {
           .map(([name, value]) => ({ name, value, pct: (value / geoRaw) * 100, fill: GEO_CLS_COLOR[name] || '#94a3b8' }))
       : []
 
-    return { assetList, capList, geoList, hasDetailedAlloc, configuredCount, totalFunds: holdings.filter(h => h.units > 0).length }
+    return { assetList, capList, geoList, hasDetailedAlloc, configuredCount: configuredFundCodes.size, totalFunds: seenFundCodes.size }
   }, [holdings, assetAllocations])
 
   // Unique funds across selected holdings for Allocations tab
@@ -367,6 +534,7 @@ export default function MutualFundsPage() {
     const map = {}
     holdings.forEach(h => {
       if (!h.fundCode && !h.schemeCode) return
+      if (h.units <= 0) return
       const code = (h.fundCode || h.schemeCode).toString()
       if (!map[code]) map[code] = { fundCode: code, fundName: h.fundName || '' }
     })
@@ -380,8 +548,8 @@ export default function MutualFundsPage() {
     const totalValue = activeHoldings.reduce((s, h) => s + h.currentValue, 0)
     if (totalValue === 0) return null
 
-    // ATH Analysis — weighted average drawdown
-    const athHoldings = activeHoldings.filter(h => h.athNav > 0 && h.belowATHPct > 0)
+    // ATH Analysis — weighted average drawdown (only 5%+ below ATH is meaningful)
+    const athHoldings = activeHoldings.filter(h => h.athNav > 0 && h.belowATHPct >= 5)
     const weightedDrawdown = athHoldings.length > 0
       ? athHoldings.reduce((s, h) => s + (h.belowATHPct * h.currentValue), 0) / totalValue
       : 0
@@ -413,7 +581,100 @@ export default function MutualFundsPage() {
     cashFlows.sort((a, b) => a.date - b.date)
     const xirr = cashFlows.length >= 2 ? computeXIRR(cashFlows) : null
 
-    return { weightedDrawdown, athSorted, topPerformers, bottomPerformers, concentration, top5Pct, xirr, totalValue }
+    // Simple returns
+    const totalInvested = activeHoldings.reduce((s, h) => s + h.investment, 0)
+    const totalPL = totalValue - totalInvested
+    const totalPLPct = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0
+
+    // Simple CAGR from earliest transaction
+    const earliestDate = cashFlows.length > 1 ? cashFlows[0].date : null
+    let cagr = null
+    if (earliestDate && totalInvested > 0) {
+      const years = (new Date() - earliestDate) / (365.25 * 86400000)
+      if (years >= 0.1) {
+        cagr = (Math.pow(totalValue / totalInvested, 1 / years) - 1)
+      }
+    }
+
+    // Deduplicate by fund name (consolidate across portfolios)
+    function dedupeByFund(arr) {
+      const map = {}
+      arr.forEach(h => {
+        const key = h.fundName
+        if (!map[key]) { map[key] = { ...h } }
+        else {
+          map[key].currentValue += h.currentValue
+          map[key].investment += h.investment
+          map[key].pl = map[key].currentValue - map[key].investment
+          map[key].plPct = map[key].investment > 0 ? ((map[key].pl) / map[key].investment) * 100 : 0
+          // Keep the higher ATH drawdown for buy opportunities
+          if (h.belowATHPct > map[key].belowATHPct) {
+            map[key].belowATHPct = h.belowATHPct
+            map[key].athNav = h.athNav
+          }
+        }
+      })
+      return Object.values(map)
+    }
+
+    const athDeduped = dedupeByFund(athHoldings).sort((a, b) => b.belowATHPct - a.belowATHPct)
+    const allDeduped = dedupeByFund(withPL)
+    const losersDeduped = allDeduped.filter(h => h.plPct <= -5).sort((a, b) => a.plPct - b.plPct).slice(0, 5)
+    const gainersDeduped = allDeduped.filter(h => h.plPct >= 5).sort((a, b) => b.plPct - a.plPct).slice(0, 5)
+
+    // Concentration deduped
+    const concDeduped = dedupeByFund(activeHoldings).sort((a, b) => b.currentValue - a.currentValue)
+    const concTop5 = concDeduped.slice(0, 5)
+    const concTop5Value = concTop5.reduce((s, h) => s + h.currentValue, 0)
+    const concentrationDeduped = concTop5.map(h => ({
+      ...h, pctOfTotal: totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+    }))
+
+    // Investment timeline — group transactions by date
+    const sortedTxns = [...relevantTxns]
+      .map(t => ({ ...t, _date: parseDate(t.date) }))
+      .filter(t => t._date)
+      .sort((a, b) => a._date - b._date)
+    let cumInvested = 0
+    const dateGroups = {}
+    sortedTxns.forEach(t => {
+      const d = t._date
+      const label = `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${String(d.getFullYear()).slice(2)}`
+      const isBuy = t.type === 'BUY'
+      cumInvested += isBuy ? t.totalAmount : -t.totalAmount
+      if (!dateGroups[label]) dateGroups[label] = { date: label, invested: 0, txns: [], hasBuy: false, hasSell: false }
+      dateGroups[label].invested = Math.round(cumInvested)
+      dateGroups[label].txns.push({
+        fundName: splitFundName(t.fundName || '').main,
+        portfolioName: displayName(t.portfolioName || ''),
+        txnType: t.transactionType || t.type,
+        type: t.type,
+        amount: Math.round(t.totalAmount),
+        units: Math.round((t.units || 0) * 1000) / 1000,
+        realizedPL: !isBuy ? Math.round(t.gainLoss || 0) : null,
+        isBuy,
+      })
+      if (isBuy) dateGroups[label].hasBuy = true
+      else dateGroups[label].hasSell = true
+    })
+    const timeline = Object.values(dateGroups)
+    // Add current value as final point
+    if (timeline.length > 0) {
+      timeline[timeline.length - 1].currentValue = Math.round(totalValue)
+    }
+
+    // Category breakdown from holdings
+    const catMap = {}
+    activeHoldings.forEach(h => {
+      const cat = h.category || 'Other'
+      catMap[cat] = (catMap[cat] || 0) + h.currentValue
+    })
+    const categoryBreakdown = Object.entries(catMap)
+      .filter(([, v]) => v > 0)
+      .sort(([, a], [, b]) => b - a)
+      .map(([name, value]) => ({ name, value, pct: totalValue > 0 ? (value / totalValue) * 100 : 0 }))
+
+    return { weightedDrawdown, athSorted, athDeduped, topPerformers, bottomPerformers, losersDeduped, gainersDeduped, concentration, concentrationDeduped, top5Pct, xirr, cagr, totalValue, totalInvested, totalPL, totalPLPct, timeline, categoryBreakdown }
   }, [enrichedHoldings, holdings, allFilteredTxns])
 
   // Loading state — after all hooks
@@ -576,6 +837,29 @@ export default function MutualFundsPage() {
     }
   }
 
+  async function handleDeleteFund(portfolioId, fundCode, fundName) {
+    const portfolio = portfolioData.find(p => p.portfolioId === portfolioId)
+    const portfolioName = portfolio ? displayName(portfolio.portfolioName) : portfolioId
+    const ok = await confirm({
+      title: 'Delete Fund from Portfolio',
+      message: `Delete "${splitFundName(fundName).main}" from ${portfolioName}?\n\nThis will permanently remove the fund and all its transactions from this portfolio. This cannot be undone.`,
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    showBlockUI('Deleting fund...')
+    try {
+      const result = await deleteFundFromPortfolio(portfolioId, fundCode)
+      showToast(result?.message || 'Fund deleted successfully')
+      setFundDetailHolding(null)
+      setModal({ allocations: portfolioId })
+    } catch (err) {
+      showToast(err.message || 'Failed to delete fund', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
   return (
     <div className="space-y-4">
       {portfolios.length === 0 ? (
@@ -588,7 +872,17 @@ export default function MutualFundsPage() {
         </div>
       ) : (
         <>
-          {!fundDetailHolding && (<>
+          {!fundDetailHolding && selectedPortfolioId !== 'all' && (<>
+          {/* ── Back to All + Portfolio Name ── */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setSelectedPortfolioId('all'); setSubTab('holdings') }}
+              className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <ArrowLeft size={14} /> All Portfolios
+            </button>
+          </div>
+
           {/* ── Top Bar: Portfolio Selector + Actions ── */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="relative w-full sm:w-auto">
@@ -703,6 +997,202 @@ export default function MutualFundsPage() {
             <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
           </div>
 
+          {/* ═══ ALL PORTFOLIOS — Breakdown + Table + Chart ═══ */}
+          {selectedPortfolioId === 'all' && (
+            <>
+            {/* Portfolio Breakdown — Pie Charts (shown first in All view) */}
+            {breakdown && breakdown.assetList.length > 0 && (
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+                <button onClick={() => setBreakdownOpen(p => !p)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors">
+                  <span className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolio Breakdown</span>
+                  <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform duration-200 ${breakdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {breakdownOpen && (
+                  <div className="px-4 pb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <DonutCard title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
+                      {breakdown.capList.length > 0
+                        ? <DonutCard title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
+                        : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
+                            <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown</p>
+                          </div>
+                      }
+                      {breakdown.geoList?.length > 0
+                        ? <DonutCard title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
+                        : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
+                            <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown</p>
+                          </div>
+                      }
+                    </div>
+                    {!breakdown.hasDetailedAlloc && (
+                      <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. Go to Fund Breakdown tab to add detailed data from Morningstar.</p>
+                    )}
+                    {breakdown.hasDetailedAlloc && breakdown.configuredCount < breakdown.totalFunds && (
+                      <p className="text-xs text-amber-400/70 mt-2 text-center">
+                        {breakdown.totalFunds - breakdown.configuredCount} of {breakdown.totalFunds} funds not yet classified
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Investment Journey Chart */}
+            {insights && insights.timeline.length >= 2 && (
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
+                <JourneyChart data={insights.timeline} gradientId="globalInvestedGrad" />
+                <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-dim)]">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Buy</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Sell</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" /> Current Value</span>
+                </div>
+              </div>
+            )}
+
+            {/* Portfolio Summary Table */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolios</p>
+              <button onClick={() => setModal('addPortfolio')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
+                <Plus size={13} /> New Portfolio
+              </button>
+            </div>
+            {portfolioData.length > 0 ? (
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+                {/* Desktop table */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                        <th className="text-left py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Portfolio</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Funds</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Invested</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Current</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Unrealized P&L</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Realized P&L</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Total P&L</th>
+                        <th className="py-2 px-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {portfolioData.map(p => {
+                        const unrealPL = p.currentValue - p.totalInvestment
+                        const unrealUp = unrealPL >= 0
+                        const unrealPct = p.totalInvestment > 0 ? (unrealPL / p.totalInvestment) * 100 : 0
+                        const realPL = p.realizedPL || 0
+                        const realUp = realPL >= 0
+                        const totalPLUp = p.totalPL >= 0
+                        const ind = portfolioIndicators[p.portfolioId] || {}
+                        return (
+                          <tr key={p.portfolioId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                              onClick={() => { setSelectedPortfolioId(p.portfolioId); setSubTab('holdings') }}>
+                            <td className="py-2.5 px-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">{displayName(p.portfolioName)}</span>
+                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
+                                {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
+                              </div>
+                              <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform}</p>
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-xs text-[var(--text-secondary)] tabular-nums">{p.fundCount}</td>
+                            <td className="py-2.5 px-3 text-right text-xs text-[var(--text-secondary)] tabular-nums">{formatINR(p.totalInvestment)}</td>
+                            <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.currentValue)}</td>
+                            <td className="py-2.5 px-3 text-right">
+                              <span className={`text-xs font-semibold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                {unrealUp ? '+' : ''}{formatINR(unrealPL)}
+                              </span>
+                              <span className={`text-xs tabular-nums ml-1 ${unrealUp ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}>
+                                ({unrealUp ? '+' : ''}{unrealPct.toFixed(1)}%)
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <span className={`text-xs font-semibold tabular-nums ${realUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                {realUp ? '+' : ''}{formatINR(realPL)}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <span className={`text-xs font-bold tabular-nums ${totalPLUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                {totalPLUp ? '+' : ''}{formatINR(p.totalPL)}
+                              </span>
+                              <span className={`text-xs tabular-nums ml-1 ${totalPLUp ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}>
+                                ({totalPLUp ? '+' : ''}{p.totalPLPct.toFixed(1)}%)
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setModal({ editPortfolio: p }) }}
+                                className="w-6 h-6 flex items-center justify-center rounded-full text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                title="Edit portfolio"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="lg:hidden divide-y divide-[var(--border-light)]">
+                  {portfolioData.map(p => {
+                    const unrealPL = p.currentValue - p.totalInvestment
+                    const unrealUp = unrealPL >= 0
+                    const totalPLUp = p.totalPL >= 0
+                    const ind = portfolioIndicators[p.portfolioId] || {}
+                    return (
+                      <div key={p.portfolioId} className="px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                           onClick={() => { setSelectedPortfolioId(p.portfolioId); setSubTab('holdings') }}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{displayName(p.portfolioName)}</p>
+                            {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                            {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
+                            <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setModal({ editPortfolio: p }) }}
+                            className="w-6 h-6 flex items-center justify-center rounded-full text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-[var(--text-dim)] mt-0.5">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs tabular-nums">
+                          <div>
+                            <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Invested</p>
+                            <p className="text-[var(--text-secondary)]">{formatINR(p.totalInvestment)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Current</p>
+                            <p className="text-[var(--text-primary)] font-semibold">{formatINR(p.currentValue)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Total P&L</p>
+                            <p className={`font-bold ${totalPLUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                              {totalPLUp ? '+' : ''}{formatINR(p.totalPL)}
+                              <span className="font-normal ml-1">({totalPLUp ? '+' : ''}{p.totalPLPct.toFixed(1)}%)</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
+                <Wallet size={32} className="text-[var(--text-dim)]" />
+                <p className="text-sm text-[var(--text-muted)]">No mutual fund portfolios yet</p>
+                <button onClick={() => setModal('addPortfolio')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
+                  Create your first portfolio
+                </button>
+              </div>
+            )}
+
+            </>
+          )}
+
           {fundDetailHolding ? (() => {
             const h = fundDetailHolding
             const ath = athColor(h.belowATHPct)
@@ -718,12 +1208,12 @@ export default function MutualFundsPage() {
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
-                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{splitFundName(h.fundName).plan}</p>}
+                    {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)] mt-0.5">{splitFundName(h.fundName).plan}</p>}
                   </div>
                   {pData && (
                     <div className="text-right shrink-0 mt-0.5">
-                      <p className="text-[10px] font-semibold text-[var(--text-secondary)]">{mv(pData.ownerName, 'name')}</p>
-                      <p className="text-[10px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded mt-0.5 inline-block">{displayName(pData.portfolioName)} · {pData.platform}</p>
+                      <p className="text-xs font-semibold text-[var(--text-secondary)]">{mv(pData.ownerName, 'name')}</p>
+                      <p className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded mt-0.5 inline-block">{displayName(pData.portfolioName)} · {pData.platform}</p>
                     </div>
                   )}
                 </div>
@@ -745,7 +1235,7 @@ export default function MutualFundsPage() {
                   {h.athNav > 0 && (
                     <DetailRow
                       label="ATH"
-                      value={h.belowATHPct > 0 ? `↓${h.belowATHPct.toFixed(1)}% (₹${h.athNav.toFixed(0)})` : 'At All-Time High'}
+                      value={h.belowATHPct > 0 ? `↓${h.belowATHPct.toFixed(1)}% (₹${h.athNav.toFixed(2)})` : 'At All-Time High'}
                       valueStyle={h.belowATHPct > 0 ? ath : { color: '#34d399' }}
                     />
                   )}
@@ -758,7 +1248,9 @@ export default function MutualFundsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } })}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-400 bg-[var(--bg-card)] border border-[var(--border)] hover:bg-emerald-500/10 rounded-lg transition-colors"
+                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors ${h.lumpsumRestricted && h.sipRestricted ? 'text-[var(--text-dim)] cursor-not-allowed opacity-50' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
+                    disabled={h.lumpsumRestricted && h.sipRestricted}
+                    title={h.lumpsumRestricted && h.sipRestricted ? 'Both SIP and Lumpsum are restricted' : 'Buy / Invest'}
                   >
                     <Plus size={14} /> Invest
                   </button>
@@ -774,11 +1266,18 @@ export default function MutualFundsPage() {
                   >
                     <Repeat2 size={14} /> Switch
                   </button>
+                  <button
+                    onClick={() => handleDeleteFund(h.portfolioId, h.schemeCode, h.fundName)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-card)] border border-[var(--border)] hover:bg-rose-500/10 hover:text-rose-400 rounded-lg transition-colors ml-auto"
+                    title="Delete fund from portfolio"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
 
                 {/* Fund Transactions */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1 mb-2">Transactions ({fundTxns.length})</p>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1 mb-2">Transactions ({fundTxns.length})</p>
                   {fundTxns.length > 0 ? (
                     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
                       {/* Desktop table */}
@@ -892,11 +1391,11 @@ export default function MutualFundsPage() {
               </div>
             )
           })() : (<>
-          {/* ── Portfolio Breakdown — Collapsible Donut Charts ── */}
-          {breakdown && breakdown.assetList.length > 0 && (
+          {/* ── Portfolio Breakdown — Collapsible Donut Charts (individual portfolio only) ── */}
+          {selectedPortfolioId !== 'all' && breakdown && breakdown.assetList.length > 0 && (
             <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
               <button onClick={() => setBreakdownOpen(p => !p)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors">
-                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolio Breakdown</span>
+                <span className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolio Breakdown</span>
                 <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform duration-200 ${breakdownOpen ? 'rotate-180' : ''}`} />
               </button>
               {breakdownOpen && (
@@ -906,21 +1405,21 @@ export default function MutualFundsPage() {
                     {breakdown.capList.length > 0
                       ? <DonutCard title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
                       : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
-                          <p className="text-[10px] text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown</p>
+                          <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown</p>
                         </div>
                     }
                     {breakdown.geoList?.length > 0
                       ? <DonutCard title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
                       : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
-                          <p className="text-[10px] text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown</p>
+                          <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown</p>
                         </div>
                     }
                   </div>
                   {!breakdown.hasDetailedAlloc && (
-                    <p className="text-[9px] text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. Go to Fund Breakdown tab to add detailed data from Morningstar.</p>
+                    <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. Go to Fund Breakdown tab to add detailed data from Morningstar.</p>
                   )}
                   {breakdown.hasDetailedAlloc && breakdown.configuredCount < breakdown.totalFunds && (
-                    <p className="text-[9px] text-amber-400/70 mt-2 text-center">
+                    <p className="text-xs text-amber-400/70 mt-2 text-center">
                       {breakdown.totalFunds - breakdown.configuredCount} of {breakdown.totalFunds} funds not yet classified
                     </p>
                   )}
@@ -929,7 +1428,21 @@ export default function MutualFundsPage() {
             </div>
           )}
 
-          {/* ── Sub-tabs + Action Buttons ── */}
+          {/* ── Investment Journey (individual portfolio) ── */}
+          {selectedPortfolioId !== 'all' && insights && insights.timeline.length >= 2 && (
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+              <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
+              <JourneyChart data={insights.timeline} gradientId="portfolioInvestedGrad" height={200} />
+              <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-dim)]">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Buy</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Sell</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" /> Current Value</span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-tabs + Action Buttons (only for individual portfolio) ── */}
+          {selectedPortfolioId !== 'all' && (
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 shrink-0">
               <button
@@ -950,7 +1463,7 @@ export default function MutualFundsPage() {
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                 }`}
               >
-                <List size={12} /> All Transactions ({allFilteredTxns.length})
+                <List size={12} /> Transactions ({allFilteredTxns.length})
               </button>
               <button
                 onClick={() => setSubTab('breakdown')}
@@ -962,44 +1475,34 @@ export default function MutualFundsPage() {
               >
                 <PieChartIcon size={12} /> Fund Breakdown ({uniqueFunds.length})
               </button>
-              <button
-                onClick={() => setSubTab('insights')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
-                  subTab === 'insights'
-                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                <TrendingUp size={12} /> Insights
-              </button>
             </div>
             <div className="flex items-center gap-1.5 ml-auto shrink-0">
               <button
-                onClick={() => selectedPortfolioId !== 'all' && setModal({ invest: selectedPortfolioId })}
-                disabled={selectedPortfolioId === 'all'}
-                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${selectedPortfolioId === 'all' ? 'border-[var(--border)] text-[var(--text-dim)] cursor-not-allowed opacity-50 bg-[var(--bg-card)]' : 'text-emerald-400 hover:text-emerald-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}
+                onClick={() => setModal({ invest: selectedPortfolioId })}
+                className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-[var(--bg-card)] border border-[var(--border)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
               >
                 <TrendingUp size={12} /> Invest
               </button>
               <button
-                onClick={() => selectedPortfolioId !== 'all' && holdings.length > 0 && setModal({ redeem: selectedPortfolioId })}
-                disabled={selectedPortfolioId === 'all' || holdings.length === 0}
-                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${selectedPortfolioId === 'all' || holdings.length === 0 ? 'border-[var(--border)] text-[var(--text-dim)] cursor-not-allowed opacity-50 bg-[var(--bg-card)]' : 'text-rose-400 hover:text-rose-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}
+                onClick={() => holdings.length > 0 && setModal({ redeem: selectedPortfolioId })}
+                disabled={holdings.length === 0}
+                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${holdings.length === 0 ? 'border-[var(--border)] text-[var(--text-dim)] cursor-not-allowed opacity-50 bg-[var(--bg-card)]' : 'text-rose-400 hover:text-rose-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}
               >
                 <ArrowDownCircle size={12} /> Redeem
               </button>
               <button
-                onClick={() => selectedPortfolioId !== 'all' && holdings.length > 0 && setModal({ switchFunds: selectedPortfolioId })}
-                disabled={selectedPortfolioId === 'all' || holdings.length === 0}
-                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${selectedPortfolioId === 'all' || holdings.length === 0 ? 'border-[var(--border)] text-[var(--text-dim)] cursor-not-allowed opacity-50 bg-[var(--bg-card)]' : 'text-amber-400 hover:text-amber-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}
+                onClick={() => holdings.length > 0 && setModal({ switchFunds: selectedPortfolioId })}
+                disabled={holdings.length === 0}
+                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${holdings.length === 0 ? 'border-[var(--border)] text-[var(--text-dim)] cursor-not-allowed opacity-50 bg-[var(--bg-card)]' : 'text-amber-400 hover:text-amber-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}
               >
                 <Repeat2 size={12} /> Switch
               </button>
             </div>
           </div>
+          )}
 
           {/* ── Holdings Tab ── */}
-          {subTab === 'holdings' && (
+          {selectedPortfolioId !== 'all' && subTab === 'holdings' && (
             <>
               {holdings.length > 0 ? (
                 <div className={selectedPortfolioId === 'all' ? 'space-y-4' : ''}>
@@ -1011,20 +1514,30 @@ export default function MutualFundsPage() {
                   return (
                 <div key={group.portfolioId} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
                   {/* Portfolio header (only in "All" view) */}
-                  {selectedPortfolioId === 'all' && groupPortfolio && (
-                    <div className="px-4 py-2.5 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                  {selectedPortfolioId === 'all' && groupPortfolio && (() => {
+                    const groupInvested = groupHoldings.reduce((s, h) => s + h.investment, 0)
+                    const groupPLPct = groupInvested > 0 ? (groupPL / groupInvested) * 100 : 0
+                    return (
+                    <button
+                      onClick={() => { setSelectedPortfolioId(group.portfolioId); setSubTab('holdings') }}
+                      className="w-full px-4 py-2.5 border-b border-[var(--border-light)] bg-[var(--bg-inset)] hover:bg-[var(--bg-inset-hover)] transition-colors text-left"
+                    >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-[var(--text-primary)]">{displayName(groupPortfolio.portfolioName)}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-bold text-[var(--text-primary)]">{displayName(groupPortfolio.portfolioName)}</p>
+                          <ChevronRight size={14} className="text-[var(--text-dim)]" />
+                        </div>
                         <div className="flex items-center gap-3 text-xs tabular-nums">
                           <span className="text-[var(--text-muted)]">{formatINR(groupPortfolio.currentValue || 0)}</span>
                           <span className={`font-bold ${groupPLUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                            {groupPLUp ? '+' : ''}{formatINR(groupPL)}
+                            {groupPLUp ? '+' : ''}{formatINR(groupPL)} ({groupPLUp ? '+' : ''}{groupPLPct.toFixed(1)}%)
                           </span>
                         </div>
                       </div>
-                      <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{mv(groupPortfolio.ownerName, 'name')} · {groupHoldings.filter(h => h.units > 0).length} funds</p>
-                    </div>
-                  )}
+                      <p className="text-xs text-[var(--text-dim)] mt-0.5">{mv(groupPortfolio.ownerName, 'name')} · {groupHoldings.filter(h => h.units > 0).length} funds</p>
+                    </button>
+                    )
+                  })()}
                   {/* Desktop table */}
                   <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-sm">
@@ -1035,23 +1548,23 @@ export default function MutualFundsPage() {
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Units</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>NAV</div>
-                            <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Avg</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]">Current / Avg</div>
                           </th>
                           <th className="text-center py-2 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>ATH</div>
-                            <div className="text-[10px] font-medium text-[var(--text-dim)]">Below Peak</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]">Below Peak</div>
                           </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>Allocation %</div>
-                            <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Target</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]">Current / Target</div>
                           </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>Amount</div>
-                            <div className="text-[10px] font-medium text-[var(--text-dim)]">Current / Invested</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]">Current / Invested</div>
                           </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>P&L</div>
-                            <div className="text-[10px] font-medium text-[var(--text-dim)]">on Holdings</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]">on Holdings</div>
                           </th>
                           <th className="py-2 px-2 w-8"></th>
                         </tr>
@@ -1087,11 +1600,11 @@ export default function MutualFundsPage() {
                                     <span className="flex items-center gap-1.5 flex-wrap">
                                       {splitFundName(h.fundName).main}
                                       {isPlanned && <span className="text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">Planned</span>}
-                                      {h.lumpsumRestricted && h.sipRestricted && <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />Blocked</span>}
-                                      {h.lumpsumRestricted && !h.sipRestricted && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />SIP only</span>}
-                                      {!h.lumpsumRestricted && h.sipRestricted && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />Lumpsum only</span>}
+                                      {h.lumpsumRestricted && h.sipRestricted && <span className="text-xs font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />Blocked</span>}
+                                      {h.lumpsumRestricted && !h.sipRestricted && <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />SIP only</span>}
+                                      {!h.lumpsumRestricted && h.sipRestricted && <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5"><Lock size={9} />Lumpsum only</span>}
                                     </span>
-                                    {splitFundName(h.fundName).plan && <p className="text-[10px] text-[var(--text-dim)] font-normal mt-0.5">{splitFundName(h.fundName).plan}</p>}
+                                    {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)] font-normal mt-0.5">{splitFundName(h.fundName).plan}</p>}
                                   </button>
                                   {isPlanned && (plannedBuy > 0 || steadySIP > 0) && (
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -1118,10 +1631,10 @@ export default function MutualFundsPage() {
                                 ) : h.athNav > 0 && h.belowATHPct > 0 ? (
                                   <div>
                                     <p className="text-sm font-bold tabular-nums" style={ath}>↓{h.belowATHPct.toFixed(1)}%</p>
-                                    <p className="text-[11px] text-[var(--text-muted)] tabular-nums mt-0.5">₹{h.athNav.toFixed(0)}</p>
+                                    <p className="text-xs text-[var(--text-muted)] tabular-nums mt-0.5">₹{h.athNav.toFixed(2)}</p>
                                   </div>
                                 ) : h.athNav > 0 ? (
-                                  <span className="text-[10px] text-emerald-400/70 font-semibold">AT HIGH</span>
+                                  <span className="text-xs text-emerald-400/70 font-semibold">AT HIGH</span>
                                 ) : (
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 )}
@@ -1164,8 +1677,9 @@ export default function MutualFundsPage() {
                                 <div className="flex items-center gap-0.5 justify-center">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } }) }}
-                                    className="w-6 h-6 flex items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-                                    title="Buy / Invest"
+                                    className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.lumpsumRestricted && h.sipRestricted ? 'bg-slate-500/15 text-[var(--text-dim)] cursor-not-allowed' : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'}`}
+                                    title={h.lumpsumRestricted && h.sipRestricted ? 'Blocked — both SIP and Lumpsum restricted' : 'Buy / Invest'}
+                                    disabled={h.lumpsumRestricted && h.sipRestricted}
                                   >
                                     <Plus size={14} strokeWidth={2.5} />
                                   </button>
@@ -1199,6 +1713,13 @@ export default function MutualFundsPage() {
                                       >
                                         <Repeat size={11} strokeWidth={2.5} className={h.sipRestricted ? 'line-through' : ''} />
                                       </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteFund(h.portfolioId, h.schemeCode, h.fundName) }}
+                                        className="w-6 h-6 flex items-center justify-center rounded-full bg-[var(--bg-inset)] text-[var(--text-dim)] hover:bg-rose-500/20 hover:text-rose-400 transition-colors"
+                                        title="Delete fund from portfolio"
+                                      >
+                                        <Trash2 size={11} strokeWidth={2.5} />
+                                      </button>
                                     </>
                                   )}
                                 </div>
@@ -1225,10 +1746,10 @@ export default function MutualFundsPage() {
                           <div key={h._key} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 opacity-60">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <p className="text-[11px] text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
-                                {splitFundName(h.fundName).plan && <p className="text-[9px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                                <p className="text-xs text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
+                                {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                               </div>
-                              <span className="text-[10px] font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded shrink-0">Planned</span>
+                              <span className="text-xs font-semibold text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded shrink-0">Planned</span>
                             </div>
                             <div className="flex items-center justify-between mt-1.5">
                               <span className="text-xs text-[var(--text-dim)]">Target {h.targetAllocationPct.toFixed(1)}%</span>
@@ -1236,9 +1757,17 @@ export default function MutualFundsPage() {
                                 {plannedBuy > 0 && <span className="text-xs text-emerald-400 font-semibold">{formatINR(plannedBuy)}</span>}
                                 <button
                                   onClick={() => setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } })}
-                                  className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10"
+                                  className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded ${h.lumpsumRestricted && h.sipRestricted ? 'text-[var(--text-dim)] bg-slate-500/10 cursor-not-allowed' : 'text-emerald-400 bg-emerald-500/10'}`}
+                                  disabled={h.lumpsumRestricted && h.sipRestricted}
                                 >
-                                  <Plus size={10} strokeWidth={2.5} /> Buy
+                                  <Plus size={10} strokeWidth={2.5} /> {h.lumpsumRestricted && h.sipRestricted ? 'Blocked' : 'Buy'}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFund(h.portfolioId, h.schemeCode, h.fundName)}
+                                  className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded text-[var(--text-dim)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                  title="Delete fund"
+                                >
+                                  <Trash2 size={10} strokeWidth={2.5} />
                                 </button>
                               </div>
                             </div>
@@ -1255,21 +1784,21 @@ export default function MutualFundsPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
-                                {h.lumpsumRestricted && h.sipRestricted && <span className="text-[9px] font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Blocked</span>}
-                                {h.lumpsumRestricted && !h.sipRestricted && <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />SIP only</span>}
-                                {!h.lumpsumRestricted && h.sipRestricted && <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Lumpsum only</span>}
+                                <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
+                                {h.lumpsumRestricted && h.sipRestricted && <span className="text-xs font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Blocked</span>}
+                                {h.lumpsumRestricted && !h.sipRestricted && <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />SIP only</span>}
+                                {!h.lumpsumRestricted && h.sipRestricted && <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Lumpsum only</span>}
                               </div>
-                              {splitFundName(h.fundName).plan && <p className="text-[9px] text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
+                              {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
                             </div>
                             <div className="text-right shrink-0">
                               <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
-                              <p className={`text-[11px] font-semibold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                              <p className={`text-xs font-semibold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
                                 {unrealUp ? '+' : ''}{formatINR(h.pl)} ({unrealUp ? '+' : ''}{h.plPct.toFixed(1)}%)
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between mt-1.5 text-[11px] tabular-nums">
+                          <div className="flex items-center justify-between mt-1.5 text-xs tabular-nums">
                             <span className="text-[var(--text-dim)]">Invested {formatINR(h.investment)}</span>
                             <ChevronRight size={12} className="text-[var(--text-dim)]" />
                           </div>
@@ -1293,8 +1822,161 @@ export default function MutualFundsPage() {
             </>
           )}
 
+          {/* ── Buy Opportunities + Rebalance (below holdings) ── */}
+          {selectedPortfolioId !== 'all' && subTab === 'holdings' && insights && (
+            <div className="space-y-3">
+              {/* Buy Opportunities */}
+              {insights.athDeduped.length > 0 && (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Buy Opportunities</p>
+                  <p className="text-xs text-[var(--text-dim)] mb-3">Funds trading below All-Time High</p>
+                  {insights.athDeduped.map((h, idx) => {
+                    const { main } = splitFundName(h.fundName)
+                    const isStrongBuy = h.belowATHPct >= 10
+                    return (
+                      <div key={h.fundName} className="flex items-center justify-between py-2.5"
+                           style={{ borderBottom: idx < insights.athDeduped.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                        <div className="min-w-0">
+                          <p className="text-[13px] text-[var(--text-primary)] font-medium truncate">{main}</p>
+                          <p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">{mv(formatINR(h.currentValue), 'value')}</p>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
+                                style={{
+                                  background: isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(251,191,36,0.10)',
+                                  color: isStrongBuy ? '#22d3ee' : '#fbbf24',
+                                }}>
+                            {isStrongBuy ? 'Strong Buy' : 'Buy'}
+                          </span>
+                          <p className="text-xs mt-0.5 font-medium tabular-nums"
+                             style={{ color: isStrongBuy ? '#22d3ee' : '#fbbf24' }}>
+                            &#9660; {h.belowATHPct.toFixed(1)}% below ATH
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Rebalance Needed (hidden if portfolio has skipRebalance) */}
+              {selectedPortfolio && !selectedPortfolio.skipRebalance && (() => {
+                const threshold = (selectedPortfolio.rebalanceThreshold || 0.05) * 100
+                const rebalanceHoldings = enrichedHoldings
+                  .filter(h => h.units > 0 && h.targetAllocationPct > 0)
+                  .map(h => ({
+                    fundName: splitFundName(h.fundName).main,
+                    fundCode: h.schemeCode,
+                    currentPct: Math.round(h.currentAllocationPct * 10) / 10,
+                    targetPct: Math.round(h.targetAllocationPct * 10) / 10,
+                    drift: Math.round((h.currentAllocationPct - h.targetAllocationPct) * 10) / 10,
+                    currentValue: h.currentValue,
+                    investment: h.investment,
+                  }))
+                  .filter(h => Math.abs(h.drift) > threshold)
+                  .sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift))
+
+                if (rebalanceHoldings.length === 0) return null
+
+                const totalValue = enrichedHoldings.filter(h => h.units > 0).reduce((s, h) => s + h.currentValue, 0)
+
+                return (
+                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Rebalance Needed</p>
+                        <p className="text-xs text-[var(--text-dim)] mt-0.5">Funds drifting more than {threshold}% from target allocation</p>
+                      </div>
+                      <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400">
+                        {rebalanceHoldings.length} fund{rebalanceHoldings.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {/* Desktop view */}
+                    <div className="hidden sm:block">
+                      <div className="grid grid-cols-[1fr_90px_60px_180px_70px_80px] gap-2 text-[10px] text-[var(--text-dim)] font-semibold uppercase tracking-wider pb-1 mb-1 border-b border-[var(--border-light)]">
+                        <span>Fund</span>
+                        <span className="text-right">Current → Target</span>
+                        <span className="text-right">Drift</span>
+                        <span className="text-center">Allocation Bar</span>
+                        <span className="text-right">Amount</span>
+                        <span className="text-right">Action</span>
+                      </div>
+                      {rebalanceHoldings.map((item, idx) => {
+                        const isOver = item.drift > 0
+                        const maxPct = Math.max(item.currentPct, item.targetPct, 1)
+                        const rebalanceAmt = Math.abs(item.drift / 100 * totalValue)
+                        return (
+                          <div key={idx} className="grid grid-cols-[1fr_90px_60px_180px_70px_80px] gap-2 items-center py-2"
+                               style={{ borderBottom: idx < rebalanceHoldings.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                            <div className="text-xs text-[var(--text-primary)] font-medium truncate min-w-0">{item.fundName}</div>
+                            <div className="text-xs tabular-nums text-right text-[var(--text-secondary)]">
+                              {item.currentPct}% → {item.targetPct}%
+                            </div>
+                            <div className={`text-xs tabular-nums text-right font-bold ${isOver ? 'text-amber-400' : 'text-blue-400'}`}>
+                              {isOver ? '+' : ''}{item.drift}%
+                            </div>
+                            <div className="relative h-4 rounded bg-[var(--bg-inset)] overflow-hidden">
+                              <div className="absolute inset-y-0 left-0 rounded"
+                                   style={{
+                                     width: `${(item.currentPct / maxPct) * 100}%`,
+                                     background: isOver ? 'rgba(251,146,60,0.3)' : 'rgba(96,165,250,0.3)',
+                                   }} />
+                              <div className="absolute inset-y-0 w-0.5 bg-violet-400/80"
+                                   style={{ left: `${(item.targetPct / maxPct) * 100}%` }} />
+                            </div>
+                            <div className="text-xs tabular-nums text-right text-[var(--text-muted)]">
+                              {formatINR(rebalanceAmt)}
+                            </div>
+                            <div className="text-right">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                isOver ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400'
+                              }`}>
+                                {isOver ? 'Reduce' : 'Add'}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* Mobile view */}
+                    <div className="sm:hidden space-y-2">
+                      {rebalanceHoldings.map((item, idx) => {
+                        const isOver = item.drift > 0
+                        const rebalanceAmt = Math.abs(item.drift / 100 * totalValue)
+                        return (
+                          <div key={idx} className="py-2" style={{ borderBottom: idx < rebalanceHoldings.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-[var(--text-primary)] font-medium truncate flex-1 min-w-0">{item.fundName}</p>
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ml-2 ${
+                                isOver ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400'
+                              }`}>
+                                {isOver ? 'Reduce' : 'Add'} {formatINR(rebalanceAmt)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-[var(--text-dim)] tabular-nums">
+                              <span>{item.currentPct}% → {item.targetPct}%</span>
+                              <span className={`font-bold ${isOver ? 'text-amber-400' : 'text-blue-400'}`}>
+                                ({isOver ? '+' : ''}{item.drift}%)
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setModal({ allocations: selectedPortfolioId })}
+                      className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-lg transition-colors"
+                    >
+                      <Settings2 size={13} /> Open Allocation Manager
+                    </button>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
           {/* ── Transactions Tab ── */}
-          {subTab === 'transactions' && (
+          {selectedPortfolioId !== 'all' && subTab === 'transactions' && (
             <>
               {/* Fund filter */}
               {txnFundNames.length > 1 && (
@@ -1361,7 +2043,7 @@ export default function MutualFundsPage() {
                               <td className="py-2.5 px-3">
                                 <div className="max-w-[200px]">
                                   <p className="text-xs text-[var(--text-primary)] truncate">{splitFundName(t.fundName).main}</p>
-                                  {splitFundName(t.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
+                                  {splitFundName(t.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
                                 </div>
                                 {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
                               </td>
@@ -1420,8 +2102,8 @@ export default function MutualFundsPage() {
                             </div>
                           </div>
                           <div className="mb-1">
-                            <p className="text-[11px] text-[var(--text-primary)] truncate">{splitFundName(t.fundName).main}</p>
-                            {splitFundName(t.fundName).plan && <p className="text-[9px] text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
+                            <p className="text-xs text-[var(--text-primary)] truncate">{splitFundName(t.fundName).main}</p>
+                            {splitFundName(t.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <p className="text-[var(--text-dim)]">{t.units.toFixed(2)} units @ ₹{t.price.toFixed(2)}</p>
@@ -1459,22 +2141,24 @@ export default function MutualFundsPage() {
           )}
 
           {/* ── Fund Breakdown Tab ── */}
-          {subTab === 'breakdown' && (
+          {selectedPortfolioId !== 'all' && subTab === 'breakdown' && (
             <>
               {uniqueFunds.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-[var(--text-dim)] px-1">Copy allocation data from <span className="font-semibold text-[var(--text-muted)]">morningstar.in</span> → Fund → Portfolio tab</p>
-                  {uniqueFunds.map(fund => {
-                    const existing = assetAllocations?.find(a => a.fundCode === fund.fundCode)
-                    return (
-                      <FundAllocationRow
-                        key={fund.fundCode}
-                        fund={fund}
-                        existing={existing}
-                        onConfigure={() => setModal({ classifyFund: { fund, existing } })}
-                      />
-                    )
-                  })}
+                <div>
+                  <p className="text-xs text-[var(--text-dim)] px-1 mb-2">Copy allocation data from <span className="font-semibold text-[var(--text-muted)]">morningstar.in</span> → Fund → Portfolio tab</p>
+                  <div className="space-y-2">
+                    {uniqueFunds.map(fund => {
+                      const existing = assetAllocations?.find(a => a.fundCode === fund.fundCode)
+                      return (
+                        <FundAllocationRow
+                          key={fund.fundCode}
+                          fund={fund}
+                          existing={existing}
+                          onConfigure={() => setModal({ classifyFund: { fund, existing } })}
+                        />
+                      )
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
@@ -1485,164 +2169,6 @@ export default function MutualFundsPage() {
             </>
           )}
 
-          {/* ── Insights Tab ── */}
-          {subTab === 'insights' && (
-            <>
-              {insights ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* XIRR Card */}
-                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Portfolio Return</p>
-                    {insights.xirr !== null ? (
-                      <div>
-                        <div className="flex items-baseline gap-2">
-                          <p className={`text-2xl font-bold tabular-nums ${insights.xirr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {(insights.xirr * 100).toFixed(1)}%
-                          </p>
-                          <p className="text-[10px] text-[var(--text-dim)]">XIRR p.a.</p>
-                        </div>
-                        <div className="flex items-center gap-3 mt-2 text-[10px] tabular-nums">
-                          <span className="text-[var(--text-dim)]">Invested {mv(formatINR(stats.invested), 'value')}</span>
-                          <span className="text-[var(--text-dim)]">Current {mv(formatINR(stats.current), 'value')}</span>
-                        </div>
-                        <p className={`text-[10px] mt-1 ${insights.xirr >= 0.12 ? 'text-emerald-400' : insights.xirr >= 0.08 ? 'text-[var(--text-dim)]' : 'text-amber-400'}`}>
-                          {insights.xirr >= 0.12 ? 'Strong returns — stay the course' : insights.xirr >= 0.08 ? 'Decent returns — review periodically' : insights.xirr >= 0 ? 'Below expectations — review fund selection' : 'Negative returns — consider rebalancing'}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-[var(--text-dim)]">N/A</p>
-                    )}
-                  </div>
-
-                  {/* Buy Opportunities Card */}
-                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Buy Opportunities</p>
-                    {insights.athSorted.length > 0 ? (
-                      <div>
-                        <p className="text-[10px] text-[var(--text-dim)] mb-3">
-                          {insights.athSorted.filter(h => h.belowATHPct >= 10).length} funds 10%+ below peak — consider adding
-                        </p>
-                        <div className="space-y-1.5 max-h-44 overflow-y-auto">
-                          {insights.athSorted.map(h => {
-                            const { shortName } = splitFundName(h.fundName)
-                            return (
-                              <div key={h._key} className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] text-[var(--text-secondary)] truncate flex-1">{shortName}</p>
-                                <span className="text-[10px] font-semibold tabular-nums shrink-0" style={athColor(h.belowATHPct)}>
-                                  -{h.belowATHPct.toFixed(1)}%
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-emerald-400">All funds at or near peak — no dips to buy</p>
-                    )}
-                  </div>
-
-                  {/* Needs Review Card */}
-                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Needs Review</p>
-                    {insights.bottomPerformers.some(h => h.plPct < 0) ? (
-                      <div className="space-y-3">
-                        <p className="text-[10px] text-amber-400">
-                          {insights.bottomPerformers.filter(h => h.plPct < 0).length} fund{insights.bottomPerformers.filter(h => h.plPct < 0).length > 1 ? 's' : ''} in loss — evaluate if you should hold, add more, or exit
-                        </p>
-                        <div className="space-y-1.5">
-                          {insights.bottomPerformers.filter(h => h.plPct < 0).map(h => {
-                            const { shortName } = splitFundName(h.fundName)
-                            return (
-                              <div key={h._key} className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] text-[var(--text-secondary)] truncate flex-1">{shortName}</p>
-                                <span className="text-[10px] font-semibold tabular-nums shrink-0 text-rose-400">
-                                  {h.plPct.toFixed(1)}%
-                                </span>
-                                <span className="text-[10px] tabular-nums shrink-0 text-rose-400/70">
-                                  {mv(formatINR(Math.abs(h.pl)), 'value')}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                        {/* Top gainers for context */}
-                        {insights.topPerformers.some(h => h.plPct > 0) && (
-                          <div>
-                            <p className="text-[9px] font-semibold text-emerald-400/70 uppercase mb-1">Top performers</p>
-                            <div className="space-y-1">
-                              {insights.topPerformers.filter(h => h.plPct > 0).slice(0, 3).map(h => {
-                                const { shortName } = splitFundName(h.fundName)
-                                return (
-                                  <div key={h._key} className="flex items-center justify-between gap-2">
-                                    <p className="text-[10px] text-[var(--text-dim)] truncate flex-1">{shortName}</p>
-                                    <span className="text-[10px] font-semibold tabular-nums shrink-0 text-emerald-400/70">
-                                      +{h.plPct.toFixed(1)}%
-                                    </span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-emerald-400">All holdings in profit — no action needed</p>
-                    )}
-                  </div>
-
-                  {/* Concentration Card */}
-                  <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Concentration Risk</p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-lg font-bold tabular-nums text-[var(--text-primary)]">
-                        {insights.top5Pct.toFixed(0)}%
-                      </p>
-                      <p className="text-[10px] text-[var(--text-dim)]">in top 5 holdings</p>
-                      {insights.top5Pct > 60 && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400">High</span>
-                      )}
-                    </div>
-                    <p className={`text-[10px] mb-3 ${insights.top5Pct > 70 ? 'text-amber-400' : insights.top5Pct > 50 ? 'text-[var(--text-dim)]' : 'text-emerald-400'}`}>
-                      {insights.top5Pct > 70 ? 'Very concentrated — consider diversifying across more funds' : insights.top5Pct > 50 ? 'Moderately concentrated — acceptable for focused portfolios' : 'Well diversified'}
-                    </p>
-                    {/* Stacked bar */}
-                    <div className="h-2 rounded-full overflow-hidden flex mb-3" style={{ background: 'var(--bg-inset)' }}>
-                      {insights.concentration.map((h, i) => (
-                        <div key={h._key || i} className="h-full" style={{
-                          width: `${h.pctOfTotal}%`,
-                          background: ['#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4'][i] || '#94a3b8',
-                        }} />
-                      ))}
-                    </div>
-                    <div className="space-y-1.5">
-                      {insights.concentration.map((h, i) => {
-                        const { shortName } = splitFundName(h.fundName)
-                        return (
-                          <div key={h._key || i} className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{
-                              background: ['#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4'][i] || '#94a3b8'
-                            }} />
-                            <p className="text-[10px] text-[var(--text-secondary)] truncate flex-1">{shortName}</p>
-                            <span className="text-[10px] font-semibold tabular-nums text-[var(--text-muted)] shrink-0">
-                              {h.pctOfTotal.toFixed(1)}%
-                            </span>
-                            <span className="text-[10px] tabular-nums text-[var(--text-dim)] shrink-0">
-                              {mv(formatINR(h.currentValue), 'value')}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
-                  <TrendingUp size={28} className="text-[var(--text-dim)]" />
-                  <p className="text-sm text-[var(--text-muted)]">No holdings to analyze</p>
-                </div>
-              )}
-            </>
-          )}
           </>)}
         </>
       )}
@@ -1714,7 +2240,7 @@ export default function MutualFundsPage() {
         )}
       </Modal>
 
-      <Modal open={!!modal?.classifyFund} onClose={() => setModal(null)} title="Classify Fund">
+      <Modal open={!!modal?.classifyFund} onClose={() => setModal(null)} title="Classify Fund" maxWidth="max-w-4xl">
         {modal?.classifyFund && (
           <FundAllocationForm
             fund={modal.classifyFund.fund}
@@ -1752,7 +2278,7 @@ function StatCard({ label, value, sub, positive, bold }) {
 function DetailRow({ label, value, valueStyle, valueClass }) {
   return (
     <div className="flex items-center justify-between px-3.5 py-2">
-      <p className="text-[11px] text-[var(--text-dim)]">{label}</p>
+      <p className="text-xs text-[var(--text-dim)]">{label}</p>
       <p className={`text-xs font-semibold tabular-nums ${valueClass || 'text-[var(--text-primary)]'}`} style={valueStyle}>{value}</p>
     </div>
   )
@@ -1850,7 +2376,7 @@ function EditTxnForm({ txn, onSave, onCancel }) {
     <div className="space-y-4">
       <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
         <p className="text-xs text-[var(--text-dim)]">{splitFundName(txn.fundName).main}</p>
-        {splitFundName(txn.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(txn.fundName).plan}</p>}
+        {splitFundName(txn.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(txn.fundName).plan}</p>}
         <p className="text-xs text-[var(--text-muted)]">
           {txn.type} · {txn.transactionType} · {txn.transactionId}
         </p>
@@ -1925,69 +2451,104 @@ const ALLOC_DISPLAY = [
   { key: 'Other', bg: 'bg-slate-400' },
 ]
 const CAP_ABBR = { Giant: 'G', Large: 'L', Mid: 'M', Small: 'S', Micro: 'Mi' }
-const GEO_ABBR = { India: 'IN', Global: 'GL' }
+const GEO_ABBR = { India: 'India', Global: 'Global' }
+
+function AllocPills({ entries, colorMap }) {
+  return entries.map(([k, v]) => (
+    <span key={k} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] tabular-nums whitespace-nowrap" style={{ background: (colorMap[k] || '#94a3b8') + '18' }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: colorMap[k] || '#94a3b8' }} />
+      <span style={{ color: colorMap[k] || '#94a3b8' }}>{k}</span>
+      <span className="text-[var(--text-secondary)]">{v}%</span>
+    </span>
+  ))
+}
 
 function FundAllocationRow({ fund, existing, onConfigure }) {
   const hasData = existing?.assetAllocation && Object.keys(existing.assetAllocation).length > 0
-  const hasCap = existing?.equityAllocation && Object.keys(existing.equityAllocation).length > 0
-  const hasGeo = existing?.geoAllocation && Object.keys(existing.geoAllocation).length > 0
+
+  const assetEntries = hasData ? [...ALLOC_DISPLAY.map(d => [d.key, existing.assetAllocation[d.key] || 0]).filter(([, v]) => v > 0),
+    ...Object.entries(existing.assetAllocation || {}).filter(([k, v]) => v > 0 && !ALLOC_DISPLAY.some(d => d.key === k))] : []
+  const capEntries = Object.entries(existing?.equityAllocation || {}).filter(([, v]) => v > 0)
+  const geoEntries = Object.entries(existing?.geoAllocation || {}).filter(([, v]) => v > 0)
 
   return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          <div>
-            <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{splitFundName(fund.fundName).main}</p>
-            {splitFundName(fund.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
-          </div>
-          <p className="text-[10px] text-[var(--text-dim)] tabular-nums mt-0.5">{fund.fundCode}</p>
-        </div>
-        <button onClick={onConfigure}
-          className="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors shrink-0 ml-3"
-          title="Classify fund">
-          <Settings2 size={14} />
-        </button>
-      </div>
-
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-3 py-2.5">
       {hasData ? (
-        <div className="px-4 pb-3">
-          <div className="h-2 rounded-full overflow-hidden bg-[var(--bg-inset)] flex mb-1.5">
-            {ALLOC_DISPLAY.map(({ key, bg }) => {
-              const val = existing.assetAllocation[key] || 0
-              return val > 0 ? <div key={key} className={`h-full ${bg}`} style={{ width: `${val}%` }} /> : null
-            })}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Column 1: Fund name + Geography */}
+          <div className="flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{splitFundName(fund.fundName).main}</p>
+                {splitFundName(fund.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
+              </div>
+              <button onClick={onConfigure}
+                className="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors shrink-0 ml-1"
+                title="Classify fund">
+                <Settings2 size={15} />
+              </button>
+            </div>
+            {geoEntries.length > 0 && (
+              <div className="mt-auto pt-1.5">
+                <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)' }}>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">Geography</span>
+                  <div className="flex flex-wrap gap-1">
+                    {geoEntries.map(([k, v]) => (
+                      <span key={k} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs tabular-nums whitespace-nowrap"
+                            style={{ background: (GEO_CLS_COLOR[k] || '#94a3b8') + '18' }}>
+                        <span className="w-2 h-2 rounded-full" style={{ background: GEO_CLS_COLOR[k] || '#94a3b8' }} />
+                        <span style={{ color: GEO_CLS_COLOR[k] || '#94a3b8' }}>{k}</span>
+                        <span className="text-[var(--text-secondary)]">{v}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {ALLOC_DISPLAY.map(({ key, bg }) => {
-              const val = existing.assetAllocation[key] || 0
-              return val > 0 ? (
-                <span key={key} className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] tabular-nums">
-                  <span className={`w-1.5 h-1.5 rounded-full ${bg}`} />{val}% {key}
+          {/* Column 2: Asset Allocation */}
+          <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)' }}>
+            <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">Asset Allocation</span>
+            <div className="flex flex-col gap-0.5">
+              {assetEntries.map(([k, v]) => (
+                <span key={k} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs tabular-nums whitespace-nowrap w-fit"
+                      style={{ background: (ASSET_CLS_COLOR[k] || '#94a3b8') + '18' }}>
+                  <span className="w-2 h-2 rounded-full" style={{ background: ASSET_CLS_COLOR[k] || '#94a3b8' }} />
+                  <span style={{ color: ASSET_CLS_COLOR[k] || '#94a3b8' }}>{k}</span>
+                  <span className="text-[var(--text-secondary)]">{v}%</span>
                 </span>
-              ) : null
-            })}
-            {hasCap && (
-              <span className="text-[11px] text-[var(--text-dim)] tabular-nums ml-1">
-                | {Object.entries(CAP_ABBR).map(([k, abbr]) => {
-                  const val = existing.equityAllocation[k] || 0
-                  return val > 0 ? `${abbr}${val}` : ''
-                }).filter(Boolean).join(' ')}
-              </span>
-            )}
-            {hasGeo && (
-              <span className="text-[11px] text-[var(--text-dim)] tabular-nums ml-1">
-                | {Object.entries(GEO_ABBR).map(([k, abbr]) => {
-                  const val = existing.geoAllocation[k] || 0
-                  return val > 0 ? `${abbr}${val}` : ''
-                }).filter(Boolean).join(' ')}
-              </span>
-            )}
+              ))}
+            </div>
           </div>
+          {/* Column 3: Market Cap */}
+          {capEntries.length > 0 && (
+            <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)' }}>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">Market Cap</span>
+              <div className="flex flex-col gap-0.5">
+                {capEntries.map(([k, v]) => (
+                  <span key={k} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs tabular-nums whitespace-nowrap w-fit"
+                        style={{ background: (CAP_CLS_COLOR[k] || '#94a3b8') + '18' }}>
+                    <span className="w-2 h-2 rounded-full" style={{ background: CAP_CLS_COLOR[k] || '#94a3b8' }} />
+                    <span style={{ color: CAP_CLS_COLOR[k] || '#94a3b8' }}>{k}</span>
+                    <span className="text-[var(--text-secondary)]">{v}%</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="px-4 pb-3">
-          <div className="h-2 rounded-full bg-[var(--bg-inset)] mb-1" />
-          <p className="text-[10px] text-[var(--text-dim)] italic">Not configured — click ⚙ to classify</p>
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{splitFundName(fund.fundName).main}</p>
+            {splitFundName(fund.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
+            <p className="text-[10px] text-[var(--text-dim)] italic mt-1">Not classified — click ⚙ to configure</p>
+          </div>
+          <button onClick={onConfigure}
+            className="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 transition-colors shrink-0 ml-3"
+            title="Classify fund">
+            <Settings2 size={14} />
+          </button>
         </div>
       )}
     </div>
@@ -1998,7 +2559,7 @@ function FundAllocationRow({ fund, existing, onConfigure }) {
 function DonutCard({ title, data, bgMap }) {
   return (
     <div className="rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-3">
-      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 text-center">{title}</p>
+      <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 text-center">{title}</p>
       <div className="w-full h-[120px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -2022,9 +2583,9 @@ function DonutCard({ title, data, bgMap }) {
       </div>
       <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5 mt-1">
         {data.map(d => (
-          <span key={d.name} className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] tabular-nums">
+          <span key={d.name} className="flex items-center gap-1 text-xs text-[var(--text-muted)] tabular-nums">
             <span className={`w-1.5 h-1.5 rounded-full ${bgMap[d.name] || 'bg-slate-500'}`} />
-            {d.name} {d.pct.toFixed(0)}%
+            {d.name} {d.pct < 1 ? d.pct.toFixed(1) : d.pct.toFixed(0)}%
           </span>
         ))}
       </div>

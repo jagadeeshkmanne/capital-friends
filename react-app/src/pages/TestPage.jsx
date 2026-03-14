@@ -558,7 +558,7 @@ export default function TestPage() {
               <>
                 <div className="text-xs text-[var(--text-secondary)] space-y-1">
                   <p><span className="text-[var(--text-dim)]">Spreadsheet:</span> {diagData.spreadsheetName}</p>
-                  <p><span className="text-[var(--text-dim)]">ID:</span> <code className="text-[10px]">{diagData.spreadsheetId}</code></p>
+                  <p><span className="text-[var(--text-dim)]">ID:</span> <code className="text-xs">{diagData.spreadsheetId}</code></p>
                 </div>
 
                 {/* Sheets */}
@@ -566,7 +566,7 @@ export default function TestPage() {
                   <h3 className="text-xs font-medium text-[var(--text-primary)] mb-1">Sheets</h3>
                   <div className="grid grid-cols-2 gap-1">
                     {Object.entries(diagData.sheets || {}).map(([name, info]) => (
-                      <div key={name} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-[var(--bg-elevated)]">
+                      <div key={name} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-[var(--bg-elevated)]">
                         <span className="text-[var(--text-secondary)] truncate">{name}</span>
                         {info.exists ? (
                           <span className="text-emerald-400 ml-1">{info.dataRows}r</span>
@@ -583,7 +583,7 @@ export default function TestPage() {
                   <h3 className="text-xs font-medium text-[var(--text-primary)] mb-1">Data Functions</h3>
                   <div className="space-y-1">
                     {Object.entries(diagData.dataTests || {}).map(([name, info]) => (
-                      <div key={name} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-[var(--bg-elevated)]">
+                      <div key={name} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-[var(--bg-elevated)]">
                         <span className="text-[var(--text-secondary)]">{name}</span>
                         {info.success ? (
                           <span className="text-emerald-400">{info.count} items</span>
@@ -600,7 +600,7 @@ export default function TestPage() {
                   <div>
                     <h3 className="text-xs font-medium text-rose-400 mb-1">SafeCall Errors</h3>
                     {diagData.safeCallErrors.map((err, i) => (
-                      <p key={i} className="text-[11px] text-rose-400">{err.fn}: {err.error}</p>
+                      <p key={i} className="text-xs text-rose-400">{err.fn}: {err.error}</p>
                     ))}
                   </div>
                 )}
@@ -621,10 +621,10 @@ export default function TestPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-[var(--text-primary)]">{r.test}</p>
                     {r.detail && (
-                      <p className="text-[11px] text-[var(--text-dim)] mt-0.5 break-all">{r.detail}</p>
+                      <p className="text-xs text-[var(--text-dim)] mt-0.5 break-all">{r.detail}</p>
                     )}
                   </div>
-                  <span className="text-[10px] text-[var(--text-dim)] shrink-0">{r.time}</span>
+                  <span className="text-xs text-[var(--text-dim)] shrink-0">{r.time}</span>
                 </div>
               ))}
             </div>

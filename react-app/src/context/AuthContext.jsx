@@ -9,13 +9,13 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 // OAuth scopes — must match all scopes in webapp's appsscript.json
 // spreadsheets: GAS reads/writes user spreadsheets + master DB
-// drive: GAS copies template spreadsheet for new users (DriveApp.makeCopy)
+// drive.file: GAS creates user spreadsheet (SpreadsheetApp.create)
 // gmail.send: GAS sends email reports via GmailApp from user's Gmail
 // script.scriptapp: GAS creates daily sync triggers for auto-refresh
 // openid/email/profile: user identity
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/script.scriptapp',
   'openid',
@@ -85,9 +85,10 @@ export function AuthProvider({ children }) {
         // Valid token in storage — restore session immediately (page refresh)
         restoreSession()
       } else if (getCachedUser() && !explicitLogout) {
-        // User previously logged in and didn't explicitly log out (tab/browser closed).
-        // Try silent auth — like Gmail, auto-login without any button click.
-        trySilentRefresh()
+        // Token expired but user didn't explicitly log out — restore from cache immediately.
+        // The API module will refresh the token lazily on the first API call (via setTokenRefreshFn).
+        // Do NOT call requestAccessToken here — it can show an account-switcher popup on page load.
+        setLoading(false)
       } else {
         // Explicit logout or first-time user — show login page
         setLoading(false)
@@ -166,17 +167,6 @@ export function AuthProvider({ children }) {
     } finally {
       if (!hadCachedUser) setLoading(false)
       // If had cache, loading was already false from init
-    }
-  }
-
-  // Try silent refresh on page load — avoids showing consent screen for returning users
-  async function trySilentRefresh() {
-    try {
-      await silentRefresh()
-      await restoreSession()
-    } catch {
-      // Silent failed (first-time user or consent revoked) — show login page
-      setLoading(false)
     }
   }
 

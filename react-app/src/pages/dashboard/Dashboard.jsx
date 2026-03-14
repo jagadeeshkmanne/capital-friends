@@ -1,13 +1,15 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Mail, Check, Loader2, Globe, Trophy, Star, TrendingUp, TrendingDown } from 'lucide-react'
-import * as api from '../../services/api'
+import { Trophy, Star, TrendingUp, TrendingDown, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useData } from '../../context/DataContext'
 import PageLoading from '../../components/PageLoading'
+import Modal from '../../components/Modal'
+import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR, splitFundName } from '../../data/familyData'
+import { GLIDE_PATH } from '../../data/glidePath'
 
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-red-400' }
 function plPrefix(val) { return val >= 0 ? '+' : '' }
@@ -73,7 +75,7 @@ function SectionHeader({ label, color, badge, linkText, onClick }) {
          style={{ background: 'rgba(128,128,128,0.04)', borderBottom: '1px solid rgba(128,128,128,0.08)' }}>
       <div className="flex items-center gap-2">
         <span className="w-[3px] h-3.5 rounded-sm opacity-60" style={{ background: color || 'currentColor' }} />
-        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: color || 'var(--text-muted)' }}>{label}</span>
+        <span className="text-sm font-bold uppercase tracking-wider" style={{ color: color || 'var(--text-muted)' }}>{label}</span>
         {badge != null && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
                 style={{ background: color ? `${color}15` : 'rgba(128,128,128,0.1)', color: color || 'var(--text-muted)' }}>
@@ -104,166 +106,8 @@ export default function Dashboard() {
     activeMembers, activeBanks, activeInvestmentAccounts,
   } = useData()
 
-  const [emailSending, setEmailSending] = useState(false)
-  const [emailSent, setEmailSent] = useState(false)
-  const [pdfExporting, setPdfExporting] = useState(false)
-  const [pdfToast, setPdfToast] = useState(null)
-  const dashboardRef = useRef(null)
-  const pdfFooterRef = useRef(null)
-  const pdfLibsRef = useRef(null)
-
-  // Prefetch PDF libraries on mount — if chunks are stale, reload now (not on click)
-  useEffect(() => {
-    Promise.all([import('html2canvas-pro'), import('jspdf')])
-      .then(([h2cMod, jsPDFMod]) => {
-        pdfLibsRef.current = { html2canvas: h2cMod.default, jsPDF: jsPDFMod.jsPDF }
-      })
-      .catch((err) => {
-        if (err.message?.includes('dynamically imported module')) {
-          window.location.reload()
-        }
-      })
-  }, [])
-
-  // Get PAN of primary member (Self) for PDF password protection
-  const primaryPAN = useMemo(() => {
-    const self = (activeMembers || []).find(m => m.relationship === 'Self')
-    return self?.pan || ''
-  }, [activeMembers])
-
-  // Shared: generate PDF from dashboard and return { pdf, fileName }
-  // forEmail: use lower quality (JPEG, reduced scale) to keep payload under GAS API limits
-  const generatePDF = useCallback(async ({ forEmail = false } = {}) => {
-    if (!dashboardRef.current) throw new Error('Dashboard not ready')
-    // Use prefetched libs, or fetch on demand as fallback
-    let html2canvas, jsPDF
-    if (pdfLibsRef.current) {
-      ({ html2canvas, jsPDF } = pdfLibsRef.current)
-    } else {
-      const [h2cMod, jsPDFMod] = await Promise.all([
-        import('html2canvas-pro'),
-        import('jspdf'),
-      ])
-      html2canvas = h2cMod.default
-      jsPDF = jsPDFMod.jsPDF
-    }
-    const el = dashboardRef.current
-
-    // Temporarily reveal PDF-only footer for capture
-    if (pdfFooterRef.current) pdfFooterRef.current.style.display = 'block'
-
-    // Small delay to ensure images (QR code) are rendered
-    await new Promise(r => setTimeout(r, 100))
-
-    const canvas = await html2canvas(el, {
-      scale: forEmail ? 1 : 2,
-      useCORS: true,
-      backgroundColor: '#0f172a',
-      logging: false,
-    })
-
-    // Hide PDF-only footer again
-    if (pdfFooterRef.current) pdfFooterRef.current.style.display = 'none'
-
-    // PDF setup — password-protect with PAN for downloads only (not email — encrypted PDFs break MailApp)
-    const pdfOpts = { orientation: 'p', unit: 'mm', format: 'a4' }
-    if (primaryPAN && !forEmail) {
-      pdfOpts.encryption = {
-        userPassword: primaryPAN,
-        ownerPassword: primaryPAN,
-        userPermissions: ['print', 'copy'],
-      }
-    }
-    const pdf = new jsPDF(pdfOpts)
-    const pageW = pdf.internal.pageSize.getWidth()
-    const pageH = pdf.internal.pageSize.getHeight()
-    const margin = 6
-    const contentW = pageW - margin * 2
-    const contentH = pageH - margin * 2
-
-    // Scale: mm per canvas pixel
-    const pxScale = contentW / canvas.width
-    // How many canvas pixels fit in one page's content area
-    const pagePixelH = Math.floor(contentH / pxScale)
-
-    let yPixel = 0
-    let page = 0
-    while (yPixel < canvas.height) {
-      if (page > 0) pdf.addPage()
-
-      // Fill entire page with dark background to match theme
-      pdf.setFillColor(15, 23, 42) // #0f172a
-      pdf.rect(0, 0, pageW, pageH, 'F')
-
-      // Crop this page's slice from the full canvas
-      const sliceH = Math.min(pagePixelH, canvas.height - yPixel)
-      const pageCanvas = document.createElement('canvas')
-      pageCanvas.width = canvas.width
-      pageCanvas.height = sliceH
-      const ctx = pageCanvas.getContext('2d')
-      ctx.drawImage(canvas, 0, yPixel, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
-
-      const sliceImg = forEmail
-        ? pageCanvas.toDataURL('image/jpeg', 0.65)
-        : pageCanvas.toDataURL('image/png')
-      const sliceMM = sliceH * pxScale
-      pdf.addImage(sliceImg, forEmail ? 'JPEG' : 'PNG', margin, margin, contentW, sliceMM)
-
-      yPixel += pagePixelH
-      page++
-    }
-
-    const memberLabel = selectedMember === 'all' ? 'Family' : (familyMembers?.find(m => m.memberId === selectedMember)?.name || 'Dashboard')
-    const date = new Date().toISOString().slice(0, 10)
-    const fileName = `Capital-Friends-${memberLabel}-${date}.pdf`
-    return { pdf, fileName }
-  }, [selectedMember, familyMembers, primaryPAN])
-
-  const handlePDFExport = useCallback(async () => {
-    if (pdfExporting) return
-    setPdfExporting(true)
-    // Show password hint immediately before generating
-    const panHint = primaryPAN ? `${primaryPAN.slice(0, 2)}****${primaryPAN.slice(-2)}` : ''
-    if (primaryPAN) {
-      setPdfToast({ status: 'generating', panHint })
-    }
-    try {
-      const { pdf, fileName } = await generatePDF()
-      pdf.save(fileName)
-      // Update toast to confirm download
-      if (primaryPAN) {
-        setPdfToast({ status: 'done', panHint })
-        setTimeout(() => setPdfToast(null), 8000)
-      }
-    } catch (err) {
-      console.error('PDF export failed:', err)
-      setPdfToast(null)
-      window.print()
-    } finally {
-      setPdfExporting(false)
-    }
-  }, [pdfExporting, generatePDF, primaryPAN])
-
-  const handleSendEmail = useCallback(async () => {
-    if (emailSending || emailSent) return
-    setEmailSending(true)
-    try {
-      const { pdf, fileName } = await generatePDF({ forEmail: true })
-      // Convert to base64 and send via GAS
-      const pdfBase64 = pdf.output('datauristring').split(',')[1]
-      await api.sendDashboardPDF(pdfBase64, fileName)
-      setEmailSent(true)
-      setTimeout(() => setEmailSent(false), 3000)
-    } catch (err) {
-      alert('Failed to send email: ' + err.message)
-    } finally {
-      setEmailSending(false)
-    }
-  }, [emailSending, emailSent, generatePDF])
-
-  const pdfTitle = primaryPAN
-    ? `Download as PDF (password: your PAN)`
-    : 'Download as PDF'
+  const [showRebalanceDialog, setShowRebalanceDialog] = useState(false)
+  const [openRebalance, setOpenRebalance] = useState({ 0: true })
 
   // ── Filter helper ──
   const filterOwner = (items, ownerKey) =>
@@ -390,28 +234,25 @@ export default function Dashboard() {
       .sort(([, a], [, b]) => b - a)
       .map(([name, value], idx) => ({ name, value, pct: totalAssets > 0 ? (value / totalAssets) * 100 : 0, fill: ALLOC_TYPE_COLORS[idx % ALLOC_TYPE_COLORS.length] }))
 
-    // Buy opportunities (MF holdings 5%+ below ATH)
-    const buyOpportunities = []
+    // Buy opportunities (MF holdings 5%+ below ATH) — deduplicated by fund name
+    const buyOppMap = {}
     activeMFPortfolios.forEach((p) => {
       const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
       pHoldings.forEach((h) => {
         if (h.athNav > 0 && h.belowATHPct >= 5) {
           const { main } = splitFundName(h.fundName)
-          buyOpportunities.push({
-            fundName: main,
-            portfolioName: p.portfolioName,
-            ownerName: p.ownerName,
-            belowATHPct: h.belowATHPct,
-            isStrongBuy: h.belowATHPct >= 10,
-          })
+          if (!buyOppMap[main] || h.belowATHPct > buyOppMap[main].belowATHPct) {
+            buyOppMap[main] = { fundName: main, belowATHPct: h.belowATHPct, isStrongBuy: h.belowATHPct >= 10 }
+          }
         }
       })
     })
-    buyOpportunities.sort((a, b) => b.belowATHPct - a.belowATHPct)
+    const buyOpportunities = Object.values(buyOppMap).sort((a, b) => b.belowATHPct - a.belowATHPct)
 
     // Rebalance needed (MF holdings with allocation drift beyond threshold)
+    // Skip portfolios where user has opted out of rebalance alerts
     const rebalanceItems = []
-    activeMFPortfolios.forEach((p) => {
+    activeMFPortfolios.filter(p => !p.skipRebalance).forEach((p) => {
       const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
       const pValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
       const threshold = (p.rebalanceThreshold || 0.05) * 100
@@ -434,6 +275,15 @@ export default function Dashboard() {
       })
     })
     rebalanceItems.sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift))
+
+    // Group rebalance items by portfolio for tabbed display
+    const rebalanceByPortfolio = {}
+    rebalanceItems.forEach(item => {
+      const key = `${item.ownerName}'s ${item.portfolioName}`
+      if (!rebalanceByPortfolio[key]) rebalanceByPortfolio[key] = { label: key, ownerName: item.ownerName, portfolioName: item.portfolioName, items: [] }
+      rebalanceByPortfolio[key].items.push(item)
+    })
+    const rebalancePortfolios = Object.values(rebalanceByPortfolio)
 
     // Investments table rows (grouped by type)
     const investmentRows = []
@@ -517,8 +367,8 @@ export default function Dashboard() {
     const fundPerformance = Object.values(fundMap)
       .map(f => ({ ...f, pl: f.currentValue - f.investment, plPct: ((f.currentValue - f.investment) / f.investment) * 100 }))
       .sort((a, b) => b.plPct - a.plPct)
-    const topGainers = fundPerformance.filter(f => f.plPct > 0).slice(0, 3)
-    const topLosers = fundPerformance.filter(f => f.plPct < 0).sort((a, b) => a.plPct - b.plPct).slice(0, 3)
+    const topGainers = fundPerformance.filter(f => f.plPct >= 5).slice(0, 3)
+    const topLosers = fundPerformance.filter(f => f.plPct <= -5).sort((a, b) => a.plPct - b.plPct).slice(0, 3)
 
     // ── Portfolio Leaderboard ──
     const portfolioLeaderboard = activeMFPortfolios
@@ -537,28 +387,29 @@ export default function Dashboard() {
     const totalMonthlySIP = activeMFHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
     const activeSIPCount = activeMFHoldings.filter(h => h.ongoingSIP > 0).length
 
-    // ── Near ATH Funds ──
-    const nearATHFunds = []
+    // ── Near ATH Funds (deduplicated by fund name) ──
+    const nearATHMap = {}
     activeMFPortfolios.forEach(p => {
       activeMFHoldings.filter(h => h.portfolioId === p.portfolioId).forEach(h => {
         if (h.athNav > 0 && h.belowATHPct >= 0 && h.belowATHPct < 2) {
-          nearATHFunds.push({
-            fundName: splitFundName(h.fundName).main,
-            ownerName: p.ownerName, belowATHPct: h.belowATHPct,
-            isAtATH: h.belowATHPct === 0,
-          })
+          const name = splitFundName(h.fundName).main
+          if (!nearATHMap[name] || h.belowATHPct < nearATHMap[name].belowATHPct) {
+            nearATHMap[name] = { fundName: name, belowATHPct: h.belowATHPct, isAtATH: h.belowATHPct === 0 }
+          }
         }
       })
     })
-    nearATHFunds.sort((a, b) => a.belowATHPct - b.belowATHPct)
+    const nearATHFunds = Object.values(nearATHMap).sort((a, b) => a.belowATHPct - b.belowATHPct)
 
     // ── Goal Allocation Health (for dashboard goals section) ──
+    // Build fund breakdown lookup for accurate equity/debt split
+    const goalAllocMap = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        if (a.assetAllocation) goalAllocMap[a.fundCode] = a.assetAllocation
+      }
+    }
     const EQUITY_CATS_G = new Set(['Equity', 'ELSS', 'Index'])
-    const GLIDE_PATH = [
-      { maxYears: 1, equity: 10, label: 'Short-term' }, { maxYears: 3, equity: 30, label: 'Short-term' },
-      { maxYears: 5, equity: 50, label: 'Medium-term' }, { maxYears: 7, equity: 65, label: 'Medium-term' },
-      { maxYears: 10, equity: 75, label: 'Long-term' }, { maxYears: Infinity, equity: 85, label: 'Long-term' },
-    ]
     const nowGH = new Date()
     const dashGoalHealth = {}
     activeGoals.forEach(g => {
@@ -574,7 +425,10 @@ export default function Dashboard() {
         for (const h of activeMFHoldings.filter(h => h.portfolioId === m.portfolioId)) {
           const v = h.currentValue * (m.allocationPct / 100)
           totalVal += v
-          if (EQUITY_CATS_G.has(h.category)) eqVal += v
+          const detailed = goalAllocMap[h.schemeCode || h.fundCode]
+          if (detailed) {
+            eqVal += v * ((detailed.Equity || 0) / 100)
+          } else if (EQUITY_CATS_G.has(h.category)) eqVal += v
           else if (h.category === 'Hybrid') eqVal += v * 0.65
           else if (h.category === 'Multi-Asset') eqVal += v * 0.50
         }
@@ -604,14 +458,14 @@ export default function Dashboard() {
       lifeCover, healthCover, totalPremium,
       totalAssets, totalInvested, totalPL, plPct, netWorth,
       assetClassList, allocByType,
-      buyOpportunities, rebalanceItems,
+      buyOpportunities, rebalanceItems, rebalancePortfolios,
       investmentRows,
       activeLiabilities, activeInsurance, activeGoals, activeReminders,
       filteredBanks, filteredInvAccounts, filteredMembers,
       memberNetWorth,
       activeMFPortfolios, activeStockPortfolios,
       topGainers, topLosers, portfolioLeaderboard,
-      totalMonthlySIP, activeSIPCount, totalEMI,
+      totalMonthlySIP, activeSIPCount,
       nearATHFunds, dashGoalHealth,
     }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, goalPortfolioMappings, reminderList, assetAllocations, activeMembers])
@@ -684,6 +538,7 @@ export default function Dashboard() {
     })
 
     // Goal allocation mismatches (de-risk alerts)
+    // Reuse goalAllocMap built above for fund breakdown data
     const EQUITY_CATS_DASH = new Set(['Equity', 'ELSS', 'Index'])
     const nowD = new Date()
     filterOwner((goalList || []).filter(g => g.isActive !== false), 'familyMemberId').forEach(g => {
@@ -700,7 +555,10 @@ export default function Dashboard() {
         for (const h of (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)) {
           const v = h.currentValue * (m.allocationPct / 100)
           total += v
-          if (EQUITY_CATS_DASH.has(h.category)) eq += v
+          const detailed = goalAllocMap[h.schemeCode || h.fundCode]
+          if (detailed) {
+            eq += v * ((detailed.Equity || 0) / 100)
+          } else if (EQUITY_CATS_DASH.has(h.category)) eq += v
           else if (h.category === 'Hybrid') eq += v * 0.65
           else if (h.category === 'Multi-Asset') eq += v * 0.50
         }
@@ -737,54 +595,7 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* PDF password modal overlay — outside dashboardRef so it doesn't appear in PDF */}
-      {pdfToast && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center print:hidden"
-             style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-             onClick={() => pdfToast.status === 'done' && setPdfToast(null)}>
-          <div className="w-[340px] rounded-2xl border border-[var(--border)] p-6 shadow-2xl"
-               style={{ background: 'var(--bg-card)' }}
-               onClick={(e) => e.stopPropagation()}>
-            {/* Icon */}
-            <div className="flex justify-center mb-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                   style={{
-                     background: pdfToast.status === 'done' ? 'rgba(16,185,129,0.12)' : 'rgba(139,92,246,0.12)',
-                     border: `1px solid ${pdfToast.status === 'done' ? 'rgba(16,185,129,0.2)' : 'rgba(139,92,246,0.2)'}`,
-                   }}>
-                {pdfToast.status === 'done'
-                  ? <Check size={28} className="text-emerald-400" />
-                  : <Loader2 size={28} className="text-violet-400 animate-spin" />
-                }
-              </div>
-            </div>
-
-            {/* Title */}
-            <p className="text-center text-base font-bold text-[var(--text-primary)]">
-              {pdfToast.status === 'done' ? 'PDF Downloaded' : 'Generating PDF...'}
-            </p>
-
-            {/* Password info */}
-            <div className="mt-4 rounded-xl px-4 py-3 text-center"
-                 style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <p className="text-[11px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">PDF Password</p>
-              <p className="text-lg font-bold text-violet-400 mt-1 tracking-wider">Your PAN</p>
-              <p className="text-xs text-[var(--text-dim)] mt-1">{pdfToast.panHint}</p>
-            </div>
-
-            {/* Dismiss button */}
-            {pdfToast.status === 'done' && (
-              <button onClick={() => setPdfToast(null)}
-                      className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/10"
-                      style={{ border: '1px solid rgba(16,185,129,0.2)' }}>
-                Got it
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-[1280px] mx-auto" ref={dashboardRef}>
+      <div className="max-w-[1280px] mx-auto">
         {/* Print styles — fallback for window.print() */}
         <style>{`
           @media print {
@@ -814,22 +625,7 @@ export default function Dashboard() {
                style={{ background: 'rgba(128,128,128,0.04)', borderBottom: '1px solid rgba(128,128,128,0.08)' }}>
             <div className="flex items-center gap-2">
               <span className="w-[3px] h-3.5 rounded-sm opacity-60" style={{ background: 'var(--text-muted)' }} />
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Net Worth</span>
-            </div>
-            <div className="flex items-center gap-1.5 print:hidden">
-              <button onClick={handlePDFExport} disabled={pdfExporting}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
-                      title={pdfTitle}>
-                {pdfExporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                <span className="hidden sm:inline">{pdfExporting ? 'Exporting...' : 'PDF'}</span>
-              </button>
-              <button onClick={handleSendEmail} disabled={emailSending}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                      style={{ color: emailSent ? '#34d399' : 'var(--text-secondary)' }}
-                      title="Email wealth report">
-                {emailSent ? <Check size={13} /> : <Mail size={13} />}
-                <span className="hidden sm:inline">{emailSending ? 'Sending...' : emailSent ? 'Sent!' : 'Email'}</span>
-              </button>
+              <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">Net Worth</span>
             </div>
           </div>
 
@@ -867,14 +663,14 @@ export default function Dashboard() {
             <div className="mt-4">
               <div className="flex h-2.5 rounded-[5px] overflow-hidden gap-0.5">
                 {data.assetClassList.map((ac) => (
-                  <div key={ac.name} style={{ width: `${ac.pct}%`, background: ac.fill }} title={`${ac.name} ${ac.pct.toFixed(0)}%`} />
+                  <div key={ac.name} style={{ width: `${ac.pct}%`, background: ac.fill }} title={`${ac.name} ${ac.pct < 1 ? ac.pct.toFixed(1) : ac.pct.toFixed(0)}%`} />
                 ))}
               </div>
               <div className="flex gap-4 mt-2 text-xs flex-wrap">
                 {data.assetClassList.map((ac) => (
                   <span key={ac.name} className="flex items-center gap-1">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: ac.fill }} />
-                    <span className="text-[var(--text-secondary)] font-medium">{ac.name} {ac.pct.toFixed(0)}%</span>
+                    <span className="text-[var(--text-secondary)] font-medium">{ac.name} {ac.pct < 1 ? ac.pct.toFixed(1) : ac.pct.toFixed(0)}%</span>
                   </span>
                 ))}
               </div>
@@ -903,7 +699,7 @@ export default function Dashboard() {
                           return (
                             <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 shadow-lg text-xs">
                               <span className="font-semibold text-[var(--text-primary)]">{d.name}</span>
-                              <span className="text-[var(--text-muted)] ml-1.5">{formatINR(d.value)} ({d.pct.toFixed(0)}%)</span>
+                              <span className="text-[var(--text-muted)] ml-1.5">{formatINR(d.value)} ({d.pct < 1 ? d.pct.toFixed(1) : d.pct.toFixed(0)}%)</span>
                             </div>
                           )
                         }}
@@ -911,35 +707,35 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Net Worth</div>
+                    <div className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Net Worth</div>
                     <div className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(data.netWorth)}</div>
                   </div>
                 </div>
                 {/* Summary cards below donut */}
                 <div className="w-full max-w-[280px] mt-4 grid grid-cols-2 gap-2">
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
-                    <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Assets</p>
+                    <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Assets</p>
                     <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(data.totalAssets)}</p>
                     {data.totalInvested > 0 && (
-                      <p className="text-[10px] tabular-nums mt-0.5" style={{ color: data.totalPL >= 0 ? '#34d399' : '#f87171' }}>
+                      <p className="text-xs tabular-nums mt-0.5" style={{ color: data.totalPL >= 0 ? '#34d399' : '#f87171' }}>
                         {data.totalPL >= 0 ? '+' : ''}{formatINR(data.totalPL)} P&L
                       </p>
                     )}
                   </div>
                   {data.totalLiabilities > 0 ? (
                     <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(244,63,94,0.08)' }}>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Liabilities</p>
+                      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Liabilities</p>
                       <p className="text-sm font-bold text-rose-400 tabular-nums mt-0.5">{formatINR(data.totalLiabilities)}</p>
-                      <p className="text-[10px] text-[var(--text-dim)] mt-0.5">
+                      <p className="text-xs text-[var(--text-dim)] mt-0.5">
                         {data.activeLiabilities.length} {data.activeLiabilities.length === 1 ? 'Loan' : 'Loans'}
                       </p>
                     </div>
                   ) : (
                     <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(16,185,129,0.08)' }}>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Invested</p>
+                      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Invested</p>
                       <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(data.totalInvested)}</p>
                       {data.totalInvested > 0 && (
-                        <p className="text-[10px] tabular-nums mt-0.5" style={{ color: data.totalPL >= 0 ? '#34d399' : '#f87171' }}>
+                        <p className="text-xs tabular-nums mt-0.5" style={{ color: data.totalPL >= 0 ? '#34d399' : '#f87171' }}>
                           {data.plPct >= 0 ? '+' : ''}{data.plPct.toFixed(1)}% returns
                         </p>
                       )}
@@ -961,7 +757,7 @@ export default function Dashboard() {
                       <span className="text-[var(--text-secondary)] font-semibold tabular-nums">{formatINR(item.value)}</span>
                       <span className="inline-flex items-center justify-center min-w-[36px] px-2 py-0.5 rounded-[5px] text-xs font-semibold tabular-nums"
                             style={{ background: 'rgba(128,128,128,0.08)', color: item.fill }}>
-                        {item.pct.toFixed(0)}%
+                        {item.pct < 1 ? item.pct.toFixed(1) : item.pct.toFixed(0)}%
                       </span>
                     </span>
                   </div>
@@ -1033,110 +829,135 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ═══ BUY OPPORTUNITIES (left) ═══ */}
+        {/* ═══ BUY OPPORTUNITIES ═══ */}
         {data.buyOpportunities.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.nearATHFunds.length === 0 ? 'md:col-span-2' : ''}`}
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 cursor-pointer hover:border-[var(--border-light)] transition-colors${data.nearATHFunds.length === 0 ? ' md:col-span-2' : ''}`}
                onClick={() => navigate('/investments/mutual-funds')}>
             <SectionHeader label="Buy Opportunities" color="#34d399" badge={data.buyOpportunities.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
-            <div className="text-xs text-[var(--text-dim)] mb-2.5">Funds trading below All-Time High</div>
-
-            {data.buyOpportunities.map((opp, idx) => (
-              <div key={idx} className="flex items-center justify-between py-2.5"
-                   style={{ borderBottom: idx < data.buyOpportunities.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                <div className="min-w-0">
-                  <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{opp.fundName}</div>
-                  <div className="text-xs text-[var(--text-dim)] mt-1.5">{opp.ownerName}'s {opp.portfolioName}</div>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
-                        style={{
-                          background: opp.isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(251,191,36,0.10)',
-                          color: opp.isStrongBuy ? '#22d3ee' : '#fbbf24',
-                        }}>
-                    {opp.isStrongBuy ? 'Strong Buy' : 'Buy'}
-                  </span>
-                  <div className="text-xs mt-0.5 font-medium tabular-nums"
-                       style={{ color: opp.isStrongBuy ? '#22d3ee' : '#fbbf24' }}>
-                    &#9660; {opp.belowATHPct.toFixed(1)}% below ATH
+            <div className="text-xs text-[var(--text-dim)] mb-3">Funds 5%+ below All-Time High</div>
+            <div className="space-y-0">
+              {data.buyOpportunities.map((opp, idx) => (
+                <div key={idx} className="py-2"
+                     style={{ borderBottom: idx < data.buyOpportunities.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs text-[var(--text-primary)] font-medium min-w-0 break-words leading-snug">{opp.fundName}</div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
+                            style={{
+                              background: opp.isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(52,211,153,0.10)',
+                              color: opp.isStrongBuy ? '#22d3ee' : '#34d399',
+                            }}>
+                        {opp.isStrongBuy ? 'Strong Buy' : 'Buy'}
+                      </span>
+                      <span className="text-xs font-semibold tabular-nums"
+                            style={{ color: opp.isStrongBuy ? '#22d3ee' : '#34d399' }}>
+                        -{opp.belowATHPct.toFixed(1)}%
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-
-            {/* Disclaimer */}
-            <div className="mt-3.5 py-3 px-3.5 rounded-r-md text-[11px] text-[var(--text-muted)] leading-relaxed"
-                 style={{ background: 'rgba(251,191,36,0.06)', borderLeft: '3px solid rgba(251,191,36,0.3)' }}
-                 onClick={(e) => e.stopPropagation()}>
-              <span className="text-amber-400 font-semibold">Note:</span> A fund significantly below ATH may indicate market correction <em>or</em> fund-specific issues (poor management, regulatory action, etc.). Always research before investing.
+              ))}
             </div>
           </div>
         )}
 
-        {/* ═══ PROFIT BOOKING (right, paired with Buy Opportunities) ═══ */}
+        {/* ═══ NEAR PEAK ═══ */}
         {data.nearATHFunds.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${data.buyOpportunities.length === 0 ? 'md:col-span-2' : ''}`}
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 cursor-pointer hover:border-[var(--border-light)] transition-colors${data.buyOpportunities.length === 0 ? ' md:col-span-2' : ''}`}
                onClick={() => navigate('/investments/mutual-funds')}>
-            <SectionHeader label="Profit Booking" color="#f59e0b" badge={data.nearATHFunds.length}
+            <SectionHeader label="Near Peak" color="#fbbf24" badge={data.nearATHFunds.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
-            <div className="text-xs text-[var(--text-dim)] mb-2.5">Funds at or near All-Time High — consider booking profits</div>
-
-            {data.nearATHFunds.map((f, idx) => (
-              <div key={idx} className="flex items-center justify-between py-2.5"
-                   style={{ borderBottom: idx < data.nearATHFunds.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
-                       style={{ background: f.isAtATH ? 'rgba(251,191,36,0.15)' : 'rgba(245,158,11,0.08)' }}>
-                    <Star size={13} className="text-amber-400" fill={f.isAtATH ? '#fbbf24' : 'none'} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{f.fundName}</div>
-                    <div className="text-xs text-[var(--text-dim)] mt-1">{f.ownerName}</div>
-                  </div>
+            <div className="text-xs text-[var(--text-dim)] mb-3">At or near ATH — book profits or redirect to other funds</div>
+            <div className="space-y-0">
+              {data.nearATHFunds.map((f, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-2 py-2"
+                     style={{ borderBottom: idx < data.nearATHFunds.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                  <div className="text-xs text-[var(--text-primary)] font-medium min-w-0 break-words leading-snug">{f.fundName}</div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold shrink-0"
+                        style={{
+                          background: f.isAtATH ? 'rgba(251,191,36,0.15)' : 'rgba(245,158,11,0.08)',
+                          color: f.isAtATH ? '#fbbf24' : '#f59e0b',
+                        }}>
+                    {f.isAtATH ? 'At ATH' : `${f.belowATHPct.toFixed(1)}% below`}
+                  </span>
                 </div>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold shrink-0 ml-2"
-                      style={{
-                        background: f.isAtATH ? 'rgba(251,191,36,0.12)' : 'rgba(245,158,11,0.06)',
-                        color: f.isAtATH ? '#fbbf24' : '#f59e0b',
-                      }}>
-                  {f.isAtATH ? 'At ATH' : `${f.belowATHPct.toFixed(1)}% below`}
-                </span>
-              </div>
-            ))}
-
-            <div className="mt-3.5 py-3 px-3.5 rounded-r-md text-[11px] text-[var(--text-muted)] leading-relaxed"
-                 style={{ background: 'rgba(245,158,11,0.06)', borderLeft: '3px solid rgba(245,158,11,0.3)' }}
-                 onClick={(e) => e.stopPropagation()}>
-              <span className="text-amber-400 font-semibold">Note:</span> Funds at ATH are performing well. Partial profit booking can lock in gains, but exiting too early may miss further upside.
+              ))}
             </div>
           </div>
         )}
 
         {/* ═══ REBALANCE NEEDED ═══ */}
         {data.rebalanceItems.length > 0 && (
-          <div className="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors"
-               onClick={() => navigate('/investments/mutual-funds')}>
-            <SectionHeader label="Rebalance Needed" color="#a78bfa" badge={data.rebalanceItems.length}
-                           linkText="Portfolios" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
-            <div className="text-xs text-[var(--text-dim)] mb-2.5">Allocation drifted beyond threshold</div>
+          <div className="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
+            <SectionHeader label="Rebalance Needed" color="#a78bfa" badge={data.rebalancePortfolios.reduce((s, p) => s + p.items.length, 0)}
+                           linkText="Rebalance" onClick={() => setShowRebalanceDialog(true)} />
 
-            {data.rebalanceItems.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between py-2.5"
-                   style={{ borderBottom: idx < data.rebalanceItems.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
-                <div className="min-w-0">
-                  <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{item.fundName}</div>
-                  <div className="text-xs text-[var(--text-dim)] mt-1.5">{item.ownerName}'s {item.portfolioName}</div>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <div className="text-xs text-violet-400 font-semibold tabular-nums">
-                    {item.currentPct}% → {item.targetPct}%
+            {/* Accordion per portfolio */}
+            <div className="mt-2 space-y-1">
+              {data.rebalancePortfolios.map((portfolio, pIdx) => {
+                const isOpen = !!openRebalance[pIdx]
+                return (
+                  <div key={portfolio.label} className="rounded-lg border border-[var(--border)] overflow-hidden">
+                    <button className="w-full flex items-center justify-between px-3 py-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-inset-hover)] transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setOpenRebalance(prev => ({ ...prev, [pIdx]: !prev[pIdx] })) }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-violet-400">{portfolio.portfolioName}</span>
+                        <span className="text-[10px] tabular-nums text-[var(--text-dim)] bg-violet-500/10 px-1.5 py-0.5 rounded">{portfolio.items.length} funds</span>
+                      </div>
+                      <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="px-3 py-1">
+                        {portfolio.items.map((item, idx) => {
+                          const isOver = item.drift > 0
+                          const maxPct = Math.max(item.currentPct, item.targetPct, 1)
+                          return (
+                            <div key={idx} className="py-2"
+                                 style={{ borderBottom: idx < portfolio.items.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                              {/* Desktop: single row grid */}
+                              <div className="hidden sm:grid grid-cols-[1fr_80px_180px] gap-2 items-center">
+                                <div className="text-xs text-[var(--text-primary)] font-medium truncate min-w-0">{item.fundName}</div>
+                                <div className="text-xs tabular-nums text-right text-[var(--text-secondary)]">
+                                  {item.currentPct}% → {item.targetPct}%
+                                </div>
+                                <div className="relative h-4 rounded bg-[var(--bg-inset)] overflow-hidden">
+                                  <div className="absolute inset-y-0 left-0 rounded"
+                                       style={{ width: `${(item.currentPct / maxPct) * 100}%`, background: isOver ? 'rgba(251,146,60,0.3)' : 'rgba(96,165,250,0.3)' }} />
+                                  <div className="absolute inset-y-0 w-0.5 bg-violet-400/80"
+                                       style={{ left: `${(item.targetPct / maxPct) * 100}%` }} />
+                                  <div className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-[var(--text-secondary)]">
+                                    {isOver ? `${Math.abs(item.drift)}% over` : `${Math.abs(item.drift)}% under`}
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Mobile: stacked layout */}
+                              <div className="sm:hidden">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="text-xs text-[var(--text-primary)] font-medium min-w-0 break-words leading-snug">{item.fundName}</div>
+                                  <div className="text-xs tabular-nums text-[var(--text-secondary)] shrink-0">
+                                    {item.currentPct}% → {item.targetPct}%
+                                  </div>
+                                </div>
+                                <div className="relative h-4 rounded bg-[var(--bg-inset)] overflow-hidden">
+                                  <div className="absolute inset-y-0 left-0 rounded"
+                                       style={{ width: `${(item.currentPct / maxPct) * 100}%`, background: isOver ? 'rgba(251,146,60,0.3)' : 'rgba(96,165,250,0.3)' }} />
+                                  <div className="absolute inset-y-0 w-0.5 bg-violet-400/80"
+                                       style={{ left: `${(item.targetPct / maxPct) * 100}%` }} />
+                                  <div className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-[var(--text-secondary)]">
+                                    {isOver ? `${Math.abs(item.drift)}% over` : `${Math.abs(item.drift)}% under`}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-[var(--text-dim)] tabular-nums">
-                    {item.drift > 0 ? '+' : ''}{item.drift}% {item.drift > 0 ? 'over' : 'under'} target
-                  </div>
-                </div>
-              </div>
-            ))}
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -1149,18 +970,18 @@ export default function Dashboard() {
               <>
                 <div className="flex items-center gap-1.5 mb-2 mt-1">
                   <TrendingUp size={12} className="text-emerald-400" />
-                  <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Top Gainers</span>
+                  <span className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Top Gainers</span>
                 </div>
                 {data.topGainers.map((f, idx) => (
                   <div key={`g-${idx}`} className="flex items-center justify-between py-2"
                        style={{ borderBottom: '1px solid rgba(128,128,128,0.04)' }}>
                     <div className="min-w-0">
-                      <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{f.fundName}</div>
+                      <div className="text-[13px] text-[var(--text-primary)] font-medium break-words leading-snug">{f.fundName}</div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {f.portfolios.map(p => (
-                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
+                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
                         ))}
-                        <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
+                        <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0 ml-3">
@@ -1176,18 +997,18 @@ export default function Dashboard() {
               <>
                 <div className={`flex items-center gap-1.5 mb-2 ${data.topGainers.length > 0 ? 'mt-4 pt-3 border-t border-[var(--border)]' : 'mt-1'}`}>
                   <TrendingDown size={12} className="text-red-400" />
-                  <span className="text-[11px] font-semibold text-red-400 uppercase tracking-wider">Top Losers</span>
+                  <span className="text-sm font-semibold text-red-400 uppercase tracking-wider">Top Losers</span>
                 </div>
                 {data.topLosers.map((f, idx) => (
                   <div key={`l-${idx}`} className="flex items-center justify-between py-2"
                        style={{ borderBottom: idx < data.topLosers.length - 1 ? '1px solid rgba(128,128,128,0.04)' : 'none' }}>
                     <div className="min-w-0">
-                      <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{f.fundName}</div>
+                      <div className="text-[13px] text-[var(--text-primary)] font-medium break-words leading-snug">{f.fundName}</div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {f.portfolios.map(p => (
-                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
+                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
                         ))}
-                        <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
+                        <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0 ml-3">
@@ -1214,7 +1035,7 @@ export default function Dashboard() {
                 <>
                   <div className="flex items-center gap-1.5 mb-2 mt-1">
                     <TrendingUp size={12} className="text-emerald-400" />
-                    <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Top Performing</span>
+                    <span className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Top Performing</span>
                   </div>
                   {topPortfolios.map((p, idx) => {
                     const medal = idx === 0 ? '#fbbf24' : idx === 1 ? '#94a3b8' : idx === 2 ? '#cd7f32' : null
@@ -1236,8 +1057,8 @@ export default function Dashboard() {
                           <div className="min-w-0">
                             <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{p.portfolioName}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              {p.ownerName && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
-                              <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
+                              {p.ownerName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
+                              <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
                             </div>
                           </div>
                         </div>
@@ -1255,7 +1076,7 @@ export default function Dashboard() {
                 <>
                   <div className={`flex items-center gap-1.5 mb-2 ${topPortfolios.length > 0 ? 'mt-4 pt-3 border-t border-[var(--border)]' : 'mt-1'}`}>
                     <TrendingDown size={12} className="text-red-400" />
-                    <span className="text-[11px] font-semibold text-red-400 uppercase tracking-wider">Underperforming</span>
+                    <span className="text-sm font-semibold text-red-400 uppercase tracking-wider">Underperforming</span>
                   </div>
                   {bottomPortfolios.map((p, idx) => (
                     <div key={p.portfolioId} className="flex items-center justify-between py-2"
@@ -1268,8 +1089,8 @@ export default function Dashboard() {
                         <div className="min-w-0">
                           <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{p.portfolioName}</div>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            {p.ownerName && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
-                            <span className="text-[10px] text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
+                            {p.ownerName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
+                            <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
                           </div>
                         </div>
                       </div>
@@ -1338,10 +1159,16 @@ export default function Dashboard() {
             {data.activeGoals.map((g, idx) => {
               const pct = g.targetAmount > 0 ? Math.min((g.currentValue / g.targetAmount) * 100, 100) : 0
               const gh = data.dashGoalHealth[g.goalId]
+              const yearsLeft = g.targetDate ? (new Date(g.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000) : null
+              const isPastDue = yearsLeft !== null && yearsLeft <= 0 && pct < 100
 
               let statusColor, statusText
               if (pct >= 100) {
                 statusColor = '#34d399'; statusText = 'Achieved'
+              } else if (isPastDue) {
+                statusColor = '#f87171'; statusText = 'Overdue'
+              } else if (!g.currentValue || g.currentValue === 0) {
+                statusColor = '#94a3b8'; statusText = 'Not started'
               } else if (g.status === 'Needs Attention') {
                 statusColor = '#fbbf24'; statusText = 'Needs Attention'
               } else if (g.status === 'On Track') {
@@ -1362,13 +1189,13 @@ export default function Dashboard() {
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="text-[13px] font-medium text-[var(--text-secondary)] truncate">{g.goalName}</span>
                       {gh && (
-                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
                               style={{ background: `${labelColor}15`, color: labelColor }}>
                           {gh.label}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ml-2"
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ml-2"
                           style={{ background: `${statusColor}15`, color: statusColor }}>
                       {statusText}
                     </span>
@@ -1394,18 +1221,18 @@ export default function Dashboard() {
                     <div className="mt-2 space-y-1.5">
                       {/* Recommended vs Actual table */}
                       <div className="bg-[var(--bg-inset)] rounded-md px-2.5 py-1.5">
-                        <div className="flex items-center justify-between text-[10px] mb-1">
+                        <div className="flex items-center justify-between text-xs mb-1">
                           <span className="text-[var(--text-dim)]">Recommended</span>
                           <span className="text-[var(--text-muted)] font-semibold tabular-nums">{gh.recommendedEquity}% Equity · {gh.recommendedDebt}% Debt</span>
                         </div>
                         {gh.isMapped && gh.actualEquity !== null ? (
                           <>
-                            <div className="flex items-center justify-between text-[10px] mb-1">
+                            <div className="flex items-center justify-between text-xs mb-1">
                               <span className="text-[var(--text-dim)]">Actual</span>
                               <span className="text-[var(--text-muted)] font-semibold tabular-nums">{gh.actualEquity}% Equity · {100 - gh.actualEquity}% Debt</span>
                             </div>
                             {gh.mismatch !== null && gh.mismatch !== 0 && (
-                              <div className="flex items-center justify-between text-[10px]">
+                              <div className="flex items-center justify-between text-xs">
                                 <span className="text-[var(--text-dim)]">Difference</span>
                                 <span className={`font-bold tabular-nums ${gh.needsAttention ? (gh.mismatch > 0 ? 'text-amber-400' : 'text-blue-400') : 'text-emerald-400'}`}>
                                   {gh.mismatch > 0 ? '+' : ''}{gh.mismatch}% Equity
@@ -1416,19 +1243,19 @@ export default function Dashboard() {
                               </div>
                             )}
                             {gh.mismatch === 0 && (
-                              <div className="flex items-center justify-between text-[10px]">
+                              <div className="flex items-center justify-between text-xs">
                                 <span className="text-[var(--text-dim)]">Difference</span>
                                 <span className="text-emerald-400 font-bold">Perfectly aligned ✓</span>
                               </div>
                             )}
                           </>
                         ) : (
-                          <div className="text-[10px] font-semibold text-amber-400">⚠ No investments linked — at risk</div>
+                          <div className="text-xs font-semibold text-amber-400">⚠ No investments linked — at risk</div>
                         )}
                       </div>
-                      {/* SIP / Lumpsum suggestion */}
-                      {gh.liveSIP > 0 && gap > 0 && (
-                        <div className="flex items-center gap-3 text-[10px]">
+                      {/* SIP / Lumpsum suggestion — only when investments are linked */}
+                      {gh.isMapped && gh.liveSIP > 0 && gap > 0 && (
+                        <div className="flex items-center gap-3 text-xs">
                           <span className="text-violet-400 font-semibold tabular-nums">SIP {formatINR(gh.liveSIP)}/mo</span>
                           <span className="text-[var(--text-dim)]">or</span>
                           <span className="text-violet-400 font-semibold tabular-nums">Lumpsum {formatINR(gh.liveLumpsum)}</span>
@@ -1443,54 +1270,13 @@ export default function Dashboard() {
         )}
 
 
-        {/* ═══ PDF-ONLY FOOTER — hidden on web, revealed during PDF capture ═══ */}
-        <div ref={pdfFooterRef} className="md:col-span-2 mt-4 rounded-xl border border-[var(--border)] overflow-hidden"
-             style={{ display: 'none', background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(16,185,129,0.03) 100%)' }}>
-          {/* Brand row */}
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <img src="/logo-new.png" alt="Capital Friends" className="h-8 w-auto" />
-              <div>
-                <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '14px' }}>
-                  <span className="font-bold text-[var(--text-primary)]">Capital</span>
-                  <span className="font-extrabold text-emerald-400">Friends</span>
-                </span>
-                <p className="text-[10px] text-[var(--text-dim)] -mt-0.5">Family Portfolio Manager</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
-                 style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-              <Globe size={13} className="text-emerald-400" />
-              <span className="text-xs font-semibold text-emerald-400">capitalfriends.in</span>
-            </div>
-          </div>
-          {/* Donate section */}
-          <div className="border-t border-[var(--border-light)]" />
-          <div className="px-6 py-5 text-center"
-               style={{ background: 'linear-gradient(180deg, rgba(245,158,11,0.05) 0%, rgba(139,92,246,0.05) 100%)' }}>
-            <p className="text-sm font-semibold text-amber-400">
-              {'\u2764'} Support the Developer
-            </p>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Capital Friends is free and always will be. If it helps your family, a small donation means a lot!
-            </p>
-            <div className="mt-4 inline-block bg-white rounded-xl p-3">
-              <img src="/upi-qr-code.png" alt="UPI QR Code" className="w-40 h-40 object-contain" />
-            </div>
-            <p className="text-[11px] text-[var(--text-dim)] mt-2">Scan with any UPI app</p>
-            <div className="mt-2 inline-block bg-[var(--bg-inset)] rounded-lg px-4 py-2 border border-[var(--border)]">
-              <p className="text-[10px] text-[var(--text-dim)]">UPI ID</p>
-              <p className="text-sm font-mono font-semibold text-[var(--text-primary)]">jagadeeshmanne.hdfc@kphdfc</p>
-            </div>
-            <p className="text-[11px] text-[var(--text-dim)] mt-3">
-              Built with {'\u2764'} by Jagadeesh Manne
-            </p>
-          </div>
-        </div>
 
       </div>
       </div>
 
+      <Modal open={showRebalanceDialog} onClose={() => setShowRebalanceDialog(false)} title="Rebalance Alerts" wide>
+        {showRebalanceDialog && <MFRebalanceDialog />}
+      </Modal>
     </>
   )
 }

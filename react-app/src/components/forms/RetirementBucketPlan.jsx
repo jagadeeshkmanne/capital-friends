@@ -40,19 +40,19 @@ function SellFundRow({ fund, suggestedUnits, navMap, setNavMap, unitsMap, setUni
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs text-[var(--text-secondary)] truncate">{splitFundName(fund.fundName).main}</p>
-          {splitFundName(fund.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
-          <p className="text-[9px] text-[var(--text-dim)]">{fund.portfolioName}</p>
+          {splitFundName(fund.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
+          <p className="text-xs text-[var(--text-dim)]">{fund.portfolioName}</p>
         </div>
         <p className="text-xs font-bold tabular-nums shrink-0" style={{ color: accentColor }}>{formatINR(units * nav)}</p>
       </div>
       <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5 flex-wrap">
-        <span className="text-[10px] text-[var(--text-dim)] shrink-0">Units</span>
+        <span className="text-xs text-[var(--text-dim)] shrink-0">Units</span>
         <input type="number" step="0.0001" min="0.0001" max={fund.units}
           placeholder={suggestedUnits.toFixed(4)} value={unitsMap[fund.schemeCode] ?? ''}
           onChange={e => setUnitsMap(prev => ({ ...prev, [fund.schemeCode]: e.target.value }))}
           className="w-24 text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500" />
-        <span className="text-[10px] text-[var(--text-dim)]">/ {fund.units.toFixed(4)} avail</span>
-        <span className="text-[10px] text-[var(--text-dim)] shrink-0 ml-auto">NAV ₹</span>
+        <span className="text-xs text-[var(--text-dim)]">/ {fund.units.toFixed(4)} avail</span>
+        <span className="text-xs text-[var(--text-dim)] shrink-0 ml-auto">NAV ₹</span>
         <input type="number" step="0.01" min="0.01"
           placeholder={fund.currentNav.toFixed(4)} value={navMap[fund.schemeCode] ?? ''}
           onChange={e => setNavMap(prev => ({ ...prev, [fund.schemeCode]: e.target.value }))}
@@ -78,7 +78,7 @@ function ToFundSelector({ allFunds, toFund, setToFund, navKey, buyNavs, setBuyNa
         </select>
       ) : (
         <>
-          <p className="text-[10px] text-amber-400 bg-amber-500/10 rounded px-2 py-1.5">No suitable fund in linked portfolios — search to add one</p>
+          <p className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-1.5">No suitable fund in linked portfolios — search to add one</p>
           <FundSearchInput
             value={toFund ? { schemeCode: toFund.schemeCode, fundName: toFund.fundName } : null}
             onSelect={({ schemeCode, fundName, nav }) => setToFund({ schemeCode, fundName, currentNav: nav || 0, portfolioId: null, portfolioName: 'New' })}
@@ -87,10 +87,10 @@ function ToFundSelector({ allFunds, toFund, setToFund, navKey, buyNavs, setBuyNa
       )}
       {toFund && (
         <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5">
-          <span className="text-[10px] text-[var(--text-dim)] flex-1">
+          <span className="text-xs text-[var(--text-dim)] flex-1">
             Est. units received: <span className="font-semibold text-[var(--text-primary)] tabular-nums">{buyNav > 0 ? (switchValue / buyNav).toFixed(4) : '—'}</span>
           </span>
-          <span className="text-[10px] text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
+          <span className="text-xs text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
           <input type="number" step="0.01" min="0.01"
             placeholder={toFund.currentNav?.toFixed(4) || ''} value={buyNavs[navKey] ?? ''}
             onChange={e => setBuyNavs(prev => ({ ...prev, [navKey]: e.target.value }))}
@@ -234,7 +234,7 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
 
       const b1SellFund = portB1[0] || null
       const b1SuggestedUnits = b1SellFund && b1SellFund.currentNav > 0
-        ? Math.min((monthlyExp * 12) / b1SellFund.currentNav, b1SellFund.units) : 0
+        ? Math.min(monthlyExp / b1SellFund.currentNav, b1SellFund.units) : 0
 
       return {
         portfolioId: m.portfolioId, portfolioName,
@@ -330,6 +330,9 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
     if (plan.needsB2ToB1 && (!b2ToB1Fund || !(rNav(b2ToB1BuyNavs, 'b2tob1', b2ToB1Fund?.currentNav) > 0))) return false
     if (plan.needsB3ToB1Direct && (!b3ToB1Fund || !(rNav(b3ToB1BuyNavs, 'b3tob1', b3ToB1Fund?.currentNav) > 0))) return false
     if (plan.needsB3ToB2 && (!b3ToB2Fund || !(rNav(b3ToB2BuyNavs, 'b3tob2', b3ToB2Fund?.currentNav) > 0))) return false
+    // When all buckets are at target, only allow confirm if B1 withdraw is enabled
+    const nothingToSwitch = !plan.needsB2ToB1 && !plan.needsB3ToB1Direct && !plan.needsB3ToB2
+    if (nothingToSwitch && !b1WithdrawEnabled) return false
     return true
   })()
 
@@ -362,14 +365,14 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
           className="text-xs font-semibold bg-transparent text-[var(--text-primary)] border-none outline-none" />
         <div className="ml-auto flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[var(--text-dim)]">B1 keep</span>
+            <span className="text-xs text-[var(--text-dim)]">B1 keep</span>
             <select value={b1TargetMonths} onChange={e => setB1TargetMonths(Number(e.target.value))}
               className="text-xs bg-transparent text-[var(--text-primary)] border border-[var(--border)] rounded px-2 py-0.5">
               {[12, 18, 24, 36].map(m => <option key={m} value={m}>{m} mo</option>)}
             </select>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[var(--text-dim)]">B2 keep</span>
+            <span className="text-xs text-[var(--text-dim)]">B2 keep</span>
             <select value={b2TargetMonths} onChange={e => setB2TargetMonths(Number(e.target.value))}
               className="text-xs bg-transparent text-[var(--text-primary)] border border-[var(--border)] rounded px-2 py-0.5">
               {[36, 48, 60, 84].map(m => <option key={m} value={m}>{m} mo</option>)}
@@ -380,7 +383,7 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
 
       {/* Bucket state vs targets */}
       <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] p-4 space-y-3">
-        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">Current Bucket State vs Targets</p>
+        <p className="text-sm font-bold text-[var(--text-dim)] uppercase tracking-wider">Current Bucket State vs Targets</p>
         {totalCorpus > 0 && (
           <div className="flex items-center gap-0.5 h-2.5 rounded-full overflow-hidden">
             <div className="h-full bg-violet-500" style={{ width: `${(plan.totalB3 / totalCorpus) * 100}%` }} />
@@ -397,20 +400,20 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
             const ok = b.target === null || b.value >= b.target
             return (
               <div key={b.label} className={`bg-${b.color}-500/10 rounded-lg px-2 py-1.5 text-center`}>
-                <p className={`text-[10px] font-bold text-${b.color}-400`}>{b.label}</p>
+                <p className={`text-xs font-bold text-${b.color}-400`}>{b.label}</p>
                 <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(b.value)}</p>
                 {b.target !== null && (
-                  <p className={`text-[9px] font-semibold mt-0.5 ${ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <p className={`text-xs font-semibold mt-0.5 ${ok ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {ok ? '✓ Funded' : `↓ ${formatINR(b.target - b.value)} short`}
                   </p>
                 )}
-                <p className="text-[9px] text-[var(--text-dim)]">{b.sub}</p>
+                <p className="text-xs text-[var(--text-dim)]">{b.sub}</p>
               </div>
             )
           })}
         </div>
         {plan.monthlyExp > 0 && (
-          <p className="text-[10px] text-[var(--text-dim)]">
+          <p className="text-xs text-[var(--text-dim)]">
             Monthly expenses: <span className="font-semibold">{formatINR(plan.monthlyExp)}</span>
             {plan.b1Deficit > 0 && <> · B1 short by <span className="text-rose-400 font-semibold">{formatINR(plan.b1Deficit)}</span></>}
           </p>
@@ -421,20 +424,20 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
       {nothingNeeded ? (
         <div className="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-4 py-3 text-center">
           <p className="text-sm font-semibold text-emerald-400">All buckets at target — nothing to rebalance</p>
-          <p className="text-[10px] text-[var(--text-dim)] mt-1">Use "Withdraw from B1" below to redeem for monthly expenses.</p>
+          <p className="text-xs text-[var(--text-dim)] mt-1">Use "Withdraw from B1" below to redeem for monthly expenses.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider px-1">Recommended Switches</p>
+          <p className="text-sm font-bold text-[var(--text-dim)] uppercase tracking-wider px-1">Recommended Switches</p>
 
           {/* B2 → B1 */}
           {plan.needsB2ToB1 && (
             <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
               <div className="px-4 py-2.5 bg-amber-500/5 border-b border-[var(--border-light)] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">B2</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">B2</span>
                   <ArrowRightLeft size={10} className="text-[var(--text-dim)]" />
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">B1</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">B1</span>
                   <span className="text-xs text-[var(--text-secondary)]">Hybrid → Liquid (B2 has surplus)</span>
                 </div>
                 <span className="text-xs font-bold text-amber-400 tabular-nums">{formatINR(plan.amtB2ToB1)}</span>
@@ -444,8 +447,8 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
                   <SellFundRow key={pd.portfolioId} fund={pd.b2SellFund} suggestedUnits={pd.b2SuggestedUnits}
                     navMap={b2SellNavs} setNavMap={setB2SellNavs} unitsMap={b2SellUnits} setUnitsMap={setB2SellUnits} accentColor="#f59e0b" />
                 ))}
-                {plan.portfolioDetails.every(pd => !pd.b2SellFund) && <p className="text-[10px] text-[var(--text-dim)]">No hybrid funds in linked portfolios</p>}
-                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-[var(--border-light)]" /><ArrowRightLeft size={10} className="text-amber-400" /><span className="text-[10px] text-[var(--text-dim)]">into B1 (Liquid/Debt)</span><div className="flex-1 h-px bg-[var(--border-light)]" /></div>
+                {plan.portfolioDetails.every(pd => !pd.b2SellFund) && <p className="text-xs text-[var(--text-dim)]">No hybrid funds in linked portfolios</p>}
+                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-[var(--border-light)]" /><ArrowRightLeft size={10} className="text-amber-400" /><span className="text-xs text-[var(--text-dim)]">into B1 (Liquid/Debt)</span><div className="flex-1 h-px bg-[var(--border-light)]" /></div>
                 <ToFundSelector allFunds={plan.allB1} toFund={b2ToB1Fund} setToFund={setB2ToB1Fund} navKey="b2tob1"
                   buyNavs={b2ToB1BuyNavs} setBuyNavs={setB2ToB1BuyNavs}
                   switchValue={plan.portfolioDetails.reduce((s, pd) => s + sellValue(b2SellUnits, b2SellNavs, pd.b2SellFund, pd.b2SuggestedUnits), 0)}
@@ -459,9 +462,9 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
             <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
               <div className="px-4 py-2.5 bg-violet-500/5 border-b border-[var(--border-light)] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400">B3</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400">B3</span>
                   <ArrowRightLeft size={10} className="text-[var(--text-dim)]" />
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">B1</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">B1</span>
                   <span className="text-xs text-[var(--text-secondary)]">Equity → Liquid directly (B2 depleted)</span>
                 </div>
                 <span className="text-xs font-bold text-violet-400 tabular-nums">{formatINR(plan.amtB3ToB1Direct)}</span>
@@ -471,7 +474,7 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
                   <SellFundRow key={pd.portfolioId} fund={pd.b3ForB1Fund} suggestedUnits={pd.b3ForB1SuggestedUnits}
                     navMap={b3ForB1Navs} setNavMap={setB3ForB1Navs} unitsMap={b3ForB1Units} setUnitsMap={setB3ForB1Units} accentColor="#8b5cf6" />
                 ))}
-                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-[var(--border-light)]" /><ArrowRightLeft size={10} className="text-violet-400" /><span className="text-[10px] text-[var(--text-dim)]">into B1 (Liquid/Debt)</span><div className="flex-1 h-px bg-[var(--border-light)]" /></div>
+                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-[var(--border-light)]" /><ArrowRightLeft size={10} className="text-violet-400" /><span className="text-xs text-[var(--text-dim)]">into B1 (Liquid/Debt)</span><div className="flex-1 h-px bg-[var(--border-light)]" /></div>
                 <ToFundSelector allFunds={plan.allB1} toFund={b3ToB1Fund} setToFund={setB3ToB1Fund} navKey="b3tob1"
                   buyNavs={b3ToB1BuyNavs} setBuyNavs={setB3ToB1BuyNavs}
                   switchValue={plan.portfolioDetails.reduce((s, pd) => s + sellValue(b3ForB1Units, b3ForB1Navs, pd.b3ForB1Fund, pd.b3ForB1SuggestedUnits), 0)}
@@ -485,9 +488,9 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
             <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
               <div className="px-4 py-2.5 bg-violet-500/5 border-b border-[var(--border-light)] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400">B3</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400">B3</span>
                   <ArrowRightLeft size={10} className="text-[var(--text-dim)]" />
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">B2</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">B2</span>
                   <span className="text-xs text-[var(--text-secondary)]">Equity → Hybrid (replenish B2 buffer)</span>
                 </div>
                 <span className="text-xs font-bold text-violet-400 tabular-nums">{formatINR(plan.amtB3ToB2)}</span>
@@ -497,7 +500,7 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
                   <SellFundRow key={pd.portfolioId} fund={pd.b3ForB2Fund} suggestedUnits={pd.b3ForB2SuggestedUnits}
                     navMap={b3ForB2Navs} setNavMap={setB3ForB2Navs} unitsMap={b3ForB2Units} setUnitsMap={setB3ForB2Units} accentColor="#8b5cf6" />
                 ))}
-                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-[var(--border-light)]" /><ArrowRightLeft size={10} className="text-violet-400" /><span className="text-[10px] text-[var(--text-dim)]">into B2 (Hybrid)</span><div className="flex-1 h-px bg-[var(--border-light)]" /></div>
+                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-[var(--border-light)]" /><ArrowRightLeft size={10} className="text-violet-400" /><span className="text-xs text-[var(--text-dim)]">into B2 (Hybrid)</span><div className="flex-1 h-px bg-[var(--border-light)]" /></div>
                 <ToFundSelector allFunds={plan.allB2} toFund={b3ToB2Fund} setToFund={setB3ToB2Fund} navKey="b3tob2"
                   buyNavs={b3ToB2BuyNavs} setBuyNavs={setB3ToB2BuyNavs}
                   switchValue={plan.portfolioDetails.reduce((s, pd) => s + sellValue(b3ForB2Units, b3ForB2Navs, pd.b3ForB2Fund, pd.b3ForB2SuggestedUnits), 0)}
@@ -512,11 +515,11 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
       <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
         <div className="px-4 py-2.5 bg-emerald-500/5 border-b border-[var(--border-light)] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">B1</span>
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">B1</span>
             <span className="text-xs text-[var(--text-secondary)]">Withdraw — Redeem Liquid for Expenses</span>
           </div>
           <button onClick={() => setB1WithdrawEnabled(v => !v)}
-            className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${b1WithdrawEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}>
+            className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${b1WithdrawEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}>
             {b1WithdrawEnabled ? 'Enabled' : 'Add'}
           </button>
         </div>
@@ -527,13 +530,13 @@ export default function RetirementBucketPlan({ goal, goalPortfolioMappings, mfHo
                 navMap={b1SellNavs} setNavMap={setB1SellNavs} unitsMap={b1SellUnits} setUnitsMap={setB1SellUnits} accentColor="#10b981" />
             ))}
             {plan.portfolioDetails.every(pd => !pd.b1SellFund) && (
-              <p className="text-[10px] text-amber-400">No liquid/debt fund in linked portfolios — top up B1 first</p>
+              <p className="text-xs text-amber-400">No liquid/debt fund in linked portfolios — top up B1 first</p>
             )}
           </div>
         )}
       </div>
 
-      <p className="text-[10px] text-[var(--text-dim)] px-1">
+      <p className="text-xs text-[var(--text-dim)] px-1">
         Actions computed from current B1/B2 levels vs targets. B3→B1 direct only appears when B2 can't fully cover B1's deficit. Adjust B1/B2 target months above to change thresholds.
       </p>
 

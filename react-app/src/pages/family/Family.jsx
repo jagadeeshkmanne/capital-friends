@@ -117,11 +117,11 @@ export default function Family() {
                             {dfEntries.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-0.5">
                                 {dfEntries.slice(0, 3).map(([k, v]) => (
-                                  <span key={k} className="text-[10px] text-[var(--text-dim)] bg-[var(--bg-inset)] px-1.5 py-0.5 rounded">
+                                  <span key={k} className="text-xs text-[var(--text-dim)] bg-[var(--bg-inset)] px-1.5 py-0.5 rounded">
                                     {k}: {v}
                                   </span>
                                 ))}
-                                {dfEntries.length > 3 && <span className="text-[10px] text-[var(--text-dim)]">+{dfEntries.length - 3} more</span>}
+                                {dfEntries.length > 3 && <span className="text-xs text-[var(--text-dim)]">+{dfEntries.length - 3} more</span>}
                               </div>
                             )}
                           </div>
@@ -179,11 +179,11 @@ export default function Family() {
                   {dfEntries.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {dfEntries.slice(0, 3).map(([k, v]) => (
-                        <span key={k} className="text-[10px] text-[var(--text-dim)] bg-[var(--bg-inset)] px-1.5 py-0.5 rounded">
+                        <span key={k} className="text-xs text-[var(--text-dim)] bg-[var(--bg-inset)] px-1.5 py-0.5 rounded">
                           {k}: {v}
                         </span>
                       ))}
-                      {dfEntries.length > 3 && <span className="text-[10px] text-[var(--text-dim)]">+{dfEntries.length - 3} more</span>}
+                      {dfEntries.length > 3 && <span className="text-xs text-[var(--text-dim)]">+{dfEntries.length - 3} more</span>}
                     </div>
                   )}
                 </div>

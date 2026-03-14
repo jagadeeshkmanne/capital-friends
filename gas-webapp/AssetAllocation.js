@@ -190,6 +190,7 @@ function processAssetAllocation(allocation) {
     if (allocation.cash) assetAllocationJSON.Cash = allocation.cash;
     if (allocation.realEstate) assetAllocationJSON['Real Estate'] = allocation.realEstate;
     if (allocation.commodities) assetAllocationJSON.Commodities = allocation.commodities;
+    if (allocation.other) assetAllocationJSON.Other = allocation.other;
     // Custom asset fields
     if (allocation.customAsset) {
       Object.entries(allocation.customAsset).forEach(([k, v]) => { if (v > 0) assetAllocationJSON[k] = v; });

@@ -20,10 +20,10 @@ export default function AboutPage() {
         </h1>
         <p className="text-xs text-[var(--text-dim)] mt-1">Family Portfolio Manager</p>
         <div className="flex items-center justify-center gap-3 mt-3">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-violet-500/10 text-violet-400">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-500/10 text-violet-400">
             v1.0
           </span>
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-500/10 text-emerald-400">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400">
             Open Source
           </span>
         </div>
@@ -39,7 +39,7 @@ export default function AboutPage() {
       {/* Features */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Features</h3>
+          <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Features</h3>
         </div>
         <div className="px-4 py-3 space-y-3">
           {FEATURES.map((f) => (
@@ -56,7 +56,7 @@ export default function AboutPage() {
       {/* Links */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Links & Feedback</h3>
+          <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Links & Feedback</h3>
         </div>
         <div className="divide-y divide-[var(--border-light)]">
           <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank" rel="noopener noreferrer"
@@ -66,7 +66,7 @@ export default function AboutPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--text-primary)]">GitHub Repository</p>
-              <p className="text-[11px] text-[var(--text-dim)]">View source code and contribute</p>
+              <p className="text-xs text-[var(--text-dim)]">View source code and contribute</p>
             </div>
             <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
           </a>
@@ -77,7 +77,7 @@ export default function AboutPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--text-primary)]">capitalfriends.in</p>
-              <p className="text-[11px] text-[var(--text-dim)]">Official website</p>
+              <p className="text-xs text-[var(--text-dim)]">Official website</p>
             </div>
             <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
           </a>
@@ -89,7 +89,7 @@ export default function AboutPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--text-primary)]">Request a Feature</p>
-              <p className="text-[11px] text-[var(--text-dim)]">Suggest new features or improvements</p>
+              <p className="text-xs text-[var(--text-dim)]">Suggest new features or improvements</p>
             </div>
             <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
           </a>
@@ -101,7 +101,7 @@ export default function AboutPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--text-primary)]">Report a Bug</p>
-              <p className="text-[11px] text-[var(--text-dim)]">Found something wrong? Let us know</p>
+              <p className="text-xs text-[var(--text-dim)]">Found something wrong? Let us know</p>
             </div>
             <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
           </a>
@@ -111,7 +111,7 @@ export default function AboutPage() {
       {/* Contact */}
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Contact</h3>
+          <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Contact</h3>
         </div>
         <a href="mailto:jagadeesh.k.manne@gmail.com"
            className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors">
@@ -120,7 +120,7 @@ export default function AboutPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)]">jagadeesh.k.manne@gmail.com</p>
-            <p className="text-[11px] text-[var(--text-dim)]">Questions, feedback, or just say hi</p>
+            <p className="text-xs text-[var(--text-dim)]">Questions, feedback, or just say hi</p>
           </div>
           <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
         </a>
@@ -131,7 +131,7 @@ export default function AboutPage() {
         <p className="text-xs text-[var(--text-dim)]">
           Built with <Heart size={10} className="inline text-pink-400 mx-0.5" /> by Jagadeesh Manne
         </p>
-        <p className="text-[11px] text-[var(--text-dim)] mt-1">React + Vite + Tailwind CSS + Google Apps Script</p>
+        <p className="text-xs text-[var(--text-dim)] mt-1">React + Vite + Tailwind CSS + Google Apps Script</p>
       </div>
     </div>
   )

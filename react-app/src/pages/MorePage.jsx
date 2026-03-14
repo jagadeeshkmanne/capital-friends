@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Settings, Info, Heart, Zap, Users, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight } from 'lucide-react'
+import { Bell, Settings, Info, Heart, Zap, Users, Landmark, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, Wallet, Target } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
 
 const navItems = [
   { label: 'Family Members', desc: 'Manage family profiles', icon: Users, path: '/family', color: 'bg-violet-500/15 text-violet-400' },
+  { label: 'Bank Accounts', desc: 'Savings & current accounts', icon: Landmark, path: '/accounts/bank', color: 'bg-slate-500/15 text-slate-400' },
   { label: 'Investment Accounts', desc: 'Demat & trading accounts', icon: Briefcase, path: '/accounts/investment', color: 'bg-blue-500/15 text-blue-400' },
   { label: 'Insurance', desc: 'Life & health policies', icon: Shield, path: '/insurance', color: 'bg-cyan-500/15 text-cyan-400' },
+  { label: 'Mutual Funds', desc: 'MF portfolios & holdings', icon: Wallet, path: '/investments/mutual-funds', color: 'bg-emerald-500/15 text-emerald-400' },
   { label: 'Stocks', desc: 'Stock portfolio holdings', icon: BarChart3, path: '/investments/stocks', color: 'bg-indigo-500/15 text-indigo-400' },
   { label: 'Other Investments', desc: 'FD, PPF, Gold, NPS & more', icon: Package, path: '/investments/other', color: 'bg-teal-500/15 text-teal-400' },
   { label: 'Liabilities', desc: 'Loans & outstanding balances', icon: CreditCard, path: '/liabilities', color: 'bg-rose-500/15 text-rose-400' },
+  { label: 'Goals', desc: 'Financial goals & tracking', icon: Target, path: '/goals', color: 'bg-amber-500/15 text-amber-400' },
   { label: 'Reminders', desc: 'View and manage reminders', icon: Bell, path: '/reminders', color: 'bg-amber-500/15 text-[var(--accent-amber)]' },
 ]
 
@@ -30,7 +33,7 @@ function NavItem({ item, onClick }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-        <p className="text-[11px] text-[var(--text-dim)]">{item.desc}</p>
+        <p className="text-xs text-[var(--text-dim)]">{item.desc}</p>
       </div>
       <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
     </button>
@@ -47,7 +50,7 @@ export default function MorePage() {
 
       {/* Navigate section */}
       <div className="space-y-1.5">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Navigate</p>
+        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Navigate</p>
         <div className="space-y-1.5">
           {navItems.map((item) => (
             <NavItem key={item.label} item={item} onClick={() => navigate(item.path)} />
@@ -57,7 +60,7 @@ export default function MorePage() {
 
       {/* Tools & Settings section */}
       <div className="space-y-1.5">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Tools & Settings</p>
+        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Tools & Settings</p>
         <div className="space-y-1.5">
           {toolItems.map((item) => (
             <NavItem key={item.label} item={item} onClick={() => navigate(item.path)} />
@@ -77,7 +80,7 @@ export default function MorePage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-amber-400">Support the Developer</p>
-            <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Capital Friends is free. If it helps, consider a small donation!</p>
+            <p className="text-xs text-[var(--text-dim)] mt-0.5">Capital Friends is free. If it helps, consider a small donation!</p>
           </div>
           <ChevronRight size={14} className="text-amber-400/60 shrink-0" />
         </div>

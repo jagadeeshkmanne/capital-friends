@@ -47,7 +47,7 @@ export default function DonateDialog({ open, onClose }) {
           {/* UPI ID + Copy */}
           <div className="mt-3 flex items-center justify-center gap-2">
             <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border)]">
-              <p className="text-[10px] text-[var(--text-dim)] mb-0.5">UPI ID</p>
+              <p className="text-xs text-[var(--text-dim)] mb-0.5">UPI ID</p>
               <p className="text-sm font-mono font-semibold text-[var(--text-primary)] select-all">{UPI_ID}</p>
             </div>
             <button
@@ -58,7 +58,7 @@ export default function DonateDialog({ open, onClose }) {
             </button>
           </div>
 
-          <p className="text-[11px] text-[var(--text-dim)] mt-4">
+          <p className="text-xs text-[var(--text-dim)] mt-4">
             Developed with {'\u2764\uFE0F'} by <span className="font-semibold text-[var(--text-muted)]">Jagadeesh Manne</span>
           </p>
         </div>

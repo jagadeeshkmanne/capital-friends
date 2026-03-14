@@ -800,11 +800,11 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
       `=IF(A${newRow}="","",IFERROR(VLOOKUP(A${newRow}*1,MF_ATH_Data!$A:$G,7,FALSE),""))`
     );
 
-    // T (20): Lumpsum Restricted - static flag, FALSE by default
-    portfolioSheet.getRange(newRow, 20).setValue(false);
-
-    // U (21): SIP Restricted - static flag, FALSE by default
-    portfolioSheet.getRange(newRow, 21).setValue(false);
+    // T (20): Lumpsum Restricted / U (21): SIP Restricted
+    // Copy restriction flags from existing portfolios if the fund is already restricted elsewhere
+    var existingRestrictions = getFundRestrictionsFromOtherPortfolios(fundCode, portfolioId);
+    portfolioSheet.getRange(newRow, 20).setValue(existingRestrictions.lumpsumRestricted);
+    portfolioSheet.getRange(newRow, 21).setValue(existingRestrictions.sipRestricted);
 
     log(`DEBUG: All formulas set, applying formatting...`);
 
@@ -1036,6 +1036,44 @@ function toggleFundRestrictionGlobal(fundCode, restricted, column, label) {
     log('Error in toggleFundRestrictionGlobal (' + label + '): ' + error.toString());
     throw error;
   }
+}
+
+/**
+ * Check if a fund has restrictions in any other active portfolio.
+ * Used when adding a fund to a new portfolio to carry over existing restrictions.
+ */
+function getFundRestrictionsFromOtherPortfolios(fundCode, excludePortfolioId) {
+  var result = { lumpsumRestricted: false, sipRestricted: false };
+  try {
+    var portfolios = getAllPortfolios();
+    for (var p = 0; p < portfolios.length; p++) {
+      if (portfolios[p].status === 'Inactive') continue;
+      if (portfolios[p].portfolioId === excludePortfolioId) continue;
+      var sheet = getPortfolioSheet(portfolios[p].portfolioId);
+      if (!sheet) continue;
+      var lastRow = sheet.getLastRow();
+      if (lastRow <= 3) continue;
+      var maxCol = sheet.getLastColumn();
+      if (maxCol < 20) continue; // no restriction columns
+
+      var data = sheet.getRange(4, 1, lastRow - 3, Math.min(maxCol, 21)).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] && data[i][0].toString() === fundCode.toString()) {
+          if (maxCol >= 20 && (data[i][19] === true || data[i][19] === 'TRUE' || data[i][19] === 'true')) {
+            result.lumpsumRestricted = true;
+          }
+          if (maxCol >= 21 && (data[i][20] === true || data[i][20] === 'TRUE' || data[i][20] === 'true')) {
+            result.sipRestricted = true;
+          }
+          if (result.lumpsumRestricted && result.sipRestricted) return result; // both found, no need to continue
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    log('getFundRestrictionsFromOtherPortfolios error: ' + e.toString());
+  }
+  return result;
 }
 
 /**
@@ -1447,6 +1485,82 @@ function editTransaction(params) {
 
   } catch (error) {
     log('Error in editTransaction: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Delete a fund from a portfolio: removes the fund row from the portfolio sheet
+ * and all related transactions from TransactionHistory.
+ * Asset allocations are preserved (user may re-add the fund later).
+ * @param {Object} params - { portfolioId, fundCode }
+ */
+function deleteFundFromPortfolio(params) {
+  try {
+    const { portfolioId, fundCode } = params;
+    if (!portfolioId) throw new Error('Portfolio ID is required');
+    if (!fundCode) throw new Error('Fund code is required');
+
+    const portfolioSheet = getPortfolioSheet(portfolioId);
+    if (!portfolioSheet) throw new Error('Portfolio sheet not found: ' + portfolioId);
+
+    // 1. Find and delete the fund row from portfolio sheet
+    // Portfolio structure: Row 1=Watermark, Row 2=Group Headers, Row 3=Column Headers, Row 4+=Data
+    // Column A (index 0) = Scheme Code
+    const portfolioData = portfolioSheet.getDataRange().getValues();
+    let fundRowIndex = -1;
+    let fundName = '';
+
+    for (let i = 3; i < portfolioData.length; i++) {
+      if (portfolioData[i][0] && portfolioData[i][0].toString() === fundCode.toString()) {
+        fundRowIndex = i + 1; // 1-indexed sheet row
+        fundName = portfolioData[i][1] || fundCode;
+        break;
+      }
+    }
+
+    if (fundRowIndex === -1) throw new Error('Fund not found in portfolio: ' + fundCode);
+
+    // 2. Delete all transactions for this fund+portfolio from TransactionHistory
+    // Column B (2) = Portfolio ID, Column D (4) = Fund Code
+    const txnSheet = getSheet(CONFIG.transactionHistorySheet);
+    let txnDeleteCount = 0;
+    if (txnSheet) {
+      const txnLastRow = txnSheet.getLastRow();
+      if (txnLastRow >= 3) {
+        const txnData = txnSheet.getRange(3, 1, txnLastRow - 2, 14).getValues();
+        const rowsToDelete = [];
+
+        for (let i = 0; i < txnData.length; i++) {
+          const txnPortfolioId = txnData[i][1]; // Column B = Portfolio ID
+          const txnFundCode = txnData[i][3];    // Column D = Fund Code
+          if (txnPortfolioId === portfolioId && txnFundCode && txnFundCode.toString() === fundCode.toString()) {
+            rowsToDelete.push(i + 3); // sheet row (1-indexed, offset by 2 header rows)
+          }
+        }
+
+        // Delete in reverse order to avoid row shifting
+        rowsToDelete.reverse();
+        for (const row of rowsToDelete) {
+          txnSheet.deleteRow(row);
+          txnDeleteCount++;
+        }
+      }
+    }
+
+    // 3. Delete the fund row from portfolio sheet
+    portfolioSheet.deleteRow(fundRowIndex);
+
+    log(`Deleted fund ${fundName} (${fundCode}) from portfolio ${portfolioId}: removed fund row + ${txnDeleteCount} transactions`);
+
+    return {
+      success: true,
+      message: `Deleted ${fundName} from portfolio. ${txnDeleteCount} transaction${txnDeleteCount !== 1 ? 's' : ''} removed.`,
+      data: { fundCode, fundName, transactionsDeleted: txnDeleteCount }
+    };
+
+  } catch (error) {
+    log('Error in deleteFundFromPortfolio: ' + error.toString());
     return { success: false, message: error.message };
   }
 }

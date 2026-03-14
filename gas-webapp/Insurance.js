@@ -169,9 +169,7 @@ function addInsurancePolicy(policyData) {
     if (!policyData.policyName) {
       return { success: false, error: 'Policy name is required' };
     }
-    if (!policyData.insuredMember) {
-      return { success: false, error: 'Insured member is required' };
-    }
+    // insuredMember is optional during first-time setup (no members yet)
     if (!policyData.sumAssured || policyData.sumAssured <= 0) {
       return { success: false, error: 'Valid sum assured is required' };
     }

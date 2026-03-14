@@ -120,6 +120,10 @@ function routeAction(action, params, userRecord) {
       requireOwner(userRecord);
       return removeFromFamily(userRecord, params.email);
 
+    // ── Fast init: verify/create user spreadsheet, return immediately ──
+    case 'data:init':
+      return { spreadsheetId: userRecord.spreadsheetId, ready: true, isNewUser: userRecord.isNew === true };
+
     // ── Bulk Load (fetch all data at once for initial load) ──
     case 'data:load-all':
       return loadAllData();
@@ -379,6 +383,9 @@ function routeAction(action, params, userRecord) {
     case 'mf-transaction:edit':
       return editTransaction(params);
 
+    case 'mf:delete-fund':
+      return deleteFundFromPortfolio(params);
+
     case 'stock-holdings:list-all':
       return getAllStockHoldingsData();
 
@@ -457,13 +464,9 @@ function loadAllData() {
   // Reset error collector for this load
   _safeCallErrors = [];
 
-  // Auto-refresh master data if stale (runs in background, transparent to user)
-  var refreshResult = null;
-  try {
-    refreshResult = autoRefreshMasterDataIfStale();
-  } catch (e) {
-    log('Auto-refresh failed (non-blocking): ' + e.message);
-  }
+  // NOTE: Master data refresh (NAV, ATH) is no longer done here — it runs on a
+  // scheduled daily trigger. This keeps loadAllData fast for all users.
+  // Use 'data:refresh-master' action to trigger manually from the client.
 
   // Migrate GoalPortfolioMapping to 7-column format if needed (transparent)
   try {
@@ -489,7 +492,6 @@ function loadAllData() {
     stockTransactions: safeCall(getAllStockTransactionsData),
     reminders: safeCall(getAllReminders),
     assetAllocations: safeCall(getAllAssetAllocationsData),
-    _masterDataRefreshed: refreshResult !== null,
     _errors: _safeCallErrors
   };
 }

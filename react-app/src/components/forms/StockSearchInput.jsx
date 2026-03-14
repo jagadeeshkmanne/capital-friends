@@ -116,10 +116,10 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
             <span className="font-bold">{value.symbol}</span> — {value.companyName}
           </p>
           <div className="flex items-center gap-2 mt-0.5">
-            {value.sector && <span className="text-[10px] text-[var(--text-dim)]">{value.sector}</span>}
+            {value.sector && <span className="text-xs text-[var(--text-dim)]">{value.sector}</span>}
             {fetchingPrice && <Loader2 size={10} className="text-violet-400 animate-spin" />}
             {!fetchingPrice && value.price > 0 && (
-              <span className="text-[10px] font-semibold text-emerald-400 tabular-nums">
+              <span className="text-xs font-semibold text-emerald-400 tabular-nums">
                 CMP: ₹{value.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             )}
@@ -163,8 +163,8 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
                 <span className="font-bold">{stock.symbol}</span> — {stock.companyName}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
-                {stock.sector && <span className="text-[10px] text-[var(--text-dim)]">{stock.sector}</span>}
-                {stock.industry && <span className="text-[10px] text-[var(--text-dim)]">· {stock.industry}</span>}
+                {stock.sector && <span className="text-xs text-[var(--text-dim)]">{stock.sector}</span>}
+                {stock.industry && <span className="text-xs text-[var(--text-dim)]">· {stock.industry}</span>}
               </div>
             </button>
           ))}

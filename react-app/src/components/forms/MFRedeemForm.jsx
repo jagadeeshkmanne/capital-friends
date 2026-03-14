@@ -9,7 +9,7 @@ export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, o
   const { selectedMember } = useFamily()
 
   const activePortfolios = useMemo(() => {
-    const active = mfPortfolios.filter((p) => p.status === 'Active')
+    const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [mfPortfolios, selectedMember])
 
@@ -38,7 +38,7 @@ export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, o
 
   const holdings = useMemo(() => {
     if (!form.portfolioId) return []
-    return mfHoldings.filter((h) => h.portfolioId === form.portfolioId && h.units > 0)
+    return (mfHoldings || []).filter((h) => h.portfolioId === form.portfolioId && h.units > 0)
   }, [mfHoldings, form.portfolioId])
 
   const selectedHolding = holdings.find((h) => h.schemeCode === form.fundCode)
@@ -96,7 +96,7 @@ export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, o
         <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
           <div>
             <p className="text-xs text-[var(--text-dim)]">{splitFundName(selectedHolding.fundName).main}</p>
-            {splitFundName(selectedHolding.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(selectedHolding.fundName).plan}</p>}
+            {splitFundName(selectedHolding.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(selectedHolding.fundName).plan}</p>}
           </div>
           <p className="text-xs text-[var(--text-muted)]">
             Available: <span className="font-semibold text-[var(--text-primary)]">{selectedHolding.units.toFixed(2)}</span> units

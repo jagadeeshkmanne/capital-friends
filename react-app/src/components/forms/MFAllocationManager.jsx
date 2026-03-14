@@ -12,7 +12,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
   const portfolio = mfPortfolios.find((p) => p.portfolioId === portfolioId)
   const existingHoldings = useMemo(() =>
-    mfHoldings.filter((h) => h.portfolioId === portfolioId),
+    (mfHoldings || []).filter((h) => h.portfolioId === portfolioId),
   [mfHoldings, portfolioId])
 
   // Local state: allocations editable
@@ -151,7 +151,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                     <td className="py-2 px-2">
                       <p className="text-xs text-[var(--text-primary)] leading-tight">
                         {splitFundName(a.fundName).main}
-                        {a.isNew && <span className="text-violet-400 text-[10px] ml-1">(new)</span>}
+                        {a.isNew && <span className="text-violet-400 text-xs ml-1">(new)</span>}
                       </p>
                       {(sugLumpsum > 0 || sugSip > 0) && (
                         <p className="text-xs text-blue-400 mt-0.5">
@@ -237,9 +237,9 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">
                       {splitFundName(a.fundName).main}
-                      {a.isNew && <span className="text-violet-400 text-[10px] font-semibold ml-1">(new)</span>}
+                      {a.isNew && <span className="text-violet-400 text-xs font-semibold ml-1">(new)</span>}
                     </p>
-                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[var(--text-dim)] flex-wrap">
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-[var(--text-dim)] flex-wrap">
                       {a.currentValue > 0 && <span className="tabular-nums">{formatINR(a.currentValue)}</span>}
                       {a.currentValue > 0 && <span>·</span>}
                       <span className="tabular-nums">Current {a.currentAllocationPct.toFixed(1)}%</span>
@@ -274,7 +274,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
                 {/* Slider + value */}
                 <div className="flex items-center gap-2.5">
-                  <span className="text-[10px] text-[var(--text-dim)] w-10 shrink-0">Target</span>
+                  <span className="text-xs text-[var(--text-dim)] w-10 shrink-0">Target</span>
                   <input
                     type="range"
                     min="0"
@@ -293,12 +293,12 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                     onChange={(e) => updateTarget(a.schemeCode, e.target.value)}
                     className="w-14 bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-1 text-xs text-center text-[var(--text-primary)] tabular-nums focus:outline-none focus:border-violet-500/50 shrink-0"
                   />
-                  <span className="text-[10px] text-[var(--text-dim)] shrink-0">%</span>
+                  <span className="text-xs text-[var(--text-dim)] shrink-0">%</span>
                 </div>
 
                 {/* Invest suggestion for new funds */}
                 {(sugLumpsum > 0 || sugSip > 0) && (
-                  <p className="text-[11px] text-blue-400">
+                  <p className="text-xs text-blue-400">
                     Invest: {sugLumpsum > 0 && <span className="font-semibold">{formatINR(sugLumpsum)}</span>}
                     {sugLumpsum > 0 && sugSip > 0 && ' · '}
                     {sugSip > 0 && <span className="font-semibold">{formatINR(sugSip)}/mo SIP</span>}

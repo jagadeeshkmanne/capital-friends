@@ -12,13 +12,13 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
   const [actualUnits, setActualUnits] = useState({})  // schemeCode -> units string
 
   const plan = useMemo(() => {
-    const mappings = goalPortfolioMappings.filter((m) => m.goalId === goal.goalId)
+    const mappings = (goalPortfolioMappings || []).filter((m) => m.goalId === goal.goalId)
     if (mappings.length === 0) return null
 
     const portfolioDetails = mappings.map((m) => {
-      const portfolio = mfPortfolios.find((p) => p.portfolioId === m.portfolioId)
+      const portfolio = (mfPortfolios || []).find((p) => p.portfolioId === m.portfolioId)
       if (!portfolio) return null
-      const holdings = mfHoldings.filter((h) => h.portfolioId === m.portfolioId && h.units > 0)
+      const holdings = (mfHoldings || []).filter((h) => h.portfolioId === m.portfolioId && h.units > 0)
       const portfolioValue = holdings.reduce((s, h) => s + h.currentValue, 0)
       const linkedValue = (portfolioValue * m.allocationPct) / 100
 
@@ -137,7 +137,7 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
           <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-[var(--text-primary)]">{pd.portfolioName}</p>
-              <p className="text-[10px] text-[var(--text-dim)]">{pd.ownerName} · {pd.allocationPct}% allocated to goal</p>
+              <p className="text-xs text-[var(--text-dim)]">{pd.ownerName} · {pd.allocationPct}% allocated to goal</p>
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)]">{formatINR(pd.linkedValue)}</span>
           </div>
@@ -152,17 +152,17 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-xs text-[var(--text-secondary)] truncate">{splitFundName(fw.fundName).main}</p>
-                      {splitFundName(fw.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fw.fundName).plan}</p>}
+                      {splitFundName(fw.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(fw.fundName).plan}</p>}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{formatINR(amount)}</p>
-                      <p className={`text-[10px] tabular-nums ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <p className={`text-xs tabular-nums ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {gain >= 0 ? '+' : ''}{formatINR(gain)} gain
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5 flex-wrap">
-                    <span className="text-[10px] text-[var(--text-dim)] shrink-0">Units</span>
+                    <span className="text-xs text-[var(--text-dim)] shrink-0">Units</span>
                     <input
                       type="number" step="0.0001" min="0.0001" max={fw.availableUnits}
                       placeholder={fw.suggestedUnits.toFixed(4)}
@@ -170,8 +170,8 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
                       onChange={e => setActualUnits(prev => ({ ...prev, [fw.schemeCode]: e.target.value }))}
                       className="w-24 text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
                     />
-                    <span className="text-[10px] text-[var(--text-dim)]">/ {fw.availableUnits.toFixed(4)} avail</span>
-                    <span className="text-[10px] text-[var(--text-dim)] shrink-0 ml-auto">NAV ₹</span>
+                    <span className="text-xs text-[var(--text-dim)]">/ {fw.availableUnits.toFixed(4)} avail</span>
+                    <span className="text-xs text-[var(--text-dim)] shrink-0 ml-auto">NAV ₹</span>
                     <input
                       type="number" step="0.01" min="0.01"
                       placeholder={fw.currentNav.toFixed(4)}
@@ -187,7 +187,7 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
         </div>
       ))}
 
-      <p className="text-[10px] text-[var(--text-dim)] px-1">
+      <p className="text-xs text-[var(--text-dim)] px-1">
         Units and NAV are pre-filled based on your portfolio allocation — edit both to match what you actually executed in your AMC/broker.
         After confirming, redemptions will be recorded and remaining goal allocations will auto-adjust to 100%.
       </p>

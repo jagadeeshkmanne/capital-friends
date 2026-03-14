@@ -5,7 +5,7 @@ import BrandedLoading from './BrandedLoading'
 
 export default function ProtectedRoute() {
   const { isAuthenticated, loading: authLoading } = useAuth()
-  const { healthCheckCompleted, loading: dataLoading } = useData()
+  const { healthCheckCompleted, loading: dataLoading, isSetupLoading } = useData()
   const location = useLocation()
 
   // Only show full-screen loading on first login (no cached data)
@@ -18,13 +18,17 @@ export default function ProtectedRoute() {
     return <Navigate to="/" replace />
   }
 
-  // First-time load (no cache) — show loading phases
+  // First-time load: show setup progress for new users, simple spinner for returning users
   if (dataLoading) {
-    return <BrandedLoading phase="data" />
+    return <BrandedLoading phase={isSetupLoading ? 'data' : undefined} />
   }
 
-  // Health check: only block if explicitly false (not completed)
-  // null = still loading from API → let user through, check resolves in background
+  // Health check pending — resolveHealthCheck() hasn't completed yet (brief API call)
+  // Block until resolved so user can't briefly see the app before being redirected
+  if (healthCheckCompleted === null) {
+    return <BrandedLoading />
+  }
+
   if (healthCheckCompleted === false && location.pathname !== '/health-check') {
     return <Navigate to="/health-check" replace />
   }

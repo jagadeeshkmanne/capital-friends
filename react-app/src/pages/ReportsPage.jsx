@@ -132,7 +132,7 @@ export default function ReportsPage() {
                           <div className="flex items-center gap-1">
                             <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${typeBadge[t.type] || ''}`}>{t.type}</span>
                             {t.transactionType && (
-                              <span className={`text-[10px] font-semibold px-1 py-0.5 rounded ${subBadge[t.transactionType] || ''}`}>{t.transactionType}</span>
+                              <span className={`text-xs font-semibold px-1 py-0.5 rounded ${subBadge[t.transactionType] || ''}`}>{t.transactionType}</span>
                             )}
                           </div>
                         </td>
@@ -140,12 +140,12 @@ export default function ReportsPage() {
                           {t.fundName ? (
                             <>
                               <p className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[180px]">{splitFundName(t.fundName).main}</p>
-                              {splitFundName(t.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
+                              {splitFundName(t.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
                             </>
                           ) : (
                             <p className="text-xs font-medium text-[var(--text-primary)] truncate max-w-[180px]">{t.companyName}</p>
                           )}
-                          <p className="text-[10px] text-[var(--text-dim)]">{t.fundCode || t.symbol}</p>
+                          <p className="text-xs text-[var(--text-dim)]">{t.fundCode || t.symbol}</p>
                         </td>
                         <td className="py-2.5 px-3 text-xs text-[var(--text-muted)]">{t.portfolioName || ''}</td>
                         <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">
@@ -184,7 +184,7 @@ export default function ReportsPage() {
                         {t.fundName ? (
                           <>
                             <p className="text-sm font-medium text-[var(--text-primary)] truncate">{splitFundName(t.fundName).main}</p>
-                            {splitFundName(t.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
+                            {splitFundName(t.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
                           </>
                         ) : (
                           <p className="text-sm font-medium text-[var(--text-primary)] truncate">{t.companyName}</p>

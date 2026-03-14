@@ -172,7 +172,7 @@ export default function GoalPortfolioMapping({ goal, onClose }) {
 
                 {/* Cross-goal allocation info */}
                 {otherTotal > 0 && (
-                  <div className={`text-[10px] px-2 py-1 rounded ${combined > 100 ? 'bg-rose-500/10 text-rose-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                  <div className={`text-xs px-2 py-1 rounded ${combined > 100 ? 'bg-rose-500/10 text-rose-400' : 'bg-blue-500/10 text-blue-400'}`}>
                     Already allocated: {other.goals.map((g) => `${g.goalName} (${g.pct}%)`).join(', ')}
                     {' '} — <span className="font-bold">Available: {Math.max(0, available)}%</span>
                   </div>
@@ -180,7 +180,7 @@ export default function GoalPortfolioMapping({ goal, onClose }) {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-[var(--text-dim)]">Allocation</span>
+                    <span className="text-xs text-[var(--text-dim)]">Allocation</span>
                     <input
                       type="number"
                       value={m.allocationPct}
@@ -195,7 +195,7 @@ export default function GoalPortfolioMapping({ goal, onClose }) {
                     </button>
                   </div>
                   {item && (
-                    <p className="text-[10px] text-[var(--text-dim)]">
+                    <p className="text-xs text-[var(--text-dim)]">
                       Contributes {formatINR((item.value * m.allocationPct) / 100)}
                     </p>
                   )}
@@ -221,10 +221,10 @@ export default function GoalPortfolioMapping({ goal, onClose }) {
         <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 space-y-1">
           <div className="flex items-center gap-1.5">
             <AlertTriangle size={12} className="text-rose-400 shrink-0" />
-            <span className="text-[10px] font-bold text-rose-400 uppercase">Over-allocated</span>
+            <span className="text-xs font-bold text-rose-400 uppercase">Over-allocated</span>
           </div>
           {overAllocated.map((o, i) => (
-            <p key={i} className="text-[10px] text-rose-300">
+            <p key={i} className="text-xs text-rose-300">
               {o.name}: {o.combined}% total across goals (exceeds 100% by {o.excess}%)
             </p>
           ))}

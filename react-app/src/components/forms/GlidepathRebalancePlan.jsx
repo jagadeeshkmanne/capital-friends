@@ -10,14 +10,16 @@ const DEBT_CATS = new Set([
   'Corporate Bond', 'Banking & PSU', 'Credit Risk', 'Floater',
 ])
 
-function equityWeight(h) {
+function equityWeight(h, allocMap) {
+  const detailed = allocMap?.[h.schemeCode || h.fundCode]
+  if (detailed) return (detailed.Equity || 0) / 100
   if (EQUITY_CATS.has(h.category)) return 1
   if (h.category === 'Hybrid') return 0.65
   if (h.category === 'Multi-Asset') return 0.50
   return 0
 }
 
-export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMappings, mfHoldings, mfPortfolios, onClose, onConfirmRebalance }) {
+export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, onClose, onConfirmRebalance }) {
   const today = new Date().toISOString().split('T')[0]
   const [rebalanceDate, setRebalanceDate] = useState(today)
   const [sellNavs, setSellNavs] = useState({})          // schemeCode → navString
@@ -29,6 +31,17 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
     () => (goalPortfolioMappings || []).filter(m => m.goalId === goal.goalId),
     [goalPortfolioMappings, goal.goalId]
   )
+
+  // Build fund breakdown lookup
+  const allocMap = useMemo(() => {
+    const m = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        if (a.assetAllocation) m[a.fundCode] = a.assetAllocation
+      }
+    }
+    return m
+  }, [assetAllocations])
 
   const plan = useMemo(() => {
     if (!mappings.length) return null
@@ -42,7 +55,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
       for (const h of holdings) {
         const v = h.currentValue * goalShare
         totalGoalValue += v
-        equityGoalValue += v * equityWeight(h)
+        equityGoalValue += v * equityWeight(h, allocMap)
       }
 
       const targetEquityValue = (health.recommendedEquity / 100) * totalGoalValue
@@ -50,7 +63,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
 
       // Equity funds sorted by value desc (sell candidates)
       const equityFunds = holdings
-        .filter(h => equityWeight(h) > 0)
+        .filter(h => equityWeight(h, allocMap) > 0)
         .sort((a, b) => b.currentValue - a.currentValue)
 
       // Debt/liquid funds (switch-into candidates)
@@ -82,7 +95,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
     }).filter(Boolean)
 
     return { portfolioDetails }
-  }, [mappings, mfHoldings, mfPortfolios, health])
+  }, [mappings, mfHoldings, mfPortfolios, health, allocMap])
 
   // Initialize toFundChoices for portfolios with debt funds (first-time only)
   useEffect(() => {
@@ -195,10 +208,10 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
             <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(health.actualEquity, 100)}%` }} />
             <div className="absolute top-0 h-full w-0.5 bg-emerald-500" style={{ left: `${Math.min(health.recommendedEquity, 100)}%` }} />
           </div>
-          <span className="text-[10px] font-bold text-amber-400 tabular-nums">{health.mismatch > 0 ? '+' : ''}{health.mismatch}% over</span>
+          <span className="text-xs font-bold text-amber-400 tabular-nums">{health.mismatch > 0 ? '+' : ''}{health.mismatch}% over</span>
         </div>
         {!allAligned && (
-          <p className="text-[10px] text-[var(--text-dim)] pt-1">Total to move equity → debt: <span className="font-semibold text-[var(--text-primary)]">{formatINR(totalExcess)}</span></p>
+          <p className="text-xs text-[var(--text-dim)] pt-1">Total to move equity → debt: <span className="font-semibold text-[var(--text-primary)]">{formatINR(totalExcess)}</span></p>
         )}
       </div>
 
@@ -218,10 +231,10 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
               <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-[var(--text-primary)]">{pd.portfolioName}</p>
-                  <p className="text-[10px] text-[var(--text-dim)]">{pd.allocationPct}% linked to goal</p>
+                  <p className="text-xs text-[var(--text-dim)]">{pd.allocationPct}% linked to goal</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-[var(--text-dim)]">Excess equity</p>
+                  <p className="text-xs text-[var(--text-dim)]">Excess equity</p>
                   <p className="text-xs font-bold text-amber-400">{formatINR(pd.excessEquityValue)}</p>
                 </div>
               </div>
@@ -230,7 +243,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
                 {/* SELL section */}
                 {pd.suggestedSells.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">Sell (Equity)</p>
+                    <p className="text-sm font-bold text-[var(--text-dim)] uppercase tracking-wider">Sell (Equity)</p>
                     {pd.suggestedSells.map(sell => {
                       const nav = getSellNav(sell.schemeCode, sell.currentNav)
                       const units = getSellUnits(sell.schemeCode, sell.suggestedUnits, sell.units)
@@ -240,12 +253,12 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-xs text-[var(--text-secondary)] truncate">{splitFundName(sell.fundName).main}</p>
-                              {splitFundName(sell.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(sell.fundName).plan}</p>}
+                              {splitFundName(sell.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(sell.fundName).plan}</p>}
                             </div>
                             <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(amount)}</p>
                           </div>
                           <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5 flex-wrap">
-                            <span className="text-[10px] text-[var(--text-dim)] shrink-0">Units</span>
+                            <span className="text-xs text-[var(--text-dim)] shrink-0">Units</span>
                             <input
                               type="number" step="0.0001" min="0.0001" max={sell.units}
                               placeholder={sell.suggestedUnits.toFixed(4)}
@@ -253,8 +266,8 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
                               onChange={e => setSellUnits(prev => ({ ...prev, [sell.schemeCode]: e.target.value }))}
                               className="w-24 text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
                             />
-                            <span className="text-[10px] text-[var(--text-dim)]">/ {sell.units.toFixed(4)} avail</span>
-                            <span className="text-[10px] text-[var(--text-dim)] shrink-0 ml-auto">Sell NAV ₹</span>
+                            <span className="text-xs text-[var(--text-dim)]">/ {sell.units.toFixed(4)} avail</span>
+                            <span className="text-xs text-[var(--text-dim)] shrink-0 ml-auto">Sell NAV ₹</span>
                             <input
                               type="number" step="0.01" min="0.01"
                               placeholder={sell.currentNav.toFixed(4)}
@@ -278,7 +291,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
 
                 {/* SWITCH INTO section */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">Switch Into (Debt/Liquid)</p>
+                  <p className="text-sm font-bold text-[var(--text-dim)] uppercase tracking-wider">Switch Into (Debt/Liquid)</p>
                   {pd.debtFunds.length > 0 ? (
                     <>
                       <select
@@ -295,12 +308,12 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
                       </select>
                       {toFund && (
                         <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5">
-                          <span className="text-[10px] text-[var(--text-dim)] flex-1">
+                          <span className="text-xs text-[var(--text-dim)] flex-1">
                             Est. units bought: <span className="font-semibold text-[var(--text-primary)] tabular-nums">
                               {buyNav > 0 ? (totalSwitchValue / buyNav).toFixed(4) : '—'}
                             </span>
                           </span>
-                          <span className="text-[10px] text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
+                          <span className="text-xs text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
                           <input
                             type="number" step="0.01" min="0.01"
                             placeholder={toFund.currentNav?.toFixed(4) || ''}
@@ -313,7 +326,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
                     </>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-[10px] text-amber-400 bg-amber-500/10 rounded px-2 py-1.5">
+                      <p className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-1.5">
                         No debt/liquid fund in this portfolio — search to switch into one
                       </p>
                       <FundSearchInput
@@ -323,12 +336,12 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
                       />
                       {toFund && (
                         <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5">
-                          <span className="text-[10px] text-[var(--text-dim)] flex-1">
+                          <span className="text-xs text-[var(--text-dim)] flex-1">
                             Est. units bought: <span className="font-semibold text-[var(--text-primary)] tabular-nums">
                               {buyNav > 0 ? (totalSwitchValue / buyNav).toFixed(4) : '—'}
                             </span>
                           </span>
-                          <span className="text-[10px] text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
+                          <span className="text-xs text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
                           <input
                             type="number" step="0.01" min="0.01"
                             placeholder="e.g., 1234.56"
@@ -347,7 +360,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
         })
       )}
 
-      <p className="text-[10px] text-[var(--text-dim)] px-1">
+      <p className="text-xs text-[var(--text-dim)] px-1">
         Units and NAVs are pre-filled based on your goal allocation — edit both to match what you actually executed in your AMC/broker. Each equity fund becomes a separate switch transaction.
       </p>
 

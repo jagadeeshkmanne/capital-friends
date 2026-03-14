@@ -24,7 +24,7 @@ export default function PrivacyPolicy() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-slate-500 mb-10">Last updated: March 4, 2026</p>
+        <p className="text-sm text-slate-500 mb-10">Last updated: March 13, 2026</p>
 
         {/* Overview */}
         <Section icon={<Shield size={20} />} color="emerald" title="Overview">
@@ -57,12 +57,12 @@ export default function PrivacyPolicy() {
             why="Required to create your Capital Friends spreadsheet on first sign-in, and to read/write your portfolio data, goals, settings, family members, insurance, liabilities, and all other financial information. The app only accesses the Capital Friends spreadsheet it created — no other spreadsheets."
           />
           <Scope
-            name="Google Drive"
-            scope="auth/drive"
-            badge="Restricted"
-            badgeColor="rose"
-            desc="See, edit, create and delete all of your Google Drive files"
-            why={<>Required because Google Apps Script&apos;s <code className="text-xs text-violet-400 bg-violet-500/10 px-1 rounded">SpreadsheetApp.create()</code> function needs the Drive scope to create a new spreadsheet. This is a Google API limitation — there is no narrower scope available for spreadsheet creation. <strong className="text-white">We only use this to create one spreadsheet during first-time setup.</strong> We do not list, access, read, or modify any other files in your Drive.</>}
+            name="Google Drive (App-Created Files)"
+            scope="auth/drive.file"
+            badge="Non-Sensitive"
+            badgeColor="emerald"
+            desc="See, edit, create and delete only files created by this app"
+            why={<>Used to create your Capital Friends spreadsheet via <code className="text-xs text-violet-400 bg-violet-500/10 px-1 rounded">SpreadsheetApp.create()</code> during first-time setup. This scope only grants access to the single spreadsheet the app creates — <strong className="text-white">we cannot access any other files in your Google Drive.</strong></>}
           />
           <Scope
             name="Gmail (Send Only)"
@@ -100,6 +100,33 @@ export default function PrivacyPolicy() {
             <p className="text-sm text-emerald-400 font-semibold mb-1">No unnecessary permissions</p>
             <p className="text-sm text-slate-400">We do not request access to your contacts, calendar, browsing history, or any other Google service beyond what is listed above. Every permission is actively used and essential.</p>
           </div>
+        </Section>
+
+        {/* How We Use Google User Data */}
+        <Section icon={<Eye size={20} />} color="amber" title="How We Use Google User Data">
+          <p>Capital Friends accesses Google user data exclusively to provide its core portfolio tracking functionality. Below is a complete disclosure of how each type of data is used:</p>
+          <ul className="mt-3 space-y-3">
+            <Li><strong className="text-white">Google Sheets data:</strong> Your financial data (mutual fund holdings, stock portfolios, insurance policies, loan records, family members, goals, and transaction history) is read from and written to a single Google Spreadsheet that the app creates in your Google Drive. This data is used solely to render your dashboard, portfolio views, reports, and goal tracking within the app. It is never copied, cached on any server, or transmitted outside your browser session.</Li>
+            <Li><strong className="text-white">Google Drive access:</strong> Used only to create the Capital Friends spreadsheet during first-time setup. No other files in your Drive are listed, accessed, read, or modified.</Li>
+            <Li><strong className="text-white">Gmail (send only):</strong> Used exclusively to send scheduled portfolio summary emails and reminder notifications (SIP reminders, insurance renewal alerts, goal progress) from your own Gmail account to recipients you configure. Email content is generated on-the-fly from your spreadsheet data and is not stored anywhere. We do not read, search, or delete any emails.</Li>
+            <Li><strong className="text-white">Apps Script triggers:</strong> Used to schedule background tasks that refresh mutual fund NAV prices daily and send automated email reports. These triggers run entirely within Google&apos;s infrastructure under your authenticated session.</Li>
+            <Li><strong className="text-white">Profile information:</strong> Your name, email, and profile picture (from Google Sign-In) are displayed within the app&apos;s UI for identification purposes only. This information is not stored on any server or shared with any third party.</Li>
+          </ul>
+          <p className="mt-3"><strong className="text-white">Data is never used for:</strong> advertising, profiling, selling to third parties, training AI/ML models, or any purpose other than providing the portfolio tracking features described above.</p>
+        </Section>
+
+        {/* Data Protection */}
+        <Section icon={<Lock size={20} />} color="rose" title="Data Protection & Security">
+          <p>Capital Friends implements the following measures to protect your sensitive financial data:</p>
+          <ul className="mt-3 space-y-3">
+            <Li><strong className="text-white">No server-side storage:</strong> Your financial data is never transmitted to or stored on any server owned or operated by Capital Friends. All data resides exclusively in your Google Drive, protected by Google&apos;s enterprise-grade security infrastructure.</Li>
+            <Li><strong className="text-white">Encryption in transit:</strong> All communication between your browser and Google APIs is encrypted using HTTPS/TLS. The app is served over HTTPS from GitHub Pages.</Li>
+            <Li><strong className="text-white">Encryption at rest:</strong> Your spreadsheet data is stored in Google Drive, which encrypts all data at rest using AES-256 encryption as part of Google&apos;s standard infrastructure security.</Li>
+            <Li><strong className="text-white">OAuth 2.0 authentication:</strong> The app uses Google&apos;s OAuth 2.0 protocol for authentication. Access tokens are stored only in your browser&apos;s session memory and are never persisted to disk, local storage, or any server.</Li>
+            <Li><strong className="text-white">Minimal data access:</strong> The app accesses only the single spreadsheet it created. It does not scan, index, or access any other files in your Google Drive, emails in your Gmail, or data in any other Google service.</Li>
+            <Li><strong className="text-white">No third-party data sharing:</strong> Your Google user data is never shared with, disclosed to, or made accessible to any third party, including analytics services, advertising networks, or data brokers.</Li>
+            <Li><strong className="text-white">Open source:</strong> The entire application source code is publicly available on <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">GitHub</a>, allowing independent verification of all data handling practices.</Li>
+          </ul>
         </Section>
 
         {/* Data Collection */}
@@ -208,11 +235,11 @@ function Scope({ name, scope, badge, badgeColor, desc, why }) {
         <div>
           <p className="text-sm font-semibold text-white flex items-center gap-2">
             {name}
-            {badge && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeColors[badgeColor] || ''}`}>{badge}</span>}
+            {badge && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${badgeColors[badgeColor] || ''}`}>{badge}</span>}
           </p>
           {desc && <p className="text-xs text-slate-500 mt-0.5">{desc}</p>}
         </div>
-        <code className="text-[10px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded shrink-0">{scope}</code>
+        <code className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded shrink-0">{scope}</code>
       </div>
       <p className="text-sm text-slate-400 mt-2 leading-relaxed"><strong className="text-slate-300">Why we need this:</strong> {why}</p>
     </div>

@@ -137,6 +137,8 @@ export const getSharedMembers = () => callAPI('auth:shared-members')
 export const inviteFamilyMember = (email, name) => callAPI('auth:invite', { email, name })
 export const removeFamilyMember = (email) => callAPI('auth:remove-member', { email })
 
+// Fast init: verify/create spreadsheet, returns immediately
+export const initUser = () => callAPI('data:init')
 // Bulk load
 export const loadAllData = () => callAPI('data:load-all')
 
@@ -222,6 +224,7 @@ export const getStockTransactions = (portfolioId) => callAPI('stock:transactions
 // MF Transaction Edit/Delete
 export const deleteMFTransaction = (transactionId) => callAPI('mf-transaction:delete', { transactionId })
 export const editMFTransaction = (data) => callAPI('mf-transaction:edit', data)
+export const deleteFundFromPortfolio = (portfolioId, fundCode) => callAPI('mf:delete-fund', { portfolioId, fundCode })
 
 // Stock Transaction Edit/Delete
 export const editStockTransaction = (data) => callAPI('stock-transaction:edit', data)

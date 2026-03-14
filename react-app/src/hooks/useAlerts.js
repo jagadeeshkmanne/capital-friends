@@ -30,7 +30,7 @@ export default function useAlerts() {
       pHoldings.forEach((h) => {
         if (h.athNav > 0 && h.belowATHPct >= 10) strongBuyCount++
         else if (h.athNav > 0 && h.belowATHPct >= 5) buyCount++
-        if (h.targetAllocationPct > 0 && pValue > 0) {
+        if (!p.skipRebalance && h.targetAllocationPct > 0 && pValue > 0) {
           const currentPct = (h.currentValue / pValue) * 100
           if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalanceCount++
         }

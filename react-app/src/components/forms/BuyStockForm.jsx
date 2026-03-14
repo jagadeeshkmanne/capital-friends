@@ -11,7 +11,7 @@ export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
 
   // Filter portfolios by header's selected member
   const activePortfolios = useMemo(() => {
-    const active = stockPortfolios.filter((p) => p.status === 'Active')
+    const active = (stockPortfolios || []).filter((p) => p.status === 'Active')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [stockPortfolios, selectedMember])
 

@@ -630,6 +630,13 @@ export function DataProvider({ children }) {
     await refreshMF()
   }, [refreshMF])
 
+  const deleteFundFromPortfolio = useCallback(async (portfolioId, fundCode) => {
+    const result = await api.deleteFundFromPortfolio(portfolioId, fundCode)
+    if (!result?.success) throw new Error(result?.message || 'Failed to delete fund')
+    await refreshMF()
+    return result
+  }, [refreshMF])
+
   // ── Asset Allocation ──
   const updateAssetAllocation = useCallback(async (data) => {
     const result = await api.saveAssetAllocation(data)
@@ -643,6 +650,7 @@ export function DataProvider({ children }) {
       if (data.cash) assetAlloc.Cash = data.cash
       if (data.realEstate) assetAlloc['Real Estate'] = data.realEstate
       if (data.commodities) assetAlloc.Commodities = data.commodities
+      if (data.other) assetAlloc.Other = data.other
       // Include custom asset fields
       if (data.customAsset) Object.entries(data.customAsset).forEach(([k, v]) => { if (v > 0) assetAlloc[k] = v })
       const equityAlloc = {}
@@ -703,7 +711,7 @@ export function DataProvider({ children }) {
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-      investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction,
+      investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
       // Settings
       settings, updateSettings, refreshSettings,
       // Health Check

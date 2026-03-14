@@ -105,7 +105,7 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
         <div className="flex-1 min-w-0">
           <div>
             <p className="text-xs font-medium text-[var(--text-primary)] truncate">{splitFundName(value.fundName).main}</p>
-            {splitFundName(value.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(value.fundName).plan}</p>}
+            {splitFundName(value.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(value.fundName).plan}</p>}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-[var(--text-dim)]">{value.schemeCode}</span>
@@ -150,7 +150,7 @@ export default function FundSearchInput({ value, onSelect, placeholder, disabled
             >
               <div>
                 <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{splitFundName(fund.fundName).main}</p>
-                {splitFundName(fund.fundName).plan && <p className="text-[10px] text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
+                {splitFundName(fund.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(fund.fundName).plan}</p>}
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-[var(--text-dim)]">{fund.fundCode || fund.schemeCode}</span>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { FormField, FormInput, FormSelect, FormCheckbox, FormActions, DeleteButton } from '../Modal'
+import { FormField, FormInput, FormDateInput, FormSelect, FormCheckbox, FormActions, DeleteButton } from '../Modal'
 
 const RELATIONSHIPS = [
   'Self', 'Spouse', 'Father', 'Mother', 'Son', 'Daughter', 'Brother', 'Sister', 'Other',
@@ -13,11 +13,23 @@ const VALIDATORS = {
   mobile: /^\d{10}$/,
 }
 
+// Common DOB key names used in dynamicFields
+const DOB_KEYS = ['dob', 'date of birth', 'dateofbirth', 'birthday', 'birth date', 'date_of_birth']
+
+function extractDOB(dynamicFields) {
+  if (!dynamicFields) return ''
+  const key = Object.keys(dynamicFields).find(k => DOB_KEYS.includes(k.toLowerCase().trim()))
+  if (!key) return ''
+  const d = new Date(dynamicFields[key])
+  return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]
+}
+
 export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
   const isEdit = !!initial
   const [form, setForm] = useState({
     memberName: initial?.memberName || '',
     relationship: initial?.relationship || '',
+    dob: extractDOB(initial?.dynamicFields),
     pan: initial?.pan || '',
     aadhar: initial?.aadhar || '',
     email: initial?.email || '',
@@ -28,10 +40,12 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
-  // Dynamic fields (custom key-value pairs stored as JSON in GAS column L)
+  // Dynamic fields — exclude DOB since it has a dedicated field now
   const [dynamicFields, setDynamicFields] = useState(() => {
     const fields = initial?.dynamicFields || {}
-    return Object.entries(fields).map(([key, value]) => ({ key, value }))
+    return Object.entries(fields)
+      .filter(([key]) => !DOB_KEYS.includes(key.toLowerCase().trim()))
+      .map(([key, value]) => ({ key, value }))
   })
 
   function set(key, val) {
@@ -43,6 +57,7 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
     const e = {}
     if (!form.memberName.trim()) e.memberName = 'Required'
     if (!form.relationship) e.relationship = 'Required'
+    if (!form.dob) e.dob = 'Required'
     if (!VALIDATORS.pan.test(form.pan.toUpperCase())) e.pan = 'Format: ABCDE1234F'
     if (!VALIDATORS.aadhar.test(form.aadhar)) e.aadhar = '12 digits required'
     if (!VALIDATORS.email.test(form.email)) e.email = 'Invalid email'
@@ -66,8 +81,9 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
 
   async function handleSubmit() {
     if (!validate()) return
-    // Build dynamic fields object (skip empty keys)
+    // Build dynamic fields object (skip empty keys); DOB stored with canonical key
     const dfObj = {}
+    if (form.dob) dfObj['DOB'] = form.dob
     dynamicFields.forEach(({ key, value }) => {
       const k = key.trim()
       if (k) dfObj[k] = value
@@ -90,6 +106,10 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
           <FormSelect value={form.relationship} onChange={(v) => set('relationship', v)} options={RELATIONSHIPS} placeholder="Select..." />
         </FormField>
       </div>
+
+      <FormField label="Date of Birth" required error={errors.dob}>
+        <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
+      </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="PAN" required error={errors.pan}>
@@ -126,7 +146,7 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
           </button>
         </div>
         {dynamicFields.length === 0 && (
-          <p className="text-xs text-[var(--text-dim)]">No custom fields. Add DOB, occupation, blood group, etc.</p>
+          <p className="text-xs text-[var(--text-dim)]">No custom fields. Add occupation, blood group, etc.</p>
         )}
         <div className="space-y-2">
           {dynamicFields.map((f, idx) => (

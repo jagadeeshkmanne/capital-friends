@@ -155,12 +155,12 @@ function TickerItem({ item }) {
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 border-r border-[var(--border-light)] last:border-0 shrink-0">
-      <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase whitespace-nowrap">{item.name}</span>
-      <span className="text-[11px] font-bold text-[var(--text-primary)] tabular-nums whitespace-nowrap">
+      <span className="text-xs font-semibold text-[var(--text-dim)] uppercase whitespace-nowrap">{item.name}</span>
+      <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums whitespace-nowrap">
         {item.unit ? `${formatPrice(item.price)}` : formatPrice(item.price)}
       </span>
       {item.changePct !== undefined && item.changePct !== null && (
-        <span className={`flex items-center gap-0.5 text-[10px] font-bold tabular-nums ${color}`}>
+        <span className={`flex items-center gap-0.5 text-xs font-bold tabular-nums ${color}`}>
           {arrow}
           {isUp ? '+' : ''}{item.changePct.toFixed(2)}%
         </span>

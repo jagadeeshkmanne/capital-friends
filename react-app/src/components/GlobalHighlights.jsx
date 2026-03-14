@@ -21,8 +21,10 @@ export default function GlobalHighlights() {
         const threshold = (p.rebalanceThreshold || 0.05) * 100
         pHoldings.forEach((h) => {
           if (h.athNav > 0 && h.belowATHPct >= 1) buyOpp++
-          const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-          if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
+          if (!p.skipRebalance && h.targetAllocationPct > 0 && totalValue > 0) {
+            const currentPct = (h.currentValue / totalValue) * 100
+            if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
+          }
         })
       })
     return { buyOppCount: buyOpp, rebalanceCount: rebalance }

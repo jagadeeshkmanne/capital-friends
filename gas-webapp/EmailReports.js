@@ -584,7 +584,8 @@ function buildDashboardReportData() {
         realizedPLPct: parseFloat(p.realizedPLPct) || 0,
         totalPL: parseFloat(p.totalPL) || 0,
         totalPLPct: parseFloat(p.totalPLPct) || 0,
-        status: p.status
+        status: p.status,
+        skipRebalance: p.skipRebalance === true || p.skipRebalance === 'TRUE'
       };
     });
 
@@ -829,8 +830,9 @@ function buildDashboardReportData() {
     buyOpportunities.sort(function(a, b) { return b.belowATHPct - a.belowATHPct; });
 
     // ── 10. Rebalance items (MF holdings with allocation drift beyond threshold) ──
+    // Skip portfolios where user has opted out of rebalance alerts
     const rebalanceItems = [];
-    activeMFPortfolios.forEach(function(p) {
+    activeMFPortfolios.filter(function(p) { return !p.skipRebalance; }).forEach(function(p) {
       const pHoldings = activeMFHoldings.filter(function(h) { return h.portfolioId === p.portfolioId; });
       const pValue = pHoldings.reduce(function(s, h) { return s + (parseFloat(h.currentValue) || 0); }, 0);
       const threshold = (p.rebalanceThreshold || 0.05) * 100;
@@ -1122,14 +1124,17 @@ function buildDashboardReportData() {
         rec = { equity: step.equity, debt: 100 - step.equity, label: step.label };
       }
 
-      // Actual allocation from mapped portfolios
+      // Actual allocation from mapped portfolios (use fund breakdown when available)
       var maps = allGoalMappings.filter(function(m) { return m.goalId === g.goalId; });
       var totalVal = 0, eqVal = 0;
       maps.forEach(function(m) {
         activeMFHoldings.filter(function(h) { return h.portfolioId === m.portfolioId && h.units > 0; }).forEach(function(h) {
           var v = (parseFloat(h.currentValue) || 0) * (m.allocationPct / 100);
           totalVal += v;
-          if (EQUITY_CATS[h.category]) eqVal += v;
+          var detailed = allocMap[h.schemeCode || h.fundCode];
+          if (detailed && detailed.Equity !== undefined) {
+            eqVal += v * ((detailed.Equity || 0) / 100);
+          } else if (EQUITY_CATS[h.category]) eqVal += v;
           else if (h.category === 'Hybrid') eqVal += v * 0.65;
           else if (h.category === 'Multi-Asset') eqVal += v * 0.50;
         });

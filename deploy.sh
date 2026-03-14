@@ -23,13 +23,15 @@ git checkout gh-pages
 git pull origin gh-pages --quiet
 
 echo "🗑️  Replacing assets..."
-rm -rf assets
+rm -rf assets privacy terms
 cp "$DIST_TMP/index.html" .
 cp "$DIST_TMP/404.html" .
 cp -r "$DIST_TMP/assets" .
+cp -r "$DIST_TMP/privacy" .
+cp -r "$DIST_TMP/terms" .
 
 echo "🚀 Committing and pushing..."
-git add -A index.html 404.html assets/
+git add -A index.html 404.html assets/ privacy/ terms/
 git commit -m "Deploy: $(date '+%Y-%m-%d %H:%M')" --allow-empty
 git push origin gh-pages
 

@@ -4,7 +4,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useMask } from '../context/MaskContext'
 
-export default function Modal({ open, onClose, title, children, wide }) {
+export default function Modal({ open, onClose, title, children, wide, maxWidth }) {
   const overlayRef = useRef(null)
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function Modal({ open, onClose, title, children, wide }) {
   return (
     <div ref={overlayRef} className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] sm:pt-[10vh] px-4" onClick={(e) => { if (e.target === overlayRef.current) onClose() }}>
       <div className="fixed inset-0 bg-black/60" />
-      <div className={`relative bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[80vh] flex flex-col animate-fade-in`}>
+      <div className={`relative bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-2xl w-full ${maxWidth || (wide ? 'max-w-2xl' : 'max-w-lg')} max-h-[80vh] flex flex-col animate-fade-in`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] shrink-0">
           <h2 className="text-sm font-bold text-[var(--text-primary)]">{title}</h2>

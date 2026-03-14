@@ -316,7 +316,7 @@ export default function Header() {
                 title={`${buyOppCount} Buy Opportunit${buyOppCount === 1 ? 'y' : 'ies'}${strongBuyCount > 0 ? ` (${strongBuyCount} Strong)` : ''}`}
               >
                 <TrendingDown size={18} />
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold text-white bg-emerald-500 rounded-full px-1">{buyOppCount}</span>
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-emerald-500 rounded-full px-1">{buyOppCount}</span>
               </button>
             )}
 
@@ -332,7 +332,7 @@ export default function Header() {
                 title={`${rebalanceCount} fund${rebalanceCount === 1 ? '' : 's'} need rebalancing`}
               >
                 <Scale size={18} />
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold text-white bg-violet-500 rounded-full px-1">{rebalanceCount}</span>
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-violet-500 rounded-full px-1">{rebalanceCount}</span>
               </button>
             )}
 
@@ -354,13 +354,13 @@ export default function Header() {
                   className="relative p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <Bell size={18} />
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold text-white bg-rose-500 rounded-full px-1">{notifCount}</span>
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-rose-500 rounded-full px-1">{notifCount}</span>
                 </button>
 
                 {notifOpen && (
                   <div className="absolute right-0 top-full mt-2 w-72 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl shadow-black/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                     <div className="px-3 py-2 border-b border-[var(--border-light)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Notifications</p>
+                      <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)]">Notifications</p>
                     </div>
                     <div className="max-h-[300px] overflow-y-auto py-1">
                       {criticalAlerts.map((a, i) => {
@@ -374,7 +374,7 @@ export default function Header() {
                           >
                             <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
                             <span className="text-xs text-[var(--text-secondary)] flex-1 text-left truncate">{a.title}</span>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${badgeCls}`}>{a.badge}</span>
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${badgeCls}`}>{a.badge}</span>
                           </button>
                         )
                       })}
@@ -397,7 +397,7 @@ export default function Header() {
                           >
                             <span className="w-2 h-2 rounded-full shrink-0 bg-amber-500" />
                             <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{r.title}</span>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${badgeCls}`}>
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${badgeCls}`}>
                               {r.days === 0 ? 'Today' : r.days <= 30 ? `${r.days}d` : r.dateStr}
                             </span>
                           </button>
@@ -430,7 +430,7 @@ export default function Header() {
               {dropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl shadow-black/20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                   <div className="px-4 py-2.5 border-b border-[var(--border-light)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Viewing as</p>
+                    <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)]">Viewing as</p>
                   </div>
 
                   <div className="py-1.5">
@@ -445,7 +445,7 @@ export default function Header() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate ${selectedMember === 'all' ? 'text-violet-400' : 'text-[var(--text-primary)]'}`}>Everyone</p>
-                        <p className="text-[11px] text-[var(--text-muted)]">All family members</p>
+                        <p className="text-xs text-[var(--text-muted)]">All family members</p>
                       </div>
                       {selectedMember === 'all' && <Check size={16} className="text-violet-400 shrink-0" />}
                     </button>
@@ -467,7 +467,7 @@ export default function Header() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate text-[var(--text-primary)]">{mv(m.memberName, 'name')}</p>
-                            <p className="text-[11px] text-[var(--text-muted)]">{m.relationship || 'Family member'}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{m.relationship || 'Family member'}</p>
                           </div>
                           {isSelected && <Check size={16} className="text-emerald-400 shrink-0" />}
                         </button>
@@ -505,7 +505,7 @@ export default function Header() {
                     </Link>
                     {user && (
                       <div className="px-4 py-1.5">
-                        <p className="text-[11px] text-[var(--text-muted)] truncate">{mv(user.email, 'email')}</p>
+                        <p className="text-xs text-[var(--text-muted)] truncate">{mv(user.email, 'email')}</p>
                       </div>
                     )}
                     <button
@@ -558,7 +558,7 @@ export default function Header() {
                 : 'bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/15'
             }`}
           >
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${nw.netWorth >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>Net Worth</span>
+            <span className={`text-sm font-bold uppercase tracking-wider ${nw.netWorth >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>Net Worth</span>
             <span className={`text-sm font-extrabold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</span>
             <ChevronRight size={12} className={nw.netWorth >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'} />
           </button>
@@ -593,7 +593,7 @@ export default function Header() {
               : 'bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/15'
           }`}
         >
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${nw.netWorth >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>Net Worth</span>
+          <span className={`text-sm font-bold uppercase tracking-wider ${nw.netWorth >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>Net Worth</span>
           <span className={`text-sm font-extrabold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</span>
           <ChevronRight size={12} className={nw.netWorth >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'} />
         </button>
@@ -622,7 +622,7 @@ export default function Header() {
               {/* TOP — Asset Allocation (full width) */}
               {nw.assetAllocation.length > 0 && (
                 <div className="px-6 pt-6 pb-3 border-b border-[var(--border-light)]">
-                  <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider text-center mb-2">Asset Allocation</p>
+                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider text-center mb-2">Asset Allocation</p>
                   {/* Stacked bar */}
                   <div className="flex h-3 rounded-full overflow-hidden">
                     {nw.assetAllocation.map((a) => (
@@ -634,7 +634,7 @@ export default function Header() {
                     {nw.assetAllocation.map((a) => (
                       <div key={a.cls} className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: a.hex }} />
-                        <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{a.cls} {((a.total / nw.totalInv) * 100).toFixed(0)}%</span>
+                        <span className="text-xs text-[var(--text-muted)] tabular-nums">{a.cls} {((a.total / nw.totalInv) * 100).toFixed(0)}%</span>
                       </div>
                     ))}
                   </div>
@@ -665,7 +665,7 @@ export default function Header() {
                     </ResponsiveContainer>
                     {/* Center label */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Net Worth</p>
+                      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Net Worth</p>
                       <p className={`text-lg md:text-xl font-bold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</p>
                     </div>
                   </div>
@@ -673,28 +673,28 @@ export default function Header() {
                   {/* Summary cards below donut */}
                   <div className="w-full max-w-[280px] mt-4 grid grid-cols-2 gap-2">
                     <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Investments</p>
+                      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Investments</p>
                       <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(nw.totalInv)}</p>
                       {nw.totalInvested > 0 && (
-                        <p className="text-[10px] tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
+                        <p className="text-xs tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
                           {nw.totalInv >= nw.totalInvested ? '+' : ''}{formatINR(nw.totalInv - nw.totalInvested)} P&L
                         </p>
                       )}
                     </div>
                     {nw.totalLiab > 0 ? (
                       <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(244,63,94,0.08)' }}>
-                        <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Liabilities</p>
+                        <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Liabilities</p>
                         <p className="text-sm font-bold text-rose-400 tabular-nums mt-0.5">{formatINR(nw.totalLiab)}</p>
-                        <p className="text-[10px] text-[var(--text-dim)] tabular-nums mt-0.5">
+                        <p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">
                           {nw.liabilities.length} {nw.liabilities.length === 1 ? 'loan' : 'loans'}
                         </p>
                       </div>
                     ) : (
                       <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(52,211,153,0.08)' }}>
-                        <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Invested</p>
+                        <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Invested</p>
                         <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(nw.totalInvested)}</p>
                         {nw.totalInvested > 0 && (
-                          <p className="text-[10px] tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
+                          <p className="text-xs tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
                             {((nw.totalInv - nw.totalInvested) / nw.totalInvested * 100).toFixed(1)}% returns
                           </p>
                         )}
@@ -721,7 +721,7 @@ export default function Header() {
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hex }} />
                           <span className="text-[13px] font-medium text-[var(--text-primary)] flex-1 min-w-0 truncate">{sec.label}</span>
                           <span className="text-[13px] font-bold text-[var(--text-primary)] tabular-nums shrink-0 w-[80px] text-right">{formatINR(sec.total)}</span>
-                          <span className="text-[10px] font-medium tabular-nums shrink-0 w-[40px] text-center py-0.5 rounded-full" style={{ backgroundColor: `${hex}20`, color: hex }}>{pct.toFixed(0)}%</span>
+                          <span className="text-xs font-medium tabular-nums shrink-0 w-[40px] text-center py-0.5 rounded-full" style={{ backgroundColor: `${hex}20`, color: hex }}>{pct.toFixed(0)}%</span>
                         </Link>
                       )
                     })}
@@ -744,7 +744,7 @@ export default function Header() {
 
                   {/* Net Worth total */}
                   <div className="mt-4 pt-3 mx-1 border-t border-[var(--border-light)] flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Net Worth</span>
+                    <span className="text-xs uppercase tracking-wider text-[var(--text-dim)]">Net Worth</span>
                     <span className={`text-base font-bold tabular-nums ${nw.netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(nw.netWorth)}</span>
                   </div>
                 </div>
@@ -753,7 +753,7 @@ export default function Header() {
               {/* BOTTOM — Disclaimer */}
               {nw.assetAllocation.length > 0 && (
                 <div className="px-6 py-2.5 border-t border-[var(--border-light)] bg-[var(--bg-inset)]">
-                  <p className="text-[10px] text-[var(--text-dim)] text-center">Approximate. MF splits are estimated from fund names. Add Morningstar data in Fund Breakdown for accuracy.</p>
+                  <p className="text-xs text-[var(--text-dim)] text-center">Approximate. MF splits are estimated from fund names. Add Morningstar data in Fund Breakdown for accuracy.</p>
                 </div>
               )}
             </div>
