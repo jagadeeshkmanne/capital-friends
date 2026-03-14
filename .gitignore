@@ -21,6 +21,8 @@ react-app/.vite/
 
 # Local-only folders
 youtube/
+temp/
+funds/
 
 # Logs
 *.log
