@@ -18,8 +18,18 @@
  */
 function parseTrendlyneAlerts() {
   try {
-    // Search Gmail for Trendlyne screener alert emails from last 24 hours
-    const query = 'from:alerts@trendlyne.com subject:"Screener Alert" newer_than:1d';
+    // Search Gmail for Trendlyne screener alert emails from the last 24 hours
+    // that haven't been labeled as processed yet
+    const PROCESSED_LABEL = 'CF-Screener-Processed';
+
+    // Ensure the label exists
+    let label = GmailApp.getUserLabelByName(PROCESSED_LABEL);
+    if (!label) {
+      label = GmailApp.createLabel(PROCESSED_LABEL);
+    }
+
+    // Only find unprocessed emails: exclude already-labeled threads
+    const query = 'from:alerts@trendlyne.com subject:"Screener Alert" newer_than:1d -label:' + PROCESSED_LABEL;
     const threads = GmailApp.search(query, 0, 20);
 
     if (threads.length === 0) {
@@ -79,6 +89,9 @@ function parseTrendlyneAlerts() {
 
         Logger.log('Screener ' + screenerNum + ' (' + screenerName + '): found ' + stocks.length + ' stocks');
       }
+
+      // Mark this thread as processed so we don't re-read it
+      threads[t].addLabel(label);
     }
 
     // Deduplicate by symbol (same stock from multiple emails)
@@ -246,6 +259,14 @@ function addToWatchlist(stocks) {
       }));
       const coolingEndDate = new Date(today.getTime() + minCooling * 24 * 60 * 60 * 1000);
 
+      // Fetch market cap from Screener.in (lightweight call)
+      var mcapData = { marketCapCr: null, capClass: null };
+      try {
+        mcapData = fetchMarketCapOnly(sym);
+      } catch (e) {
+        Logger.log('Market cap fetch failed for ' + sym + ': ' + e.message);
+      }
+
       const newRow = [
         sym,                                    // A: Symbol
         stock.name || '',                       // B: Stock Name
@@ -262,7 +283,9 @@ function addToWatchlist(stocks) {
         'NO',                                   // T: All BUY Met
         '',                                     // U: Failed Conditions
         today,                                  // V: Last Updated
-        ''                                      // W: Notes
+        '',                                     // W: Notes
+        mcapData.marketCapCr || '',             // X: Market Cap (Cr)
+        mcapData.capClass || ''                 // Y: Cap Class
       ];
 
       sheet.appendRow(newRow);

@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * Core logic:
- * - checkWatchlistForBuySignals(): All 10 BUY conditions
+ * - checkWatchlistForBuySignals(): All 11 BUY conditions
  * - checkHoldingsForAddSignals(): ADD #1, ADD #2, DIP BUY
  * - checkHoldingsForExitSignals(): Hard exits, trailing stops
  * - checkPortfolioLevel(): Freeze, crash, systemic, sector alerts
@@ -12,7 +12,7 @@
 
 /**
  * Check all watchlist stocks for BUY signals
- * Evaluates all 10 conditions per stock
+ * Evaluates all 11 conditions per stock
  *
  * @param {Object} niftyData - from getNiftyData()
  * @param {Object} config - from getAllScreenerConfig()
@@ -25,7 +25,7 @@ function checkWatchlistForBuySignals(niftyData, config) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 23).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 25).getValues();
   const today = new Date();
 
   // Get current holdings count and sector breakdown
@@ -56,6 +56,8 @@ function checkWatchlistForBuySignals(niftyData, config) {
     const return6m = parseFloat(data[i][14]) || 0; // col O
     const niftyReturn6m = niftyData.return6m || 0;
     const sector = String(data[i][17]).trim(); // col R
+    const marketCapCr = parseFloat(data[i][23]) || 0; // col X
+    const capClass = String(data[i][24]).trim(); // col Y
 
     const screeners = screenersStr.split(',').map(function(s) { return parseInt(s); }).filter(function(s) { return !isNaN(s); });
 
@@ -151,6 +153,14 @@ function checkWatchlistForBuySignals(niftyData, config) {
       failed.push('#10: 6M return ' + return6m + '% < Nifty ' + niftyReturn6m + '%');
     }
 
+    // 11. Market cap >= minimum (skip micro caps)
+    const minMcap = config.MIN_MARKET_CAP_CR || 500;
+    if (marketCapCr > 0 && marketCapCr < minMcap) {
+      failed.push('#11: Market cap ₹' + Math.round(marketCapCr) + ' Cr < ₹' + minMcap + ' Cr (' + capClass + ')');
+    } else if (capClass === 'MICRO') {
+      failed.push('#11: Micro cap — below ₹500 Cr');
+    }
+
     // Update Nifty >200DMA column
     sheet.getRange(row, 19).setValue(niftyAbove ? 'YES' : 'NO'); // col S
 
@@ -176,7 +186,8 @@ function checkWatchlistForBuySignals(niftyData, config) {
         shares: shares,
         triggerDetail: 'Screeners: ' + screenersStr + ', RSI: ' + rsi +
           ', Golden Cross: ' + (hasGoldenCross ? 'YES' : 'EXCEPTION(1+3)') +
-          ', 6M vs Nifty: ' + return6m + '% vs ' + niftyReturn6m + '%',
+          ', 6M vs Nifty: ' + return6m + '% vs ' + niftyReturn6m + '%' +
+          ', Cap: ' + (capClass || 'N/A') + ' (₹' + Math.round(marketCapCr) + ' Cr)',
         conviction: conviction
       });
 

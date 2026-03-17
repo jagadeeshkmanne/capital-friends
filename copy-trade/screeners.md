@@ -13,6 +13,7 @@ These filters run on EVERY stock before screener-specific filters:
 |---|---|---|---|---|
 | G1 | 6Month Volume Avg | > | 50,000 | Liquidity — avoid illiquid operator stocks |
 | G2 | Price above 200D SMA | = | true | Only buy in uptrend — avoid falling knives |
+| G3 | Mcap Classification | != | Micro Cap | Skip micro caps (< ₹500 Cr) — manipulation risk, low liquidity |
 
 **Liquidity is the #1 missing filter flagged by both validators.** Without it, screeners can catch operator-manipulated penny stocks that you can't sell in a crash (lower circuit trap).
 
@@ -44,7 +45,7 @@ These filters run on EVERY stock before screener-specific filters:
 
 **Trendlyne AI prompt**:
 ```
-Find small and midcap stocks with market cap below 15000 crores AND 3 year sales growth above 20% AND 3 year profit growth above 20% AND ROE above 18% AND debt to equity below 0.5 AND promoter holding above 50% AND operating profit margin above 12% AND PE ratio below 35 AND PEG TTM below 1.5 AND Piotroski score above 6 AND promoter pledge percentage below 10% AND operating cash flow 3 year growth above 10% AND cash from operating activity annual greater than net profit annual AND 6 month average volume above 50000 AND price above 200 day SMA
+Find small and midcap stocks with market cap below 15000 crores AND market cap classification is not micro cap AND 3 year sales growth above 20% AND 3 year profit growth above 20% AND ROE above 18% AND debt to equity below 0.5 AND promoter holding above 50% AND operating profit margin above 12% AND PE ratio below 35 AND PEG TTM below 1.5 AND Piotroski score above 6 AND promoter pledge percentage below 10% AND operating cash flow 3 year growth above 10% AND cash from operating activity annual greater than net profit annual AND 6 month average volume above 50000 AND price above 200 day SMA
 ```
 
 **Changes from v1**:
@@ -74,7 +75,7 @@ Find small and midcap stocks with market cap below 15000 crores AND 3 year sales
 
 **Trendlyne AI prompt**:
 ```
-Find stocks where institutional holding current quarter is above 10% AND mutual fund holding increased by more than 0.5% QoQ AND institutional holding change over 4 quarters is above 1% AND promoter holding above 45% AND ROE above 15% AND debt to equity below 0.5 AND 3 year sales growth above 15% AND 3 year profit growth above 15% AND promoter pledge percentage below 15% AND Piotroski score above 5 AND cash from operating activity annual greater than net profit annual AND 6 month average volume above 50000 AND price above 200 day SMA
+Find stocks where institutional holding current quarter is above 10% AND mutual fund holding increased by more than 0.5% QoQ AND institutional holding change over 4 quarters is above 1% AND promoter holding above 45% AND ROE above 15% AND debt to equity below 0.5 AND 3 year sales growth above 15% AND 3 year profit growth above 15% AND promoter pledge percentage below 15% AND Piotroski score above 5 AND cash from operating activity annual greater than net profit annual AND market cap classification is not micro cap AND 6 month average volume above 50000 AND price above 200 day SMA
 ```
 
 **Changes from v1**:
@@ -101,7 +102,7 @@ Find stocks where institutional holding current quarter is above 10% AND mutual 
 
 **Trendlyne AI prompt**:
 ```
-Find stocks where promoter holding increased by more than 0.25% in the latest quarter AND sales growth above 15% AND ROE above 12% AND debt to equity below 0.7 AND market cap below 20000 crores AND promoter pledge percentage below 5% AND interest coverage ratio above 3 AND SAST buys last week greater than 0 AND 6 month average volume above 50000 AND price above 200 day SMA
+Find stocks where promoter holding increased by more than 0.25% in the latest quarter AND sales growth above 15% AND ROE above 12% AND debt to equity below 0.7 AND market cap below 20000 crores AND market cap classification is not micro cap AND promoter pledge percentage below 5% AND interest coverage ratio above 3 AND SAST buys last week greater than 0 AND 6 month average volume above 50000 AND price above 200 day SMA
 ```
 
 **Changes from v1**:
@@ -133,7 +134,7 @@ Find stocks where promoter holding increased by more than 0.25% in the latest qu
 
 **Trendlyne AI prompt**:
 ```
-Find stocks with 5 year sales growth above 12% AND 3 year sales growth above 12% AND TTM sales growth above 10% AND 5 year profit growth above 12% AND 5 year average ROE above 18% AND debt to equity below 0.3 AND promoter holding above 55% AND market cap above 5000 crores AND Piotroski score above 7 AND 5 year average ROCE above 18% AND operating cash flow 5 year growth above 10% AND Altman Z-score above 3 AND promoter pledge percentage equals 0 AND interest coverage ratio above 5 AND cash from operating activity annual greater than net profit annual AND 6 month average volume above 50000 AND price above 200 day SMA
+Find stocks with 5 year sales growth above 12% AND 3 year sales growth above 12% AND TTM sales growth above 10% AND 5 year profit growth above 12% AND 5 year average ROE above 18% AND debt to equity below 0.3 AND promoter holding above 55% AND market cap above 5000 crores AND market cap classification is not micro cap AND Piotroski score above 7 AND 5 year average ROCE above 18% AND operating cash flow 5 year growth above 10% AND Altman Z-score above 3 AND promoter pledge percentage equals 0 AND interest coverage ratio above 5 AND cash from operating activity annual greater than net profit annual AND 6 month average volume above 50000 AND price above 200 day SMA
 ```
 
 **Changes from v1**:

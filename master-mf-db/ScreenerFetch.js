@@ -77,6 +77,10 @@ function fetchFundamentals(symbol) {
       revenueGrowthQ1: _extractQuarterlyRevenueGrowth(html, 0),
       revenueGrowthQ2: _extractQuarterlyRevenueGrowth(html, 1),
 
+      // Market cap & classification
+      marketCapCr: _extractMarketCapCr(html),
+      capClass: null, // calculated below
+
       // Valuation
       pe: _extractRatioFromScreener(html, 'Stock P/E'),
 
@@ -111,6 +115,11 @@ function fetchFundamentals(symbol) {
       fundamentals.promoterPledgeChange = fundamentals.promoterPledge - fundamentals.promoterPledgePrev;
     }
 
+    // Classify market cap
+    if (fundamentals.marketCapCr !== null) {
+      fundamentals.capClass = _classifyMarketCap(fundamentals.marketCapCr);
+    }
+
     Logger.log('Fundamentals fetched for ' + symbol + ': PE=' + fundamentals.pe +
       ', D/E=' + fundamentals.debtToEquity + ', Promoter=' + fundamentals.promoterHolding + '%');
 
@@ -125,6 +134,76 @@ function fetchFundamentals(symbol) {
 // ============================================================================
 // HTML PARSING HELPERS
 // ============================================================================
+
+/**
+ * Extract market cap in Crores from Screener.in HTML.
+ * Screener.in shows "Market Cap" in the top section as "₹ XX,XXX Cr."
+ *
+ * @param {string} html
+ * @returns {number|null} market cap in Cr
+ */
+function _extractMarketCapCr(html) {
+  try {
+    var patterns = [
+      // "Market Cap" ... <span class="number">12,345</span>
+      /Market\s*Cap[^<]*<[^>]*>[^<]*<[^>]*class="number"[^>]*>([\d,\.]+)/i,
+      /Market\s*Cap[\s\S]{0,200}?class="number"[^>]*>([\d,\.]+)/i,
+      // "Market Cap ₹ 12,345 Cr"
+      /Market\s*Cap[^₹]*₹\s*([\d,\.]+)\s*Cr/i
+    ];
+
+    for (var i = 0; i < patterns.length; i++) {
+      var match = html.match(patterns[i]);
+      if (match && match[1]) {
+        var val = parseFloat(match[1].replace(/,/g, ''));
+        if (!isNaN(val)) return val;
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log('Error extracting Market Cap: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Classify market cap into Large/Mid/Small/Micro
+ * SEBI definitions: Large ≥ 20,000 Cr, Mid 5,000-20,000, Small 500-5,000, Micro < 500
+ *
+ * @param {number} marketCapCr - market cap in Crores
+ * @returns {string} 'LARGE' | 'MID' | 'SMALL' | 'MICRO'
+ */
+function _classifyMarketCap(marketCapCr) {
+  if (marketCapCr >= 20000) return 'LARGE';
+  if (marketCapCr >= 5000) return 'MID';
+  if (marketCapCr >= 500) return 'SMALL';
+  return 'MICRO';
+}
+
+/**
+ * Lightweight market cap fetch — only grabs market cap from Screener.in
+ * Used when adding stocks to watchlist (doesn't need full fundamentals)
+ *
+ * @param {string} symbol - NSE symbol
+ * @returns {{marketCapCr: number|null, capClass: string|null}}
+ */
+function fetchMarketCapOnly(symbol) {
+  try {
+    var url = SCREENER_BASE_URL + encodeURIComponent(symbol) + '/';
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (response.getResponseCode() !== 200) return { marketCapCr: null, capClass: null };
+
+    var html = response.getContentText();
+    var marketCapCr = _extractMarketCapCr(html);
+    var capClass = marketCapCr ? _classifyMarketCap(marketCapCr) : null;
+
+    Logger.log('Market cap for ' + symbol + ': ₹' + marketCapCr + ' Cr (' + capClass + ')');
+    return { marketCapCr: marketCapCr, capClass: capClass };
+  } catch (e) {
+    Logger.log('Error fetching market cap for ' + symbol + ': ' + e.message);
+    return { marketCapCr: null, capClass: null };
+  }
+}
 
 /**
  * Extract a numeric value from Screener.in HTML for a given label.

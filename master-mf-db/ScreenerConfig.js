@@ -49,7 +49,8 @@ const SCREENER_CONFIG = {
     MIN_DAILY_TRADED_VALUE_CR: 5,
     PORTFOLIO_FREEZE_PCT: 25,
     NIFTY_CRASH_PCT: 20,
-    SYSTEMIC_EXIT_COUNT: 3
+    SYSTEMIC_EXIT_COUNT: 3,
+    MIN_MARKET_CAP_CR: 500          // Minimum market cap in Cr — skip micro caps
   },
 
   // --- Screener definitions ---

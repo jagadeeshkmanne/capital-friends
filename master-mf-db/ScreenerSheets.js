@@ -142,7 +142,7 @@ function createScreenerConfigSheet() {
   return sheet;
 }
 
-// --- Screener_Watchlist (23 columns A-W) ---
+// --- Screener_Watchlist (25 columns A-Y) ---
 function createScreenerWatchlistSheet() {
   return _getOrCreateSheet(
     SCREENER_CONFIG.sheets.watchlist,
@@ -153,7 +153,8 @@ function createScreenerWatchlistSheet() {
       '50DMA', '200DMA', 'Golden Cross', '6M Return %',
       'Nifty 6M Return %', 'Relative Strength', 'Sector',
       'Nifty >200DMA', 'All BUY Met', 'Failed Conditions',
-      'Last Updated', 'Notes'
+      'Last Updated', 'Notes',
+      'Market Cap (Cr)', 'Cap Class'
     ],
     [
       90, 180, 100, 90,
@@ -162,7 +163,8 @@ function createScreenerWatchlistSheet() {
       80, 80, 80, 90,
       100, 90, 120,
       80, 80, 180,
-      110, 150
+      110, 150,
+      100, 80
     ]
   );
 }
