@@ -13,7 +13,7 @@
  * Flow:
  * 1. Parse Trendlyne alert emails → add new stocks to watchlist
  * 2. Update market data for watchlist + holdings
- * 3. Check watchlist for BUY signals (all 10 conditions)
+ * 3. Check watchlist for BUY signals (all 11 conditions)
  * 4. Check holdings for ADD/EXIT signals
  * 5. Check portfolio-level conditions
  * 6. Send email for any new signals
@@ -41,7 +41,7 @@ function dailyScreenerCheck() {
     Logger.log('Step 3: Fetching Nifty data...');
     const niftyData = getNiftyData();
 
-    // 4. BUY SIGNALS — Check watchlist (all 10 conditions)
+    // 4. BUY SIGNALS — Check watchlist (all 11 conditions)
     Logger.log('Step 4: Checking watchlist for BUY signals...');
     checkWatchlistForBuySignals(niftyData, config);
 

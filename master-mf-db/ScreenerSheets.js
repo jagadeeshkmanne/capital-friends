@@ -126,10 +126,10 @@ function createScreenerConfigSheet() {
     ['DIP_BUY_RSI_MAX', 30, 'Max RSI for dip buy'],
     ['PRICE_RUNUP_EXPIRE_PCT', 20, 'Expire from watchlist if price up this much'],
     ['RSI_BUY_MAX', 45, 'Max RSI for BUY signal'],
-    ['MIN_DAILY_TRADED_VALUE_CR', 5, 'Min avg daily traded value in ₹ Cr'],
     ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze new buys if portfolio down this %'],
     ['NIFTY_CRASH_PCT', 20, 'Crash alert if Nifty drops this % in 1 month'],
-    ['SYSTEMIC_EXIT_COUNT', 3, 'Exit all if this many hard exits at same time']
+    ['SYSTEMIC_EXIT_COUNT', 3, 'Exit all if this many hard exits at same time'],
+    ['MIN_MARKET_CAP_CR', 500, 'Min market cap in Cr — skip micro caps']
   ];
 
   sheet.getRange(2, 1, rows.length, 3).setValues(rows);
@@ -169,7 +169,7 @@ function createScreenerWatchlistSheet() {
   );
 }
 
-// --- Screener_Holdings (29 columns A-AC) ---
+// --- Screener_Holdings (30 columns A-AD) ---
 function createScreenerHoldingsSheet() {
   return _getOrCreateSheet(
     SCREENER_CONFIG.sheets.holdings,
@@ -182,7 +182,8 @@ function createScreenerHoldingsSheet() {
       'Conviction', 'Is Compounder', 'LTCG Date', 'Days to LTCG',
       'RSI(14)', '50DMA', '200DMA',
       'Last Fundamental Check', 'Status',
-      'Allocation %', 'Sector Alloc %', 'Notes'
+      'Allocation %', 'Sector Alloc %', 'Notes',
+      'Last Add Date'
     ],
     [
       90, 180, 100, 100, 90,
@@ -193,7 +194,8 @@ function createScreenerHoldingsSheet() {
       90, 80, 100, 80,
       70, 80, 80,
       120, 80,
-      80, 90, 150
+      80, 90, 150,
+      100
     ]
   );
 }

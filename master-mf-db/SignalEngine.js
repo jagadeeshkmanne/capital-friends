@@ -87,7 +87,7 @@ function checkWatchlistForBuySignals(niftyData, config) {
       sheet.getRange(row, 8).setValue('ELIGIBLE');
     }
 
-    // --- Evaluate ALL 10 BUY conditions ---
+    // --- Evaluate ALL 11 BUY conditions ---
     const failed = [];
 
     // 1. Cooling period passed ✅ (we're here, so it passed)
@@ -208,7 +208,9 @@ function checkHoldingsForAddSignals(config) {
     // Skip if no current price
     if (!h.currentPrice || !h.entryPrice) continue;
 
-    const gainPct = ((h.currentPrice - h.entryPrice) / h.entryPrice) * 100;
+    // Use avgPrice (blended cost after pyramiding) for gain calculation
+    const costBasis = h.avgPrice > 0 ? h.avgPrice : h.entryPrice;
+    const gainPct = ((h.currentPrice - costBasis) / costBasis) * 100;
     const timeSinceEntry = (new Date() - new Date(h.entryDate)) / (1000 * 60 * 60 * 24);
 
     // --- ADD #1 ---
@@ -314,7 +316,9 @@ function checkHoldingsForExitSignals(config) {
     const h = holdings[i];
     if (!h.currentPrice) continue;
 
-    const gainPct = h.entryPrice ? ((h.currentPrice - h.entryPrice) / h.entryPrice) * 100 : 0;
+    // Use avgPrice (blended cost after pyramiding) for gain calculation
+    const costBasis = h.avgPrice > 0 ? h.avgPrice : h.entryPrice;
+    const gainPct = costBasis ? ((h.currentPrice - costBasis) / costBasis) * 100 : 0;
 
     // --- Hard stop loss: -30% from entry ---
     const hardStopPct = config.HARD_STOP_LOSS || 30;
@@ -472,7 +476,7 @@ function _getActiveHoldings() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 29).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 30).getValues();
   const holdings = [];
 
   for (let i = 0; i < data.length; i++) {
@@ -499,7 +503,8 @@ function _getActiveHoldings() {
       rsi: parseFloat(data[i][21]) || 50,
       dma50: parseFloat(data[i][22]) || 0,
       dma200: parseFloat(data[i][23]) || 0,
-      status: status
+      status: status,
+      lastAddDate: data[i][29] || null  // col AD
     });
   }
 

@@ -28,7 +28,7 @@ function updateHoldingsMarketData() {
   });
 
   // Now update computed columns for each holding
-  const data = sheet.getRange(2, 1, lastRow - 1, 29).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 30).getValues();
 
   for (let i = 0; i < data.length; i++) {
     const row = i + 2;

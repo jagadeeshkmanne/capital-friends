@@ -296,8 +296,77 @@ function _fetchHistoricalPricesForIndex(gfSymbol, tradingDays) {
 }
 
 /**
+ * Calculate RSI, DMA, and 6M return from a single historical price array.
+ * Avoids 3 separate GOOGLEFINANCE calls per stock.
+ *
+ * @param {Array<number>} prices - closing prices oldest→newest (210+ days)
+ * @returns {{rsi: number|null, dma50: number|null, dma200: number|null, return6m: number|null}}
+ */
+function _calculateAllFromPrices(prices) {
+  const result = { rsi: null, dma50: null, dma200: null, return6m: null };
+  if (!prices || prices.length < 30) return result;
+
+  // RSI(14) — needs 14+16 = 30 prices minimum
+  const days = 14;
+  if (prices.length >= days + 1) {
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= days; i++) {
+      const change = prices[prices.length - (days + 16) + i] - prices[prices.length - (days + 16) + i - 1];
+      if (isNaN(change)) continue;
+      if (change > 0) gains += change;
+      else losses += Math.abs(change);
+    }
+    let avgGain = gains / days;
+    let avgLoss = losses / days;
+    const startIdx = prices.length - (days + 16) + days + 1;
+    for (let i = startIdx; i < prices.length; i++) {
+      const change = prices[i] - prices[i - 1];
+      if (isNaN(change)) continue;
+      if (change > 0) {
+        avgGain = (avgGain * (days - 1) + change) / days;
+        avgLoss = (avgLoss * (days - 1)) / days;
+      } else {
+        avgGain = (avgGain * (days - 1)) / days;
+        avgLoss = (avgLoss * (days - 1) + Math.abs(change)) / days;
+      }
+    }
+    if (avgLoss === 0) result.rsi = 100;
+    else {
+      const rs = avgGain / avgLoss;
+      result.rsi = Math.round((100 - (100 / (1 + rs))) * 100) / 100;
+    }
+  }
+
+  // 50DMA
+  if (prices.length >= 50) {
+    result.dma50 = Math.round(prices.slice(prices.length - 50).reduce(function(a, b) { return a + b; }, 0) / 50 * 100) / 100;
+  }
+
+  // 200DMA
+  if (prices.length >= 200) {
+    result.dma200 = Math.round(prices.slice(prices.length - 200).reduce(function(a, b) { return a + b; }, 0) / 200 * 100) / 100;
+  }
+
+  // 6M return (using ~130 trading days)
+  if (prices.length >= 130) {
+    const oldPrice = prices[prices.length - 130];
+    const currentPrice = prices[prices.length - 1];
+    if (oldPrice > 0) {
+      result.return6m = Math.round(((currentPrice - oldPrice) / oldPrice) * 10000) / 100;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Update market data for all stocks in a given sheet (watchlist or holdings)
  * Writes: Current Price, RSI, 50DMA, 200DMA to appropriate columns
+ *
+ * OPTIMIZED: Fetches 210 days of historical data ONCE per stock,
+ * then calculates RSI, DMA, 6M return from the same array.
+ * Before: 3 GOOGLEFINANCE calls × 3s each = 9s/stock
+ * After:  1 GOOGLEFINANCE call × 3s = 3s/stock
  *
  * @param {string} sheetName - Sheet to update
  * @param {Object} colMap - { symbolCol, priceCol, rsiCol, dma50Col, dma200Col, return6mCol }
@@ -320,10 +389,10 @@ function updateMarketDataForSheet(sheetName, colMap) {
 
   if (symbols.length === 0) return;
 
-  // Batch fetch current prices
+  // Batch fetch current prices + volume
   const marketData = getMarketDataBatch(symbols);
 
-  // For each stock, calculate RSI, DMA, 6M return
+  // For each stock: ONE historical fetch → calculate RSI + DMA + 6M return
   for (let i = 0; i < symbols.length; i++) {
     const sym = symbols[i];
     const row = i + 2;
@@ -335,28 +404,25 @@ function updateMarketDataForSheet(sheetName, colMap) {
       sheet.getRange(row, colMap.priceCol).setValue(md.price);
     }
 
-    // RSI(14)
-    if (colMap.rsiCol) {
-      const rsi = calculateRSI(sym);
-      if (rsi !== null) {
-        sheet.getRange(row, colMap.rsiCol).setValue(rsi);
-      }
-    }
+    // Fetch 210 days of history ONCE — calculate everything from it
+    var needsHistory = colMap.rsiCol || colMap.dma50Col || colMap.dma200Col || colMap.return6mCol;
+    if (needsHistory) {
+      var prices = _fetchHistoricalPrices(sym, 210);
+      if (prices && prices.length > 0) {
+        var calc = _calculateAllFromPrices(prices);
 
-    // 50DMA and 200DMA
-    if (colMap.dma50Col || colMap.dma200Col) {
-      const dma = calculateDMA(sym);
-      if (dma) {
-        if (colMap.dma50Col && dma.dma50) sheet.getRange(row, colMap.dma50Col).setValue(dma.dma50);
-        if (colMap.dma200Col && dma.dma200) sheet.getRange(row, colMap.dma200Col).setValue(dma.dma200);
-      }
-    }
-
-    // 6M Return
-    if (colMap.return6mCol) {
-      const ret = calculate6MReturn(sym);
-      if (ret !== null) {
-        sheet.getRange(row, colMap.return6mCol).setValue(ret);
+        if (colMap.rsiCol && calc.rsi !== null) {
+          sheet.getRange(row, colMap.rsiCol).setValue(calc.rsi);
+        }
+        if (colMap.dma50Col && calc.dma50 !== null) {
+          sheet.getRange(row, colMap.dma50Col).setValue(calc.dma50);
+        }
+        if (colMap.dma200Col && calc.dma200 !== null) {
+          sheet.getRange(row, colMap.dma200Col).setValue(calc.dma200);
+        }
+        if (colMap.return6mCol && calc.return6m !== null) {
+          sheet.getRange(row, colMap.return6mCol).setValue(calc.return6m);
+        }
       }
     }
 
