@@ -348,6 +348,19 @@ function onOpen() {
     .addItem('🔄 Update ATH Now', 'dailyATHUpdate')
     .addItem('🗑️ Reset ATH Sheet (Start Fresh)', 'resetATHSheet')
     .addToUi();
+
+  ui.createMenu('📋 Stock Screener')
+    .addItem('🔧 Setup Screener Sheets (Run Once)', 'setupScreenerSheets')
+    .addSeparator()
+    .addItem('▶️ Run Daily Check Now', 'manualDailyCheck')
+    .addItem('🔄 Update Watchlist Data', 'updateWatchlistMarketData')
+    .addItem('🔄 Update Holdings Data', 'updateHoldingsMarketData')
+    .addItem('📊 Quarterly Fundamentals Now', 'quarterlyFundamentalCheckAll')
+    .addItem('📰 Check BSE Announcements', 'checkAnnouncementsForAllHoldings')
+    .addSeparator()
+    .addItem('⏰ Install Screener Triggers', 'installScreenerTriggers')
+    .addItem('❌ Remove Screener Triggers', 'removeScreenerTriggers')
+    .addToUi();
 }
 
 // ============================================================================
