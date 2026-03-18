@@ -226,9 +226,19 @@ export default function ScreenerPage() {
             positive={niftyData.return1m > 0 ? true : niftyData.return1m < 0 ? false : undefined}
           />
           <StatCard
-            label="6M Return"
+            label="Nifty 6M"
             value={niftyData.return6m != null ? `${niftyData.return6m > 0 ? '+' : ''}${niftyData.return6m}%` : 'N/A'}
             positive={niftyData.return6m > 0 ? true : niftyData.return6m < 0 ? false : undefined}
+          />
+          <StatCard
+            label="Midcap150 6M"
+            value={niftyData.midcapReturn6m != null ? `${niftyData.midcapReturn6m > 0 ? '+' : ''}${niftyData.midcapReturn6m}%` : 'N/A'}
+            positive={niftyData.midcapReturn6m > 0 ? true : niftyData.midcapReturn6m < 0 ? false : undefined}
+          />
+          <StatCard
+            label="Smallcap250 6M"
+            value={niftyData.smallcapReturn6m != null ? `${niftyData.smallcapReturn6m > 0 ? '+' : ''}${niftyData.smallcapReturn6m}%` : 'N/A'}
+            positive={niftyData.smallcapReturn6m > 0 ? true : niftyData.smallcapReturn6m < 0 ? false : undefined}
           />
         </div>
       )}

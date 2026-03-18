@@ -280,6 +280,8 @@ function _persistNiftyData(niftyData) {
       ['NIFTY_ABOVE_200DMA', niftyData.aboveDMA200 ? 'TRUE' : 'FALSE', 'Is Nifty above 200DMA'],
       ['NIFTY_RETURN_1M', niftyData.return1m, 'Nifty 1-month return %'],
       ['NIFTY_RETURN_6M', niftyData.return6m, 'Nifty 6-month return %'],
+      ['MIDCAP150_RETURN_6M', niftyData.midcapReturn6m, 'Nifty Midcap 150 6-month return %'],
+      ['SMALLCAP250_RETURN_6M', niftyData.smallcapReturn6m, 'Nifty Smallcap 250 6-month return %'],
       ['NIFTY_LAST_UPDATED', new Date().toISOString(), 'Last Nifty data update timestamp']
     ];
 

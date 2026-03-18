@@ -235,16 +235,48 @@ function getNiftyData() {
     // Clean up
     sheet.getRange(niftyRow, 1, 1, 4).clearContent();
 
+    // --- Fetch benchmark returns for Midcap 150 and Smallcap 250 ---
+    var midcapReturn6m = null;
+    var smallcapReturn6m = null;
+
+    try {
+      var midcapPrices = _fetchHistoricalPricesForIndex('INDEXNSE:NIFTY_MIDCAP_150', 140);
+      if (midcapPrices && midcapPrices.length >= 130) {
+        var midPrice6mAgo = midcapPrices[0];
+        var midPriceCurrent = midcapPrices[midcapPrices.length - 1];
+        if (midPrice6mAgo > 0) {
+          midcapReturn6m = Math.round(((midPriceCurrent - midPrice6mAgo) / midPrice6mAgo) * 10000) / 100;
+        }
+      }
+    } catch (midErr) {
+      Logger.log('Midcap 150 fetch failed (non-fatal): ' + midErr.message);
+    }
+
+    try {
+      var smallcapPrices = _fetchHistoricalPricesForIndex('INDEXNSE:NIFTY_SMLCAP_250', 140);
+      if (smallcapPrices && smallcapPrices.length >= 130) {
+        var smPrice6mAgo = smallcapPrices[0];
+        var smPriceCurrent = smallcapPrices[smallcapPrices.length - 1];
+        if (smPrice6mAgo > 0) {
+          smallcapReturn6m = Math.round(((smPriceCurrent - smPrice6mAgo) / smPrice6mAgo) * 10000) / 100;
+        }
+      }
+    } catch (smErr) {
+      Logger.log('Smallcap 250 fetch failed (non-fatal): ' + smErr.message);
+    }
+
     return {
       price: price,
       dma200: dma200,
       aboveDMA200: price && dma200 ? price > dma200 : null,
       return1m: return1m,
-      return6m: return6m
+      return6m: return6m,
+      midcapReturn6m: midcapReturn6m,
+      smallcapReturn6m: smallcapReturn6m
     };
   } catch (e) {
     Logger.log('Error fetching Nifty data: ' + e.message);
-    return { price: null, dma200: null, aboveDMA200: null, return1m: null, return6m: null };
+    return { price: null, dma200: null, aboveDMA200: null, return1m: null, return6m: null, midcapReturn6m: null, smallcapReturn6m: null };
   }
 }
 

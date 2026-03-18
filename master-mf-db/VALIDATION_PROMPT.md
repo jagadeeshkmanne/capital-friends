@@ -147,10 +147,22 @@ Cash from Operations > Net Profit
 - "YES" if 50DMA > 200DMA (both must be > 0)
 - "NO" otherwise
 
-### Relative Strength
+### Relative Strength (Dual Filter)
 
-- "PASS" if stock's 6M Return % > Nifty 6M Return %
-- "FAIL" otherwise
+A stock must outperform BOTH the broad market AND its cap-class benchmark:
+
+1. **vs Nifty 50**: Stock's 6M Return % > Nifty 50 6M Return % (market outperformance)
+2. **vs Cap Benchmark**: Stock's 6M Return % > category benchmark 6M Return % (true alpha)
+
+| Cap Class | Benchmark |
+|-----------|-----------|
+| LARGE | Nifty 50 (same as #1, so only one check needed) |
+| MID | Nifty Midcap 150 |
+| SMALL / MICRO | Nifty Smallcap 250 |
+
+- "PASS" only if BOTH conditions met
+- "FAIL" if either fails
+- Failed messages: `Weak vs Nifty (X% vs Y%)` and/or `Weak vs Midcap150 (X% vs Y%)` or `Weak vs Smallcap250 (X% vs Y%)`
 
 ### Price Expiry
 
@@ -173,7 +185,7 @@ A watchlist stock generates a **BUY_STARTER** signal only when ALL 11 conditions
 | 7 | Budget has room | Cash > starter amount | `Low cash (need ₹XK)` |
 | 8 | Nifty above 200DMA | Price > 200DMA | `Nifty below 200DMA` |
 | 9 | Golden Cross | 50DMA > 200DMA | `No golden cross` |
-| 10 | Beats Nifty 6M return | 6M > Nifty 6M | `Weak vs Nifty (X% vs Y%)` |
+| 10 | Dual relative strength (beats Nifty 50 AND cap benchmark) | 6M > Nifty AND 6M > benchmark | `Weak vs Nifty (X% vs Y%)` / `Weak vs Midcap150` / `Weak vs Smallcap250` |
 | 11 | Market cap above minimum | ≥ 500 Cr | `Small cap (₹X Cr)` or `Micro cap` |
 
 ### Golden Cross Exception (Condition 9)

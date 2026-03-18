@@ -145,12 +145,29 @@ function checkWatchlistForBuySignals(niftyData, config) {
       }
     }
 
-    // 10. Relative strength (6M return > Nifty 6M return)
+    // 10. Dual relative strength: must beat Nifty 50 AND cap-class benchmark
     sheet.getRange(row, 16).setValue(niftyReturn6m); // col P
-    const relStrength = return6m > niftyReturn6m;
+    const beatsNifty = return6m > niftyReturn6m;
+
+    // Cap-class benchmark: LARGE=Nifty50, MID=Midcap150, SMALL=Smallcap250
+    let benchmarkReturn = niftyReturn6m;
+    let benchmarkName = 'Nifty';
+    if (capClass === 'MID' && niftyData.midcapReturn6m != null) {
+      benchmarkReturn = niftyData.midcapReturn6m;
+      benchmarkName = 'Midcap150';
+    } else if ((capClass === 'SMALL' || capClass === 'MICRO') && niftyData.smallcapReturn6m != null) {
+      benchmarkReturn = niftyData.smallcapReturn6m;
+      benchmarkName = 'Smallcap250';
+    }
+    const beatsBenchmark = return6m > benchmarkReturn;
+    const relStrength = beatsNifty && beatsBenchmark;
+
     sheet.getRange(row, 17).setValue(relStrength ? 'PASS' : 'FAIL'); // col Q
-    if (!relStrength) {
+    if (!beatsNifty) {
       failed.push('Weak vs Nifty (' + return6m + '% vs ' + niftyReturn6m + '%)');
+    }
+    if (!beatsBenchmark && benchmarkName !== 'Nifty') {
+      failed.push('Weak vs ' + benchmarkName + ' (' + return6m + '% vs ' + benchmarkReturn + '%)');
     }
 
     // 11. Market cap >= minimum (skip micro caps)

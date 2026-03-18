@@ -101,6 +101,8 @@ function readNiftyDataFromMasterDB() {
       aboveDMA200: config.NIFTY_ABOVE_200DMA === 'TRUE' || config.NIFTY_ABOVE_200DMA === true,
       return1m: parseFloat(config.NIFTY_RETURN_1M) || null,
       return6m: parseFloat(config.NIFTY_RETURN_6M) || null,
+      midcapReturn6m: parseFloat(config.MIDCAP150_RETURN_6M) || null,
+      smallcapReturn6m: parseFloat(config.SMALLCAP250_RETURN_6M) || null,
       lastUpdated: config.NIFTY_LAST_UPDATED || null
     };
   } catch (e) {
@@ -110,7 +112,7 @@ function readNiftyDataFromMasterDB() {
 }
 
 function _defaultNiftyData() {
-  return { price: null, dma200: null, aboveDMA200: null, return1m: null, return6m: null, lastUpdated: null };
+  return { price: null, dma200: null, aboveDMA200: null, return1m: null, return6m: null, midcapReturn6m: null, smallcapReturn6m: null, lastUpdated: null };
 }
 
 // ============================================================================
@@ -570,9 +572,23 @@ function _checkBuyConditions(stock, screeners, config, niftyData, holdingCount, 
     }
   }
 
-  // 10 — Relative strength
-  if (stock.relativeStrength !== 'PASS') {
+  // 10 — Dual relative strength: must beat Nifty 50 AND cap-class benchmark
+  var beatsNifty = stock.return6m > (niftyData.return6m || 0);
+  var benchmarkReturn = niftyData.return6m || 0;
+  var benchmarkName = 'Nifty';
+  if (stock.capClass === 'MID' && niftyData.midcapReturn6m != null) {
+    benchmarkReturn = niftyData.midcapReturn6m;
+    benchmarkName = 'Midcap150';
+  } else if ((stock.capClass === 'SMALL' || stock.capClass === 'MICRO') && niftyData.smallcapReturn6m != null) {
+    benchmarkReturn = niftyData.smallcapReturn6m;
+    benchmarkName = 'Smallcap250';
+  }
+  var beatsBenchmark = stock.return6m > benchmarkReturn;
+  if (!beatsNifty) {
     failed.push('Weak vs Nifty (' + stock.return6m + '% vs ' + (niftyData.return6m || 'N/A') + '%)');
+  }
+  if (!beatsBenchmark && benchmarkName !== 'Nifty') {
+    failed.push('Weak vs ' + benchmarkName + ' (' + stock.return6m + '% vs ' + benchmarkReturn + '%)');
   }
 
   // 11 — Market cap minimum
