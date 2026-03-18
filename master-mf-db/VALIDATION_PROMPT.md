@@ -624,11 +624,88 @@ These stocks appear in multiple screeners (expected to have higher conviction):
 | Uni Abex Alloy | 1 | 567 Cr | BSE-only (BSE:504605) |
 | Sunshield Chemicals | 3 | 669 Cr | BSE-only (BSE:530845) |
 
-**Total from screeners**: 33 + 12 + 7 + 1 = 53 results → 47 unique NSE stocks (after dedup overlaps) → 41 in watchlist (6 BSE-only excluded)
+**Total from screeners**: 33 + 12 + 7 + 1 = 53 results → 47 unique NSE stocks (after dedup overlaps) → 40 in watchlist (6 BSE-only excluded, AMAL also excluded as BSE-only)
 
 ---
 
-## PART 15: ADDITIONAL VALIDATION CHECKS (with Screener.in data)
+## PART 15: ACTUAL WATCHLIST DATA (March 18, 2026)
+
+This is the current watchlist data after running `bulkImportToWatchlist()` + `manualDailyCheck()`. All 40 stocks are in COOLING status (added today, cooling periods active). BUY evaluation is skipped during COOLING — so Golden Cross, Relative Strength, Failed Conditions, and All BUY Met are not yet calculated.
+
+**Nifty context**: Nifty below 200DMA (all rows show Nifty >200DMA = NO via the daily check).
+
+| # | Symbol | Name | Found Price | Screeners | Conviction | Cooling End | Status | Current Price | RSI | 50DMA | 200DMA | 6M Ret% | MCap (Cr) | Cap | 1W% | 1M% | 1Y% |
+|---|--------|------|------------|-----------|-----------|------------|--------|--------------|-----|-------|--------|---------|----------|-----|-----|-----|-----|
+| 1 | ECLERX | eClerx Services | 1469 | 1,3 | MEDIUM | 01/04/2026 | COOLING | 1469 | 16.4 | 1993 | 2040 | -31.26 | 13870 | MID | -5.3 | -20.9 | 9.37 |
+| 2 | J&KBANK | Jammu & Kashmir Bank | 121 | 1 | LOW | 17/04/2026 | COOLING | 121 | 57.68 | 108 | 106 | 20.95 | 13335 | MID | -3.44 | 19.03 | 28.5 |
+| 3 | JINDALSAW | Jindal Saw | 198.9 | 1 | LOW | 17/04/2026 | COOLING | 198.9 | 60.57 | 180 | 195 | -1.18 | 12800 | MID | 1.07 | 5.25 | -22.01 |
+| 4 | INDIAMART | IndiaMART InterMESH | 2065.3 | 1,2 | MEDIUM | 07/04/2026 | COOLING | 2065.3 | 32.85 | 2181 | 2389 | -19.77 | 12412 | MID | -3.04 | -6.1 | 6.15 |
+| 5 | PRIVISCL | Privi Speciality | 2934.9 | 1,2 | MEDIUM | 07/04/2026 | COOLING | 2934.9 | 54.34 | 2813 | 2686 | 27.82 | 11461 | MID | 1.17 | 7.15 | 96.85 |
+| 6 | RAINBOW | Rainbow Childrens | 1130 | 1,2 | MEDIUM | 07/04/2026 | COOLING | 1130 | 42.85 | 1203 | 1372 | -23.89 | 11451 | MID | -6.35 | -4.94 | -9.74 |
+| 7 | LUMAXTECH | Lumax Auto Tech | 1570 | 1 | LOW | 17/04/2026 | COOLING | 1570 | 54.57 | 1549 | 1292 | 46.17 | 10647 | MID | 6.24 | -12.45 | 195.94 |
+| 8 | BBTC | BBTC | 1521 | 1 | LOW | 17/04/2026 | COOLING | 1521 | 30.46 | 1738 | 1867 | -18.94 | 10544 | MID | -3.77 | -15.66 | -11.01 |
+| 9 | ACE | ACE | 820 | 1 | LOW | 17/04/2026 | COOLING | 820 | 39.61 | 875 | 1032 | -22.64 | 9776 | MID | -3.81 | -8.5 | -29.8 |
+| 10 | WAAREERTL | Waaree Renewable | 825.5 | 1 | LOW | 17/04/2026 | COOLING | 825.5 | 41.49 | 887 | 1018 | -18.47 | 8616 | MID | 0.57 | -7.09 | — |
+| 11 | ELECON | Elecon Engineering | 383.5 | 1 | LOW | 17/04/2026 | COOLING | 383.5 | 41.95 | 423 | 536 | -30.88 | 8590 | MID | -4.61 | -13.92 | -7.86 |
+| 12 | ESABINDIA | Esab | 5425 | 1 | LOW | 17/04/2026 | COOLING | 5425 | 44.82 | 5590 | 5381 | 6.55 | 8361 | MID | 1.8 | -1.8 | 22.5 |
+| 13 | SYMPHONY | Symphony | 786 | 1 | LOW | 17/04/2026 | COOLING | 786 | 36.08 | 866 | 953 | -16.98 | 5388 | MID | -4.44 | -10.57 | -33.71 |
+| 14 | FIEMIND | FIEM Industries | 2007 | 1,2 | MEDIUM | 07/04/2026 | COOLING | 2007 | 38.48 | 2219 | 2091 | -7.67 | 5272 | MID | -5.11 | -12.86 | 49.59 |
+| 15 | SWARAJENG | Swaraj Engines | 3552.5 | 1 | LOW | 17/04/2026 | COOLING | 3552.5 | 53.77 | 3559 | 3913 | -19.09 | 4333 | SMALL | 2.77 | -0.7 | 16.37 |
+| 16 | EPIGRAL | Epigral | 850 | 1 | LOW | 17/04/2026 | COOLING | 850 | 30.06 | 1010 | 1521 | -51.62 | 3681 | SMALL | -2.57 | -12.68 | -52.79 |
+| 17 | ROLEXRINGS | Rolex Rings | 116 | 1 | LOW | 17/04/2026 | COOLING | 116 | 38.74 | 128 | 134 | -16.07 | 3178 | SMALL | -5.05 | -15.64 | -15.86 |
+| 18 | KRISHANA | Krishana Phoschem | 474.95 | 1,3 | MEDIUM | 01/04/2026 | COOLING | 474.95 | 45.95 | 496 | 511 | -16.18 | 2873 | SMALL | -4.33 | -10.12 | 128.86 |
+| 19 | POKARNA | Pokarna | 858.5 | 1 | LOW | 17/04/2026 | COOLING | 858.5 | 46.64 | 885 | 908 | 10.96 | 2664 | SMALL | -4.78 | -20.64 | -27.4 |
+| 20 | MAYURUNIQ | Mayur Uniquoters | 507 | 1 | LOW | 17/04/2026 | COOLING | 507 | 37.68 | 527 | 532 | -5.25 | 2190 | SMALL | -1.36 | -10.35 | 7.95 |
+| 21 | CANTABIL | Cantabil Retail | 247.5 | 1 | LOW | 17/04/2026 | COOLING | 247.5 | 33.8 | 281 | 264 | -2.26 | 2076 | SMALL | -3.54 | -18.65 | -5.01 |
+| 22 | ANTELOPUS | Antelopus Selan Energy | 544 | 1 | LOW | 17/04/2026 | COOLING | 544 | 47.68 | 523 | 546 | -4.29 | 1900 | SMALL | -5.06 | -5.63 | 3.86 |
+| 23 | EIHAHOTELS | EIH Asso Hotels | 301.8 | 1 | LOW | 17/04/2026 | COOLING | 301.8 | 33.6 | 333 | 368 | -27.52 | 1834 | SMALL | -3.9 | -10.92 | -7.32 |
+| 24 | ACCELYA | Accelya Solutions | 1171.5 | 1 | LOW | 17/04/2026 | COOLING | 1171.5 | 39.13 | 1257 | 1361 | -15.65 | 1763 | SMALL | -3.71 | -0.87 | -8.83 |
+| 25 | EXPLEOSOL | Expleo Solutions | 725 | 1 | LOW | 17/04/2026 | COOLING | 725 | 25.85 | 862 | 1033 | -29.55 | 1115 | SMALL | -5.16 | -14.93 | -16.44 |
+| 26 | ALLDIGI | Allsec Technologies | 725 | 1 | LOW | 17/04/2026 | COOLING | 725 | 24.67 | 825 | 894 | -22.39 | 1104 | SMALL | -9.18 | -12.74 | -20.58 |
+| 27 | RAJOOENG | Rajoo Engineers | 57.1 | 1 | LOW | 17/04/2026 | COOLING | 57.1 | 35.24 | 64 | 89 | -41.04 | 1014 | SMALL | -5.73 | -11.12 | — |
+| 28 | MAMATA | Mamata Machinery | 383.1 | 1 | LOW | 17/04/2026 | COOLING | 383.1 | 36.81 | 409 | 432 | -4.18 | 946 | SMALL | -0.29 | -9.87 | 10.59 |
+| 29 | HAL | Hindustan Aeronautics | 3950 | 2 | LOW | 07/04/2026 | COOLING | 3950 | 39.64 | 4223 | 4565 | -10.81 | 265042 | LARGE | -1.05 | -5.92 | 16.04 |
+| 30 | BRITANNIA | Britannia Industries | 5856 | 2 | LOW | 07/04/2026 | COOLING | 5856 | 45.96 | 5959 | 5861 | -4.22 | 141089 | LARGE | -1.08 | -2.06 | 23.0 |
+| 31 | VBL | Varun Beverages | 406.95 | 2 | LOW | 07/04/2026 | COOLING | 406.95 | 32.48 | 461 | 471 | -14.28 | 137431 | LARGE | -5.77 | -9.56 | -15.05 |
+| 32 | PETRONET | Petronet LNG | 287.05 | 2 | LOW | 07/04/2026 | COOLING | 287.05 | 45.62 | 293 | 287 | 4.98 | 43155 | LARGE | -0.67 | -0.93 | 0.86 |
+| 33 | NBCC | NBCC | 83.22 | 2 | LOW | 07/04/2026 | COOLING | 83.22 | 29.97 | 98 | 109 | -18.93 | 22445 | LARGE | -3.52 | -15.24 | 5.08 |
+| 34 | LALPATHLAB | Dr. Lal Pathlabs | 1331.8 | 2 | LOW | 07/04/2026 | COOLING | 1331.8 | 38.55 | 1407 | 1502 | -16.64 | 22313 | LARGE | -5.2 | -4.79 | 5.34 |
+| 35 | VIJAYA | Vijaya Diagnostic | 934.5 | 2 | LOW | 07/04/2026 | COOLING | 934.5 | 44.39 | 985 | 1009 | -14.88 | 9692 | MID | -2.1 | -4.67 | -7.33 |
+| 36 | DODLA | Dodla Dairy | 1004.1 | 2 | LOW | 07/04/2026 | COOLING | 1004.1 | 29.59 | 1163 | 1280 | -31.65 | 6030 | MID | -1.83 | -18.25 | -0.58 |
+| 37 | RATEGAIN | RateGain Travel | 482.1 | 3 | LOW | 01/04/2026 | COOLING | 482.1 | 32.08 | 582 | 576 | -22.62 | 5700 | MID | -5.55 | -11.92 | 0.69 |
+| 38 | GATEWAY | Gateway Distriparks | 52.4 | 3 | LOW | 01/04/2026 | COOLING | 52.4 | 30.79 | 58 | 62 | -18.74 | 2622 | SMALL | -6.2 | -10.83 | -12.36 |
+| 39 | JINDRILL | Jindal Drilling | 464.95 | 3 | LOW | 01/04/2026 | COOLING | 464.95 | 43.87 | 503 | 573 | -23.28 | 1347 | SMALL | -12.49 | -1.8 | -50.79 |
+| 40 | INDSWFTLAB | Ind-Swift Labs | 146 | 3 | LOW | 01/04/2026 | COOLING | 146 | 62.62 | 123 | 107 | 37.08 | 1190 | SMALL | 2.14 | 7.21 | 65.01 |
+| 41 | TORNTPHARM | Torrent Pharma | 4302.9 | 4 | COMPOUNDER | 17/04/2026 | COOLING | 4302.9 | 53.25 | 4137 | 3706 | 19.17 | 145718 | LARGE | -2.84 | 5.58 | 39.04 |
+
+### Data Notes
+
+- **Date Found**: All stocks added 18/03/2026 via `bulkImportToWatchlist()`
+- **Found Price = Current Price**: No price change yet (just added)
+- **Price Change %**: Empty (0% since found price = current price)
+- **Golden Cross**: Not yet calculated (BUY evaluation skipped during COOLING)
+- **Nifty 6M Return %**: Not yet populated in watchlist (available in Screener_Config)
+- **Relative Strength**: Not yet calculated (depends on Nifty 6M Return)
+- **Sector**: Empty (not populated by market data update — to be added)
+- **Nifty >200DMA**: Set to NO by daily check (Nifty currently below 200DMA)
+- **All BUY Met**: Default "NO" — BUY evaluation skipped during COOLING
+- **Failed Conditions**: Empty — BUY evaluation skipped during COOLING
+- **1Y Return**: Empty for WAAREERTL and RAJOOENG (listed < 1 year)
+
+### Expected Cooling End Dates
+
+| Screener | Cooling Days | Cooling End |
+|----------|-------------|-------------|
+| Screener 1 only | 30 days | 17/04/2026 |
+| Screener 2 only | 20 days | 07/04/2026 |
+| Screener 3 only | 14 days | 01/04/2026 |
+| Screener 4 only | 30 days | 17/04/2026 |
+| Screener 1+2 | min(30,20) = 20 days | 07/04/2026 |
+| Screener 1+3 | min(30,14) = 14 days | 01/04/2026 |
+
+---
+
+## PART 16: ADDITIONAL VALIDATION CHECKS (with Screener.in data + Watchlist data)
 
 With the raw fundamental data above, also validate:
 
@@ -638,10 +715,13 @@ With the raw fundamental data above, also validate:
 29. **Missing NSE stocks**: Are all NSE-listed stocks from the screener results present in the watchlist? Flag any missing.
 30. **Market cap consistency**: Does the market cap in the watchlist (column X) approximately match the Screener.in market cap? (Small differences expected due to price changes.)
 31. **Rolex Rings pledge**: ROLEXRINGS has 5.02% promoter pledge — Screener 1 requires < 10%, so it passes. But flag it as the only stock with non-zero pledge in Screener 1.
+32. **Cooling End Date accuracy**: Verify each stock's cooling end = Date Found (18/03/2026) + min cooling days for its screeners. See expected dates table in Part 15.
+33. **Status consistency**: All stocks should be COOLING (today 18/03/2026 is before all cooling end dates).
+34. **Conviction vs screener data**: Cross-check conviction against Part 14 screener overlap — e.g., ECLERX in Screener 1+3 = MEDIUM, TORNTPHARM in Screener 4 = COMPOUNDER.
+35. **Golden Cross derivable**: Even though not calculated yet, check if 50DMA > 200DMA from the data — which stocks WOULD have golden cross?
+36. **RSI readiness**: Which stocks have RSI < 45 (buy threshold) and would pass that condition when they become ELIGIBLE?
+37. **Price Change % validation**: Found Price should equal Current Price (all just added). Price Change should be 0%.
 
 ---
 
-## Data to Validate
-
-*(Paste your Screener_Watchlist data below this line, tab-separated with headers)*
 
