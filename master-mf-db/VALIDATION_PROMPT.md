@@ -165,7 +165,7 @@ A watchlist stock generates a **BUY_STARTER** signal only when ALL 11 conditions
 | # | Condition | Default | Failed Message |
 |---|-----------|---------|----------------|
 | 1 | Cooling period passed | Status = ELIGIBLE | *(stays in COOLING, never checked)* |
-| 2 | Passes 2+ screeners | ≥ 2 | `Only N screener — need 2+` |
+| 2 | Passes 2+ screeners (Screener 4 bypasses) | ≥ 2, or Screener 4 | `Only N screener — need 2+` |
 | 3 | RSI below threshold | < 45 | `RSI too high (X, max 45)` |
 | 4 | Price hasn't run up since found | < 20% | *(marked EXPIRED, skipped)* |
 | 5 | Portfolio has room | < 8 stocks held | `Portfolio full (N/8)` |
@@ -277,18 +277,25 @@ The trailing stop % gets **tighter** as gains increase (lock in more profit on b
 | 50–100% | 15% | **Peak Price** |
 | 100%+ | 12% | **Peak Price** |
 
-**Key distinction**: At 0–20% gain, the stop is from ENTRY price (protecting capital). Above 20%, it switches to PEAK price (protecting profit).
+**Key rules**:
+- At 0–20% gain, the stop is from ENTRY price (protecting capital). Above 20%, it switches to PEAK price (protecting profit).
+- **Tier is based on MAX GAIN (from peak price), NOT current gain. Tiers NEVER downgrade.** If a stock reached +50% but currently at +15%, it stays in the 50–100% tier (15% from peak), not the 0–20% tier. This prevents loosening risk control after profits.
 
 ```
-Example: Entry ₹100, Peak ₹150, Current ₹140 (gain = 40%, from peak = -6.7%)
-  Tier: 20-50% → Stop = 20% below peak
-  Stop Price = ₹150 × (1 - 0.20) = ₹120
-  Current ₹140 > ₹120 → NOT triggered
+Example: Entry ₹100, Peak ₹150, Current ₹140 (gain = 40%, max gain = 50%)
+  Tier: 50-100% (based on max gain) → Stop = 15% below peak
+  Stop Price = ₹150 × (1 - 0.15) = ₹127.50
+  Current ₹140 > ₹127.50 → NOT triggered
 
-Example: Entry ₹100, Peak ₹150, Current ₹115 (gain = 15%, from peak = -23.3%)
+Example: Entry ₹100, Peak ₹150, Current ₹115 (gain = 15%, max gain = 50%)
+  Tier: STILL 50-100% (max gain = 50%, tier never downgrades)
+  Stop Price = ₹150 × (1 - 0.15) = ₹127.50
+  Current ₹115 < ₹127.50 → TRIGGERED! Sell.
+
+Example: Entry ₹100, Peak ₹118, Current ₹110 (gain = 10%, max gain = 18%)
   Tier: 0-20% → Stop = 25% below ENTRY
   Stop Price = ₹100 × (1 - 0.25) = ₹75
-  Current ₹115 > ₹75 → NOT triggered
+  Current ₹110 > ₹75 → NOT triggered
 ```
 
 ### Trailing Stop — Compounder Stocks (Screener 4)

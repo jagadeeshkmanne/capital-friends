@@ -529,8 +529,8 @@ function generateUserSignals() {
 function _checkBuyConditions(stock, screeners, config, niftyData, holdingCount, sectorCounts, cashAvailable, starterAmount) {
   var failed = [];
 
-  // 2 — Passes 2+ screeners
-  if (screeners.length < 2) {
+  // 2 — Passes 2+ screeners (Screener 4 = Compounder bypasses this)
+  if (screeners.length < 2 && screeners.indexOf(4) === -1) {
     failed.push('Only ' + screeners.length + ' screener — need 2+');
   }
 
@@ -590,15 +590,18 @@ function _checkBuyConditions(stock, screeners, config, niftyData, holdingCount, 
 
 function _calculateTrailingStop(holding, config, pnlPct) {
   var peakPrice = holding.peakPrice || holding.currentPrice || holding.entryPrice;
+  var entryPrice = holding.entryPrice || 0;
+  // Use MAX gain (from peak) for tier selection — tiers NEVER downgrade
+  var maxGainPct = entryPrice > 0 ? ((peakPrice - entryPrice) / entryPrice * 100) : pnlPct;
 
   if (holding.isCompounder) {
-    if (pnlPct < 40) {
+    if (maxGainPct < 40) {
       return { stopPrice: null, stopPct: null, tier: 'COMPOUNDER <40%', description: 'No trailing stop' };
     }
     var cStopPct;
     var cTier;
-    if (pnlPct >= 200) { cStopPct = config.COMPOUNDER_STOP_200_PLUS || 15; cTier = 'COMPOUNDER 200%+'; }
-    else if (pnlPct >= 100) { cStopPct = config.COMPOUNDER_STOP_100_200 || 20; cTier = 'COMPOUNDER 100-200%'; }
+    if (maxGainPct >= 200) { cStopPct = config.COMPOUNDER_STOP_200_PLUS || 15; cTier = 'COMPOUNDER 200%+'; }
+    else if (maxGainPct >= 100) { cStopPct = config.COMPOUNDER_STOP_100_200 || 20; cTier = 'COMPOUNDER 100-200%'; }
     else { cStopPct = config.COMPOUNDER_STOP_40_100 || 25; cTier = 'COMPOUNDER 40-100%'; }
     return {
       stopPrice: Math.round(peakPrice * (1 - cStopPct / 100) * 100) / 100,
@@ -608,16 +611,16 @@ function _calculateTrailingStop(holding, config, pnlPct) {
   }
 
   var stopPct, tier;
-  if (pnlPct >= 100) { stopPct = config.TRAILING_STOP_100_PLUS || 12; tier = '100%+'; }
-  else if (pnlPct >= 50) { stopPct = config.TRAILING_STOP_50_100 || 15; tier = '50-100%'; }
-  else if (pnlPct >= 20) { stopPct = config.TRAILING_STOP_20_50 || 20; tier = '20-50%'; }
+  if (maxGainPct >= 100) { stopPct = config.TRAILING_STOP_100_PLUS || 12; tier = '100%+'; }
+  else if (maxGainPct >= 50) { stopPct = config.TRAILING_STOP_50_100 || 15; tier = '50-100%'; }
+  else if (maxGainPct >= 20) { stopPct = config.TRAILING_STOP_20_50 || 20; tier = '20-50%'; }
   else {
     stopPct = config.TRAILING_STOP_0_20 || 25;
-    var entryStop = holding.entryPrice * (1 - stopPct / 100);
+    var entryStop = entryPrice * (1 - stopPct / 100);
     return {
       stopPrice: Math.round(entryStop * 100) / 100,
       stopPct: stopPct, tier: '0-20%',
-      description: '-' + stopPct + '% from entry ₹' + holding.entryPrice
+      description: '-' + stopPct + '% from entry ₹' + entryPrice
     };
   }
 

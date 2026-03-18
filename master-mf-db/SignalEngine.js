@@ -92,8 +92,8 @@ function checkWatchlistForBuySignals(niftyData, config) {
 
     // 1. Cooling period passed ✅ (we're here, so it passed)
 
-    // 2. Passes 2+ screeners
-    if (screeners.length < 2) {
+    // 2. Passes 2+ screeners (Screener 4 = Compounder bypasses this)
+    if (screeners.length < 2 && screeners.indexOf(4) === -1) {
       failed.push('Only ' + screeners.length + ' screener — need 2+');
     }
 
