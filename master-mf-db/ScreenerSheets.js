@@ -154,7 +154,8 @@ function createScreenerWatchlistSheet() {
       'Nifty 6M Return %', 'Relative Strength', 'Sector',
       'Nifty >200DMA', 'All BUY Met', 'Failed Conditions',
       'Last Updated', 'Notes',
-      'Market Cap (Cr)', 'Cap Class'
+      'Market Cap (Cr)', 'Cap Class',
+      '1W Return %', '1M Return %', '1Y Return %'
     ],
     [
       90, 180, 100, 90,
@@ -164,7 +165,8 @@ function createScreenerWatchlistSheet() {
       100, 90, 120,
       80, 80, 180,
       110, 150,
-      100, 80
+      100, 80,
+      80, 80, 80
     ]
   );
 }
@@ -242,6 +244,80 @@ function createScreenerHistorySheet() {
       80, 150
     ]
   );
+}
+
+/**
+ * ONE-TIME BULK IMPORT — Manually seed the watchlist with stocks from all 4 screeners.
+ * Run from Script Editor after setupScreenerSheets().
+ * Maps NSE codes to screener numbers, deduplicates, and calls addToWatchlist().
+ */
+function bulkImportToWatchlist() {
+  // --- Paste your stocks here: [NSE_CODE, Stock_Name, Screener_Numbers_Array] ---
+  var stocks = [
+    // Screener 1: CF-Multibagger-DNA
+    ['ECLERX', 'eClerx Services', [1,3]],
+    ['J&KBANK', 'Jammu & Kashmir Bank', [1]],
+    ['JINDALSAW', 'Jindal Saw', [1]],
+    ['INDIAMART', 'IndiaMART InterMESH', [1,2]],
+    ['PRIVISCL', 'Privi Speciality', [1,2]],
+    ['RAINBOW', 'Rainbow Childrens Medicare', [1,2]],
+    ['LUMAXTECH', 'Lumax Auto Tech', [1]],
+    ['BBTC', 'BBTC', [1]],
+    ['ACE', 'ACE', [1]],
+    ['WAAREERTL', 'Waaree Renewable', [1]],
+    ['ELECON', 'Elecon Engineering', [1]],
+    ['ESABINDIA', 'Esab', [1]],
+    ['SYMPHONY', 'Symphony', [1]],
+    ['FIEMIND', 'FIEM Industries', [1,2]],
+    ['SWARAJENG', 'Swaraj Engines', [1]],
+    ['EPIGRAL', 'Epigral', [1]],
+    ['ROLEXRINGS', 'Rolex Rings', [1]],
+    ['KRISHANA', 'Krishana Phoschem', [1,3]],
+    ['POKARNA', 'Pokarna', [1]],
+    ['MAYURUNIQ', 'Mayur Uniquoters', [1]],
+    ['CANTABIL', 'Cantabil Retail', [1]],
+    ['ANTELOPUS', 'Antelopus Selan Energy', [1]],
+    ['EIHAHOTELS', 'EIH Asso Hotels', [1]],
+    ['ACCELYA', 'Accelya Solutions', [1]],
+    ['EXPLEOSOL', 'Expleo Solutions', [1]],
+    ['ALLDIGI', 'Allsec Technologies', [1]],
+    ['RAJOOENG', 'Rajoo Engineers', [1]],
+    ['MAMATA', 'Mamata Machinery', [1]],
+    ['AMAL', 'Amal', [1]],
+
+    // Screener 2 only (not in 1): CF-SmartMoney-Flow
+    ['HAL', 'Hindustan Aeronautics', [2]],
+    ['BRITANNIA', 'Britannia Industries', [2]],
+    ['VBL', 'Varun Beverages', [2]],
+    ['PETRONET', 'Petronet LNG', [2]],
+    ['NBCC', 'NBCC', [2]],
+    ['LALPATHLAB', 'Dr. Lal Pathlabs', [2]],
+    ['VIJAYA', 'Vijaya Diagnostic Centre', [2]],
+    ['DODLA', 'Dodla Dairy', [2]],
+
+    // Screener 3 only (not in 1): CF-Insider-Buying
+    ['RATEGAIN', 'RateGain Travel', [3]],
+    ['GATEWAY', 'Gateway Distriparks', [3]],
+    ['JINDRILL', 'Jindal Drilling', [3]],
+    ['INDSWFTLAB', 'Ind-Swift Laboratories', [3]],
+
+    // Screener 4: CF-Compounder
+    ['TORNTPHARM', 'Torrent Pharma', [4]]
+  ];
+
+  // Convert to addToWatchlist format
+  var formatted = [];
+  for (var i = 0; i < stocks.length; i++) {
+    formatted.push({
+      symbol: stocks[i][0],
+      name: stocks[i][1],
+      screeners: stocks[i][2]
+    });
+  }
+
+  addToWatchlist(formatted);
+  Logger.log('Bulk import complete: ' + stocks.length + ' stocks processed');
+  SpreadsheetApp.getUi().alert('Bulk import complete!\n\n' + stocks.length + ' stocks added to watchlist.\n\nNext: Run "Update Watchlist Data" to fetch prices, RSI, and DMA.');
 }
 
 // --- Screener_NearMiss (8 columns A-H) ---

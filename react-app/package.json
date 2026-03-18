@@ -10,6 +10,8 @@
     "deploy": "vite build && echo 'Copy dist/ contents to your GitHub Pages repo /app/ folder'"
   },
   "dependencies": {
+    "ag-grid-community": "^35.1.0",
+    "ag-grid-react": "^35.1.0",
     "fuse.js": "^7.1.0",
     "html2canvas-pro": "^2.0.2",
     "jspdf": "^4.2.0",

@@ -11,6 +11,7 @@ import LiabilitiesTab from './pages/accounts/LiabilitiesTab'
 import OtherInvestmentsTab from './pages/accounts/OtherInvestmentsTab'
 import MutualFundsPage from './pages/investments/MutualFundsPage'
 import StocksPage from './pages/investments/StocksPage'
+import ScreenerPage from './pages/investments/ScreenerPage'
 import Family from './pages/family/Family'
 import GoalsPage from './pages/goals/GoalsPage'
 import MorePage from './pages/MorePage'
@@ -54,6 +55,7 @@ export default function App() {
           {/* Investments */}
           <Route path="investments/mutual-funds" element={<MutualFundsPage />} />
           <Route path="investments/stocks" element={<StocksPage />} />
+          <Route path="investments/screener" element={<ScreenerPage />} />
           <Route path="investments/other" element={<OtherInvestmentsTab />} />
 
           {/* Liabilities */}

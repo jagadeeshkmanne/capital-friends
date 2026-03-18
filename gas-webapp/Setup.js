@@ -195,7 +195,11 @@ function createAllSheets() {
     { name: 'Settings', func: setupSettingsSheet },
     { name: 'MutualFundData', func: setupMutualFundDataSheet },
     { name: 'MF_ATH_Data', func: setupATHDataImport },
-    { name: 'StockMasterData', func: setupStockMasterDataSheet }
+    { name: 'StockMasterData', func: setupStockMasterDataSheet },
+    // ========== SCREENER (auto-created on first access) ==========
+    { name: 'Screener_Signals', func: setupScreenerSignalsSheet },
+    { name: 'Screener_StockMeta', func: setupScreenerStockMetaSheet },
+    { name: 'Screener_UserConfig', func: setupScreenerUserConfigSheet }
   ];
 
   // Create each sheet
@@ -1107,6 +1111,10 @@ function setupSettingsSheet() {
   sheet.appendRow(['EmailMinute', '0', 'Minute for email reports (0/15/30/45)']);
   sheet.appendRow(['EmailDayOfWeek', '0', 'Day of week for weekly reports (0=Sunday, 6=Saturday)']);
   sheet.appendRow(['EmailDayOfMonth', '1', 'Day of month for monthly reports (1-28)']);
+  sheet.appendRow(['ReminderNotificationsEnabled', 'TRUE', 'Enable daily reminder notifications (TRUE/FALSE)']);
+  sheet.appendRow(['ReminderCheckHour', '8', 'Hour for reminder check (0-23)']);
+  sheet.appendRow(['ScreenerEmailEnabled', 'FALSE', 'Enable daily screener signal emails (TRUE/FALSE)']);
+  sheet.appendRow(['ScreenerEmailHour', '10', 'Hour for screener email (0-23, after 9:30 market check)']);
 
   // Set column widths
   sheet.setColumnWidth(1, 180);  // Setting
@@ -1650,6 +1658,208 @@ function setupGoalPortfolioMappingSheet() {
   sheet.setTabColor('#fbbf24');
 
   log('GoalPortfolioMapping sheet created successfully');
+  return sheet;
+}
+
+// ============================================================================
+// SCREENER SHEET SETUP
+// ============================================================================
+
+/**
+ * Ensure all screener sheets exist for current user.
+ * Called lazily on first screener API access — safe for existing users.
+ */
+function ensureScreenerSheets() {
+  var created = [];
+  var screenerSheets = [
+    { name: CONFIG.screenerSignalsSheet, func: setupScreenerSignalsSheet },
+    { name: CONFIG.screenerStockMetaSheet, func: setupScreenerStockMetaSheet },
+    { name: CONFIG.screenerUserConfigSheet, func: setupScreenerUserConfigSheet }
+  ];
+  for (var i = 0; i < screenerSheets.length; i++) {
+    if (!sheetExists(screenerSheets[i].name)) {
+      try {
+        screenerSheets[i].func();
+        created.push(screenerSheets[i].name);
+      } catch (e) {
+        log('Error creating ' + screenerSheets[i].name + ': ' + e.message);
+      }
+    }
+  }
+  if (created.length > 0) {
+    log('Screener sheets created for existing user: ' + created.join(', '));
+  }
+}
+
+/**
+ * Setup Screener_Signals Sheet
+ * Structure: 16 columns (A-P) — per-user BUY/ADD/EXIT signals
+ */
+function setupScreenerSignalsSheet() {
+  var spreadsheet = getSpreadsheet();
+  var sheet = spreadsheet.insertSheet(CONFIG.screenerSignalsSheet);
+
+  addDeveloperCredit(sheet, 16);
+
+  sheet.appendRow([
+    'Signal ID',          // A
+    'Date',               // B
+    'Signal Type',        // C: BUY_STARTER, ADD1, ADD2, DIP_BUY, TRAILING_STOP, HARD_EXIT, etc.
+    'Priority',           // D: 1=highest
+    'Symbol',             // E
+    'Stock Name',         // F
+    'Action',             // G: Human-readable action text
+    'Amount ₹',           // H
+    'Shares',             // I
+    'Trigger Detail',     // J
+    'Fundamentals',       // K: JSON snapshot
+    'Status',             // L: PENDING, EXECUTED, SKIPPED
+    'Executed Date',      // M
+    'Executed Price',     // N
+    'Email Sent',         // O: YES/NO
+    'Notes'               // P
+  ]);
+
+  formatHeaderRow(sheet, sheet.getRange('A2:P2'), 40);
+
+  sheet.setColumnWidth(1, 100);   // Signal ID
+  sheet.setColumnWidth(2, 100);   // Date
+  sheet.setColumnWidth(3, 120);   // Signal Type
+  sheet.setColumnWidth(4, 60);    // Priority
+  sheet.setColumnWidth(5, 100);   // Symbol
+  sheet.setColumnWidth(6, 180);   // Stock Name
+  sheet.setColumnWidth(7, 300);   // Action
+  sheet.setColumnWidth(8, 100);   // Amount
+  sheet.setColumnWidth(9, 70);    // Shares
+  sheet.setColumnWidth(10, 280);  // Trigger Detail
+  sheet.setColumnWidth(11, 200);  // Fundamentals
+  sheet.setColumnWidth(12, 80);   // Status
+  sheet.setColumnWidth(13, 100);  // Executed Date
+  sheet.setColumnWidth(14, 100);  // Executed Price
+  sheet.setColumnWidth(15, 70);   // Email Sent
+  sheet.setColumnWidth(16, 150);  // Notes
+
+  sheet.getRange('H:H').setNumberFormat('#,##0.00');
+  sheet.getRange('I:I').setNumberFormat('#,##0');
+  sheet.getRange('N:N').setNumberFormat('#,##0.00');
+
+  applyStandardFormatting(sheet);
+  sheet.setTabColor('#ef4444');  // Red for signals
+  sheet.setFrozenRows(2);
+
+  log('Screener_Signals sheet created');
+  return sheet;
+}
+
+/**
+ * Setup Screener_StockMeta Sheet
+ * Structure: 15 columns (A-O) — per-stock screener metadata (joined to StockHoldings by symbol)
+ */
+function setupScreenerStockMetaSheet() {
+  var spreadsheet = getSpreadsheet();
+  var sheet = spreadsheet.insertSheet(CONFIG.screenerStockMetaSheet);
+
+  addDeveloperCredit(sheet, 15);
+
+  sheet.appendRow([
+    'Symbol',               // A: Join key to StockHoldings.C
+    'Stock Name',           // B
+    'Sector',               // C
+    'Entry Date',           // D: Date first bought via screener
+    'Entry Price',          // E: Price at first screener buy
+    'Peak Price',           // F: All-time high since entry (for trailing stop)
+    'Pyramid Stage',        // G: STARTER, ADD1, ADD2
+    'Dip Buy Used',         // H: YES/NO
+    'Screeners Passing',    // I: "1,2" or "1,3,4"
+    'Conviction',           // J: HIGH, MEDIUM, COMPOUNDER, LOW
+    'Is Compounder',        // K: YES/NO
+    'Trailing Stop Price',  // L: Calculated stop price
+    'Stop Tier',            // M: "0-20%", "20-50%", etc.
+    'Last Fundamental Check', // N: Date
+    'Notes'                 // O
+  ]);
+
+  formatHeaderRow(sheet, sheet.getRange('A2:O2'), 40);
+
+  sheet.setColumnWidth(1, 110);   // Symbol
+  sheet.setColumnWidth(2, 200);   // Stock Name
+  sheet.setColumnWidth(3, 120);   // Sector
+  sheet.setColumnWidth(4, 100);   // Entry Date
+  sheet.setColumnWidth(5, 100);   // Entry Price
+  sheet.setColumnWidth(6, 100);   // Peak Price
+  sheet.setColumnWidth(7, 100);   // Pyramid Stage
+  sheet.setColumnWidth(8, 90);    // Dip Buy Used
+  sheet.setColumnWidth(9, 120);   // Screeners Passing
+  sheet.setColumnWidth(10, 100);  // Conviction
+  sheet.setColumnWidth(11, 90);   // Is Compounder
+  sheet.setColumnWidth(12, 110);  // Trailing Stop Price
+  sheet.setColumnWidth(13, 90);   // Stop Tier
+  sheet.setColumnWidth(14, 130);  // Last Fundamental Check
+  sheet.setColumnWidth(15, 150);  // Notes
+
+  sheet.getRange('E:E').setNumberFormat('#,##0.00');
+  sheet.getRange('F:F').setNumberFormat('#,##0.00');
+  sheet.getRange('L:L').setNumberFormat('#,##0.00');
+
+  applyStandardFormatting(sheet);
+  sheet.setTabColor('#8b5cf6');  // Purple for screener meta
+  sheet.setFrozenRows(2);
+
+  log('Screener_StockMeta sheet created');
+  return sheet;
+}
+
+/**
+ * Setup Screener_UserConfig Sheet
+ * Structure: 3 columns (A-C) — Key/Value/Description for user overrides
+ */
+function setupScreenerUserConfigSheet() {
+  var spreadsheet = getSpreadsheet();
+  var sheet = spreadsheet.insertSheet(CONFIG.screenerUserConfigSheet);
+
+  addDeveloperCredit(sheet, 3);
+
+  sheet.appendRow(['Key', 'Value', 'Description']);
+  formatHeaderRow(sheet, sheet.getRange('A2:C2'), 40);
+
+  // Pre-populate with defaults
+  var defaults = [
+    ['STOCK_BUDGET', 300000, 'Total stock portfolio budget (₹)'],
+    ['MAX_STOCKS', 8, 'Maximum number of stock positions'],
+    ['MAX_PER_SECTOR', 2, 'Maximum stocks per sector'],
+    ['PAPER_TRADING', 'TRUE', 'Paper trading mode (TRUE/FALSE)'],
+    ['RSI_BUY_MAX', 45, 'Max RSI for BUY signal'],
+    ['HARD_STOP_LOSS', 30, 'Hard stop loss % from entry'],
+    ['TRAILING_STOP_0_20', 25, 'Trailing stop % for 0-20% gain'],
+    ['TRAILING_STOP_20_50', 20, 'Trailing stop % for 20-50% gain'],
+    ['TRAILING_STOP_50_100', 15, 'Trailing stop % for 50-100% gain'],
+    ['TRAILING_STOP_100_PLUS', 12, 'Trailing stop % for 100%+ gain'],
+    ['PRICE_RUNUP_EXPIRE_PCT', 20, 'Expire stock if price runs up more than this % since found'],
+    ['ADD1_GAIN_PCT', 12, 'Min gain % to trigger ADD #1'],
+    ['ADD1_MAX_GAIN_PCT', 25, 'Max gain % for ADD #1'],
+    ['ADD2_GAIN_PCT', 30, 'Min gain % to trigger ADD #2'],
+    ['ADD_MIN_WEEKS', 2, 'Min weeks between adds'],
+    ['DIP_BUY_MIN_DROP', 10, 'Min drop % for dip buy'],
+    ['DIP_BUY_MAX_DROP', 20, 'Max drop % for dip buy'],
+    ['DIP_BUY_RSI_MAX', 30, 'Max RSI for dip buy'],
+    ['NIFTY_BELOW_200DMA_ALLOCATION', 50, '% of normal allocation when Nifty below 200DMA'],
+    ['SECTOR_ALERT_PCT', 35, 'Alert when sector exceeds this % of portfolio'],
+    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze buys when portfolio drops this %']
+  ];
+
+  for (var i = 0; i < defaults.length; i++) {
+    sheet.appendRow(defaults[i]);
+  }
+
+  sheet.setColumnWidth(1, 220);
+  sheet.setColumnWidth(2, 120);
+  sheet.setColumnWidth(3, 350);
+
+  applyStandardFormatting(sheet);
+  sheet.setTabColor('#6366f1');  // Indigo for config
+  sheet.setFrozenRows(2);
+
+  log('Screener_UserConfig sheet created');
   return sheet;
 }
 

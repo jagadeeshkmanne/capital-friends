@@ -59,18 +59,16 @@ const SCREENER_CONFIG = {
       coolingDays: 30,
       alertFrequency: 'weekly',
       filters: {
-        salesGrowth3Y: { min: 20 },
-        profitGrowth3Y: { min: 20 },
-        roe: { min: 18 },
+        salesGrowth3Y: { min: 15 },
+        profitGrowth3Y: { min: 15 },
+        roe: { min: 15 },
         debtToEquity: { max: 0.5 },
-        promoterHolding: { min: 50 },
-        marketCap: { max: 15000 },
+        promoterHolding: { min: 45 },
+        marketCap: { min: 500, max: 15000 },
         opm: { min: 12 },
-        pe: { max: 35 },
-        pegTTM: { max: 1.5 },
-        piotroski: { min: 6 },
+        pe: { max: 45 },
+        piotroski: { min: 5 },
         promoterPledge: { max: 10 },
-        ocfGrowth3Y: { min: 10 },
         cfoGtProfit: true
       }
     },
@@ -79,14 +77,13 @@ const SCREENER_CONFIG = {
       coolingDays: 20,
       alertFrequency: 'weekly',
       filters: {
-        instHolding: { min: 10 },
         mfHoldingChangeQoQ: { min: 0.5 },
         promoterHolding: { min: 45 },
         roe: { min: 15 },
         debtToEquity: { max: 0.5 },
         salesGrowth3Y: { min: 15 },
         profitGrowth3Y: { min: 15 },
-        instHoldingChange4Q: { min: 1 },
+        marketCap: { min: 500 },
         promoterPledge: { max: 15 },
         piotroski: { min: 5 },
         cfoGtProfit: true
@@ -101,10 +98,9 @@ const SCREENER_CONFIG = {
         salesGrowth: { min: 15 },
         roe: { min: 12 },
         debtToEquity: { max: 0.7 },
-        marketCap: { max: 20000 },
+        marketCap: { min: 500, max: 20000 },
         promoterPledge: { max: 5 },
-        interestCoverage: { min: 3 },
-        sastBuys: { min: 1 }
+        interestCoverage: { min: 3 }
       }
     },
     4: {
@@ -122,8 +118,6 @@ const SCREENER_CONFIG = {
         marketCap: { min: 5000 },
         piotroski: { min: 7 },
         roce5YAvg: { min: 18 },
-        ocfGrowth5Y: { min: 10 },
-        altmanZ: { min: 3 },
         promoterPledge: { max: 0 },
         interestCoverage: { min: 5 },
         cfoGtProfit: true

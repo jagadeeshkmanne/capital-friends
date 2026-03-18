@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff, ScanSearch } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -335,6 +335,19 @@ export default function Header() {
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-violet-500 rounded-full px-1">{rebalanceCount}</span>
               </button>
             )}
+
+            {/* Screener — always visible in site header */}
+            <Link
+              to="/investments/screener"
+              className={`p-2 rounded-lg transition-colors ${
+                location.pathname === '/investments/screener'
+                  ? 'text-violet-300 bg-violet-500/20'
+                  : 'text-[var(--text-muted)] hover:text-violet-400 hover:bg-violet-500/10'
+              }`}
+              title="Stock Screener"
+            >
+              <ScanSearch size={18} />
+            </Link>
 
             {/* Mask toggle — desktop only, moved to avatar dropdown on mobile */}
             <button onClick={toggleMask} className={`hidden sm:block p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>

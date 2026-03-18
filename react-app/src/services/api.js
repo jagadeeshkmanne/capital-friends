@@ -230,6 +230,20 @@ export const deleteFundFromPortfolio = (portfolioId, fundCode) => callAPI('mf:de
 export const editStockTransaction = (data) => callAPI('stock-transaction:edit', data)
 export const deleteStockTransaction = (transactionId) => callAPI('stock-transaction:delete', { transactionId })
 
+// Screener
+export const getScreenerWatchlist = () => callAPI('screener:watchlist')
+export const getScreenerSignals = (status) => callAPI('screener:signals', { status })
+export const generateScreenerSignals = () => callAPI('screener:generate-signals')
+export const updateScreenerSignalStatus = (signalId, status, executedPrice) =>
+  callAPI('screener:signal-update', { signalId, status, executedPrice })
+export const getScreenerStockMeta = () => callAPI('screener:stock-meta')
+export const recordScreenerBuy = (symbol, data) =>
+  callAPI('screener:record-buy', { symbol, ...data })
+export const getScreenerConfig = () => callAPI('screener:config')
+export const updateScreenerConfigValue = (key, value) =>
+  callAPI('screener:config-update', { key, value })
+export const getScreenerNiftyData = () => callAPI('screener:nifty-data')
+
 // Bulk Data (for cache refresh)
 export const getAllMFHoldings = () => callAPI('mf-holdings:list')
 export const getAllMFTransactions = () => callAPI('mf-transactions:list')

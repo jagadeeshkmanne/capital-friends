@@ -94,13 +94,13 @@ function checkWatchlistForBuySignals(niftyData, config) {
 
     // 2. Passes 2+ screeners
     if (screeners.length < 2) {
-      failed.push('#2: Only ' + screeners.length + ' screener(s)');
+      failed.push('Only ' + screeners.length + ' screener — need 2+');
     }
 
     // 3. RSI < 45
     const rsiMax = config.RSI_BUY_MAX || 45;
     if (rsi >= rsiMax) {
-      failed.push('#3: RSI=' + rsi + ' (need <' + rsiMax + ')');
+      failed.push('RSI too high (' + rsi + ', max ' + rsiMax + ')');
     }
 
     // 4. Price change < 20%
@@ -109,13 +109,13 @@ function checkWatchlistForBuySignals(niftyData, config) {
     // 5. Portfolio < 8 stocks
     const maxStocks = config.MAX_STOCKS || 8;
     if (holdingCount >= maxStocks) {
-      failed.push('#5: Portfolio full (' + holdingCount + '/' + maxStocks + ')');
+      failed.push('Portfolio full (' + holdingCount + '/' + maxStocks + ')');
     }
 
     // 6. < 2 stocks in same sector
     const maxPerSector = config.MAX_PER_SECTOR || 2;
     if (sector && (sectorCounts[sector] || 0) >= maxPerSector) {
-      failed.push('#6: Sector ' + sector + ' full (' + sectorCounts[sector] + '/' + maxPerSector + ')');
+      failed.push(sector + ' sector full');
     }
 
     // 7. Budget has room
@@ -123,14 +123,14 @@ function checkWatchlistForBuySignals(niftyData, config) {
     const maxAllocPct = SCREENER_CONFIG.getMaxAllocationPct(conviction);
     const starterAmount = budget * (maxAllocPct / 100) * 0.5; // 50% of allocation
     if (cashAvailable < starterAmount) {
-      failed.push('#7: Not enough cash (need ₹' + Math.round(starterAmount) + ', have ₹' + Math.round(cashAvailable) + ')');
+      failed.push('Low cash (need ₹' + Math.round(starterAmount / 1000) + 'K)');
     }
 
     // 8. Nifty above 200DMA
     const niftyAbove = niftyData.aboveDMA200;
     if (niftyAbove === false) {
       // Not a hard block — half allocation
-      failed.push('#8: Nifty below 200DMA (half allocation)');
+      failed.push('Nifty below 200DMA');
     }
 
     // 9. Golden cross (50DMA > 200DMA)
@@ -141,7 +141,7 @@ function checkWatchlistForBuySignals(niftyData, config) {
       // Exception: Screener 1+3 overlap + RSI < 30
       const hasException = screeners.includes(1) && screeners.includes(3) && rsi < 30;
       if (!hasException) {
-        failed.push('#9: No golden cross (50DMA=' + dma50 + ', 200DMA=' + dma200 + ')');
+        failed.push('No golden cross');
       }
     }
 
@@ -150,15 +150,15 @@ function checkWatchlistForBuySignals(niftyData, config) {
     const relStrength = return6m > niftyReturn6m;
     sheet.getRange(row, 17).setValue(relStrength ? 'PASS' : 'FAIL'); // col Q
     if (!relStrength) {
-      failed.push('#10: 6M return ' + return6m + '% < Nifty ' + niftyReturn6m + '%');
+      failed.push('Weak vs Nifty (' + return6m + '% vs ' + niftyReturn6m + '%)');
     }
 
     // 11. Market cap >= minimum (skip micro caps)
     const minMcap = config.MIN_MARKET_CAP_CR || 500;
     if (marketCapCr > 0 && marketCapCr < minMcap) {
-      failed.push('#11: Market cap ₹' + Math.round(marketCapCr) + ' Cr < ₹' + minMcap + ' Cr (' + capClass + ')');
+      failed.push('Small cap (₹' + Math.round(marketCapCr) + 'Cr)');
     } else if (capClass === 'MICRO') {
-      failed.push('#11: Micro cap — below ₹500 Cr');
+      failed.push('Micro cap');
     }
 
     // Update Nifty >200DMA column

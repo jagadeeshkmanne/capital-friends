@@ -41,6 +41,9 @@ function dailyScreenerCheck() {
     Logger.log('Step 3: Fetching Nifty data...');
     const niftyData = getNiftyData();
 
+    // 3b. Persist Nifty data to Screener_Config (for gas-webapp to read)
+    _persistNiftyData(niftyData);
+
     // 4. BUY SIGNALS — Check watchlist (all 11 conditions)
     Logger.log('Step 4: Checking watchlist for BUY signals...');
     checkWatchlistForBuySignals(niftyData, config);
@@ -264,6 +267,30 @@ function _removeScreenerTriggers() {
   }
 
   Logger.log('Removed ' + removed + ' screener triggers');
+}
+
+/**
+ * Persist Nifty data to Screener_Config so gas-webapp can read it
+ */
+function _persistNiftyData(niftyData) {
+  try {
+    var niftyKeys = [
+      ['NIFTY_PRICE', niftyData.price, 'Nifty 50 current price'],
+      ['NIFTY_200DMA', niftyData.dma200, 'Nifty 50 200-day moving average'],
+      ['NIFTY_ABOVE_200DMA', niftyData.aboveDMA200 ? 'TRUE' : 'FALSE', 'Is Nifty above 200DMA'],
+      ['NIFTY_RETURN_1M', niftyData.return1m, 'Nifty 1-month return %'],
+      ['NIFTY_RETURN_6M', niftyData.return6m, 'Nifty 6-month return %'],
+      ['NIFTY_LAST_UPDATED', new Date().toISOString(), 'Last Nifty data update timestamp']
+    ];
+
+    for (var i = 0; i < niftyKeys.length; i++) {
+      setScreenerConfigValue(niftyKeys[i][0], niftyKeys[i][1]);
+    }
+
+    Logger.log('Nifty data persisted to Screener_Config');
+  } catch (e) {
+    Logger.log('Error persisting Nifty data (non-fatal): ' + e.message);
+  }
 }
 
 /**

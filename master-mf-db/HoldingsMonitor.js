@@ -111,16 +111,24 @@ function updateWatchlistMarketData() {
     rsiCol: 11,        // K: RSI(14)
     dma50Col: 12,      // L: 50DMA
     dma200Col: 13,     // M: 200DMA
-    return6mCol: 15    // O: 6M Return %
+    return6mCol: 15,   // O: 6M Return %
+    return1wCol: 26,   // Z: 1W Return %
+    return1mCol: 27,   // AA: 1M Return %
+    return1yCol: 28    // AB: 1Y Return %
   });
 
-  // Update Found Price for new entries that don't have it yet
+  // Update Found Price for new entries + calculate "Since Found %" (Price Change %)
   const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
   for (let i = 0; i < data.length; i++) {
     const foundPrice = parseFloat(data[i][3]);
     const currentPrice = parseFloat(data[i][8]);
     if ((!foundPrice || foundPrice === 0) && currentPrice > 0) {
       sheet.getRange(i + 2, 4).setValue(currentPrice); // D: Found Price
+    }
+    // Calculate "Since Found %" = (currentPrice - foundPrice) / foundPrice * 100
+    if (foundPrice > 0 && currentPrice > 0) {
+      const sinceFoundPct = Math.round(((currentPrice - foundPrice) / foundPrice) * 10000) / 100;
+      sheet.getRange(i + 2, 10).setValue(sinceFoundPct); // J: Price Change %
     }
   }
 

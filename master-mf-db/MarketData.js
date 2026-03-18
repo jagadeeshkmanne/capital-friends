@@ -269,17 +269,24 @@ function _fetchHistoricalPricesForIndex(gfSymbol, tradingDays) {
     const tempCol = 1;
 
     // GOOGLEFINANCE returns a 2D array: header row + data rows with [date, close]
+    const maxRows = tradingDays + 10;
+
+    // Clear stale data FIRST and flush to ensure clean slate
+    sheet.getRange(tempRow, tempCol, maxRows, 2).clearContent();
+    SpreadsheetApp.flush();
+    Utilities.sleep(1000);
+
     const formula = '=IFERROR(GOOGLEFINANCE("' + gfSymbol + '","close",TODAY()-' + calendarDays + ',TODAY()),"")';
     sheet.getRange(tempRow, tempCol).setFormula(formula);
     SpreadsheetApp.flush();
-    Utilities.sleep(3000); // wait for GOOGLEFINANCE to resolve
+    Utilities.sleep(5000); // wait for GOOGLEFINANCE to resolve (was 3s, too fast)
 
     // Read the output — GOOGLEFINANCE can expand to many rows
-    const maxRows = tradingDays + 10;
     const output = sheet.getRange(tempRow, tempCol, maxRows, 2).getValues();
 
     // Clean up
     sheet.getRange(tempRow, tempCol, maxRows, 2).clearContent();
+    SpreadsheetApp.flush();
 
     // Parse: skip header row, extract close prices
     const prices = [];
@@ -303,7 +310,7 @@ function _fetchHistoricalPricesForIndex(gfSymbol, tradingDays) {
  * @returns {{rsi: number|null, dma50: number|null, dma200: number|null, return6m: number|null}}
  */
 function _calculateAllFromPrices(prices) {
-  const result = { rsi: null, dma50: null, dma200: null, return6m: null };
+  const result = { rsi: null, dma50: null, dma200: null, return6m: null, return1w: null, return1m: null, return1y: null };
   if (!prices || prices.length < 30) return result;
 
   // RSI(14) — needs 14+16 = 30 prices minimum
@@ -347,12 +354,38 @@ function _calculateAllFromPrices(prices) {
     result.dma200 = Math.round(prices.slice(prices.length - 200).reduce(function(a, b) { return a + b; }, 0) / 200 * 100) / 100;
   }
 
-  // 6M return (using ~130 trading days)
+  // Returns — all use currentPrice vs price N trading days ago
+  const currentPrice = prices[prices.length - 1];
+
+  // 1W return (~5 trading days)
+  if (prices.length >= 5) {
+    const oldPrice = prices[prices.length - 5];
+    if (oldPrice > 0) {
+      result.return1w = Math.round(((currentPrice - oldPrice) / oldPrice) * 10000) / 100;
+    }
+  }
+
+  // 1M return (~22 trading days)
+  if (prices.length >= 22) {
+    const oldPrice = prices[prices.length - 22];
+    if (oldPrice > 0) {
+      result.return1m = Math.round(((currentPrice - oldPrice) / oldPrice) * 10000) / 100;
+    }
+  }
+
+  // 6M return (~130 trading days)
   if (prices.length >= 130) {
     const oldPrice = prices[prices.length - 130];
-    const currentPrice = prices[prices.length - 1];
     if (oldPrice > 0) {
       result.return6m = Math.round(((currentPrice - oldPrice) / oldPrice) * 10000) / 100;
+    }
+  }
+
+  // 1Y return (~250 trading days)
+  if (prices.length >= 250) {
+    const oldPrice = prices[prices.length - 250];
+    if (oldPrice > 0) {
+      result.return1y = Math.round(((currentPrice - oldPrice) / oldPrice) * 10000) / 100;
     }
   }
 
@@ -404,10 +437,12 @@ function updateMarketDataForSheet(sheetName, colMap) {
       sheet.getRange(row, colMap.priceCol).setValue(md.price);
     }
 
-    // Fetch 210 days of history ONCE — calculate everything from it
-    var needsHistory = colMap.rsiCol || colMap.dma50Col || colMap.dma200Col || colMap.return6mCol;
+    // Fetch history ONCE — calculate everything from it
+    // Use 260 days if 1Y return needed, else 210
+    var needsHistory = colMap.rsiCol || colMap.dma50Col || colMap.dma200Col || colMap.return6mCol || colMap.return1wCol || colMap.return1mCol || colMap.return1yCol;
     if (needsHistory) {
-      var prices = _fetchHistoricalPrices(sym, 210);
+      var histDays = colMap.return1yCol ? 260 : 210;
+      var prices = _fetchHistoricalPrices(sym, histDays);
       if (prices && prices.length > 0) {
         var calc = _calculateAllFromPrices(prices);
 
@@ -422,6 +457,15 @@ function updateMarketDataForSheet(sheetName, colMap) {
         }
         if (colMap.return6mCol && calc.return6m !== null) {
           sheet.getRange(row, colMap.return6mCol).setValue(calc.return6m);
+        }
+        if (colMap.return1wCol && calc.return1w !== null) {
+          sheet.getRange(row, colMap.return1wCol).setValue(calc.return1w);
+        }
+        if (colMap.return1mCol && calc.return1m !== null) {
+          sheet.getRange(row, colMap.return1mCol).setValue(calc.return1m);
+        }
+        if (colMap.return1yCol && calc.return1y !== null) {
+          sheet.getRange(row, colMap.return1yCol).setValue(calc.return1y);
         }
       }
     }

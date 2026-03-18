@@ -329,6 +329,34 @@ function routeAction(action, params, userRecord) {
     case 'stock-transaction:delete':
       return deleteStockTransaction(params.transactionId);
 
+    // ── Screener ──
+    case 'screener:watchlist':
+      return readScreenerWatchlist();
+
+    case 'screener:signals':
+      return getScreenerSignals(params.status || null);
+
+    case 'screener:generate-signals':
+      return generateUserSignals();
+
+    case 'screener:signal-update':
+      return updateSignalStatus(params.signalId, params.status, params.executedPrice);
+
+    case 'screener:stock-meta':
+      return getScreenerStockMeta();
+
+    case 'screener:record-buy':
+      return recordScreenerBuy(params.symbol, params);
+
+    case 'screener:config':
+      return readScreenerConfig();
+
+    case 'screener:config-update':
+      return updateScreenerConfig(params.key, params.value);
+
+    case 'screener:nifty-data':
+      return readNiftyDataFromMasterDB();
+
     // ── Reminders ──
     case 'reminders:list':
       return getAllReminders();
@@ -743,8 +771,10 @@ function getAllSettings() {
 function updateAllSettings(params) {
   var emailSettings = ['EmailConfigured', 'EmailFrequency', 'EmailHour', 'EmailMinute', 'EmailDayOfWeek', 'EmailDayOfMonth'];
   var reminderSettings = ['ReminderNotificationsEnabled', 'ReminderCheckHour'];
+  var screenerSettings = ['ScreenerEmailEnabled', 'ScreenerEmailHour'];
   var emailChanged = false;
   var reminderChanged = false;
+  var screenerChanged = false;
   var count = 0;
 
   for (var key in params) {
@@ -756,6 +786,9 @@ function updateAllSettings(params) {
     }
     if (reminderSettings.indexOf(key) !== -1) {
       reminderChanged = true;
+    }
+    if (screenerSettings.indexOf(key) !== -1) {
+      screenerChanged = true;
     }
   }
 
@@ -774,6 +807,15 @@ function updateAllSettings(params) {
       installReminderTrigger();
     } catch (e) {
       log('Error reinstalling reminder trigger: ' + e.message);
+    }
+  }
+
+  // Reinstall screener email trigger if screener settings changed
+  if (screenerChanged) {
+    try {
+      installScreenerEmailTrigger();
+    } catch (e) {
+      log('Error reinstalling screener email trigger: ' + e.message);
     }
   }
 

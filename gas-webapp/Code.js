@@ -52,6 +52,14 @@ const CONFIG = {
   masterMFDataSheet: 'MF_Data',        // Mutual fund NAVs (~8,500+ funds)
   masterATHSheet: 'MF_ATH',            // All-Time High NAV data
   masterStockDataSheet: 'Stock_Data',   // Stock data (~5,292 NSE stocks)
+  // Master DB screener sheets (read-only)
+  masterScreenerWatchlistSheet: 'Screener_Watchlist',
+  masterScreenerConfigSheet: 'Screener_Config',
+
+  // Per-user screener sheets
+  screenerSignalsSheet: 'Screener_Signals',
+  screenerStockMetaSheet: 'Screener_StockMeta',
+  screenerUserConfigSheet: 'Screener_UserConfig',
 
   // App Settings
   appName: 'Capital Friends',
@@ -269,6 +277,34 @@ function applyDataRowFormatting(sheet, startRow, endRow, numCols) {
     log('Error formatting rows in ' + sheet.getName() + ': ' + error.toString());
   }
   return sheet;
+}
+
+// ============================================================================
+// SETTINGS HELPERS
+// ============================================================================
+
+/**
+ * Get a single setting value from the Settings sheet.
+ * Used by Triggers.js and ReminderNotifications.js for reading email/reminder config.
+ */
+function getSetting(settingName) {
+  var sheet = getSheet(CONFIG.settingsSheet);
+  if (!sheet) return null;
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 2) return null;
+  var data = sheet.getRange(3, 1, lastRow - 2, 2).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === settingName) return data[i][1];
+  }
+  return null;
+}
+
+/**
+ * Get the current user's email address.
+ * Used by ReminderNotifications.js as the "from" address.
+ */
+function getFromEmailAddress() {
+  return Session.getEffectiveUser().getEmail();
 }
 
 // ============================================================================
