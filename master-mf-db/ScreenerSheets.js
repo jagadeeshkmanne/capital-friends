@@ -283,7 +283,7 @@ function bulkImportToWatchlist() {
     ['ALLDIGI', 'Allsec Technologies', [1]],
     ['RAJOOENG', 'Rajoo Engineers', [1]],
     ['MAMATA', 'Mamata Machinery', [1]],
-    ['AMAL', 'Amal', [1]],
+    // AMAL removed — BSE-only (BSE:506597), no NSE code
 
     // Screener 2 only (not in 1): CF-SmartMoney-Flow
     ['HAL', 'Hindustan Aeronautics', [2]],
