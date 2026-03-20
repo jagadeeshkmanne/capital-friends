@@ -130,25 +130,9 @@ function screenerUpdateMarketData() {
       state.idx = 0;
     }
 
-    // --- PHASE: Holdings market data (usually small — ~8 stocks) ---
+    // Holdings phase removed — master DB no longer tracks holdings.
+    // Per-user holdings are managed by gas-webapp/Screener.js
     if (state.phase === 'holdings') {
-      var remaining = MAX_MS - (new Date() - startTime);
-      if (remaining < 15000) { _saveAndContinue(props, state); return; }
-
-      Logger.log('Updating holdings market data from index ' + state.idx + '...');
-      var hResult = updateMarketDataChunked(SCREENER_CONFIG.sheets.holdings, {
-        symbolCol: 1, priceCol: 9, rsiCol: 22, dma50Col: 23, dma200Col: 24
-      }, state.idx, remaining - 10000);
-
-      if (!hResult.done) {
-        state.idx += hResult.processed;
-        _saveAndContinue(props, state);
-        return;
-      }
-
-      // Holdings done — update computed columns (P&L, peak, trailing stop, etc.)
-      _updateHoldingsComputedColumns();
-
       state.phase = 'nifty';
       state.idx = 0;
     }
@@ -358,73 +342,8 @@ function _updateWatchlistBenchmarkColumns(niftyData) {
   Logger.log('Watchlist benchmark columns updated (Golden Cross, Nifty 6M, Relative Strength, Nifty >200DMA)');
 }
 
-/**
- * Update holdings computed columns (P&L, peak, trailing stop, LTCG, allocation)
- * Extracted from updateHoldingsMarketData() in HoldingsMonitor.js
- */
-function _updateHoldingsComputedColumns() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SCREENER_CONFIG.sheets.holdings);
-  if (!sheet) return;
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-
-  var config = getAllScreenerConfig();
-  var data = sheet.getRange(2, 1, lastRow - 1, 30).getValues();
-
-  for (var i = 0; i < data.length; i++) {
-    var row = i + 2;
-    var status = String(data[i][25]).trim();
-    if (status === 'SOLD') continue;
-
-    var entryPrice = parseFloat(data[i][4]) || 0;
-    var totalShares = parseFloat(data[i][5]) || 0;
-    var totalInvested = parseFloat(data[i][6]) || 0;
-    var currentPrice = parseFloat(data[i][8]) || 0;
-    var oldPeak = parseFloat(data[i][11]) || 0;
-    if (!currentPrice || !entryPrice) continue;
-
-    var avgPrice = totalShares > 0 ? totalInvested / totalShares : entryPrice;
-    sheet.getRange(row, 8).setValue(Math.round(avgPrice * 100) / 100);
-
-    var pnlPct = ((currentPrice - avgPrice) / avgPrice) * 100;
-    sheet.getRange(row, 10).setValue(Math.round(pnlPct * 100) / 100);
-
-    var pnlRs = (currentPrice - avgPrice) * totalShares;
-    sheet.getRange(row, 11).setValue(Math.round(pnlRs));
-
-    var newPeak = updatePeakPrice(oldPeak, currentPrice);
-    if (newPeak !== oldPeak) {
-      sheet.getRange(row, 12).setValue(newPeak);
-    }
-
-    var stop = calculateTrailingStopForHolding({
-      entryPrice: entryPrice,
-      currentPrice: currentPrice,
-      peakPrice: newPeak,
-      pnlPct: pnlPct
-    }, config);
-
-    sheet.getRange(row, 13).setValue(stop.stopPrice || '');
-    sheet.getRange(row, 14).setValue(stop.tier);
-
-    var entryDate = data[i][3];
-    if (entryDate) {
-      var ltcgDate = new Date(entryDate);
-      ltcgDate.setDate(ltcgDate.getDate() + 365);
-      sheet.getRange(row, 20).setValue(ltcgDate);
-      var daysToLTCG = Math.floor((ltcgDate - new Date()) / (1000 * 60 * 60 * 24));
-      sheet.getRange(row, 21).setValue(daysToLTCG > 0 ? daysToLTCG : 0);
-    }
-
-    var budget = config.STOCK_BUDGET || 300000;
-    var allocPct = (totalInvested / budget) * 100;
-    sheet.getRange(row, 27).setValue(Math.round(allocPct * 100) / 100);
-  }
-
-  Logger.log('Holdings computed columns updated');
-}
+// _updateHoldingsComputedColumns() removed — master DB no longer tracks holdings.
+// Per-user holdings computed columns are managed by gas-webapp/Screener.js
 
 
 // ============================================================================
@@ -432,69 +351,16 @@ function _updateHoldingsComputedColumns() {
 // ============================================================================
 
 /**
- * PHASE 2 ENTRY POINT — Called by daily trigger at 9:45 AM IST
+ * PHASE 2 — Signal generation removed from master DB.
+ * Signals are now generated per-user by gas-webapp/Screener.js.
  *
- * All fast operations: reads sheet data, checks conditions, sends emails.
- * No GOOGLEFINANCE calls — uses persisted Nifty data from Phase 1.
+ * This function is kept as a no-op so existing triggers don't error out.
+ * Remove the 9:45 AM trigger when convenient (re-run installScreenerTriggers).
  */
 function screenerGenerateSignals() {
-  var startTime = new Date();
+  Logger.log('screenerGenerateSignals() — DEPRECATED. Signals are now per-user via gas-webapp.');
   var props = PropertiesService.getScriptProperties();
-  Logger.log('=== screenerGenerateSignals started at ' + startTime + ' ===');
-
-  // Check if market data is ready
-  var dataReady = props.getProperty(_DATA_READY_KEY);
-  if (!dataReady) {
-    Logger.log('WARNING: Market data not ready yet. Phase 1 may still be running.');
-    Logger.log('Proceeding with stale data — signals will use whatever is in the sheets.');
-  }
-
-  try {
-    var config = getAllScreenerConfig();
-
-    // Read Nifty data from Screener_Config (persisted by Phase 1)
-    var niftyData = _readNiftyDataFromConfig();
-    Logger.log('Nifty data: price=' + niftyData.price + ', 200DMA=' + niftyData.dma200 +
-               ', above=' + niftyData.aboveDMA200);
-
-    // BUY SIGNALS — Check watchlist
-    Logger.log('Checking watchlist for BUY signals...');
-    checkWatchlistForBuySignals(niftyData, config);
-
-    // ADD/EXIT SIGNALS — Check holdings
-    Logger.log('Checking holdings for ADD signals...');
-    checkHoldingsForAddSignals(config);
-
-    Logger.log('Checking holdings for EXIT signals...');
-    checkHoldingsForExitSignals(config);
-
-    // PORTFOLIO-LEVEL — Freeze, crash, sector
-    Logger.log('Checking portfolio-level conditions...');
-    checkPortfolioLevel(niftyData, config);
-
-    // BSE ANNOUNCEMENTS
-    Logger.log('Checking BSE announcements...');
-    try {
-      checkAnnouncementsForAllHoldings();
-    } catch (bseErr) {
-      Logger.log('BSE parser error (non-fatal): ' + bseErr.message);
-    }
-
-    // SEND EMAILS
-    Logger.log('Sending signal emails...');
-    sendSignalEmails();
-
-    // Clear the data-ready flag
-    props.deleteProperty(_DATA_READY_KEY);
-
-    var duration = Math.round((new Date() - startTime) / 1000);
-    Logger.log('=== Signal generation complete in ' + duration + 's ===');
-
-  } catch (error) {
-    Logger.log('ERROR in screenerGenerateSignals: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
-    _sendErrorEmail('Signal Generation Failed', error.message);
-  }
+  props.deleteProperty(_DATA_READY_KEY);
 }
 
 /**
@@ -540,18 +406,10 @@ function _emptyNiftyData() {
 // ============================================================================
 
 /**
- * Old single-run daily check. WILL TIMEOUT with 40+ stocks.
- * Use screenerUpdateMarketData() + screenerGenerateSignals() instead.
- *
- * Kept for backwards compatibility — manually run only with small watchlists.
+ * Legacy single-run daily check — just runs market data update now.
  */
 function dailyScreenerCheck() {
-  Logger.log('WARNING: dailyScreenerCheck() is deprecated — use the 2-phase triggers.');
-  Logger.log('Running anyway for backwards compatibility...');
   screenerUpdateMarketData();
-  // Note: if screenerUpdateMarketData needs continuation, this will NOT
-  // automatically run signals. Use the split triggers for production.
-  screenerGenerateSignals();
 }
 
 
@@ -567,38 +425,14 @@ function weeklyScreenerRecheck() {
   Logger.log('=== Weekly Screener Recheck ===');
 
   try {
-    // Use the same chunked Phase 1 approach
     // Reset state to start fresh
     var props = PropertiesService.getScriptProperties();
     props.deleteProperty(_MKT_STATE_KEY);
     props.deleteProperty(_DATA_READY_KEY);
 
-    // Start market data update (will auto-continue if needed)
+    // Refresh watchlist market data
     screenerUpdateMarketData();
-
-    // If Phase 1 finished in one run, generate signals immediately
-    if (props.getProperty(_DATA_READY_KEY)) {
-      var config = getAllScreenerConfig();
-      checkHoldingsForExitSignals(config);
-
-      try {
-        checkAnnouncementsForAllHoldings();
-      } catch (bseErr) {
-        Logger.log('BSE parser error (non-fatal): ' + bseErr.message);
-      }
-
-      sendSignalEmails();
-      props.deleteProperty(_DATA_READY_KEY);
-      Logger.log('Weekly recheck complete (single run)');
-    } else {
-      // Phase 1 needs continuation — signals will run via the daily 9:45 trigger
-      // or we could schedule a one-off signal trigger
-      ScriptApp.newTrigger('screenerGenerateSignals')
-        .timeBased()
-        .after(10 * 60 * 1000) // 10 min from now
-        .create();
-      Logger.log('Weekly recheck: market data continuing, signals scheduled in 10 min');
-    }
+    Logger.log('Weekly recheck complete');
   } catch (error) {
     Logger.log('ERROR in weeklyScreenerRecheck: ' + error.message);
   }
@@ -609,12 +443,7 @@ function weeklyScreenerRecheck() {
  * Sector concentration alert at 35%
  */
 function monthlySectorCheck() {
-  Logger.log('=== Monthly Sector Check ===');
-  var niftyData = _readNiftyDataFromConfig(); // use persisted data (fast)
-  var config = getAllScreenerConfig();
-  checkPortfolioLevel(niftyData, config);
-  sendSignalEmails();
-  Logger.log('Monthly sector check complete');
+  Logger.log('=== Monthly Sector Check — DEPRECATED (per-user via gas-webapp) ===');
 }
 
 /**
@@ -622,26 +451,7 @@ function monthlySectorCheck() {
  * Full fundamental re-check via Screener.in
  */
 function quarterlyFundamentalCheck() {
-  var month = new Date().getMonth();
-  if (month !== 0 && month !== 3 && month !== 6 && month !== 9) {
-    Logger.log('Not a quarter month (' + (month + 1) + '), skipping quarterly check');
-    return;
-  }
-
-  Logger.log('=== Quarterly Fundamental Check ===');
-
-  try {
-    quarterlyFundamentalCheckAll();
-
-    var config = getAllScreenerConfig();
-    var niftyData = _readNiftyDataFromConfig();
-    checkPortfolioLevel(niftyData, config);
-    sendSignalEmails();
-
-    Logger.log('Quarterly fundamental check complete');
-  } catch (error) {
-    Logger.log('ERROR in quarterlyFundamentalCheck: ' + error.message);
-  }
+  Logger.log('=== Quarterly Fundamental Check — DEPRECATED (per-user via gas-webapp) ===');
 }
 
 
@@ -660,12 +470,9 @@ function installScreenerTriggers() {
   var response = ui.alert(
     'Install Screener Triggers',
     'This will install:\n\n' +
-    'DAILY (split for reliability):\n' +
-    '  9:00 AM — Market data update (chunked, auto-continues)\n' +
-    '  9:45 AM — Signal generation (fast)\n\n' +
-    'WEEKLY: Sundays at 10:00 AM\n' +
-    'MONTHLY: 1st at 10:00 AM (sector check)\n' +
-    'QUARTERLY: 1st at 11:00 AM (fundamentals)\n\n' +
+    'DAILY: 9:00 AM — Watchlist market data update (chunked, auto-continues)\n' +
+    'WEEKLY: Sundays at 10:00 AM — Full recheck\n\n' +
+    'Signal generation is per-user (gas-webapp).\n' +
     'Existing MF/ATH triggers will NOT be affected.\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
@@ -675,19 +482,11 @@ function installScreenerTriggers() {
 
   _removeScreenerTriggers();
 
-  // Phase 1: Market data at 9:00 AM
+  // Daily: Market data at 9:00 AM
   ScriptApp.newTrigger('screenerUpdateMarketData')
     .timeBased()
     .atHour(9)
     .nearMinute(0)
-    .everyDays(1)
-    .create();
-
-  // Phase 2: Signals at 9:45 AM
-  ScriptApp.newTrigger('screenerGenerateSignals')
-    .timeBased()
-    .atHour(9)
-    .nearMinute(45)
     .everyDays(1)
     .create();
 
@@ -698,32 +497,14 @@ function installScreenerTriggers() {
     .atHour(10)
     .create();
 
-  // Monthly on 1st
-  ScriptApp.newTrigger('monthlySectorCheck')
-    .timeBased()
-    .onMonthDay(1)
-    .atHour(10)
-    .create();
-
-  // Quarterly on 1st
-  ScriptApp.newTrigger('quarterlyFundamentalCheck')
-    .timeBased()
-    .onMonthDay(1)
-    .atHour(11)
-    .create();
-
-  Logger.log('All screener triggers installed (split architecture)');
+  Logger.log('Screener triggers installed (watchlist + market data only)');
 
   ui.alert(
     'Triggers Installed',
-    'Stock screener triggers are now active:\n\n' +
-    'Daily:\n' +
-    '  ~9:00 AM — Market data (auto-continues if needed)\n' +
-    '  ~9:45 AM — Signal generation\n\n' +
-    'Weekly: Sundays (full recheck)\n' +
-    'Monthly: 1st (sector check)\n' +
-    'Quarterly: 1st (fundamentals)\n\n' +
-    'Check Screener_Config to adjust settings.',
+    'Screener triggers are now active:\n\n' +
+    'Daily: ~9:00 AM — Watchlist market data + Trendlyne enrichment\n' +
+    'Weekly: Sundays — Full recheck\n\n' +
+    'Signal generation is per-user via gas-webapp.',
     ui.ButtonSet.OK
   );
 }
@@ -1135,6 +916,12 @@ function _scoreAllWatchlistStocks() {
 
     var finalScore = Math.round(Math.min(rawScore * mfMultiplier * overlapBoost, 100) * 10) / 10;
     stocks[j].factorScore = finalScore;
+    // Store sub-scores for portfolio factor breakdown
+    stocks[j].momentumScore = Math.round(momentumScore * 10) / 10;
+    stocks[j].qualityScore = Math.round(qualityScore * 10) / 10;
+    stocks[j].trendScore = Math.round(trendScore * 10) / 10;
+    stocks[j].valueScore = Math.round(valueScore * 10) / 10;
+    stocks[j].lowVolScore = Math.round(lowVolScore * 10) / 10;
   }
 
   // --- Step 4: Rank by factor score (descending) ---
@@ -1144,16 +931,21 @@ function _scoreAllWatchlistStocks() {
     rankMap[ranked[r].symbol] = r + 1;
   }
 
-  // --- Step 5: Batch write scores and ranks to sheet ---
-  // Build sparse array indexed by row position, then write in one batch
+  // --- Step 5: Batch write scores, ranks + sub-scores to sheet ---
+  // AL=factorScore, AM=rank, AY=momentum, AZ=quality, BA=trend, BB=value, BC=lowVol
   var scoreData = [];
+  var subScoreData = [];
   for (var k = 0; k < total; k++) {
-    scoreData.push([null, null]); // default: no score
+    scoreData.push([null, null]);
+    subScoreData.push([null, null, null, null, null]);
   }
   for (var k = 0; k < stocks.length; k++) {
-    scoreData[stocks[k].idx] = [stocks[k].factorScore, rankMap[stocks[k].symbol]];
+    var st = stocks[k];
+    scoreData[st.idx] = [st.factorScore, rankMap[st.symbol]];
+    subScoreData[st.idx] = [st.momentumScore, st.qualityScore, st.trendScore, st.valueScore, st.lowVolScore];
   }
   sheet.getRange(2, 38, total, 2).setValues(scoreData); // AL-AM batch write
+  sheet.getRange(2, 51, total, 5).setValues(subScoreData); // AY-BC batch write
 
   Logger.log('Factor scoring complete (5-factor v2.1, regime=' + regime + '): ' + stocks.length + ' stocks scored. Top 5: ' +
     ranked.slice(0, 5).map(function(s) { return s.symbol + '(' + s.factorScore + ')'; }).join(', '));

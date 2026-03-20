@@ -69,7 +69,6 @@ const NAV_ITEMS = [
   { label: 'Insurance', path: '/insurance', match: '/insurance' },
   { label: 'Mutual Funds', path: '/investments/mutual-funds', match: '/investments/mutual-funds' },
   { label: 'Stocks', path: '/investments/stocks', match: '/investments/stocks' },
-  { label: 'Screener', path: '/investments/screener', match: '/investments/screener' },
   { label: 'Other Investments', path: '/investments/other', match: '/investments/other' },
   { label: 'Liabilities', path: '/liabilities', match: '/liabilities' },
   { label: 'Goals', path: '/goals', match: '/goals' },

@@ -1,29 +1,24 @@
 /**
  * ============================================================================
- * SCREENER SHEETS — Create and manage all 6 screener sheets
+ * SCREENER SHEETS — Create and manage screener sheets
  * ============================================================================
  *
- * Creates: Screener_Config, Screener_Watchlist, Screener_Holdings,
- *          Screener_Signals, Screener_History, Screener_NearMiss
+ * Creates: Screener_Config, Screener_Watchlist
  *
  * SAFE: Never modifies existing sheets (MF_Data, MF_ATH, Stock_Data, etc.)
  */
 
 /**
- * ONE-TIME SETUP — Create all screener sheets + populate config defaults
+ * ONE-TIME SETUP — Create screener sheets + populate config defaults
  * Run this once from Script Editor or menu
  */
 function setupScreenerSheets() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert(
     'Setup Stock Screener',
-    'This will create 6 new sheets for the stock screener system:\n\n' +
+    'This will create screener sheets:\n\n' +
     '• Screener_Config (settings)\n' +
-    '• Screener_Watchlist (discovered stocks)\n' +
-    '• Screener_Holdings (owned stocks)\n' +
-    '• Screener_Signals (pending actions)\n' +
-    '• Screener_History (completed trades)\n' +
-    '• Screener_NearMiss (almost-passed stocks)\n\n' +
+    '• Screener_Watchlist (discovered stocks)\n\n' +
     'Existing sheets will NOT be modified.\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
@@ -33,14 +28,10 @@ function setupScreenerSheets() {
 
   createScreenerConfigSheet();
   createScreenerWatchlistSheet();
-  createScreenerHoldingsSheet();
-  createScreenerSignalsSheet();
-  createScreenerHistorySheet();
-  createScreenerNearMissSheet();
 
   ui.alert(
     'Screener Setup Complete',
-    'All 6 screener sheets created.\n\n' +
+    'Screener sheets created.\n\n' +
     'Next: Run "Daily Screener Check" or wait for the daily trigger.',
     ui.ButtonSet.OK
   );
@@ -141,9 +132,10 @@ function createScreenerConfigSheet() {
   return sheet;
 }
 
-// --- Screener_Watchlist (40 columns A-AN) ---
+// --- Screener_Watchlist (50 columns A-AX) ---
 // A-AB: Original columns (28)
 // AC-AN: Factor scoring + liquidity columns (12)
+// AO-AX: Trendlyne enrichment columns (10)
 function createScreenerWatchlistSheet() {
   return _getOrCreateSheet(
     SCREENER_CONFIG.sheets.watchlist,
@@ -192,291 +184,5 @@ function createScreenerWatchlistSheet() {
       80, 90, 80,
       80
     ]
-  );
-}
-
-// --- Screener_Holdings (30 columns A-AD) ---
-function createScreenerHoldingsSheet() {
-  return _getOrCreateSheet(
-    SCREENER_CONFIG.sheets.holdings,
-    [
-      'Symbol', 'Stock Name', 'Sector', 'Entry Date', 'Entry Price',
-      'Total Shares', 'Total Invested', 'Avg Price',
-      'Current Price', 'P&L %', 'P&L ₹',
-      'Peak Price', 'Trailing Stop', 'Stop Tier',
-      'Pyramid Stage', 'Dip Buy Used', 'Screeners Passing',
-      'Conviction', 'Is Compounder', 'LTCG Date', 'Days to LTCG',
-      'RSI(14)', '50DMA', '200DMA',
-      'Last Fundamental Check', 'Status',
-      'Allocation %', 'Sector Alloc %', 'Notes',
-      'Last Add Date'
-    ],
-    [
-      90, 180, 100, 100, 90,
-      80, 100, 90,
-      90, 70, 90,
-      90, 90, 80,
-      90, 80, 120,
-      90, 80, 100, 80,
-      70, 80, 80,
-      120, 80,
-      80, 90, 150,
-      100
-    ]
-  );
-}
-
-// --- Screener_Signals (16 columns A-P) ---
-function createScreenerSignalsSheet() {
-  return _getOrCreateSheet(
-    SCREENER_CONFIG.sheets.signals,
-    [
-      'Signal ID', 'Date', 'Signal Type', 'Priority',
-      'Symbol', 'Stock Name', 'Action',
-      'Amount ₹', 'Shares', 'Trigger Detail',
-      'Fundamentals', 'Status', 'Executed Date',
-      'Executed Price', 'Email Sent', 'Notes'
-    ],
-    [
-      80, 100, 110, 60,
-      80, 180, 300,
-      90, 70, 250,
-      200, 80, 100,
-      90, 70, 150
-    ]
-  );
-}
-
-// --- Screener_History (18 columns A-R) ---
-function createScreenerHistorySheet() {
-  return _getOrCreateSheet(
-    SCREENER_CONFIG.sheets.history,
-    [
-      'Symbol', 'Stock Name', 'Entry Date', 'Exit Date',
-      'Avg Entry Price', 'Exit Price', 'Shares',
-      'Invested ₹', 'Exit Value ₹', 'P&L ₹', 'P&L %',
-      'Holding Days', 'Tax Type', 'Exit Reason',
-      'Screeners At Entry', 'Screeners At Exit',
-      'Max Gain %', 'Notes'
-    ],
-    [
-      80, 180, 100, 100,
-      100, 90, 70,
-      100, 100, 90, 70,
-      80, 70, 120,
-      110, 110,
-      80, 150
-    ]
-  );
-}
-
-/**
- * MIGRATION: Clear old 4-screener watchlist and import fresh from CF-Stock-Screener CSV.
- *
- * Steps:
- *   1. Upload Trendlyne CSV to a sheet named "CSV_Import" (paste or File > Import)
- *   2. Run this function from Script Editor
- *   3. It reads NSE codes from the CSV, clears old watchlist, imports fresh
- *   4. All stocks start as ELIGIBLE (no cooling — they already passed the screener)
- *   5. Delete "CSV_Import" sheet after running
- *
- * CSV columns expected (Trendlyne export):
- *   A: Sl No, B: Stock, C: Market Cap, ..., N: NSE Code, O: BSE Code, P: ISIN
- */
-function migrateWatchlistFromCSV() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // --- Read CSV_Import sheet ---
-  var csvSheet = ss.getSheetByName('CSV_Import');
-  if (!csvSheet) {
-    SpreadsheetApp.getUi().alert('Sheet "CSV_Import" not found.\n\nPaste the Trendlyne CSV into a sheet named "CSV_Import" first.');
-    return;
-  }
-
-  var csvData = csvSheet.getDataRange().getValues();
-  if (csvData.length < 2) {
-    SpreadsheetApp.getUi().alert('CSV_Import sheet is empty.');
-    return;
-  }
-
-  // Parse header to find NSE Code column
-  var header = csvData[0].map(function(h) { return String(h).trim().toLowerCase(); });
-  var nseIdx = header.indexOf('nse code');
-  var nameIdx = header.indexOf('stock');
-  var mcapIdx = header.indexOf('market cap');
-
-  if (nseIdx === -1) {
-    SpreadsheetApp.getUi().alert('Column "NSE Code" not found in CSV header.\nFound: ' + header.join(', '));
-    return;
-  }
-
-  // Extract stocks
-  var stocks = [];
-  for (var i = 1; i < csvData.length; i++) {
-    var nse = String(csvData[i][nseIdx]).trim();
-    if (!nse) continue;
-    stocks.push({
-      symbol: nse,
-      name: nameIdx !== -1 ? String(csvData[i][nameIdx]).trim() : '',
-      marketCapCr: mcapIdx !== -1 ? parseFloat(csvData[i][mcapIdx]) || null : null
-    });
-  }
-
-  if (stocks.length === 0) {
-    SpreadsheetApp.getUi().alert('No stocks found in CSV.');
-    return;
-  }
-
-  // --- Confirm with user ---
-  var ui = SpreadsheetApp.getUi();
-  var confirm = ui.alert(
-    'Migrate Watchlist',
-    'This will:\n' +
-    '  1. CLEAR all rows in Screener_Watchlist\n' +
-    '  2. Import ' + stocks.length + ' stocks from CF-Stock-Screener CSV\n' +
-    '  3. All start as ELIGIBLE (no cooling period)\n\n' +
-    'Stocks: ' + stocks.map(function(s) { return s.symbol; }).join(', ') + '\n\n' +
-    'Continue?',
-    ui.ButtonSet.YES_NO
-  );
-  if (confirm !== ui.Button.YES) return;
-
-  // --- Clear old watchlist ---
-  var sheet = ss.getSheetByName(SCREENER_CONFIG.sheets.watchlist);
-  if (!sheet) {
-    ui.alert('Screener_Watchlist sheet not found. Run setupScreenerSheets() first.');
-    return;
-  }
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getMaxColumns()).clearContent();
-    Logger.log('Cleared ' + (lastRow - 1) + ' old watchlist rows');
-  }
-
-  // --- Import new stocks ---
-  var today = new Date();
-  var rows = [];
-
-  for (var j = 0; j < stocks.length; j++) {
-    var stock = stocks[j];
-
-    // Fetch sector from Screener.in
-    var mcapData = { marketCapCr: stock.marketCapCr, capClass: null, sector: null };
-    try {
-      mcapData = fetchMarketCapOnly(stock.symbol);
-    } catch (e) {
-      Logger.log('Fetch failed for ' + stock.symbol + ': ' + e.message);
-    }
-
-    // Classify cap
-    var capClass = '';
-    var mc = mcapData.marketCapCr || stock.marketCapCr || 0;
-    if (mc >= 20000) capClass = 'LARGE';
-    else if (mc >= 5000) capClass = 'MID';
-    else if (mc >= 500) capClass = 'SMALL';
-    else capClass = 'MICRO';
-
-    rows.push([
-      stock.symbol,                           // A: Symbol
-      stock.name || '',                       // B: Stock Name
-      today,                                  // C: Date Found
-      '',                                     // D: Found Price (market data update fills this)
-      'CF-Stock-Screener',                    // E: Screener
-      'BASE',                                 // F: Conviction (MF enrichment updates this)
-      '',                                     // G: Cooling End Date (empty = no cooling)
-      'ELIGIBLE',                             // H: Status (skip cooling for migration)
-      '', '', '',                             // I-K: Price, Change%, RSI
-      '', '', '', '', '', '',                 // L-Q: DMA50, DMA200, GoldenCross, 6M Return, Nifty6M, RelStrength
-      mcapData.sector || '',                  // R: Sector
-      '',                                     // S: Nifty >200DMA
-      'NO',                                   // T: All BUY Met
-      '',                                     // U: Failed Conditions
-      today,                                  // V: Last Updated
-      'Migrated from CSV',                    // W: Notes
-      mc || '',                               // X: Market Cap (Cr)
-      capClass                                // Y: Cap Class
-    ]);
-
-    // Rate limit Screener.in fetches
-    if (j < stocks.length - 1) {
-      Utilities.sleep(500);
-    }
-  }
-
-  // Batch write all rows
-  if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
-  }
-
-  Logger.log('Migration complete: ' + rows.length + ' stocks imported');
-  ui.alert(
-    'Migration Complete!',
-    rows.length + ' stocks imported from CF-Stock-Screener.\n\n' +
-    'Next steps:\n' +
-    '1. Run "Update Watchlist Data" to fetch prices, RSI, DMA\n' +
-    '2. Run "MF Enrichment" to set conviction levels\n' +
-    '3. Delete the "CSV_Import" sheet',
-    ui.ButtonSet.OK
-  );
-}
-
-/**
- * Backfill sector for all watchlist stocks missing sector data.
- * Uses Screener.in (same page already fetched for market cap).
- * Normalizes to Nifty-style broad sectors.
- */
-function backfillWatchlistSectors() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SCREENER_CONFIG.sheets.watchlist);
-  if (!sheet) { Logger.log('No watchlist sheet'); return; }
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-
-  var data = sheet.getRange(2, 1, lastRow - 1, 18).getValues();
-  var filled = 0;
-  var failed = 0;
-
-  for (var i = 0; i < data.length; i++) {
-    var symbol = String(data[i][0]).trim();
-    var existingSector = String(data[i][17]).trim();
-    if (!symbol || existingSector) continue;
-
-    var result = null;
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      try {
-        result = fetchMarketCapOnly(symbol);
-        if (result.sector) break;
-      } catch (e) {
-        Logger.log(symbol + ' → attempt ' + attempt + ' error: ' + e.message);
-        if (attempt < 2) Utilities.sleep(3000); // longer wait before retry
-      }
-    }
-
-    if (result && result.sector) {
-      sheet.getRange(i + 2, 18).setValue(result.sector);
-      filled++;
-      Logger.log(symbol + ' → ' + result.sector);
-    } else {
-      failed++;
-      Logger.log(symbol + ' → sector not found');
-    }
-    Utilities.sleep(2000); // 2s between requests to avoid rate limiting
-  }
-
-  Logger.log('Backfill complete: ' + filled + ' filled, ' + failed + ' failed');
-  SpreadsheetApp.getUi().alert('Sector backfill complete!\n\n' + filled + ' sectors filled, ' + failed + ' failed.\n\nCheck logs for details.');
-}
-
-// --- Screener_NearMiss (8 columns A-H) ---
-function createScreenerNearMissSheet() {
-  return _getOrCreateSheet(
-    SCREENER_CONFIG.sheets.nearMiss,
-    [
-      'Date', 'Symbol', 'Stock Name', 'Screener',
-      'Failed Filter', 'Actual Value', 'Required Value', 'How Close %'
-    ],
-    [100, 80, 180, 100, 150, 100, 100, 80]
   );
 }

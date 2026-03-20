@@ -1,17 +1,14 @@
 /**
  * ============================================================================
- * SCREENER FETCH — Scrape Screener.in for quarterly fundamental data
+ * SCREENER FETCH — Scrape Screener.in for fundamental data
  * ============================================================================
  *
- * Fetches fundamental data from Screener.in for active stock holdings.
- * Used by the signal engine to check hard exit (#1-6, #12) and soft exit
- * (#3-10) conditions based on quarterly fundamental changes.
+ * Fetches fundamental data from Screener.in.
  *
  * Key functions:
  *   fetchFundamentals(symbol) → fundamental data object
  *   checkHardExitFundamentals(symbol, fundamentals) → hard exit signals
  *   checkSoftExitFundamentals(symbol, fundamentals) → soft exit signals
- *   quarterlyFundamentalCheckAll() → iterate all holdings, check fundamentals
  */
 
 var SCREENER_BASE_URL = 'https://www.screener.in/company/';
@@ -1105,105 +1102,8 @@ function checkSoftExitFundamentals(symbol, f) {
 // QUARTERLY CHECK — MAIN ENTRY POINT
 // ============================================================================
 
-/**
- * Run quarterly fundamental checks on all active holdings.
- * Fetches fundamentals from Screener.in and creates HARD_EXIT / SOFT_EXIT signals.
- *
- * Call this from a weekly/monthly trigger or manually from Script Editor.
- */
-function quarterlyFundamentalCheckAll() {
-  Logger.log('========================================');
-  Logger.log('Starting quarterly fundamental check...');
-  Logger.log('========================================');
-
-  var holdings = _getActiveHoldings();
-
-  if (holdings.length === 0) {
-    Logger.log('No active holdings found. Skipping fundamental check.');
-    return;
-  }
-
-  Logger.log('Checking fundamentals for ' + holdings.length + ' active holdings');
-
-  var results = {
-    checked: 0,
-    hardExits: 0,
-    softExits: 0,
-    errors: 0
-  };
-
-  for (var i = 0; i < holdings.length; i++) {
-    var h = holdings[i];
-    var symbol = h.symbol;
-
-    if (!symbol) continue;
-
-    try {
-      Logger.log('--- Checking ' + symbol + ' (' + (i + 1) + '/' + holdings.length + ') ---');
-
-      // Fetch fundamentals from Screener.in
-      var fundamentals = fetchFundamentals(symbol);
-
-      if (!fundamentals) {
-        Logger.log('Could not fetch fundamentals for ' + symbol + ', skipping');
-        results.errors++;
-        continue;
-      }
-
-      results.checked++;
-
-      // Check hard exits
-      var hardExits = checkHardExitFundamentals(symbol, fundamentals);
-      for (var he = 0; he < hardExits.length; he++) {
-        _createSignal({
-          type: 'HARD_EXIT',
-          symbol: symbol,
-          name: h.name,
-          amount: (h.currentPrice || 0) * (h.totalShares || 0),
-          shares: h.totalShares || 0,
-          triggerDetail: '[Fundamental] ' + hardExits[he].rule + ': ' + hardExits[he].detail
-        });
-        results.hardExits++;
-        Logger.log('HARD EXIT triggered for ' + symbol + ': ' + hardExits[he].rule);
-      }
-
-      // Check soft exits
-      var softExits = checkSoftExitFundamentals(symbol, fundamentals);
-      for (var se = 0; se < softExits.length; se++) {
-        _createSignal({
-          type: 'SOFT_EXIT',
-          symbol: symbol,
-          name: h.name,
-          triggerDetail: '[Fundamental] ' + softExits[se].rule + ': ' + softExits[se].detail
-        });
-        results.softExits++;
-        Logger.log('SOFT EXIT triggered for ' + symbol + ': ' + softExits[se].rule);
-      }
-
-      // Store fundamentals JSON in the signal for reference
-      if (hardExits.length > 0 || softExits.length > 0) {
-        _storeFundamentalsSnapshot(symbol, fundamentals);
-      }
-
-    } catch (e) {
-      Logger.log('Error checking fundamentals for ' + symbol + ': ' + e.message);
-      results.errors++;
-    }
-
-    // Rate limiting: 500ms delay between requests to Screener.in
-    if (i < holdings.length - 1) {
-      Utilities.sleep(500);
-    }
-  }
-
-  Logger.log('========================================');
-  Logger.log('Quarterly fundamental check complete.');
-  Logger.log('Checked: ' + results.checked + '/' + holdings.length);
-  Logger.log('Hard exits: ' + results.hardExits);
-  Logger.log('Soft exits: ' + results.softExits);
-  Logger.log('Errors: ' + results.errors);
-  Logger.log('========================================');
-}
+// quarterlyFundamentalCheckAll() removed — depended on master DB holdings + SignalEngine.
+// Quarterly fundamental checks for per-user holdings can be added to gas-webapp if needed.
 
 /**
  * Store a snapshot of fundamental data in the Stock_Data sheet for audit trail.

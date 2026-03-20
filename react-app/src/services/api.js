@@ -230,13 +230,6 @@ export const deleteFundFromPortfolio = (portfolioId, fundCode) => callAPI('mf:de
 export const editStockTransaction = (data) => callAPI('stock-transaction:edit', data)
 export const deleteStockTransaction = (transactionId) => callAPI('stock-transaction:delete', { transactionId })
 
-// Screener — Admin
-export const adminRefreshTrendlyne = () => callAPI('admin:refresh-trendlyne')
-export const adminRefreshNifty = () => callAPI('admin:refresh-nifty')
-export const adminRescoreWatchlist = () => callAPI('admin:rescore-watchlist')
-export const adminRunFullPipeline = () => callAPI('admin:run-full-pipeline')
-export const adminGetStatus = () => callAPI('admin:status')
-
 // Screener
 export const getScreenerWatchlist = () => callAPI('screener:watchlist')
 export const getScreenerSignals = (status) => callAPI('screener:signals', { status })

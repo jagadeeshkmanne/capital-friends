@@ -1,6 +1,12 @@
 #!/bin/bash
 # Deploy react-app to GitHub Pages (gh-pages branch)
 # Usage: ./deploy.sh
+#
+# WHEN TO RUN: Only when react-app/ source code changes (components, pages, styles, .env)
+# NOT NEEDED: When only GAS backend code changes (gas-webapp/ or master-mf-db/)
+#             GAS backends are called live at runtime — no React redeploy needed.
+#
+# See also: ./deploy-all.sh for deploying GAS projects
 
 set -e
 

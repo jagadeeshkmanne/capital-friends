@@ -8,10 +8,6 @@ const SCREENER_CONFIG = {
   // --- Sheet names ---
   sheets: {
     watchlist: 'Screener_Watchlist',
-    holdings: 'Screener_Holdings',
-    signals: 'Screener_Signals',
-    history: 'Screener_History',
-    nearMiss: 'Screener_NearMiss',
     config: 'Screener_Config',
     stockData: 'Stock_Data'
   },
@@ -52,9 +48,9 @@ const SCREENER_CONFIG = {
     MIN_MARKET_CAP_CR: 500,         // Minimum market cap in Cr — skip micro caps
     MIN_AVG_TRADED_VALUE_CR: 3,     // Safety net — primary liquidity filter is on Trendlyne screener side
     // Factor-based allocation (replaces conviction-based)
-    ALLOC_TOP5: 8,                   // Top 5 by factor rank → 8% of budget each
-    ALLOC_NEXT5: 5,                  // Rank 6-10 → 5% each
-    ALLOC_REST: 3,                   // Rank 11+ → 3% each
+    ALLOC_TOP5: 10,                  // Top 5 by factor rank → 10% of budget each
+    ALLOC_NEXT5: 7,                  // Rank 6-10 → 7% each
+    ALLOC_REST: 5,                   // Rank 11+ → 5% each
     FACTOR_BUY_MIN: 50              // Minimum factor score to generate BUY signal
   },
 

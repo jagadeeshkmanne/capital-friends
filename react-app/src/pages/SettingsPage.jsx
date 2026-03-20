@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
   const [showDonate, setShowDonate] = useState(false)
+
   const activeMembers = members.filter((m) => m.status === 'Active')
 
   // Local form state (synced from backend settings)

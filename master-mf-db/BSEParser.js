@@ -122,61 +122,8 @@ function parseBSEAnnouncements(symbol) {
   return results;
 }
 
-/**
- * Check BSE announcements for ALL active holdings.
- * Creates MANUAL_REVIEW signals for any keyword matches.
- */
-function checkAnnouncementsForAllHoldings() {
-  try {
-    var holdings = _getActiveHoldings();
-    if (!holdings || holdings.length === 0) {
-      Logger.log('BSEParser: No active holdings to check');
-      return;
-    }
-
-    var totalFlags = 0;
-
-    for (var i = 0; i < holdings.length; i++) {
-      var h = holdings[i];
-      var symbol = h.symbol;
-
-      if (!symbol) continue;
-
-      try {
-        var flags = parseBSEAnnouncements(symbol);
-
-        for (var j = 0; j < flags.length; j++) {
-          var flag = flags[j];
-
-          _createSignal({
-            type: 'MANUAL_REVIEW',
-            symbol: symbol,
-            name: h.name || symbol,
-            triggerDetail: 'BSE announcement flagged [' + flag.keyword.toUpperCase() + ']: '
-              + flag.headline
-              + (flag.date ? ' (' + flag.date + ')' : '')
-              + (flag.url ? ' | ' + flag.url : '')
-          });
-
-          totalFlags++;
-        }
-
-      } catch (e) {
-        Logger.log('BSEParser: Error checking ' + symbol + ': ' + e.message);
-      }
-
-      // 500ms delay between API calls to avoid rate limiting
-      if (i < holdings.length - 1) {
-        Utilities.sleep(500);
-      }
-    }
-
-    Logger.log('BSEParser: Checked ' + holdings.length + ' holdings, created ' + totalFlags + ' MANUAL_REVIEW signal(s)');
-
-  } catch (e) {
-    Logger.log('BSEParser: Fatal error in checkAnnouncementsForAllHoldings: ' + e.message);
-  }
-}
+// checkAnnouncementsForAllHoldings() removed — depended on master DB holdings + SignalEngine.
+// BSE announcement checking for per-user holdings can be added to gas-webapp if needed.
 
 // ============================================================================
 // HELPERS

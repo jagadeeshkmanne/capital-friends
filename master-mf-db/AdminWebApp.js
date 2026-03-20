@@ -234,6 +234,96 @@ function setAdminSecret() {
 }
 
 // ============================================================================
+// Menu wrappers — called from spreadsheet custom menu
+// ============================================================================
+
+function menuRefreshTrendlyne() {
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('Starting...', 'Refreshing Trendlyne data. This may take 1-2 minutes.', ui.ButtonSet.OK);
+  var start = new Date();
+  try {
+    enrichWatchlistFromTrendlyne();
+    var secs = ((new Date() - start) / 1000).toFixed(1);
+    ui.alert('Done', 'Trendlyne data refreshed in ' + secs + 's', ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('Error', 'Refresh failed: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+function menuRefreshNifty() {
+  var start = new Date();
+  try {
+    refreshNiftyData();
+    var secs = ((new Date() - start) / 1000).toFixed(1);
+    SpreadsheetApp.getUi().alert('Done', 'Nifty data refreshed in ' + secs + 's', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error', 'Refresh failed: ' + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function menuRescoreWatchlist() {
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('Starting...', 'Re-scoring all watchlist stocks. This may take 1-2 minutes.', ui.ButtonSet.OK);
+  var start = new Date();
+  try {
+    _scoreAllWatchlistStocks();
+    var secs = ((new Date() - start) / 1000).toFixed(1);
+    ui.alert('Done', 'Watchlist re-scored in ' + secs + 's', ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('Error', 'Re-score failed: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+function menuClearAndRefetchWatchlist() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert(
+    'Clear & Re-fetch Watchlist',
+    'This will:\n' +
+    '  1. DELETE all rows from Screener_Watchlist\n' +
+    '  2. Re-fetch from Trendlyne (3 screeners)\n' +
+    '  3. Re-score all stocks\n\n' +
+    'Continue?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) return;
+
+  var start = new Date();
+  var results = [];
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SCREENER_CONFIG.sheets.watchlist);
+    if (sheet && sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getMaxColumns()).clearContent();
+      results.push('Cleared watchlist');
+    }
+  } catch (e) { results.push('Clear failed: ' + e.message); }
+
+  try { enrichWatchlistFromTrendlyne(); results.push('Trendlyne ✓'); } catch (e) { results.push('Trendlyne ✗: ' + e.message); }
+  try { refreshNiftyData(); results.push('Nifty ✓'); } catch (e) { results.push('Nifty ✗: ' + e.message); }
+  try { _scoreAllWatchlistStocks(); results.push('Re-score ✓'); } catch (e) { results.push('Re-score ✗: ' + e.message); }
+
+  var secs = ((new Date() - start) / 1000).toFixed(1);
+  ui.alert('Clear & Re-fetch Complete (' + secs + 's)', results.join('\n'), ui.ButtonSet.OK);
+}
+
+function menuFullPipeline() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert('Full Pipeline', 'This will run Trendlyne refresh → Nifty refresh → Re-score.\nIt may take 3-5 minutes. Continue?', ui.ButtonSet.YES_NO);
+  if (confirm !== ui.Button.YES) return;
+
+  var start = new Date();
+  var results = [];
+
+  try { enrichWatchlistFromTrendlyne(); results.push('Trendlyne ✓'); } catch (e) { results.push('Trendlyne ✗: ' + e.message); }
+  try { refreshNiftyData(); results.push('Nifty ✓'); } catch (e) { results.push('Nifty ✗: ' + e.message); }
+  try { _scoreAllWatchlistStocks(); results.push('Re-score ✓'); } catch (e) { results.push('Re-score ✗: ' + e.message); }
+
+  var secs = ((new Date() - start) / 1000).toFixed(1);
+  ui.alert('Pipeline Complete (' + secs + 's)', results.join('\n'), ui.ButtonSet.OK);
+}
+
+// ============================================================================
 // Helper
 // ============================================================================
 

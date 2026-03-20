@@ -29,7 +29,7 @@ function readScreenerWatchlist() {
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return [];
 
-    var data = sheet.getRange(2, 1, lastRow - 1, 50).getValues(); // A-AX (50 cols)
+    var data = sheet.getRange(2, 1, lastRow - 1, 55).getValues(); // A-BC (55 cols, includes sub-scores)
     var stocks = [];
 
     for (var i = 0; i < data.length; i++) {
@@ -87,7 +87,13 @@ function readScreenerWatchlist() {
         opmQtr: parseFloat(data[i][46]) || null,          // AU: OPM Qtr %
         revenueGrowth3y: parseFloat(data[i][47]) || null, // AV: Revenue Growth 3Y %
         promoterHolding: parseFloat(data[i][48]) || null,  // AW: Promoter Holding %
-        mcapClass: String(data[i][49]).trim() || ''       // AX: MCAP Class
+        mcapClass: String(data[i][49]).trim() || '',       // AX: MCAP Class
+        // Factor sub-scores (AY-BC) — computed by Master DB scoring
+        momentumScore: parseFloat(data[i][50]) || null,    // AY: Momentum Score
+        qualityScore: parseFloat(data[i][51]) || null,     // AZ: Quality Score
+        trendScore: parseFloat(data[i][52]) || null,       // BA: Trend Score
+        valueScore: parseFloat(data[i][53]) || null,       // BB: Value Score
+        lowVolScore: parseFloat(data[i][54]) || null       // BC: Low Vol Score
       });
     }
 
@@ -170,13 +176,18 @@ function _defaultNiftyData() {
 var SCREENER_DEFAULTS = {
   STOCK_BUDGET: 1000000,
   MAX_STOCKS: 10,
+  BONUS_SCORE_THRESHOLD: 75,
+  MAX_BONUS_SLOTS: 5,
   MAX_PER_SECTOR: 3,
+  // BUY allocation by factor rank (% of budget)
+  ALLOC_TOP5: 10,
+  ALLOC_NEXT5: 7,
+  ALLOC_REST: 5,
+  FACTOR_BUY_MIN: 50,
+  // ADD allocation by conviction (% of budget)
   ALLOC_HIGH: 15,
   ALLOC_MODERATE: 12,
   ALLOC_BASE: 10,
-  MF_HIGH_THRESHOLD: 1,
-  MF_MODERATE_THRESHOLD: 0.5,
-  RSI_BUY_MAX: 65,
   RSI_OVERBOUGHT: 70,
   MIN_MARKET_CAP_CR: 500,
   MIN_AVG_TRADED_VALUE_CR: 3,
@@ -578,8 +589,18 @@ function generateUserSignals() {
   }
 
   // Rank-select: sort by factor score (highest first), take top N slots
-  var remainingSlots = Math.max(0, (config.MAX_STOCKS || 8) - holdingCount);
+  // Dynamic slots: base MAX_STOCKS + bonus for high-conviction candidates (score >= threshold)
+  var baseMax = config.MAX_STOCKS || 10;
+  var bonusThreshold = config.BONUS_SCORE_THRESHOLD || 75;
+  var maxBonus = config.MAX_BONUS_SLOTS || 5;
   buyCandidates.sort(function(a, b) { return b.factorScore - a.factorScore; });
+  var highConvictionCount = buyCandidates.filter(function(c) { return c.factorScore >= bonusThreshold; }).length;
+  var bonusSlots = Math.min(highConvictionCount, maxBonus);
+  var effectiveMax = baseMax + bonusSlots;
+  var remainingSlots = Math.max(0, effectiveMax - holdingCount);
+  if (bonusSlots > 0) {
+    log('Dynamic slots: base ' + baseMax + ' + ' + bonusSlots + ' bonus (≥' + bonusThreshold + ' score) = ' + effectiveMax + ' effective max');
+  }
   var topBuys = buyCandidates.slice(0, remainingSlots);
 
   for (var tb = 0; tb < topBuys.length; tb++) {
@@ -889,7 +910,9 @@ function generateUserSignals() {
       totalInvested: totalInvested,
       budget: budget,
       cashAvailable: cashAvailable,
-      maxStocks: config.MAX_STOCKS || 8
+      maxStocks: config.MAX_STOCKS || 10,
+      effectiveMax: effectiveMax || (config.MAX_STOCKS || 10),
+      bonusSlots: bonusSlots || 0
     },
     generatedAt: new Date().toISOString(),
     durationSeconds: duration
@@ -922,10 +945,12 @@ function _checkBuyConditions(stock, config, niftyData, holdingCount, sectorCount
     failed.push('RSI overbought (' + stock.rsi + ', max ' + rsiOverbought + ')');
   }
 
-  // 3 — Portfolio < MAX_STOCKS
-  var maxStocks = config.MAX_STOCKS || 8;
-  if (holdingCount >= maxStocks) {
-    failed.push('Portfolio full (' + holdingCount + '/' + maxStocks + ')');
+  // 3 — Portfolio < effective MAX_STOCKS (soft cap — rank-select enforces dynamic limit)
+  // Only hard-block at MAX_STOCKS + MAX_BONUS_SLOTS (absolute ceiling)
+  var maxStocks = config.MAX_STOCKS || 10;
+  var absoluteMax = maxStocks + (config.MAX_BONUS_SLOTS || 5);
+  if (holdingCount >= absoluteMax) {
+    failed.push('Portfolio full (' + holdingCount + '/' + absoluteMax + ')');
   }
 
   // 4 — Sector limit
@@ -1150,16 +1175,16 @@ function _createUserSignal(params, config) {
   var today = new Date();
   var todayStr = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-  // Dedup: same symbol + type + date
+  // Dedup: skip if a PENDING signal already exists for same symbol + type (any date)
   var lastRow = sheet.getLastRow();
   if (lastRow > 2) {
-    var existing = sheet.getRange(3, 1, lastRow - 2, 5).getValues();
+    var existing = sheet.getRange(3, 1, lastRow - 2, 12).getValues(); // read through status col (L)
     for (var i = 0; i < existing.length; i++) {
-      var existDate = existing[i][1] ? Utilities.formatDate(new Date(existing[i][1]), Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
-      if (String(existing[i][2]) === params.type &&
-          String(existing[i][4]) === params.symbol &&
-          existDate === todayStr) {
-        return; // duplicate
+      var existStatus = String(existing[i][11]).trim().toUpperCase();
+      if (existStatus === 'PENDING' &&
+          String(existing[i][2]) === params.type &&
+          String(existing[i][4]) === params.symbol) {
+        return; // pending signal already exists for this symbol+type
       }
     }
   }
@@ -1812,16 +1837,87 @@ function _getPaperPositions(statusFilter) {
  * Get paper trading portfolio — open positions with current P&L.
  * Uses watchlist data for current prices.
  */
+/**
+ * Batch-fetch live stock prices via GOOGLEFINANCE using temp cells.
+ * @param {string[]} symbols - Array of stock symbols (e.g., ["RELIANCE", "TCS"])
+ * @returns {Object} Map of symbol → price
+ */
+function _batchFetchLivePrices(symbols) {
+  if (!symbols || symbols.length === 0) return {};
+  try {
+    var sheet = getSheet(CONFIG.settingsSheet);
+    if (!sheet) return {};
+
+    // Use row 50+ as temp area (far from settings data), columns A-J
+    var startRow = 50;
+    var formulas = [];
+    for (var i = 0; i < symbols.length; i++) {
+      formulas.push(['=IFERROR(GOOGLEFINANCE("NSE:' + symbols[i] + '", "price"), 0)']);
+    }
+    var range = sheet.getRange(startRow, 26, symbols.length, 1); // Column Z
+    range.setFormulas(formulas);
+    SpreadsheetApp.flush();
+
+    var values = range.getValues();
+    range.clearContent();
+
+    var priceMap = {};
+    for (var j = 0; j < symbols.length; j++) {
+      var price = typeof values[j][0] === 'number' ? values[j][0] : 0;
+      if (price > 0) priceMap[symbols[j]] = price;
+    }
+    return priceMap;
+  } catch (e) {
+    log('_batchFetchLivePrices error: ' + e.message);
+    return {};
+  }
+}
+
 function getPaperPortfolio() {
   ensureScreenerSheets();
   var config = readScreenerConfig();
   var openPositions = _getPaperPositions('OPEN');
   var watchlist = readScreenerWatchlist();
 
-  // Build price lookup from watchlist
+  // Build price + factor lookup from watchlist
   var priceMap = {};
+  var factorMap = {};
   for (var w = 0; w < watchlist.length; w++) {
-    priceMap[watchlist[w].symbol] = watchlist[w].currentPrice;
+    var wl = watchlist[w];
+    priceMap[wl.symbol] = wl.currentPrice;
+    factorMap[wl.symbol] = {
+      factorScore: wl.factorScore,
+      factorRank: wl.factorRank,
+      sector: wl.sector,
+      rsi: wl.rsi,
+      screeners: wl.screeners,
+      conviction: wl.conviction,
+      capClass: wl.capClass,
+      return1w: wl.return1w,
+      return1m: wl.return1m,
+      return6m: wl.return6m,
+      return1y: wl.return1y,
+      pe: wl.pe,
+      roe: wl.roe,
+      piotroski: wl.piotroski,
+      drawdown: wl.drawdown,
+      high52w: wl.high52w,
+      goldenCross: wl.goldenCross,
+      momentumScore: wl.momentumScore,
+      qualityScore: wl.qualityScore,
+      trendScore: wl.trendScore,
+      valueScore: wl.valueScore,
+      lowVolScore: wl.lowVolScore
+    };
+  }
+
+  // Fetch live prices for open positions via GOOGLEFINANCE
+  var openSymbols = Object.keys(openPositions);
+  if (openSymbols.length > 0) {
+    var livePrices = _batchFetchLivePrices(openSymbols);
+    for (var s in livePrices) {
+      if (livePrices[s] > 0) priceMap[s] = livePrices[s]; // override with live
+    }
   }
 
   var holdings = [];
@@ -1837,6 +1933,7 @@ function getPaperPortfolio() {
     var daysHeld = pos.date ? Math.floor((new Date() - new Date(pos.date)) / (1000 * 60 * 60 * 24)) : 0;
     var holdingPeriodDays = config.PAPER_HOLDING_PERIOD_DAYS || 1;
 
+    var factors = factorMap[sym] || {};
     holdings.push({
       symbol: sym,
       name: pos.name,
@@ -1851,7 +1948,30 @@ function getPaperPortfolio() {
       daysHeld: daysHeld,
       isLocked: daysHeld < holdingPeriodDays,
       lockDaysRemaining: Math.max(0, holdingPeriodDays - daysHeld),
-      signalType: pos.signalType
+      signalType: pos.signalType,
+      // Factor data from watchlist
+      factorScore: factors.factorScore || null,
+      factorRank: factors.factorRank || null,
+      sector: factors.sector || '',
+      rsi: factors.rsi || null,
+      screeners: factors.screeners || '',
+      conviction: factors.conviction || '',
+      capClass: factors.capClass || '',
+      return1w: factors.return1w,
+      return1m: factors.return1m,
+      return6m: factors.return6m,
+      return1y: factors.return1y,
+      pe: factors.pe,
+      roe: factors.roe,
+      piotroski: factors.piotroski,
+      drawdown: factors.drawdown,
+      high52w: factors.high52w,
+      goldenCross: factors.goldenCross || '',
+      momentumScore: factors.momentumScore,
+      qualityScore: factors.qualityScore,
+      trendScore: factors.trendScore,
+      valueScore: factors.valueScore,
+      lowVolScore: factors.lowVolScore
     });
 
     totalInvested += pos.amount;
@@ -1861,6 +1981,56 @@ function getPaperPortfolio() {
   // Sort by P&L % descending
   holdings.sort(function(a, b) { return b.pnlPct - a.pnlPct; });
 
+  // Compute portfolio-level weighted-average factor scores (weighted by invested amount)
+  var factorTotals = { momentum: 0, quality: 0, trend: 0, value: 0, lowVol: 0 };
+  var factorWeight = 0;
+  for (var f = 0; f < holdings.length; f++) {
+    var h = holdings[f];
+    var w = h.invested || 0;
+    if (h.momentumScore != null) {
+      factorTotals.momentum += h.momentumScore * w;
+      factorTotals.quality += (h.qualityScore || 0) * w;
+      factorTotals.trend += (h.trendScore || 0) * w;
+      factorTotals.value += (h.valueScore || 0) * w;
+      factorTotals.lowVol += (h.lowVolScore || 0) * w;
+      factorWeight += w;
+    }
+  }
+  var portfolioFactors = factorWeight > 0 ? {
+    momentum: Math.round(factorTotals.momentum / factorWeight * 10) / 10,
+    quality: Math.round(factorTotals.quality / factorWeight * 10) / 10,
+    trend: Math.round(factorTotals.trend / factorWeight * 10) / 10,
+    value: Math.round(factorTotals.value / factorWeight * 10) / 10,
+    lowVol: Math.round(factorTotals.lowVol / factorWeight * 10) / 10,
+    composite: Math.round((factorTotals.momentum + factorTotals.quality + factorTotals.trend + factorTotals.value + factorTotals.lowVol) / (factorWeight * 5) * 10) / 10
+  } : null;
+
+  // Compute factor allocation — each holding's invested amount distributed proportionally across its factor scores
+  var factorAlloc = { momentum: 0, quality: 0, trend: 0, value: 0, lowVol: 0 };
+  var allocTotal = 0;
+  for (var fa = 0; fa < holdings.length; fa++) {
+    var fh = holdings[fa];
+    var fw = fh.invested || 0;
+    if (fw > 0 && fh.momentumScore != null) {
+      var fSum = (fh.momentumScore || 0) + (fh.qualityScore || 0) + (fh.trendScore || 0) + (fh.valueScore || 0) + (fh.lowVolScore || 0);
+      if (fSum > 0) {
+        factorAlloc.momentum += (fh.momentumScore || 0) / fSum * fw;
+        factorAlloc.quality += (fh.qualityScore || 0) / fSum * fw;
+        factorAlloc.trend += (fh.trendScore || 0) / fSum * fw;
+        factorAlloc.value += (fh.valueScore || 0) / fSum * fw;
+        factorAlloc.lowVol += (fh.lowVolScore || 0) / fSum * fw;
+        allocTotal += fw;
+      }
+    }
+  }
+  var factorAllocation = allocTotal > 0 ? {
+    momentum: Math.round(factorAlloc.momentum / allocTotal * 1000) / 10,
+    quality: Math.round(factorAlloc.quality / allocTotal * 1000) / 10,
+    trend: Math.round(factorAlloc.trend / allocTotal * 1000) / 10,
+    value: Math.round(factorAlloc.value / allocTotal * 1000) / 10,
+    lowVol: Math.round(factorAlloc.lowVol / allocTotal * 1000) / 10
+  } : null;
+
   return {
     holdings: holdings,
     summary: {
@@ -1869,7 +2039,9 @@ function getPaperPortfolio() {
       totalCurrentValue: Math.round(totalCurrentValue),
       totalPnl: Math.round(totalCurrentValue - totalInvested),
       totalPnlPct: totalInvested > 0 ? Math.round(((totalCurrentValue - totalInvested) / totalInvested) * 10000) / 100 : 0
-    }
+    },
+    portfolioFactors: portfolioFactors,
+    factorAllocation: factorAllocation
   };
 }
 
@@ -1992,8 +2164,10 @@ function trackSignalOutcomes() {
 
   for (var i = 0; i < data.length; i++) {
     var type = String(data[i][2]).trim();
-    // Only track BUY/ADD signals
+    var status = String(data[i][11]).trim().toUpperCase();
+    // Only track executed BUY/ADD signals
     if (type !== 'BUY_STARTER' && type !== 'ADD1' && type !== 'ADD2' && type !== 'DIP_BUY') continue;
+    if (status !== 'EXECUTED') continue;
 
     var signalDate = data[i][1];
     if (!signalDate) continue;

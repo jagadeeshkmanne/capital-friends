@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   ScanSearch, RefreshCw, TrendingUp, TrendingDown, AlertTriangle,
   Check, X, ShieldAlert, ArrowUpCircle, ArrowDownCircle,
-  Settings as SettingsIcon, Eye, Loader2, Save, Activity, Info, ChevronDown, ChevronUp, Download, Shield, Trash2
+  Settings as SettingsIcon, Eye, Loader2, Save, Activity, Info, ChevronDown, Download, Trash2
 } from 'lucide-react'
 import { AgGridReact } from 'ag-grid-react'
 import { AllCommunityModule, ModuleRegistry, themeQuartz } from 'ag-grid-community'
 import { formatINR } from '../../data/familyData'
 import { useToast } from '../../context/ToastContext'
 import { useData } from '../../context/DataContext'
-import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/Modal'
 import BuyStockForm from '../../components/forms/BuyStockForm'
 import SellStockForm from '../../components/forms/SellStockForm'
@@ -74,7 +74,9 @@ const SETTINGS_SECTIONS = [
     description: 'Budget includes ALL your stock holdings (screener + manually bought).',
     fields: [
       { key: 'STOCK_BUDGET', label: 'Total Stock Budget (₹)', description: 'Total capital you want in stocks', type: 'number' },
-      { key: 'MAX_STOCKS', label: 'Max Stocks', description: 'Maximum different stocks to hold', type: 'number' },
+      { key: 'MAX_STOCKS', label: 'Base Max Stocks', description: 'Base portfolio limit (expands dynamically for high-scoring stocks)', type: 'number' },
+      { key: 'BONUS_SCORE_THRESHOLD', label: 'Bonus Slot Score', description: 'Factor score threshold for bonus slots (default 75)', type: 'number' },
+      { key: 'MAX_BONUS_SLOTS', label: 'Max Bonus Slots', description: 'Max extra slots for high-conviction stocks (default 5)', type: 'number' },
       { key: 'MAX_PER_SECTOR', label: 'Max Per Sector', description: 'Maximum stocks in the same sector', type: 'number' },
     ]
   },
@@ -91,8 +93,7 @@ const SETTINGS_SECTIONS = [
   {
     title: 'When to Buy',
     fields: [
-      { key: 'RSI_BUY_MAX', label: 'Max RSI to Buy', description: 'Only buy when RSI below this (default 65)', type: 'number' },
-      { key: 'RSI_OVERBOUGHT', label: 'RSI Overbought Block', description: 'Hard block if RSI above this (default 70)', type: 'number' },
+      { key: 'RSI_OVERBOUGHT', label: 'RSI Overbought Block', description: 'Hard block if RSI above this (default 70). RSI 60-69 is penalized inside factor score.', type: 'number' },
       { key: 'MIN_AVG_TRADED_VALUE_CR', label: 'Min Avg Traded Value (Cr)', description: 'Skip illiquid stocks below this daily avg (default 3 Cr)', type: 'number' },
       { key: 'SKIP_COOLING_PERIOD', label: 'Skip Cooling Period', description: 'Treat COOLING stocks as ELIGIBLE immediately (for testing)', type: 'boolean' },
     ]
@@ -142,8 +143,10 @@ const CONFIG_FIELDS = SETTINGS_SECTIONS.flatMap(s => s.fields)
 export default function ScreenerPage() {
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const { stockPortfolios, buyStock, sellStock, addStockPortfolio, refreshStocks } = useData()
-  const { isOwner, isAdmin } = useAuth()
-  const [subTab, setSubTab] = useState('signals')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const TAB_KEYS = ['signals', 'paper-trading', 'watchlist', 'how-it-works', 'settings']
+  const subTab = TAB_KEYS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'signals'
+  const setSubTab = useCallback((tab) => setSearchParams({ tab }, { replace: true }), [setSearchParams])
   const [signals, setSignals] = useState(null)
   const [niftyData, setNiftyData] = useState(null)
   const [portfolioSummary, setPortfolioSummary] = useState(null)
@@ -155,13 +158,6 @@ export default function ScreenerPage() {
   const [savingConfig, setSavingConfig] = useState(false)
   const [tradeModal, setTradeModal] = useState(null) // { type: 'buy'|'sell', signal }
   const watchlistGridRef = useRef(null)
-
-  // Admin panel state
-  const [adminOpen, setAdminOpen] = useState(false)
-  const [adminStatus, setAdminStatus] = useState(null)
-  const [adminLoading, setAdminLoading] = useState({
-    trendlyne: false, nifty: false, rescore: false, pipeline: false, status: false
-  })
 
   useEffect(() => { loadSignals() }, [])
 
@@ -287,10 +283,11 @@ export default function ScreenerPage() {
         }
       }
 
+      const tradeType = tradeModal.type
       setSignals(prev => prev.filter(s => s.signalId !== signal.signalId))
       setTradeModal(null)
       refreshStocks?.()
-      showToast(`${tradeModal.type === 'buy' ? 'Buy' : 'Sell'} executed and signal marked done`)
+      showToast(`${tradeType === 'buy' ? 'Buy' : 'Sell'} executed and signal marked done`)
     } catch (err) {
       showToast(err.message || 'Trade failed', 'error')
     } finally {
@@ -356,38 +353,6 @@ export default function ScreenerPage() {
     }
   }
 
-  // ── Admin panel handlers ──
-  const loadAdminStatus = useCallback(async () => {
-    setAdminLoading(prev => ({ ...prev, status: true }))
-    try {
-      const data = await api.adminGetStatus()
-      setAdminStatus(data)
-    } catch (err) {
-      showToast(err.message || 'Failed to load admin status', 'error')
-    } finally {
-      setAdminLoading(prev => ({ ...prev, status: false }))
-    }
-  }, [showToast])
-
-  useEffect(() => {
-    if (adminOpen && !adminStatus) loadAdminStatus()
-  }, [adminOpen])
-
-  const runAdminAction = useCallback(async (key, apiFn, label) => {
-    setAdminLoading(prev => ({ ...prev, [key]: true }))
-    const start = Date.now()
-    try {
-      await apiFn()
-      const duration = ((Date.now() - start) / 1000).toFixed(1)
-      showToast(`${label} completed in ${duration}s`)
-      loadAdminStatus() // refresh status after action
-    } catch (err) {
-      showToast(err.message || `${label} failed`, 'error')
-    } finally {
-      setAdminLoading(prev => ({ ...prev, [key]: false }))
-    }
-  }, [showToast, loadAdminStatus])
-
   // Format helpers for nifty bar
   const fmtPct = (v) => {
     if (v == null) return 'N/A'
@@ -400,115 +365,14 @@ export default function ScreenerPage() {
   return (
     <div className="space-y-3">
 
-      {/* ── Compact Nifty Bar ── */}
-      {niftyData && niftyData.price && (
-        <div className="flex flex-wrap items-center bg-[var(--bg-card)] border border-[var(--border)] rounded-lg overflow-hidden divide-x divide-[var(--border-light)]">
-          <MetricPill label="Nifty" value={`₹${Number(niftyData.price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} />
-          <MetricPill
-            label="Regime"
-            value={niftyData.aboveDMA200
-              ? ((niftyData.return6m || 0) >= 0 ? 'Bull (100%)' : 'Caution (75%)')
-              : (niftyData.price && niftyData.dma200 && ((niftyData.price - niftyData.dma200) / niftyData.dma200 * 100) > -5
-                ? 'Correction (50%)'
-                : 'Bear (25%)')}
-            positive={niftyData.aboveDMA200}
-          />
-          <MetricPill label="1M" value={fmtPct(niftyData.return1m)} positive={pctPositive(niftyData.return1m)} />
-          <MetricPill label="Nifty 6M" value={fmtPct(niftyData.return6m)} positive={pctPositive(niftyData.return6m)} />
-          <MetricPill label="Midcap 6M" value={fmtPct(niftyData.midcapReturn6m)} positive={pctPositive(niftyData.midcapReturn6m)} />
-          <MetricPill label="Smallcap 6M" value={fmtPct(niftyData.smallcapReturn6m)} positive={pctPositive(niftyData.smallcapReturn6m)} />
-          {portfolioSummary && (
-            <>
-              <MetricPill label="Invested" value={formatINR(portfolioSummary.totalInvested)} />
-              <MetricPill label="Cash" value={formatINR(portfolioSummary.cashAvailable)} />
-              <MetricPill label="Stocks" value={`${portfolioSummary.holdingCount}/${portfolioSummary.maxStocks}`} />
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Admin Panel (owner only) ── */}
-      {(isOwner || isAdmin) && (
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg overflow-hidden">
-          <button
-            onClick={() => setAdminOpen(prev => !prev)}
-            className="flex items-center gap-2 w-full px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <Shield size={13} className="text-violet-400" />
-            <span>Admin</span>
-            {adminOpen ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
-          </button>
-          {adminOpen && (
-            <div className="px-3 pb-3 space-y-3 border-t border-[var(--border-light)]">
-              {/* Action buttons */}
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                {[
-                  { key: 'trendlyne', label: 'Refresh Trendlyne', fn: api.adminRefreshTrendlyne, primary: false },
-                  { key: 'nifty', label: 'Refresh Nifty', fn: api.adminRefreshNifty, primary: false },
-                  { key: 'rescore', label: 'Re-score', fn: api.adminRescoreWatchlist, primary: false },
-                  { key: 'pipeline', label: 'Full Pipeline', fn: api.adminRunFullPipeline, primary: true },
-                ].map(({ key, label, fn, primary }) => (
-                  <button
-                    key={key}
-                    onClick={() => runAdminAction(key, fn, label)}
-                    disabled={adminLoading[key]}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors ${
-                      adminLoading[key]
-                        ? 'opacity-50 cursor-not-allowed'
-                        : primary
-                          ? 'bg-violet-600 hover:bg-violet-500 text-white'
-                          : 'bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border)]'
-                    }`}
-                  >
-                    {adminLoading[key] ? <Loader2 size={12} className="animate-spin" /> : null}
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Status info */}
-              {adminLoading.status ? (
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
-                  <Loader2 size={12} className="animate-spin" /> Loading status...
-                </div>
-              ) : adminStatus ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[11px]">
-                  <div>
-                    <span className="text-[var(--text-dim)]">Trendlyne updated: </span>
-                    <span className="text-[var(--text-secondary)] font-medium">{adminStatus.lastTrendlyneUpdate || 'Never'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-dim)]">Nifty updated: </span>
-                    <span className="text-[var(--text-secondary)] font-medium">{adminStatus.lastNiftyUpdate || 'Never'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-dim)]">Watchlist: </span>
-                    <span className="text-[var(--text-secondary)] font-medium">{adminStatus.watchlistCount ?? '-'} stocks</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {adminStatus.statusDistribution && Object.entries(adminStatus.statusDistribution).map(([status, count]) => (
-                      <span key={status} className="inline-flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLORS[status]?.color || 'var(--text-dim)' }} />
-                        <span className="text-[var(--text-dim)]">{status}</span>
-                        <span className="text-[var(--text-secondary)] font-medium">{count}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Sub-tabs + Generate button ── */}
-      <div className="flex items-center gap-2">
+      {/* ── Sub-tabs + Nifty bar + Generate button ── */}
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 shrink-0">
           {[
             { key: 'signals', icon: Activity, label: 'Signals' },
-            { key: 'paper', icon: TrendingUp, label: 'Paper Trading' },
+            { key: 'paper-trading', icon: TrendingUp, label: 'Paper Trading' },
             { key: 'watchlist', icon: Eye, label: 'Watchlist' },
-            { key: 'criteria', icon: Info, label: 'How It Works' },
+            { key: 'how-it-works', icon: Info, label: 'How It Works' },
             { key: 'settings', icon: SettingsIcon, label: 'Settings' },
           ].map(({ key, icon: Icon, label }) => (
             <button
@@ -531,6 +395,33 @@ export default function ScreenerPage() {
             </button>
           ))}
         </div>
+
+        {/* Nifty market pills — inline with tabs */}
+        {niftyData && niftyData.price && (
+          <div className="flex items-center gap-0 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg overflow-hidden divide-x divide-[var(--border-light)]">
+            <MetricPill label="Nifty" value={`₹${Number(niftyData.price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} />
+            <MetricPill
+              label="Regime"
+              value={niftyData.aboveDMA200
+                ? ((niftyData.return6m || 0) >= 0 ? 'Bull (100%)' : 'Caution (85%)')
+                : (niftyData.price && niftyData.dma200 && ((niftyData.price - niftyData.dma200) / niftyData.dma200 * 100) > -5
+                  ? 'Correction (75%)'
+                  : 'Bear (50%)')}
+              positive={niftyData.aboveDMA200}
+            />
+            <MetricPill label="1M" value={fmtPct(niftyData.return1m)} positive={pctPositive(niftyData.return1m)} />
+            <MetricPill label="Nifty 6M" value={fmtPct(niftyData.return6m)} positive={pctPositive(niftyData.return6m)} />
+            <MetricPill label="Midcap 6M" value={fmtPct(niftyData.midcapReturn6m)} positive={pctPositive(niftyData.midcapReturn6m)} />
+            <MetricPill label="Smallcap 6M" value={fmtPct(niftyData.smallcapReturn6m)} positive={pctPositive(niftyData.smallcapReturn6m)} />
+            {portfolioSummary && (
+              <>
+                <MetricPill label="Invested" value={formatINR(portfolioSummary.totalInvested)} />
+                <MetricPill label="Cash" value={formatINR(portfolioSummary.cashAvailable)} />
+                <MetricPill label="Stocks" value={`${portfolioSummary.holdingCount}/${portfolioSummary.effectiveMax || portfolioSummary.maxStocks}${portfolioSummary.bonusSlots > 0 ? ` (+${portfolioSummary.bonusSlots})` : ''}`} />
+              </>
+            )}
+          </div>
+        )}
 
         <button
           onClick={handleGenerate}
@@ -662,7 +553,7 @@ export default function ScreenerPage() {
       )}
 
       {/* ===== PAPER TRADING TAB ===== */}
-      {subTab === 'paper' && <PaperTradingTab showToast={showToast} />}
+      {subTab === 'paper-trading' && <PaperTradingTab showToast={showToast} />}
 
       {/* ===== WATCHLIST TAB ===== */}
       {subTab === 'watchlist' && (
@@ -733,7 +624,7 @@ export default function ScreenerPage() {
       )}
 
       {/* ===== HOW IT WORKS TAB ===== */}
-      {subTab === 'criteria' && (
+      {subTab === 'how-it-works' && (
         <div className="space-y-4">
           {/* Stock Screener */}
           {/* 3-Screener Discovery */}
@@ -745,7 +636,7 @@ export default function ScreenerPage() {
                   <span className="text-xs font-semibold text-[var(--text-primary)]">CF-Compounder (#1) — Quality</span>
                   <span className="text-[9px] text-[var(--text-dim)] ml-auto">30-day cooling</span>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)] pl-6">Market cap ₹500-15K Cr, Sales & Profit growth 3Y &gt; 30%, ROE &gt; 18%, D/E &lt; 0.3, Promoter &gt; 45% (pledge &lt; 10%), Piotroski &gt; 6, CFO &gt; Net Profit</div>
+                <div className="text-[11px] text-[var(--text-secondary)] pl-6">Market cap ₹500-20K Cr, Sales & Profit growth 3Y &gt; 15%, ROE &gt; 15%, D/E &lt; 0.5, Promoter &gt; 40% (pledge &lt; 15%), Piotroski &gt; 5</div>
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
@@ -753,7 +644,7 @@ export default function ScreenerPage() {
                   <span className="text-xs font-semibold text-[var(--text-primary)]">CF-Momentum (#2) — Breakouts</span>
                   <span className="text-[9px] text-[var(--text-dim)] ml-auto">14-day cooling</span>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)] pl-6">Market cap ₹500-15K Cr, 6M return &gt; 15%, 1M return &lt; 25% (no chasing), near 52W high ≥ 80%, ROE &gt; 12%, Profit growth 3Y &gt; 15%, Piotroski &gt; 4, Promoter &gt; 35%</div>
+                <div className="text-[11px] text-[var(--text-secondary)] pl-6">Market cap ₹500-20K Cr, 6M return &gt; 10%, 1M return &lt; 20% (no chasing), within 25% of 52W high, ROE &gt; 10%, Profit growth 3Y &gt; 10%, Piotroski &gt; 4, Promoter &gt; 30%</div>
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
@@ -761,7 +652,7 @@ export default function ScreenerPage() {
                   <span className="text-xs font-semibold text-[var(--text-primary)]">CF-Growth (#3) — Small-Cap Leaders</span>
                   <span className="text-[9px] text-[var(--text-dim)] ml-auto">21-day cooling</span>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)] pl-6">Market cap ₹500-5K Cr, Sales growth 3Y &gt; 40%, Profit growth 3Y &gt; 30%, ROE &gt; 15%, D/E &lt; 0.5, Piotroski &gt; 5, Promoter &gt; 50% (pledge &lt; 20%)</div>
+                <div className="text-[11px] text-[var(--text-secondary)] pl-6">Market cap ₹500-10K Cr, Sales growth 3Y &gt; 20%, Profit growth 3Y &gt; 15%, ROE &gt; 12%, D/E &lt; 0.7, Piotroski &gt; 4, Promoter &gt; 40% (pledge &lt; 25%)</div>
               </div>
               <div className="mt-2 bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
                 <div className="text-[10px] font-semibold text-[var(--text-primary)] mb-1">Overlap Boost</div>
@@ -806,7 +697,7 @@ export default function ScreenerPage() {
           <CriteriaSection title="Buy Conditions" description="Factor score is the primary gate. Technical conditions (golden cross, price vs 200DMA) are inside the score, not hard gates.">
             <CriteriaCheck label={`Factor score ≥ ${config?.FACTOR_BUY_MIN || 50}`} desc="Composite score from Momentum + Quality + Trend + Value + Low Vol + Relative Strength" />
             <CriteriaCheck label={`RSI ≤ ${config?.RSI_OVERBOUGHT || 70} (hard block only)`} desc="Only blocks overbought stocks. RSI 60-69 already penalized inside Trend factor score — no double punishment." />
-            <CriteriaCheck label={`Max ${config?.MAX_STOCKS || 10} stocks`} desc="Total stock count within limit" />
+            <CriteriaCheck label={`Base ${config?.MAX_STOCKS || 10} stocks + up to ${config?.MAX_BONUS_SLOTS || 5} bonus for score ≥ ${config?.BONUS_SCORE_THRESHOLD || 75}`} desc="Dynamic slots: high-conviction stocks (factor score above threshold) unlock extra portfolio slots" />
             <CriteriaCheck label={`Max ${config?.MAX_PER_SECTOR || 3} per sector`} desc="Sector diversification maintained" />
             <CriteriaCheck label="Cash available" desc="Budget minus current invested value must cover the starter buy amount" />
             <CriteriaCheck label="Market regime → allocation scaling" desc="Bull 100%, Caution 85%, Correction 75%, Bear 50%. Never blocks — only scales position size." />
@@ -816,48 +707,49 @@ export default function ScreenerPage() {
           </CriteriaSection>
 
           {/* Factor Model */}
-          <CriteriaSection title="6-Factor Scoring Model" description="Each stock scored 0-100. Rank determines allocation size. DII overlay ±5-10%, overlap boost ×1.1-1.2. Negative-return stocks capped at 50 for Relative Strength.">
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Momentum', pct: 30, desc: '6M return rank', color: 'text-emerald-400' },
-                { label: 'Quality', pct: 20, desc: 'Piotroski + ROE', color: 'text-blue-400' },
-                { label: 'Trend', pct: 20, desc: 'RSI + GC + DMA', color: 'text-amber-400' },
-                { label: 'Rel Strength', pct: 15, desc: 'Excess return rank', color: 'text-purple-400' },
-                { label: 'Value', pct: 5, desc: 'Low PE', color: 'text-cyan-400' },
-                { label: 'Low Vol', pct: 10, desc: 'Low drawdown', color: 'text-pink-400' },
-              ].map(c => (
-                <div key={c.label} className="bg-[var(--bg-inset)] rounded-lg p-2 text-center border border-[var(--border-light)]">
-                  <div className={`text-[10px] font-bold ${c.color}`}>{c.label}</div>
-                  <div className="text-base font-bold text-[var(--text-primary)] tabular-nums">{c.pct}%</div>
-                  <div className="text-[9px] text-[var(--text-dim)]">{c.desc}</div>
-                </div>
-              ))}
+          <CriteriaSection title="5-Factor Scoring Model" description="Each stock scored 0-100. Weights shift by market regime — momentum leads in bull, quality leads in bear. DII overlay ±5-10%, overlap boost ×1.1-1.2.">
+            {/* Regime-dependent weight table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[var(--text-dim)] border-b border-[var(--border-light)]">
+                    <th className="text-left py-1.5 font-semibold">Factor</th>
+                    <th className="text-center py-1.5 font-semibold text-emerald-400">Bull</th>
+                    <th className="text-center py-1.5 font-semibold text-amber-400">Caution</th>
+                    <th className="text-center py-1.5 font-semibold text-orange-400">Correction</th>
+                    <th className="text-center py-1.5 font-semibold text-red-400">Bear</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[var(--text-primary)]">
+                  <tr className="border-b border-[var(--border-light)]"><td className="py-1.5 font-semibold text-emerald-400">Momentum</td><td className="text-center tabular-nums">40%</td><td className="text-center tabular-nums">35%</td><td className="text-center tabular-nums">25%</td><td className="text-center tabular-nums">15%</td></tr>
+                  <tr className="border-b border-[var(--border-light)]"><td className="py-1.5 font-semibold text-blue-400">Quality</td><td className="text-center tabular-nums">15%</td><td className="text-center tabular-nums">20%</td><td className="text-center tabular-nums">25%</td><td className="text-center tabular-nums">30%</td></tr>
+                  <tr className="border-b border-[var(--border-light)]"><td className="py-1.5 font-semibold text-amber-400">Trend</td><td className="text-center tabular-nums">20%</td><td className="text-center tabular-nums">20%</td><td className="text-center tabular-nums">25%</td><td className="text-center tabular-nums">15%</td></tr>
+                  <tr className="border-b border-[var(--border-light)]"><td className="py-1.5 font-semibold text-cyan-400">Value</td><td className="text-center tabular-nums">5%</td><td className="text-center tabular-nums">10%</td><td className="text-center tabular-nums">15%</td><td className="text-center tabular-nums">25%</td></tr>
+                  <tr><td className="py-1.5 font-semibold text-pink-400">Low Vol</td><td className="text-center tabular-nums">20%</td><td className="text-center tabular-nums">15%</td><td className="text-center tabular-nums">10%</td><td className="text-center tabular-nums">15%</td></tr>
+                </tbody>
+              </table>
             </div>
             {/* Sub-factor breakdown */}
             <div className="mt-3 space-y-2">
               <div className="bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
-                <div className="text-[10px] font-semibold text-emerald-400 mb-1">Momentum (30%)</div>
-                <div className="text-[10px] text-[var(--text-secondary)]">Percentile rank of 6M return among all watchlist peers. Higher return = higher rank.</div>
+                <div className="text-[10px] font-semibold text-emerald-400 mb-1">Momentum</div>
+                <div className="text-[10px] text-[var(--text-secondary)]">Percentile rank of 6M return among all watchlist peers. Includes relative strength vs benchmark (Nifty/Midcap/Smallcap by cap class).</div>
               </div>
               <div className="bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
-                <div className="text-[10px] font-semibold text-blue-400 mb-1">Quality (20%)</div>
+                <div className="text-[10px] font-semibold text-blue-400 mb-1">Quality</div>
                 <div className="text-[10px] text-[var(--text-secondary)]">Piotroski 35% + ROE 30% + Profit Growth 20% + Low D/E 15%. Missing data defaults to 50 (neutral).</div>
               </div>
               <div className="bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
-                <div className="text-[10px] font-semibold text-amber-400 mb-1">Trend (20%)</div>
+                <div className="text-[10px] font-semibold text-amber-400 mb-1">Trend</div>
                 <div className="text-[10px] text-[var(--text-secondary)]">RSI zone 40% (oversold=90, overbought=10) + Golden Cross 35% (50DMA&gt;200DMA) + Price vs 200DMA 25%.</div>
               </div>
               <div className="bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
-                <div className="text-[10px] font-semibold text-purple-400 mb-1">Relative Strength (15%)</div>
-                <div className="text-[10px] text-[var(--text-secondary)]">Excess return vs benchmark (Nifty/Midcap/Smallcap by cap class). Negative-return stocks capped at 50 — no "less bad loser" inflation.</div>
+                <div className="text-[10px] font-semibold text-cyan-400 mb-1">Value</div>
+                <div className="text-[10px] text-[var(--text-secondary)]">Inverted PE percentile — lower PE ranks higher. Low weight in bull markets because multibaggers trade at premium valuations.</div>
               </div>
               <div className="bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
-                <div className="text-[10px] font-semibold text-cyan-400 mb-1">Value (5%)</div>
-                <div className="text-[10px] text-[var(--text-secondary)]">Inverted PE percentile — lower PE ranks higher. Low weight because multibaggers trade at premium valuations.</div>
-              </div>
-              <div className="bg-[var(--bg-inset)] rounded-lg p-2 border border-[var(--border-light)]">
-                <div className="text-[10px] font-semibold text-pink-400 mb-1">Low Volatility (10%)</div>
-                <div className="text-[10px] text-[var(--text-secondary)]">Inverted drawdown from 52W high — smaller drawdown ranks higher. Rewards stability.</div>
+                <div className="text-[10px] font-semibold text-pink-400 mb-1">Low Volatility</div>
+                <div className="text-[10px] text-[var(--text-secondary)]">Inverted drawdown from 52W high — smaller drawdown ranks higher. Higher weight in bull (protects from blow-offs).</div>
               </div>
             </div>
             {/* Post-factor multipliers */}
@@ -977,7 +869,7 @@ export default function ScreenerPage() {
               <p><strong className="text-[var(--text-primary)]">Benchmarks</strong> — Nifty 50 via GOOGLEFINANCE. Midcap 150 and Smallcap 250 via Yahoo Finance (GOOGLEFINANCE doesn't support these).</p>
               <p><strong className="text-[var(--text-primary)]">Your Holdings</strong> — Read from your StockHoldings sheet. Joined with Screener_StockMeta for pyramid stage, peak price, and stop levels.</p>
               <p><strong className="text-[var(--text-primary)]">Nifty</strong> — Live price from NSE API / GOOGLEFINANCE (5-min cache). 200DMA and returns from Master DB (daily). Regime calculated from live price vs 200DMA.</p>
-              <p><strong className="text-[var(--text-primary)]">Signals</strong> — Auto-generated daily at 9:30 AM + on-demand via button. Deduplicated same-day per symbol + type.</p>
+              <p><strong className="text-[var(--text-primary)]">Signals</strong> — Auto-generated daily at 9:30 AM + on-demand via button. Deduplicated by PENDING status — skips if a pending signal already exists for same symbol + type.</p>
               <p><strong className="text-[var(--text-primary)]">Paper Trading</strong> — Auto-executes BUY/SELL signals in sandbox (separate Screener_PaperTrades sheet). Tracks CAGR, P&L, win rate. No impact on real holdings.</p>
               <p><strong className="text-[var(--text-primary)]">Signal Tracking</strong> — BUY signals tracked at 7D, 14D, 30D intervals. Records actual price vs signal price to measure accuracy.</p>
               <p><strong className="text-[var(--text-primary)]">Hourly Checks</strong> — Exit conditions (trailing stop, hard exit) checked every hour during market hours (9-16 IST). Auto-sells paper positions.</p>
@@ -1340,7 +1232,7 @@ const StatusCellRenderer = ({ value }) => {
 }
 
 const ConvictionCellRenderer = ({ value }) => {
-  const s = CONVICTION_COLORS[value] || CONVICTION_COLORS.LOW
+  const s = CONVICTION_COLORS[value] || CONVICTION_COLORS.BASE
   return <span style={{ padding: '2px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, color: s.color, background: s.bg }}>{value || '-'}</span>
 }
 
@@ -1396,9 +1288,9 @@ const watchlistColDefs = [
     cellStyle: p => ({ fontWeight: 700, color: p.value <= 5 ? '#34d399' : p.value <= 10 ? '#60a5fa' : 'var(--text-dim)' }),
     valueFormatter: p => p.value && p.value < 99 ? '#' + p.value : '-' },
   { field: 'symbol', headerName: 'Stock', cellRenderer: StockCellRenderer, minWidth: 140, flex: 1.2, filter: 'agTextColumnFilter', pinned: 'left' },
-  { field: 'factorScore', headerName: 'Score', cellRenderer: FactorScoreCellRenderer, minWidth: 90, width: 100, type: 'numericColumn', filter: 'agNumberColumnFilter',
+  { field: 'factorScore', headerName: 'Score', cellRenderer: FactorScoreCellRenderer, minWidth: 110, width: 120, type: 'numericColumn', filter: 'agNumberColumnFilter',
     headerTooltip: 'Composite factor score (0-100). 70+ = Strong Buy, 50-69 = Buy, 35-49 = Watch, <35 = Avoid' },
-  { field: 'screeners', headerName: 'Scr', cellRenderer: ScreenersCellRenderer, minWidth: 85, width: 95, filter: 'agTextColumnFilter',
+  { field: 'screeners', headerName: 'Screeners', cellRenderer: ScreenersCellRenderer, minWidth: 100, width: 120, filter: 'agTextColumnFilter',
     headerTooltip: 'C = Compounder, M = Momentum, G = Growth. Overlap boost shown (×1.1 or ×1.2)',
     comparator: (a, b) => {
       const countA = a ? String(a).split(',').length : 0
@@ -1515,71 +1407,164 @@ function PaperTradingTab({ showToast }) {
   const port = portfolio || { holdings: [], summary: {} }
   const summ = port.summary || {}
 
+  const totalPnl = (perf.totalPnl || 0)
+  const totalPnlPct = (perf.totalPnlPct || summ.totalPnlPct || 0)
+  const pnlUp = totalPnl >= 0
+  const pf = port.portfolioFactors
+  const fa = port.factorAllocation
+  const _fc = (v) => v >= 70 ? 'text-emerald-400' : v >= 50 ? 'text-blue-400' : v >= 35 ? 'text-amber-400' : 'text-[var(--text-dim)]'
+
   return (
     <div className="space-y-3">
-      {/* Sub-nav */}
-      <div className="flex gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 w-fit">
+      {/* ── Summary Card ── */}
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-y-3 gap-x-4">
+          {/* Primary 3 */}
+          <div>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase">Invested</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(summ.totalInvested || 0)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase">Current</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(summ.totalCurrentValue || 0)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase">P&L</p>
+            <p className={`text-sm font-bold tabular-nums ${pnlUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{pnlUp ? '+' : ''}{formatINR(totalPnl)} <span className="text-xs font-semibold">({pnlUp ? '+' : ''}{totalPnlPct}%)</span></p>
+          </div>
+          {/* Secondary 3 */}
+          <div>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase">Win Rate</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{perf.winRate || 0}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase">CAGR</p>
+            <p className={`text-sm font-bold tabular-nums ${(perf.cagr || 0) > 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{perf.cagr || 0}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase">Trades</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{perf.totalTrades || 0}</p>
+          </div>
+        </div>
+
+        {/* Factor Allocation — stacked bar + legend */}
+        {fa && (
+          <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
+            <p className="text-[9px] text-[var(--text-dim)] uppercase mb-1.5">Factor Allocation</p>
+            {/* Stacked bar */}
+            <div className="w-full h-3 rounded-full bg-[var(--bg-inset)] overflow-hidden flex">
+              {[
+                { k: 'momentum', c: 'bg-violet-500' },
+                { k: 'quality', c: 'bg-emerald-500' },
+                { k: 'trend', c: 'bg-blue-500' },
+                { k: 'value', c: 'bg-amber-500' },
+                { k: 'lowVol', c: 'bg-cyan-500' },
+              ].map(({ k, c }) => fa[k] > 0 ? (
+                <div key={k} className={`h-full ${c}`} style={{ width: `${fa[k]}%` }} />
+              ) : null)}
+            </div>
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+              {[
+                { k: 'momentum', l: 'Momentum', c: 'bg-violet-500', tc: 'text-violet-400' },
+                { k: 'quality', l: 'Quality', c: 'bg-emerald-500', tc: 'text-emerald-400' },
+                { k: 'trend', l: 'Trend', c: 'bg-blue-500', tc: 'text-blue-400' },
+                { k: 'value', l: 'Value', c: 'bg-amber-500', tc: 'text-amber-400' },
+                { k: 'lowVol', l: 'Low Vol', c: 'bg-cyan-500', tc: 'text-cyan-400' },
+              ].map(({ k, l, c, tc }) => (
+                <div key={k} className="flex items-center gap-1">
+                  <span className={`w-2 h-2 rounded-sm ${c}`} />
+                  <span className="text-[10px] text-[var(--text-dim)]">{l}</span>
+                  <span className={`text-[10px] font-bold tabular-nums ${tc}`}>{fa[k]}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Sub-nav ── */}
+      <div className="flex items-center gap-4 border-b border-[var(--border-light)] text-xs">
         {[
-          { key: 'portfolio', label: 'Portfolio' },
+          { key: 'portfolio', label: `Positions (${port.holdings.length})` },
           { key: 'performance', label: 'Performance' },
           { key: 'tracking', label: 'Signal Accuracy' },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setActiveView(key)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              activeView === key ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            className={`pb-2 font-semibold transition-colors border-b-2 -mb-px ${
+              activeView === key
+                ? 'text-[var(--text-primary)] border-violet-500'
+                : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'
             }`}>{label}</button>
         ))}
-      </div>
-
-      {/* ── Summary Cards (always visible) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-        <StatCard label="Invested" value={formatINR(summ.totalInvested || 0)} />
-        <StatCard label="Current" value={formatINR(summ.totalCurrentValue || 0)} />
-        <StatCard label="Unrealized P&L" value={formatINR(perf.unrealizedPnl || 0)} pct={summ.totalPnlPct} />
-        <StatCard label="Realized P&L" value={formatINR(perf.realizedPnl || 0)} />
-        <StatCard label="Total P&L" value={formatINR(perf.totalPnl || 0)} pct={perf.totalPnlPct} highlight />
-        <StatCard label="CAGR" value={`${perf.cagr || 0}%`} positive={perf.cagr > 0} />
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatCard label="Win Rate" value={`${perf.winRate || 0}%`} positive={perf.winRate > 50} />
-        <StatCard label="Trades (Closed)" value={perf.totalTrades || 0} />
-        <StatCard label="Avg Return" value={`${perf.avgReturn || 0}%`} positive={perf.avgReturn > 0} />
-        <StatCard label="Avg Hold Days" value={perf.avgHoldingDays || 0} />
       </div>
 
       {/* ── Portfolio View ── */}
       {activeView === 'portfolio' && (
         <div className="space-y-2">
-          <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide">Open Positions ({port.holdings.length})</h3>
           {port.holdings.length === 0 ? (
             <p className="text-xs text-[var(--text-dim)] py-4">No paper positions yet. Enable paper trading in Settings and generate signals.</p>
           ) : (
-            <div className="space-y-1.5">
-              {port.holdings.map(h => (
-                <div key={h.symbol} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${
-                  h.pnl >= 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'
-                }`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--text-primary)]">{h.symbol}</span>
-                      {h.isLocked && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">LOCKED ({h.lockDaysRemaining}d)</span>}
-                      <span className="text-[10px] text-[var(--text-dim)]">{h.signalType}</span>
-                    </div>
-                    <div className="text-[10px] text-[var(--text-dim)] mt-0.5">
-                      {h.shares} shares @ {formatINR(h.entryPrice)} | {h.daysHeld}d held
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-xs font-bold tabular-nums ${h.pnl >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                      {h.pnl >= 0 ? '+' : ''}{formatINR(h.pnl)}
-                    </div>
-                    <div className={`text-[10px] tabular-nums ${h.pnlPct >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                      {h.pnlPct >= 0 ? '+' : ''}{h.pnlPct}%
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-[var(--bg-inset)] border-b border-[var(--border-light)] text-[10px] font-semibold text-[var(--text-dim)] uppercase">
+                    <th className="py-2 px-3">Stock</th>
+                    <th className="py-2 px-2 text-center">Score</th>
+                    <th className="py-2 px-2 text-right">Qty</th>
+                    <th className="py-2 px-2 text-right">Avg</th>
+                    <th className="py-2 px-2 text-right">Price</th>
+                    <th className="py-2 px-2 text-right">Invested</th>
+                    <th className="py-2 px-2 text-right">Current</th>
+                    <th className="py-2 px-2 text-right">P&L</th>
+                    <th className="py-2 px-2 text-right">P&L%</th>
+                    <th className="py-2 px-2 text-center hidden lg:table-cell">RSI</th>
+                    <th className="py-2 px-2 text-right hidden lg:table-cell">PE</th>
+                    <th className="py-2 px-2 text-right hidden lg:table-cell">ROE</th>
+                    <th className="py-2 px-2 text-right hidden xl:table-cell">52W</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...port.holdings].sort((a, b) => (b.factorScore || 0) - (a.factorScore || 0)).map(h => {
+                    const up = h.pnl >= 0
+                    const invested = h.shares * h.entryPrice
+                    const current = h.shares * (h.currentPrice || h.entryPrice)
+                    const from52w = h.high52w && h.currentPrice ? ((h.currentPrice - h.high52w) / h.high52w * 100).toFixed(1) : null
+                    return (
+                      <tr key={h.symbol} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-1.5">
+                            <a href={stockUrl(h.symbol)} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-[var(--text-primary)] hover:text-blue-400 hover:underline">{h.symbol}</a>
+                            {h.isLocked && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold leading-none">LOCK</span>}
+                            {h.conviction === 'HIGH' && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold leading-none">H</span>}
+                            {h.conviction === 'MODERATE' && <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold leading-none">M</span>}
+                          </div>
+                          <p className="text-[10px] text-[var(--text-dim)] truncate max-w-[140px]">{h.sector} · {h.capClass}{h.goldenCross === 'YES' ? ' · GC' : ''}</p>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className={`text-xs font-bold tabular-nums ${_fc(h.factorScore)}`}>{h.factorScore ?? '—'}</span>
+                          {h.factorRank && <p className="text-[8px] text-[var(--text-dim)]">#{h.factorRank}</p>}
+                        </td>
+                        <td className="py-2 px-2 text-right text-xs text-[var(--text-secondary)] tabular-nums">{h.shares}</td>
+                        <td className="py-2 px-2 text-right text-xs text-[var(--text-muted)] tabular-nums">₹{Number(h.entryPrice).toLocaleString('en-IN', { maximumFractionDigits: 1 })}</td>
+                        <td className="py-2 px-2 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">₹{Number(h.currentPrice || h.entryPrice).toLocaleString('en-IN', { maximumFractionDigits: 1 })}</td>
+                        <td className="py-2 px-2 text-right text-xs text-[var(--text-secondary)] tabular-nums">{formatINR(invested)}</td>
+                        <td className="py-2 px-2 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(current)}</td>
+                        <td className={`py-2 px-2 text-right text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                          {up ? '+' : ''}{formatINR(h.pnl)}
+                        </td>
+                        <td className={`py-2 px-2 text-right text-xs font-bold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                          {up ? '+' : ''}{h.pnlPct}%
+                        </td>
+                        <td className={`py-2 px-2 text-center text-xs tabular-nums hidden lg:table-cell ${h.rsi > 70 ? 'text-red-400' : h.rsi < 30 ? 'text-emerald-400' : 'text-[var(--text-secondary)]'}`}>{h.rsi != null ? Math.round(h.rsi) : '—'}</td>
+                        <td className="py-2 px-2 text-right text-xs text-[var(--text-secondary)] tabular-nums hidden lg:table-cell">{h.pe != null ? h.pe.toFixed(1) : '—'}</td>
+                        <td className="py-2 px-2 text-right text-xs text-[var(--text-secondary)] tabular-nums hidden lg:table-cell">{h.roe != null ? `${h.roe.toFixed(1)}%` : '—'}</td>
+                        <td className={`py-2 px-2 text-right text-xs tabular-nums hidden xl:table-cell ${from52w && parseFloat(from52w) >= -5 ? 'text-emerald-400' : from52w && parseFloat(from52w) < -20 ? 'text-red-400' : 'text-[var(--text-secondary)]'}`}>{from52w != null ? `${from52w}%` : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
