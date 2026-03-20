@@ -307,13 +307,64 @@ export default function StocksPage() {
 
   return (
     <div className="space-y-4">
-      {portfolios.length === 0 ? (
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
-          <BarChart3 size={32} className="text-[var(--text-dim)]" />
-          <p className="text-sm text-[var(--text-muted)]">No stock portfolios yet</p>
-          <button onClick={() => setModal('addPortfolio')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
-            Create your first portfolio
-          </button>
+      {portfolios.length === 0 && subTab !== 'signals' ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
+              <button
+                onClick={() => setSubTab('holdings')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  subTab !== 'signals' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <Layers size={12} /> Portfolio
+              </button>
+              <button
+                onClick={() => setSubTab('signals')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  subTab === 'signals' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <Activity size={12} /> Signals
+                {signals && signals.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">{signals.length}</span>
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
+            <BarChart3 size={32} className="text-[var(--text-dim)]" />
+            <p className="text-sm text-[var(--text-muted)]">No stock portfolios yet</p>
+            <button onClick={() => setModal('addPortfolio')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
+              Create your first portfolio
+            </button>
+          </div>
+        </div>
+      ) : portfolios.length === 0 && subTab === 'signals' ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
+              <button
+                onClick={() => setSubTab('holdings')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              >
+                <Layers size={12} /> Portfolio
+              </button>
+              <button
+                onClick={() => setSubTab('signals')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm"
+              >
+                <Activity size={12} /> Signals
+                {signals && signals.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">{signals.length}</span>
+                )}
+              </button>
+            </div>
+          </div>
+          <SignalsTabContent
+            signals={signals} paperPerf={paperPerf} loadingSignals={loadingSignals}
+            generating={generating} onGenerate={handleGenerate} onSignalAction={handleSignalAction}
+          />
         </div>
       ) : (
         <>
@@ -728,81 +779,10 @@ export default function StocksPage() {
 
           {/* ── Signals Tab ── */}
           {subTab === 'signals' && (
-            <div className="space-y-3">
-              {/* Paper trading confidence banner */}
-              {paperPerf && (paperPerf.totalTrades > 0) && (
-                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-2.5">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <ScanSearch size={12} className="text-violet-400" />
-                    <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Signal System Track Record (Paper)</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase">Win Rate</p>
-                      <p className={`text-sm font-bold tabular-nums ${(paperPerf.winRate || 0) >= 50 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{paperPerf.winRate || 0}%</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase">CAGR</p>
-                      <p className={`text-sm font-bold tabular-nums ${(paperPerf.cagr || 0) > 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{paperPerf.cagr || 0}%</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase">P&L</p>
-                      <p className={`text-sm font-bold tabular-nums ${(paperPerf.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                        {(paperPerf.totalPnl || 0) >= 0 ? '+' : ''}{formatINR(paperPerf.totalPnl || 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-[var(--text-dim)] uppercase">Trades</p>
-                      <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{paperPerf.totalTrades || 0}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Generate button */}
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-[var(--text-dim)]">
-                  {signals && signals.length > 0
-                    ? `${signals.length} pending signal${signals.length > 1 ? 's' : ''}`
-                    : 'Generate signals to scan for opportunities'}
-                </p>
-                <button
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-colors shadow-sm ${
-                    generating ? 'bg-violet-600/40 text-white/50 cursor-not-allowed' : 'text-white bg-violet-600 hover:bg-violet-500'
-                  }`}
-                >
-                  {generating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  {generating ? 'Generating...' : 'Generate Signals'}
-                </button>
-              </div>
-
-              {/* Signal cards */}
-              {loadingSignals ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 size={20} className="animate-spin text-[var(--text-dim)]" />
-                  <span className="ml-2 text-sm text-[var(--text-dim)]">Loading signals...</span>
-                </div>
-              ) : !signals || signals.length === 0 ? (
-                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
-                  <Activity size={28} className="text-[var(--text-dim)]" />
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {signals ? 'No pending signals — portfolio is up to date' : 'Click "Generate Signals" to scan'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {signals.map(signal => (
-                    <SignalCard
-                      key={signal.signalId}
-                      signal={signal}
-                      onAction={handleSignalAction}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            <SignalsTabContent
+              signals={signals} paperPerf={paperPerf} loadingSignals={loadingSignals}
+              generating={generating} onGenerate={handleGenerate} onSignalAction={handleSignalAction}
+            />
           )}
         </>
       )}
@@ -880,6 +860,82 @@ const SIGNAL_STYLES = {
 }
 
 const stockUrl = (symbol) => `https://trendlyne.com/equity/${symbol}/latest/`
+
+function SignalsTabContent({ signals, paperPerf, loadingSignals, generating, onGenerate, onSignalAction }) {
+  return (
+    <div className="space-y-3">
+      {/* Paper trading confidence banner */}
+      {paperPerf && (paperPerf.totalTrades > 0) && (
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-2.5">
+          <div className="flex items-center gap-1.5 mb-2">
+            <ScanSearch size={12} className="text-violet-400" />
+            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Signal System Track Record (Paper)</span>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase">Win Rate</p>
+              <p className={`text-sm font-bold tabular-nums ${(paperPerf.winRate || 0) >= 50 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{paperPerf.winRate || 0}%</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase">CAGR</p>
+              <p className={`text-sm font-bold tabular-nums ${(paperPerf.cagr || 0) > 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{paperPerf.cagr || 0}%</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase">P&L</p>
+              <p className={`text-sm font-bold tabular-nums ${(paperPerf.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                {(paperPerf.totalPnl || 0) >= 0 ? '+' : ''}{formatINR(paperPerf.totalPnl || 0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase">Trades</p>
+              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{paperPerf.totalTrades || 0}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate button */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-[var(--text-dim)]">
+          {signals && signals.length > 0
+            ? `${signals.length} pending signal${signals.length > 1 ? 's' : ''}`
+            : 'Generate signals to scan for opportunities'}
+        </p>
+        <button
+          onClick={onGenerate}
+          disabled={generating}
+          className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-colors shadow-sm ${
+            generating ? 'bg-violet-600/40 text-white/50 cursor-not-allowed' : 'text-white bg-violet-600 hover:bg-violet-500'
+          }`}
+        >
+          {generating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {generating ? 'Generating...' : 'Generate Signals'}
+        </button>
+      </div>
+
+      {/* Signal cards */}
+      {loadingSignals ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={20} className="animate-spin text-[var(--text-dim)]" />
+          <span className="ml-2 text-sm text-[var(--text-dim)]">Loading signals...</span>
+        </div>
+      ) : !signals || signals.length === 0 ? (
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
+          <Activity size={28} className="text-[var(--text-dim)]" />
+          <p className="text-sm text-[var(--text-muted)]">
+            {signals ? 'No pending signals — portfolio is up to date' : 'Click "Generate Signals" to scan'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {signals.map(signal => (
+            <SignalCard key={signal.signalId} signal={signal} onAction={onSignalAction} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function SignalCard({ signal, onAction }) {
   const style = SIGNAL_STYLES[signal.type] || SIGNAL_STYLES.BUY_STARTER
