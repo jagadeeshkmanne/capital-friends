@@ -1723,8 +1723,9 @@ function executePaperTrades() {
         s.triggerDetail || ''       // Q: Notes
       ]);
 
-      // Mark signal as EXECUTED
-      updateSignalStatus(s.signalId, 'EXECUTED', price);
+      // Don't mark signal as EXECUTED — leave PENDING so user can also act on it manually.
+      // Dedup in _createUserSignal prevents duplicates, and paper positions are merged
+      // into holdings via _getUserHoldingsForScreener so ADD/EXIT signals generate correctly.
       executed++;
 
     // EXIT signals → close paper position (with holding lock)
@@ -1745,8 +1746,7 @@ function executePaperTrades() {
       // Close the position
       _closePaperPosition(ptSheet, pos, exitPrice, now);
 
-      // Mark signal as EXECUTED
-      updateSignalStatus(s.signalId, 'EXECUTED', exitPrice);
+      // Don't mark signal as EXECUTED — leave PENDING for manual action.
       executed++;
     }
   }
