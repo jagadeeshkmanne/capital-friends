@@ -116,7 +116,7 @@ function createScreenerConfigSheet() {
     ['DIP_BUY_MIN_DROP', 10, 'Min drop % for dip buy'],
     ['DIP_BUY_MAX_DROP', 20, 'Max drop % for dip buy (beyond = hard stop territory)'],
     ['DIP_BUY_RSI_MAX', 30, 'Max RSI for dip buy'],
-    ['NIFTY_BELOW_200DMA_ALLOCATION', 50, 'Allocation % when Nifty below 200DMA (bear market)'],
+    ['NIFTY_BELOW_200DMA_ALLOCATION', 120, 'Allocation % when Nifty below 200DMA — accumulate more (120% = buy 20% more)'],
     ['NIFTY_CRASH_PCT', 20, 'Crash alert if Nifty drops this % in 1 month'],
     ['SYSTEMIC_EXIT_COUNT', 3, 'Exit all if this many hard exits at same time'],
     ['SECTOR_ALERT_PCT', 35, 'Monthly sector concentration alert threshold (%)'],

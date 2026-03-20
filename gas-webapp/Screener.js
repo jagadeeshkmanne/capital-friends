@@ -205,7 +205,7 @@ var SCREENER_DEFAULTS = {
   DIP_BUY_RSI_MAX: 30,
   SKIP_NIFTY_GATE: false,
   SKIP_COOLING_PERIOD: false,
-  NIFTY_BELOW_200DMA_ALLOCATION: 50,
+  NIFTY_BELOW_200DMA_ALLOCATION: 120,
   NIFTY_CRASH_PCT: 20,
   SYSTEMIC_EXIT_COUNT: 3,
   SECTOR_ALERT_PCT: 35,
@@ -1407,26 +1407,29 @@ function _getOverlapAllocationMultiplier(screenerCount) {
 }
 
 /**
- * Market regime multiplier — graduated allocation based on Nifty position.
- * Bull (above 200DMA, positive returns) → 100%
- * Caution (above 200DMA, negative returns) → 85%
- * Correction (below 200DMA < 5%) → midpoint between 75% and bear allocation
- * Bear (below 200DMA > 5%) → NIFTY_BELOW_200DMA_ALLOCATION% (default 50%)
+ * Market regime multiplier — accumulation strategy.
+ * When market drops, quality stocks (already filtered by factor score) are cheaper.
+ * Buy MORE during fear, not less. Safety nets (PORTFOLIO_FREEZE, NIFTY_CRASH) still protect.
+ *
+ * Bull (above 200DMA, +ve returns) → 100% (normal)
+ * Caution (above 200DMA, -ve returns) → 90% (slight pullback)
+ * Correction (below 200DMA < 5%) → 110% (start accumulating)
+ * Deep Bear (below 200DMA > 5%) → NIFTY_BELOW_200DMA_ALLOCATION% (default 120%)
  */
 function _getMarketRegimeMultiplier(niftyData, config) {
   if (!niftyData) return 1.0;
-  var bearAlloc = ((config && config.NIFTY_BELOW_200DMA_ALLOCATION) || 50) / 100;
+  var bearAlloc = ((config && config.NIFTY_BELOW_200DMA_ALLOCATION) || 120) / 100;
   if (niftyData.aboveDMA200 === true) {
-    return (niftyData.return6m || 0) >= 0 ? 1.0 : 0.85;
+    return (niftyData.return6m || 0) >= 0 ? 1.0 : 0.90;
   }
   var niftyPrice = niftyData.price || 0;
   var niftyDMA = niftyData.dma200 || 0;
   if (niftyDMA > 0) {
     var pctBelow = ((niftyPrice - niftyDMA) / niftyDMA) * 100;
-    if (pctBelow > -5) return (1.0 + bearAlloc) / 2; // correction = midpoint
-    return bearAlloc; // bear
+    if (pctBelow > -5) return 1.10; // correction — start accumulating
+    return bearAlloc; // deep bear — aggressive accumulation
   }
-  return (1.0 + bearAlloc) / 2; // default to correction
+  return 1.10; // default to correction
 }
 
 /**
