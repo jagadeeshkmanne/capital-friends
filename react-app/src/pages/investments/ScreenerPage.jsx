@@ -124,11 +124,10 @@ const SETTINGS_SECTIONS = [
     ]
   },
   {
-    title: 'Paper Trading & Automation',
-    description: 'Paper trading auto-executes signals in a sandbox — no real money. Use it to validate the system.',
+    title: 'Automation',
+    description: 'Paper trading always runs in the background — auto-executes signals in a sandbox to build a track record.',
     fields: [
-      { key: 'PAPER_TRADING', label: 'Paper Trading', description: 'Auto-execute signals as paper trades (no real money)', type: 'boolean' },
-      { key: 'HOLDING_PERIOD_DAYS', label: 'Min Holding Period (days)', description: 'Company rule: min days to hold before selling (real trades)', type: 'number' },
+      { key: 'HOLDING_PERIOD_DAYS', label: 'Min Holding Period (days)', description: 'Min days to hold before selling (real trades)', type: 'number' },
       { key: 'PAPER_HOLDING_PERIOD_DAYS', label: 'Paper Min Hold (days)', description: 'Min days before paper auto-sell (default 1)', type: 'number' },
       { key: 'HOURLY_PRICE_CHECK', label: 'Hourly Price Check', description: 'Check exit signals every hour during market hours', type: 'boolean' },
       { key: 'SIGNAL_TRACK_DAYS', label: 'Track Days', description: 'Days after signal to check outcome (e.g. 7,14,30)', type: 'text' },

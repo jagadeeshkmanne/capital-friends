@@ -211,8 +211,7 @@ var SCREENER_DEFAULTS = {
   SECTOR_ALERT_PCT: 35,
   PORTFOLIO_FREEZE_PCT: 25,
   STALE_AFTER_DAYS: 30,
-  // Paper trading & holding lock
-  PAPER_TRADING: true,
+  // Holding lock
   HOLDING_PERIOD_DAYS: 30,
   PAPER_HOLDING_PERIOD_DAYS: 1,
   // Triggers
@@ -295,6 +294,9 @@ function readScreenerConfig() {
     }
     Logger.log('Auto-created ' + missingRows.length + ' missing config keys: ' + missingRows.map(function(r) { return r[0]; }).join(', '));
   }
+
+  // Paper trading always on — builds track record for confidence scoring
+  config.PAPER_TRADING = true;
 
   return config;
 }

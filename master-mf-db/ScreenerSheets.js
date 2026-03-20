@@ -120,8 +120,7 @@ function createScreenerConfigSheet() {
     ['NIFTY_CRASH_PCT', 20, 'Crash alert if Nifty drops this % in 1 month'],
     ['SYSTEMIC_EXIT_COUNT', 3, 'Exit all if this many hard exits at same time'],
     ['SECTOR_ALERT_PCT', 35, 'Monthly sector concentration alert threshold (%)'],
-    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze new buys if portfolio down this %'],
-    ['PAPER_TRADING', 'TRUE', 'Paper trading mode — auto-execute signals in sandbox']
+    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze new buys if portfolio down this %']
   ];
 
   sheet.getRange(2, 1, rows.length, 3).setValues(rows);

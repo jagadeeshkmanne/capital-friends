@@ -47,8 +47,7 @@ const SCREENER_CONFIG = {
     NIFTY_CRASH_PCT: 20,
     SYSTEMIC_EXIT_COUNT: 3,
     SECTOR_ALERT_PCT: 35,
-    PORTFOLIO_FREEZE_PCT: 25,
-    PAPER_TRADING: true
+    PORTFOLIO_FREEZE_PCT: 25
   },
 
   // --- 3-screener architecture for multibagger discovery ---
