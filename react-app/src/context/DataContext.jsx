@@ -706,7 +706,7 @@ export function DataProvider({ children }) {
       stockPortfolios, stockHoldings, stockTransactions,
       // Stock CRUD
       addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
-      buyStock, sellStock, editStockTransaction, deleteStockTransaction,
+      buyStock, sellStock, editStockTransaction, deleteStockTransaction, refreshStocks,
       // MF data
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD
