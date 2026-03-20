@@ -199,7 +199,8 @@ function createAllSheets() {
     // ========== SCREENER (auto-created on first access) ==========
     { name: 'Screener_Signals', func: setupScreenerSignalsSheet },
     { name: 'Screener_StockMeta', func: setupScreenerStockMetaSheet },
-    { name: 'Screener_UserConfig', func: setupScreenerUserConfigSheet }
+    { name: 'Screener_UserConfig', func: setupScreenerUserConfigSheet },
+    { name: 'Screener_PaperTrades', func: setupScreenerPaperTradesSheet }
   ];
 
   // Create each sheet

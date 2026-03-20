@@ -120,7 +120,8 @@ function createScreenerConfigSheet() {
     ['NIFTY_CRASH_PCT', 20, 'Crash alert if Nifty drops this % in 1 month'],
     ['SYSTEMIC_EXIT_COUNT', 3, 'Exit all if this many hard exits at same time'],
     ['SECTOR_ALERT_PCT', 35, 'Monthly sector concentration alert threshold (%)'],
-    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze new buys if portfolio down this %']
+    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze new buys if portfolio down this %'],
+    ['PRICE_RUNUP_EXPIRE_PCT', 20, 'Expire watchlist stock if price ran up this % since found']
   ];
 
   sheet.getRange(2, 1, rows.length, 3).setValues(rows);
@@ -161,7 +162,9 @@ function createScreenerWatchlistSheet() {
       'Promoter Pledge %', 'FII Holding %', 'FII Change QoQ',
       'Interest Coverage', 'EPS Growth TTM %', 'Price to Book',
       'OPM Qtr %', 'Revenue Growth 3Y %', 'Promoter Holding %',
-      'MCAP Class'
+      'MCAP Class',
+      // AY-BC: Factor sub-scores (5)
+      'Momentum Sub', 'Quality Sub', 'Trend Sub', 'Value Sub', 'LowVol Sub'
     ],
     [
       90, 180, 100, 90,
@@ -183,7 +186,9 @@ function createScreenerWatchlistSheet() {
       80, 80, 80,
       80, 80, 80,
       80, 90, 80,
-      80
+      80,
+      // Factor sub-score widths
+      80, 80, 80, 80, 80
     ]
   );
 }

@@ -200,8 +200,8 @@ export default function StocksPage() {
   }
 
   // ── Signal handlers ──
-  const loadSignals = useCallback(async () => {
-    if (signalsLoaded) return
+  const loadSignals = useCallback(async (force = false) => {
+    if (signalsLoaded && !force) return
     setLoadingSignals(true)
     try {
       const [sigs, perf] = await Promise.allSettled([
@@ -227,6 +227,7 @@ export default function StocksPage() {
     try {
       const result = await api.generateScreenerSignals()
       setSignals(result?.signals || [])
+      if (result?.paperPerformance) setPaperPerf(result.paperPerformance)
       showToast(`${result?.signals?.length || 0} signals generated`)
     } catch (err) {
       showToast(err.message || 'Failed to generate signals', 'error')
@@ -270,7 +271,15 @@ export default function StocksPage() {
         hideBlockUI()
       }
     } else {
-      setModal({ signalSell: true, signal })
+      try {
+        showBlockUI('Preparing trade form...')
+        const pfId = await getOrCreateSignalsPortfolio()
+        setModal({ signalSell: true, signal, portfolioId: pfId })
+      } catch (err) {
+        showToast(err.message || 'Failed to find/create CF_Signals portfolio', 'error')
+      } finally {
+        hideBlockUI()
+      }
     }
   }
 
@@ -850,6 +859,12 @@ export default function StocksPage() {
       </Modal>
       <Modal open={!!modal?.signalSell} onClose={() => setModal(null)} title={`Sell — ${modal?.signal?.symbol || ''}`} wide>
         <SellStockForm
+          portfolioId={modal?.portfolioId}
+          initialData={{
+            symbol: modal?.signal?.symbol || '',
+            companyName: modal?.signal?.name || '',
+            notes: `Screener: ${modal?.signal?.type || ''}`,
+          }}
           signalDetail={modal?.signal?.triggerDetail}
           onSave={handleSignalTradeSubmit}
           onCancel={() => setModal(null)}

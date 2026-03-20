@@ -1139,9 +1139,9 @@ function _cleanupStaleSignals(staleDays) {
   if (!sheet) return;
 
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
+  if (lastRow < 3) return;
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 16).getValues();
+  var data = sheet.getRange(3, 1, lastRow - 2, 16).getValues();
   var now = new Date();
   var changed = 0;
 
@@ -1153,7 +1153,7 @@ function _cleanupStaleSignals(staleDays) {
     var signalDate = new Date(dateVal);
     var daysOld = Math.floor((now - signalDate) / (1000 * 60 * 60 * 24));
     if (daysOld > staleDays) {
-      sheet.getRange(i + 2, 12).setValue('STALE'); // Column L
+      sheet.getRange(i + 3, 12).setValue('STALE'); // Column L
       changed++;
     }
   }
@@ -1331,7 +1331,11 @@ function recordScreenerBuy(symbol, data) {
       '',                                      // L: Trailing Stop Price (calculated later)
       '',                                      // M: Stop Tier
       '',                                      // N: Last Fundamental Check
-      ''                                       // O: Notes
+      '',                                      // O: Notes
+      data.lockedBudget || 0,                  // P: Locked Budget
+      data.lockedAllocation || 0,              // Q: Locked Allocation
+      data.add1Amount || 0,                    // R: ADD1 Amount
+      data.add2Amount || 0                     // S: ADD2 Amount
     ]);
     return { success: true, action: 'created' };
   }

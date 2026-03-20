@@ -105,8 +105,8 @@ export default function BuyStockForm({ portfolioId, lockPortfolio, initialData, 
             <span className="text-[var(--text-secondary)]">Avg: <strong className="text-[var(--text-primary)]">{formatINR(existingHolding.avgPrice)}</strong></span>
             <span className="text-[var(--text-secondary)]">CMP: <strong className="text-[var(--text-primary)]">{formatINR(existingHolding.currentPrice)}</strong></span>
             <span className="text-[var(--text-secondary)]">Value: <strong className="text-[var(--text-primary)]">{formatINR(existingHolding.currentValue)}</strong></span>
-            {(existingHolding.unrealizedPL != null || existingHolding.currentValue - existingHolding.totalInvestment) && (() => {
-              const pl = existingHolding.unrealizedPL ?? (existingHolding.currentValue - existingHolding.totalInvestment)
+            {(() => {
+              const pl = existingHolding.unrealizedPL ?? (existingHolding.currentValue - existingHolding.totalInvestment) ?? 0
               return (
                 <span className={pl >= 0 ? 'text-green-500' : 'text-red-500'}>
                   P&L: <strong>{pl >= 0 ? '+' : ''}{formatINR(pl)}</strong>

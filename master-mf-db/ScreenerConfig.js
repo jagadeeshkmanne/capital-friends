@@ -47,7 +47,8 @@ const SCREENER_CONFIG = {
     NIFTY_CRASH_PCT: 20,
     SYSTEMIC_EXIT_COUNT: 3,
     SECTOR_ALERT_PCT: 35,
-    PORTFOLIO_FREEZE_PCT: 25
+    PORTFOLIO_FREEZE_PCT: 25,
+    PRICE_RUNUP_EXPIRE_PCT: 20
   },
 
   // --- 3-screener architecture for multibagger discovery ---
@@ -175,10 +176,10 @@ const SCREENER_CONFIG = {
   // Replaces old conviction-based sizing.
   // Signal engine uses factor rank for position sizing.
   getAllocationByRank: function(rank, config) {
-    // Top 5 → 7-8%, Next 5 → 5-6%, Rest → 3-4%
-    if (rank <= 5) return (config && config.ALLOC_TOP5) || 8;
-    if (rank <= 10) return (config && config.ALLOC_NEXT5) || 5;
-    return (config && config.ALLOC_REST) || 3;
+    // Top 5 → 10%, Next 5 → 7%, Rest → 5%
+    if (rank <= 5) return (config && config.ALLOC_TOP5) || 10;
+    if (rank <= 10) return (config && config.ALLOC_NEXT5) || 7;
+    return (config && config.ALLOC_REST) || 5;
   },
 
   // --- Factor score → signal action ---

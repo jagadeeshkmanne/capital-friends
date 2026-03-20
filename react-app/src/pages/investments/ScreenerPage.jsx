@@ -976,13 +976,13 @@ export default function ScreenerPage() {
                               </button>
                             ) : (
                               <input
-                                type="number"
+                                type={f.type === 'text' ? 'text' : 'number'}
                                 value={currentValue ?? ''}
                                 onChange={(e) => setConfigEdits(prev => ({
                                   ...prev,
-                                  [key]: parseFloat(e.target.value) || 0
+                                  [key]: f.type === 'text' ? e.target.value : (parseFloat(e.target.value) || 0)
                                 }))}
-                                className="w-full px-2 py-1 text-sm text-right rounded border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:border-violet-500 focus:outline-none"
+                                className={`w-full px-2 py-1 text-sm rounded border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:border-violet-500 focus:outline-none ${f.type === 'text' ? 'text-left' : 'text-right'}`}
                               />
                             )}
                           </div>

@@ -198,19 +198,21 @@ function _saveAndContinue(props, state) {
 
 /**
  * Remove one-off continuation triggers (created by _saveAndContinue).
- * Deletes ALL screenerUpdateMarketData triggers — the daily trigger
- * is reinstalled by installScreenerTriggers() anyway.
+ * Preserves the daily time-based trigger by checking trigger ID stored during install.
  */
 function _removeContinuationTriggers() {
+  var props = PropertiesService.getScriptProperties();
+  var dailyTriggerId = props.getProperty('SCREENER_DAILY_TRIGGER_ID') || '';
   var triggers = ScriptApp.getProjectTriggers();
   var removed = 0;
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'screenerUpdateMarketData') {
+    if (triggers[i].getHandlerFunction() === 'screenerUpdateMarketData' &&
+        triggers[i].getUniqueId() !== dailyTriggerId) {
       ScriptApp.deleteTrigger(triggers[i]);
       removed++;
     }
   }
-  if (removed > 0) Logger.log('Removed ' + removed + ' screenerUpdateMarketData triggers');
+  if (removed > 0) Logger.log('Removed ' + removed + ' continuation triggers (preserved daily ID: ' + dailyTriggerId + ')');
 }
 
 /**
@@ -483,12 +485,14 @@ function installScreenerTriggers() {
   _removeScreenerTriggers();
 
   // Daily: Market data at 9:00 AM
-  ScriptApp.newTrigger('screenerUpdateMarketData')
+  var dailyTrigger = ScriptApp.newTrigger('screenerUpdateMarketData')
     .timeBased()
     .atHour(9)
     .nearMinute(0)
     .everyDays(1)
     .create();
+  // Store trigger ID so _removeContinuationTriggers can preserve it
+  PropertiesService.getScriptProperties().setProperty('SCREENER_DAILY_TRIGGER_ID', dailyTrigger.getUniqueId());
 
   // Weekly on Sunday
   ScriptApp.newTrigger('weeklyScreenerRecheck')
@@ -575,7 +579,7 @@ function _enrichWatchlistWithFundamentals(startIdx, timeLimitMs) {
   if (lastRow < 2) return { done: true, processed: 0, total: 0 };
 
   var total = lastRow - 1;
-  var data = sheet.getRange(2, 1, total, 25).getValues(); // A-Y (includes Market Cap col X=24)
+  var data = sheet.getRange(2, 1, total, 30).getValues(); // A-AD (includes Market Cap col X=24, PE col AC=29)
   var config = getAllScreenerConfig();
   var startTime = new Date();
   var processed = 0;
@@ -592,7 +596,7 @@ function _enrichWatchlistWithFundamentals(startIdx, timeLimitMs) {
 
     // Skip stocks that already have Market Cap + PE filled (already enriched)
     var existingMcap = data[i][23]; // col X (0-indexed 23)
-    var existingPE = data[i][28] || ''; // would need col AC but we only read to Y
+    var existingPE = data[i][28] || ''; // col AC (0-indexed 28)
     if (existingMcap && parseFloat(existingMcap) > 0) { processed++; skipped++; continue; }
 
     var row = i + 2;
