@@ -16,6 +16,29 @@
 
 var SCREENER_BASE_URL = 'https://www.screener.in/company/';
 
+/** Debug: test market cap extraction for a single stock */
+function debugMarketCap() {
+  var symbol = 'TCI';
+  var url = SCREENER_BASE_URL + encodeURIComponent(symbol) + '/';
+  var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  var html = response.getContentText();
+
+  // Log the area around "Market Cap"
+  var idx = html.indexOf('Market Cap');
+  if (idx === -1) idx = html.indexOf('market cap');
+  if (idx === -1) idx = html.indexOf('market-cap');
+  Logger.log('Found "Market Cap" at index: ' + idx);
+  if (idx !== -1) {
+    Logger.log('Context (500 chars): ' + html.substring(idx, idx + 500));
+  }
+
+  var result = _extractMarketCapCr(html);
+  Logger.log('Extracted market cap: ' + result);
+
+  var fullResult = fetchMarketCapOnly(symbol);
+  Logger.log('fetchMarketCapOnly result: ' + JSON.stringify(fullResult));
+}
+
 // ============================================================================
 // FETCH FUNDAMENTALS
 // ============================================================================
@@ -56,8 +79,8 @@ function fetchFundamentals(symbol) {
       fiiHolding: _extractNumberFromScreener(html, 'FII holding'),
       fiiHoldingPrev: _extractPrevQuarterValue(html, 'FII holding'),
       fiiChange: null, // calculated below
-      mfHolding: _extractNumberFromScreener(html, 'DII holding'),
-      mfHoldingPrev: _extractPrevQuarterValue(html, 'DII holding'),
+      mfHolding: _extractNumberFromScreener(html, 'DIIs') || _extractNumberFromScreener(html, 'DII holding'),
+      mfHoldingPrev: _extractPrevQuarterValue(html, 'DIIs') || _extractPrevQuarterValue(html, 'DII holding'),
       mfChange: null, // calculated below
 
       // Debt & solvency
@@ -80,6 +103,9 @@ function fetchFundamentals(symbol) {
       // Market cap & classification
       marketCapCr: _extractMarketCapCr(html),
       capClass: null, // calculated below
+
+      // Sector (from same page)
+      sector: _extractSector(html),
 
       // Valuation
       pe: _extractRatioFromScreener(html, 'Stock P/E'),
@@ -181,6 +207,49 @@ function _classifyMarketCap(marketCapCr) {
 }
 
 /**
+ * Fetch MF holding QoQ change for a stock from Screener.in.
+ * Uses the same HTML parsing as fetchFundamentals() but only extracts MF data.
+ * Called during daily market data enrichment to determine conviction.
+ *
+ * @param {string} symbol - NSE symbol
+ * @returns {{mfHolding: number|null, mfHoldingPrev: number|null, mfChangeQoQ: number|null}}
+ */
+function fetchMFHoldingChange(symbol) {
+  try {
+    var url = SCREENER_BASE_URL + encodeURIComponent(symbol) + '/';
+    var response;
+    // Retry once on failure (Screener.in sometimes blocks rapid requests)
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+        if (response.getResponseCode() === 200) break;
+      } catch (fetchErr) {
+        if (attempt === 0) { Utilities.sleep(3000); continue; }
+        throw fetchErr;
+      }
+    }
+    if (!response || response.getResponseCode() !== 200) return { mfHolding: null, mfHoldingPrev: null, mfChangeQoQ: null };
+
+    var html = response.getContentText();
+    // Screener.in uses "DIIs" label (not "DII holding") in shareholding table
+    var current = _extractNumberFromScreener(html, 'DIIs');
+    var prev = _extractPrevQuarterValue(html, 'DIIs');
+    // Fallback: try "DII" if "DIIs" not found
+    if (current === null) {
+      current = _extractNumberFromScreener(html, 'DII');
+      prev = _extractPrevQuarterValue(html, 'DII');
+    }
+    var change = (current !== null && prev !== null) ? Math.round((current - prev) * 100) / 100 : null;
+
+    Logger.log('MF holding for ' + symbol + ': ' + current + '% (prev: ' + prev + '%, change: ' + change + '%)');
+    return { mfHolding: current, mfHoldingPrev: prev, mfChangeQoQ: change };
+  } catch (e) {
+    Logger.log('Error fetching MF holding for ' + symbol + ': ' + e.message);
+    return { mfHolding: null, mfHoldingPrev: null, mfChangeQoQ: null };
+  }
+}
+
+/**
  * Lightweight market cap fetch — only grabs market cap from Screener.in
  * Used when adding stocks to watchlist (doesn't need full fundamentals)
  *
@@ -191,18 +260,164 @@ function fetchMarketCapOnly(symbol) {
   try {
     var url = SCREENER_BASE_URL + encodeURIComponent(symbol) + '/';
     var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (response.getResponseCode() !== 200) return { marketCapCr: null, capClass: null };
+    if (response.getResponseCode() !== 200) return { marketCapCr: null, capClass: null, sector: null };
 
     var html = response.getContentText();
     var marketCapCr = _extractMarketCapCr(html);
     var capClass = marketCapCr ? _classifyMarketCap(marketCapCr) : null;
 
-    Logger.log('Market cap for ' + symbol + ': ₹' + marketCapCr + ' Cr (' + capClass + ')');
-    return { marketCapCr: marketCapCr, capClass: capClass };
+    // Sector from Screener.in (same page, no extra call) + normalized
+    var sector = _extractSector(html);
+
+    Logger.log('Market cap for ' + symbol + ': ₹' + marketCapCr + ' Cr (' + capClass + '), Sector: ' + sector);
+    return { marketCapCr: marketCapCr, capClass: capClass, sector: sector };
   } catch (e) {
     Logger.log('Error fetching market cap for ' + symbol + ': ' + e.message);
-    return { marketCapCr: null, capClass: null };
+    return { marketCapCr: null, capClass: null, sector: null };
   }
+}
+
+/**
+ * Extract sector/industry from Screener.in company page.
+ * Screener.in shows sector in the sub-heading as a link to compare page.
+ * Returns normalized Nifty-style sector name.
+ */
+function _extractSector(html) {
+  try {
+    // Screener.in uses /market/ links with title attributes for classification:
+    //   <a href="/market/IN09/" title="Broad Sector">Services</a>
+    //   <a href="/market/IN09/IN0901/" title="Sector">Services</a>
+    //   <a href="/market/IN09/IN0901/IN090104/" title="Broad Industry">Commercial Services</a>
+    //   <a href="/market/IN09/IN0901/IN090104/IN090104005/" title="Industry">BPO/KPO</a>
+
+    // Try "Industry" first (most specific — e.g. "Internet & Catalogue Retail" vs just "Retailing")
+    var industry = html.match(/<a[^>]*href="\/market\/[^"]*"[^>]*title="Industry"[^>]*>([^<]+)<\/a>/i);
+    if (industry && industry[1]) {
+      return _normalizeSector(industry[1].trim());
+    }
+
+    // Fall back to "Broad Industry"
+    var broadIndustry = html.match(/<a[^>]*href="\/market\/[^"]*"[^>]*title="Broad Industry"[^>]*>([^<]+)<\/a>/i);
+    if (broadIndustry && broadIndustry[1]) {
+      return _normalizeSector(broadIndustry[1].trim());
+    }
+
+    // Fall back to "Sector"
+    var sector = html.match(/<a[^>]*href="\/market\/[^"]*"[^>]*title="Sector"[^>]*>([^<]+)<\/a>/i);
+    if (sector && sector[1]) {
+      return _normalizeSector(sector[1].trim());
+    }
+
+    return null;
+  } catch (e) {
+    Logger.log('Error extracting sector: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Normalize Screener.in granular sectors into Nifty-style broad sectors.
+ * Maps ~100+ sub-industries to ~15 standard sectors.
+ */
+function _normalizeSector(raw) {
+  var s = raw.toLowerCase();
+  Logger.log('  _normalizeSector raw: "' + raw + '"');
+
+  // Consumer Durables (granite, appliances, leather goods — NOT FMCG)
+  // Must be before FMCG since 'consumer' would match FMCG
+  if (s.indexOf('consumer durable') >= 0 || s.indexOf('granite') >= 0 || s.indexOf('marble') >= 0 ||
+      s.indexOf('appliance') >= 0 || s.indexOf('furnishing') >= 0 || s.indexOf('flooring') >= 0) return 'Capital Goods';
+
+  // Internet Retail / Online Marketplace (B2B/B2C platforms — IT, not FMCG)
+  // Must be before FMCG since 'retail' would match FMCG
+  if (s.indexOf('internet') >= 0 || s.indexOf('catalogue retail') >= 0 || s.indexOf('online') >= 0) return 'IT';
+
+  // IT & Services
+  if (s.indexOf('software') >= 0 || s.indexOf('it ') >= 0 || s.indexOf('information tech') >= 0 ||
+      s.indexOf('digital') >= 0 || s.indexOf('cloud') >= 0 || s.indexOf('saas') >= 0 ||
+      s.indexOf('commercial services') >= 0 || s.indexOf('consulting') >= 0 ||
+      s.indexOf('bpo') >= 0 || s.indexOf('outsourcing') >= 0 || s.indexOf('staffing') >= 0) return 'IT';
+
+  // Banking
+  if (s.indexOf('bank') >= 0 || s.indexOf('nbfc') >= 0 || s.indexOf('microfinance') >= 0 ||
+      s.indexOf('housing finance') >= 0) return 'Banking';
+
+  // Financial Services (non-banking)
+  if (s.indexOf('finance') >= 0 || s.indexOf('insurance') >= 0 || s.indexOf('capital market') >= 0 ||
+      s.indexOf('stock exchange') >= 0 || s.indexOf('wealth') >= 0 || s.indexOf('credit') >= 0 ||
+      s.indexOf('asset management') >= 0) return 'Fin Services';
+
+  // Pharma & Healthcare
+  if (s.indexOf('pharma') >= 0 || s.indexOf('drug') >= 0 || s.indexOf('healthcare') >= 0 ||
+      s.indexOf('hospital') >= 0 || s.indexOf('diagnostic') >= 0 || s.indexOf('medical') >= 0 ||
+      s.indexOf('biotech') >= 0 || s.indexOf('api ') >= 0 || s.indexOf('clinical') >= 0) return 'Pharma';
+
+  // Auto
+  if (s.indexOf('auto') >= 0 || s.indexOf('vehicle') >= 0 || s.indexOf('tyre') >= 0 ||
+      s.indexOf('tire') >= 0 || s.indexOf('tractor') >= 0 || s.indexOf('two wheeler') >= 0 ||
+      s.indexOf('car ') >= 0 || s.indexOf('engine') >= 0 || s.indexOf('ancillary') >= 0) return 'Auto';
+
+  // FMCG
+  if (s.indexOf('fmcg') >= 0 || s.indexOf('consumer') >= 0 || s.indexOf('food') >= 0 ||
+      s.indexOf('beverage') >= 0 || s.indexOf('dairy') >= 0 || s.indexOf('personal care') >= 0 ||
+      s.indexOf('tobacco') >= 0 || s.indexOf('liquor') >= 0 || s.indexOf('brewery') >= 0 ||
+      s.indexOf('retail') >= 0 || s.indexOf('sugar') >= 0 || s.indexOf('edible oil') >= 0 ||
+      s.indexOf('packaged') >= 0) return 'FMCG';
+
+  // Metal & Mining
+  if (s.indexOf('metal') >= 0 || s.indexOf('steel') >= 0 || s.indexOf('iron') >= 0 ||
+      s.indexOf('aluminium') >= 0 || s.indexOf('copper') >= 0 || s.indexOf('zinc') >= 0 ||
+      s.indexOf('mining') >= 0) return 'Metal';
+
+  // Energy & Oil
+  if (s.indexOf('oil') >= 0 || s.indexOf('gas ') >= 0 || s.indexOf('energy') >= 0 ||
+      s.indexOf('petroleum') >= 0 || s.indexOf('refiner') >= 0 || s.indexOf('lng') >= 0 ||
+      s.indexOf('power') >= 0 || s.indexOf('electric util') >= 0 || s.indexOf('solar') >= 0 ||
+      s.indexOf('renewable') >= 0 || s.indexOf('wind') >= 0) return 'Energy';
+
+  // Realty & Construction
+  if (s.indexOf('real estate') >= 0 || s.indexOf('construction') >= 0 || s.indexOf('infra') >= 0 ||
+      s.indexOf('cement') >= 0 || s.indexOf('building') >= 0 ||
+      (s.indexOf('housing') >= 0 && s.indexOf('finance') < 0)) return 'Realty';
+
+  // Telecom & Media
+  if (s.indexOf('telecom') >= 0 || s.indexOf('media') >= 0 || s.indexOf('entertainment') >= 0 ||
+      s.indexOf('broadcast') >= 0) return 'Telecom';
+
+  // Chemicals
+  if (s.indexOf('chemical') >= 0 || s.indexOf('fertilizer') >= 0 || s.indexOf('pesticide') >= 0 ||
+      s.indexOf('agrochemical') >= 0 || s.indexOf('specialty chem') >= 0 || s.indexOf('dye') >= 0 ||
+      s.indexOf('pigment') >= 0) return 'Chemicals';
+
+  // Capital Goods / Industrial
+  if (s.indexOf('capital goods') >= 0 || s.indexOf('industrial') >= 0 || s.indexOf('engineering') >= 0 ||
+      s.indexOf('machinery') >= 0 || s.indexOf('equipment') >= 0 || s.indexOf('electrical') >= 0 ||
+      s.indexOf('welding') >= 0 || s.indexOf('pipe') >= 0 || s.indexOf('cable') >= 0 ||
+      s.indexOf('defence') >= 0 || s.indexOf('defense') >= 0 || s.indexOf('aerospace') >= 0) return 'Capital Goods';
+
+  // Logistics & Transport
+  if (s.indexOf('logistics') >= 0 || s.indexOf('shipping') >= 0 || s.indexOf('transport') >= 0 ||
+      s.indexOf('courier') >= 0 || s.indexOf('port') >= 0 || s.indexOf('aviation') >= 0 ||
+      s.indexOf('airline') >= 0 || s.indexOf('warehouse') >= 0 || s.indexOf('drilling') >= 0) return 'Logistics';
+
+  // Textiles & Apparel
+  if (s.indexOf('textile') >= 0 || s.indexOf('apparel') >= 0 || s.indexOf('garment') >= 0 ||
+      s.indexOf('fabric') >= 0 || s.indexOf('leather') >= 0) return 'Textiles';
+
+  // Hotels & Travel
+  if (s.indexOf('hotel') >= 0 || s.indexOf('travel') >= 0 || s.indexOf('tourism') >= 0 ||
+      s.indexOf('hospitality') >= 0 || s.indexOf('restaurant') >= 0 || s.indexOf('leisure') >= 0) return 'Hotels';
+
+  // Ceramics, Glass, Paper (misc manufacturing)
+  if (s.indexOf('ceramic') >= 0 || s.indexOf('glass') >= 0 || s.indexOf('paper') >= 0 ||
+      s.indexOf('forest') >= 0 || s.indexOf('packaging') >= 0 || s.indexOf('container') >= 0) return 'Capital Goods';
+
+  // Trading / Marketplace (B2B platforms, exchanges)
+  if (s.indexOf('trading') >= 0 || s.indexOf('marketplace') >= 0 || s.indexOf('e-commerce') >= 0 ||
+      s.indexOf('exchange') >= 0) return 'IT';
+
+  // Fallback: return raw but title-cased
+  return raw.split(' - ')[0].trim();
 }
 
 /**

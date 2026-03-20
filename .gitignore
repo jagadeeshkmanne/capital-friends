@@ -23,6 +23,11 @@ react-app/.vite/
 youtube/
 temp/
 funds/
+copy-trade/data/
+*.csv
+
+# Claude settings
+.claude/settings.json
 
 # Logs
 *.log

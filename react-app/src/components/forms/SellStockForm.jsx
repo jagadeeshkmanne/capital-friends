@@ -4,7 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
-export default function SellStockForm({ portfolioId, onSave, onCancel }) {
+export default function SellStockForm({ portfolioId, initialData, onSave, onCancel }) {
   const { stockPortfolios, stockHoldings } = useData()
   const { selectedMember } = useFamily()
 
@@ -15,14 +15,14 @@ export default function SellStockForm({ portfolioId, onSave, onCancel }) {
   }, [stockPortfolios, selectedMember])
 
   const [form, setForm] = useState({
-    portfolioId: portfolioId || '',
-    symbol: '',
-    companyName: '',
-    date: new Date().toISOString().split('T')[0],
-    quantity: '',
-    pricePerShare: '',
-    brokerage: '0',
-    notes: '',
+    portfolioId: portfolioId || initialData?.portfolioId || '',
+    symbol: initialData?.symbol || '',
+    companyName: initialData?.companyName || '',
+    date: initialData?.date || new Date().toISOString().split('T')[0],
+    quantity: initialData?.quantity || '',
+    pricePerShare: initialData?.pricePerShare || '',
+    brokerage: initialData?.brokerage || '0',
+    notes: initialData?.notes || '',
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -58,8 +58,17 @@ export default function SellStockForm({ portfolioId, onSave, onCancel }) {
   }
 
   function setPortfolio(val) {
-    // Reset stock selection when portfolio changes
-    setForm((f) => ({ ...f, portfolioId: val, symbol: '', companyName: '', quantity: '' }))
+    // When portfolio changes, check if pre-filled symbol exists in new portfolio
+    const newHoldings = (stockHoldings || []).filter((h) => h.portfolioId === val && h.quantity > 0)
+    const prefilledSymbol = form.symbol
+    const match = prefilledSymbol ? newHoldings.find((h) => h.symbol === prefilledSymbol) : null
+    if (match) {
+      // Keep pre-filled symbol, update company name from holding
+      setForm((f) => ({ ...f, portfolioId: val, companyName: match.companyName || f.companyName }))
+    } else {
+      // Reset stock selection when portfolio changes
+      setForm((f) => ({ ...f, portfolioId: val, symbol: '', companyName: '', quantity: '' }))
+    }
     setErrors((e) => ({ ...e, portfolioId: undefined }))
   }
 

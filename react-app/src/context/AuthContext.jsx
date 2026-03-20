@@ -123,6 +123,7 @@ export function AuthProvider({ children }) {
         email: me.email || profile.email,
         name: me.name || profile.name,
         role: me.role,
+        isAdmin: !!me.isAdmin,
         picture: profile.picture || '',
       })
     } catch (err) {
@@ -158,6 +159,7 @@ export function AuthProvider({ children }) {
         email: me.email || profile.email,
         name: me.name || profile.name,
         role: me.role,
+        isAdmin: !!me.isAdmin,
         picture: profile.picture || '',
       })
     } catch {
@@ -238,6 +240,7 @@ export function AuthProvider({ children }) {
     error,
     isAuthenticated: !!user,
     isOwner: user?.role === 'owner',
+    isAdmin: !!user?.isAdmin,
     signIn,
     signOut,
   }

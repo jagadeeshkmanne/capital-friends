@@ -13,6 +13,7 @@ import MarketTicker from './MarketTicker'
 import useAlerts from '../hooks/useAlerts'
 import MFBuyOpportunities from './forms/MFBuyOpportunities'
 import MFRebalanceDialog from './forms/MFRebalanceDialog'
+import * as api from '../services/api'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
 
@@ -68,6 +69,7 @@ const NAV_ITEMS = [
   { label: 'Insurance', path: '/insurance', match: '/insurance' },
   { label: 'Mutual Funds', path: '/investments/mutual-funds', match: '/investments/mutual-funds' },
   { label: 'Stocks', path: '/investments/stocks', match: '/investments/stocks' },
+  { label: 'Screener', path: '/investments/screener', match: '/investments/screener' },
   { label: 'Other Investments', path: '/investments/other', match: '/investments/other' },
   { label: 'Liabilities', path: '/liabilities', match: '/liabilities' },
   { label: 'Goals', path: '/goals', match: '/goals' },
@@ -154,6 +156,14 @@ export default function Header() {
 
   const notifCount = criticalAlerts.length + upcomingReminders.length
   const { buyOppCount, buyCount, strongBuyCount, rebalanceCount } = investmentSignals
+
+  // Screener signal count — fetch on mount
+  const [screenerCount, setScreenerCount] = useState(0)
+  useEffect(() => {
+    api.getScreenerSignals('PENDING')
+      .then(data => setScreenerCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => {})
+  }, [])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -339,14 +349,17 @@ export default function Header() {
             {/* Screener — always visible in site header */}
             <Link
               to="/investments/screener"
-              className={`p-2 rounded-lg transition-colors ${
+              className={`relative p-2 rounded-lg transition-colors ${
                 location.pathname === '/investments/screener'
                   ? 'text-violet-300 bg-violet-500/20'
                   : 'text-[var(--text-muted)] hover:text-violet-400 hover:bg-violet-500/10'
               }`}
-              title="Stock Screener"
+              title={screenerCount > 0 ? `${screenerCount} pending screener signal${screenerCount === 1 ? '' : 's'}` : 'Stock Screener'}
             >
               <ScanSearch size={18} />
+              {screenerCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-emerald-500 rounded-full px-1">{screenerCount}</span>
+              )}
             </Link>
 
             {/* Mask toggle — desktop only, moved to avatar dropdown on mobile */}

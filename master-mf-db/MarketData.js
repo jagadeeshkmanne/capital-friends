@@ -63,7 +63,7 @@ function getMarketDataBatch(symbols) {
   const rows = [];
   for (let i = 0; i < symbols.length; i++) {
     const sym = symbols[i];
-    const gfSym = 'NSE:' + sym;
+    const gfSym = _toGoogleFinanceSymbol(sym);
     rows.push([
       sym,
       '=IFERROR(GOOGLEFINANCE("' + gfSym + '","price"),"")',
@@ -235,35 +235,14 @@ function getNiftyData() {
     // Clean up
     sheet.getRange(niftyRow, 1, 1, 4).clearContent();
 
-    // --- Fetch benchmark returns for Midcap 150 and Smallcap 250 ---
-    var midcapReturn6m = null;
-    var smallcapReturn6m = null;
+    // --- Fetch benchmark returns for Midcap 150 and Smallcap 250 via Yahoo Finance ---
+    // GOOGLEFINANCE doesn't support Indian midcap/smallcap index symbols.
+    // Yahoo Finance chart API reliably returns historical data for these.
+    var midcapReturn6m = _fetchIndexReturn6mViaYahoo('NIFTYMIDCAP150.NS', 'Midcap150');
+    var smallcapReturn6m = _fetchIndexReturn6mViaYahoo('HDFCSML250.NS', 'Smallcap250');
 
-    try {
-      var midcapPrices = _fetchHistoricalPricesForIndex('INDEXNSE:NIFTY_MIDCAP_150', 140);
-      if (midcapPrices && midcapPrices.length >= 130) {
-        var midPrice6mAgo = midcapPrices[0];
-        var midPriceCurrent = midcapPrices[midcapPrices.length - 1];
-        if (midPrice6mAgo > 0) {
-          midcapReturn6m = Math.round(((midPriceCurrent - midPrice6mAgo) / midPrice6mAgo) * 10000) / 100;
-        }
-      }
-    } catch (midErr) {
-      Logger.log('Midcap 150 fetch failed (non-fatal): ' + midErr.message);
-    }
-
-    try {
-      var smallcapPrices = _fetchHistoricalPricesForIndex('INDEXNSE:NIFTY_SMLCAP_250', 140);
-      if (smallcapPrices && smallcapPrices.length >= 130) {
-        var smPrice6mAgo = smallcapPrices[0];
-        var smPriceCurrent = smallcapPrices[smallcapPrices.length - 1];
-        if (smPrice6mAgo > 0) {
-          smallcapReturn6m = Math.round(((smPriceCurrent - smPrice6mAgo) / smPrice6mAgo) * 10000) / 100;
-        }
-      }
-    } catch (smErr) {
-      Logger.log('Smallcap 250 fetch failed (non-fatal): ' + smErr.message);
-    }
+    if (midcapReturn6m === null) Logger.log('Midcap benchmark unavailable — will use Nifty 50');
+    if (smallcapReturn6m === null) Logger.log('Smallcap benchmark unavailable — will use Nifty 50');
 
     return {
       price: price,
@@ -285,7 +264,17 @@ function getNiftyData() {
  * Returns array of prices sorted oldest → newest, or null on failure
  */
 function _fetchHistoricalPrices(symbol, tradingDays) {
-  return _fetchHistoricalPricesForIndex('NSE:' + symbol, tradingDays);
+  return _fetchHistoricalPricesForIndex(_toGoogleFinanceSymbol(symbol), tradingDays);
+}
+
+/**
+ * Convert a stock symbol to GOOGLEFINANCE format.
+ * NSE symbols (alphabetic) → "NSE:SYMBOL"
+ * BSE codes (numeric) → "BOM:CODE"
+ */
+function _toGoogleFinanceSymbol(symbol) {
+  if (/^\d+$/.test(symbol)) return 'BOM:' + symbol;
+  return 'NSE:' + symbol;
 }
 
 /**
@@ -335,6 +324,63 @@ function _fetchHistoricalPricesForIndex(gfSymbol, tradingDays) {
 }
 
 /**
+ * Fetch 6M return for an index via Yahoo Finance chart API.
+ * Works for Indian indices that GOOGLEFINANCE doesn't support.
+ * @param {string} yahooSymbol - Yahoo Finance symbol (e.g., 'NIFTY_MIDCAP_150.NS')
+ * @param {string} label - Display label for logging
+ * @returns {number|null} - 6M return percentage or null
+ */
+function _fetchIndexReturn6mViaYahoo(yahooSymbol, label) {
+  try {
+    var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+      encodeURIComponent(yahooSymbol) + '?range=6mo&interval=1d';
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log(label + ' Yahoo fetch failed: HTTP ' + response.getResponseCode());
+      return null;
+    }
+
+    var json = JSON.parse(response.getContentText());
+    var result = json.chart && json.chart.result && json.chart.result[0];
+    if (!result) return null;
+
+    var closes = result.indicators &&
+      result.indicators.adjclose &&
+      result.indicators.adjclose[0] &&
+      result.indicators.adjclose[0].adjclose;
+
+    if (!closes || closes.length < 10) {
+      // Try regular close if adjclose not available
+      closes = result.indicators &&
+        result.indicators.quote &&
+        result.indicators.quote[0] &&
+        result.indicators.quote[0].close;
+    }
+
+    if (!closes || closes.length < 10) return null;
+
+    // Find first and last valid prices
+    var firstPrice = null, lastPrice = null;
+    for (var i = 0; i < closes.length; i++) {
+      if (closes[i] != null && closes[i] > 0) { firstPrice = closes[i]; break; }
+    }
+    for (var j = closes.length - 1; j >= 0; j--) {
+      if (closes[j] != null && closes[j] > 0) { lastPrice = closes[j]; break; }
+    }
+
+    if (!firstPrice || !lastPrice) return null;
+
+    var ret = Math.round(((lastPrice - firstPrice) / firstPrice) * 10000) / 100;
+    Logger.log(label + ' 6M return: ' + ret + '% (via Yahoo Finance, ' + closes.length + ' data points)');
+    return ret;
+  } catch (e) {
+    Logger.log(label + ' Yahoo Finance error: ' + e.message);
+    return null;
+  }
+}
+
+/**
  * Calculate RSI, DMA, and 6M return from a single historical price array.
  * Avoids 3 separate GOOGLEFINANCE calls per stock.
  *
@@ -342,8 +388,12 @@ function _fetchHistoricalPricesForIndex(gfSymbol, tradingDays) {
  * @returns {{rsi: number|null, dma50: number|null, dma200: number|null, return6m: number|null}}
  */
 function _calculateAllFromPrices(prices) {
-  const result = { rsi: null, dma50: null, dma200: null, return6m: null, return1w: null, return1m: null, return1y: null };
+  const result = { rsi: null, dma50: null, dma200: null, return6m: null, return1w: null, return1m: null, return1y: null, high52w: null };
   if (!prices || prices.length < 30) return result;
+
+  // 52-week high (~250 trading days, or all available)
+  var lookback = Math.min(prices.length, 250);
+  result.high52w = Math.round(Math.max.apply(null, prices.slice(prices.length - lookback)) * 100) / 100;
 
   // RSI(14) — needs 14+16 = 30 prices minimum
   const days = 14;
@@ -507,4 +557,134 @@ function updateMarketDataForSheet(sheetName, colMap) {
   }
 
   Logger.log('Updated market data for ' + symbols.length + ' stocks in ' + sheetName);
+}
+
+/**
+ * CHUNKED market data update — processes stocks from startIdx until time runs out.
+ * Used by screenerUpdateMarketData() to stay within 6-minute GAS limit.
+ *
+ * Phase 1 (startIdx === 0): Batch-fetches current prices for ALL symbols (fast, ~3s).
+ * Phase 2: Fetches historical data ONE stock at a time (~6.5s each), resumable.
+ *
+ * @param {string} sheetName - Sheet to update
+ * @param {Object} colMap - Column mapping (same as updateMarketDataForSheet)
+ * @param {number} startIdx - Index of first stock to process historical data for
+ * @param {number} timeBudgetMs - Max milliseconds to spend (e.g. 280000 for ~4.5 min)
+ * @param {string[]} [skipSymbols] - Optional list of symbols to skip (e.g. already enriched by Trendlyne)
+ * @returns {{ processed: number, total: number, done: boolean }}
+ */
+function updateMarketDataChunked(sheetName, colMap, startIdx, timeBudgetMs, skipSymbols) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return { processed: 0, total: 0, done: true };
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { processed: 0, total: 0, done: true };
+
+  // Build skip set for O(1) lookups
+  var skipSet = {};
+  if (skipSymbols && skipSymbols.length > 0) {
+    for (var s = 0; s < skipSymbols.length; s++) {
+      skipSet[skipSymbols[s].toUpperCase()] = true;
+    }
+  }
+  var skipCount = Object.keys(skipSet).length;
+
+  // Read all symbols
+  var symbols = [];
+  var symbolData = sheet.getRange(2, colMap.symbolCol, lastRow - 1, 1).getValues();
+  for (var i = 0; i < symbolData.length; i++) {
+    var sym = String(symbolData[i][0]).trim();
+    if (sym) symbols.push(sym);
+  }
+
+  if (symbols.length === 0) return { processed: 0, total: 0, done: true };
+
+  var chunkStart = new Date();
+
+  // On first call (startIdx === 0): batch-fetch current prices (only non-skipped stocks)
+  if (startIdx === 0) {
+    // Filter out Trendlyne-enriched stocks — they already have price + volume
+    var batchSymbols = skipCount > 0
+      ? symbols.filter(function(sym) { return !skipSet[sym.toUpperCase()]; })
+      : symbols;
+
+    if (batchSymbols.length > 0) {
+      var marketData = getMarketDataBatch(batchSymbols);
+      for (var j = 0; j < symbols.length; j++) {
+        if (skipSet[symbols[j].toUpperCase()]) continue;
+        var md = marketData[symbols[j]] || {};
+        if (colMap.priceCol && md.price) {
+          sheet.getRange(j + 2, colMap.priceCol).setValue(md.price);
+        }
+        if (colMap.avgTradedValCol && md.avgDailyTradedValueCr) {
+          sheet.getRange(j + 2, colMap.avgTradedValCol).setValue(
+            Math.round(md.avgDailyTradedValueCr * 100) / 100
+          );
+        }
+      }
+      Logger.log('Batch prices written for ' + batchSymbols.length + '/' + symbols.length +
+        ' stocks in ' + sheetName + (skipCount > 0 ? ' (' + skipCount + ' skipped — Trendlyne)' : ''));
+    } else {
+      Logger.log('All ' + symbols.length + ' stocks enriched by Trendlyne — skipping GOOGLEFINANCE batch');
+    }
+  }
+
+  // Process historical data starting from startIdx
+  var needsHistory = colMap.rsiCol || colMap.dma50Col || colMap.dma200Col ||
+                     colMap.return6mCol || colMap.return1wCol || colMap.return1mCol || colMap.return1yCol;
+
+  var processed = 0;
+  var skipped = 0;
+
+  if (needsHistory) {
+    var histDays = colMap.return1yCol ? 260 : 210;
+
+    for (var k = startIdx; k < symbols.length; k++) {
+      // Skip Trendlyne-enriched stocks (already have RSI, DMA, returns)
+      if (skipSet[symbols[k].toUpperCase()]) {
+        processed++;
+        skipped++;
+        continue;
+      }
+
+      // Check time budget before starting next stock
+      var elapsed = new Date() - chunkStart;
+      if (elapsed > timeBudgetMs) {
+        Logger.log('Time budget exhausted after ' + processed + ' stocks (' + Math.round(elapsed / 1000) + 's)');
+        return { processed: processed, total: symbols.length, done: false };
+      }
+
+      var s = symbols[k];
+      var row = k + 2;
+      var prices = _fetchHistoricalPrices(s, histDays);
+
+      if (prices && prices.length > 0) {
+        var calc = _calculateAllFromPrices(prices);
+        if (colMap.rsiCol && calc.rsi !== null) sheet.getRange(row, colMap.rsiCol).setValue(calc.rsi);
+        if (colMap.dma50Col && calc.dma50 !== null) sheet.getRange(row, colMap.dma50Col).setValue(calc.dma50);
+        if (colMap.dma200Col && calc.dma200 !== null) sheet.getRange(row, colMap.dma200Col).setValue(calc.dma200);
+        if (colMap.return6mCol && calc.return6m !== null) sheet.getRange(row, colMap.return6mCol).setValue(calc.return6m);
+        if (colMap.return1wCol && calc.return1w !== null) sheet.getRange(row, colMap.return1wCol).setValue(calc.return1w);
+        if (colMap.return1mCol && calc.return1m !== null) sheet.getRange(row, colMap.return1mCol).setValue(calc.return1m);
+        if (colMap.return1yCol && calc.return1y !== null) sheet.getRange(row, colMap.return1yCol).setValue(calc.return1y);
+        if (colMap.high52wCol && calc.high52w !== null) {
+          sheet.getRange(row, colMap.high52wCol).setValue(calc.high52w);
+          // Calculate drawdown from 52W high
+          var currentPrice = prices[prices.length - 1];
+          if (colMap.drawdownCol && calc.high52w > 0) {
+            var drawdown = Math.round(((currentPrice - calc.high52w) / calc.high52w) * 10000) / 100;
+            sheet.getRange(row, colMap.drawdownCol).setValue(drawdown);
+          }
+        }
+      }
+
+      processed++;
+      if (k < symbols.length - 1) Utilities.sleep(500);
+    }
+  }
+
+  Logger.log('Chunked update complete: ' + processed + ' stocks in ' + sheetName +
+    (skipped > 0 ? ' (' + skipped + ' skipped — Trendlyne)' : ''));
+  return { processed: processed, total: symbols.length, done: true };
 }

@@ -1674,7 +1674,8 @@ function ensureScreenerSheets() {
   var screenerSheets = [
     { name: CONFIG.screenerSignalsSheet, func: setupScreenerSignalsSheet },
     { name: CONFIG.screenerStockMetaSheet, func: setupScreenerStockMetaSheet },
-    { name: CONFIG.screenerUserConfigSheet, func: setupScreenerUserConfigSheet }
+    { name: CONFIG.screenerUserConfigSheet, func: setupScreenerUserConfigSheet },
+    { name: CONFIG.screenerPaperTradesSheet, func: setupScreenerPaperTradesSheet }
   ];
   for (var i = 0; i < screenerSheets.length; i++) {
     if (!sheetExists(screenerSheets[i].name)) {
@@ -1753,13 +1754,13 @@ function setupScreenerSignalsSheet() {
 
 /**
  * Setup Screener_StockMeta Sheet
- * Structure: 15 columns (A-O) — per-stock screener metadata (joined to StockHoldings by symbol)
+ * Structure: 19 columns (A-S) — per-stock screener metadata (joined to StockHoldings by symbol)
  */
 function setupScreenerStockMetaSheet() {
   var spreadsheet = getSpreadsheet();
   var sheet = spreadsheet.insertSheet(CONFIG.screenerStockMetaSheet);
 
-  addDeveloperCredit(sheet, 15);
+  addDeveloperCredit(sheet, 19);
 
   sheet.appendRow([
     'Symbol',               // A: Join key to StockHoldings.C
@@ -1771,15 +1772,19 @@ function setupScreenerStockMetaSheet() {
     'Pyramid Stage',        // G: STARTER, ADD1, ADD2
     'Dip Buy Used',         // H: YES/NO
     'Screeners Passing',    // I: "1,2" or "1,3,4"
-    'Conviction',           // J: HIGH, MEDIUM, COMPOUNDER, LOW
-    'Is Compounder',        // K: YES/NO
+    'Conviction',           // J: HIGH, MODERATE, BASE
+    'Is Compounder',        // K: YES/NO (deprecated)
     'Trailing Stop Price',  // L: Calculated stop price
     'Stop Tier',            // M: "0-20%", "20-50%", etc.
     'Last Fundamental Check', // N: Date
-    'Notes'                 // O
+    'Notes',                // O
+    'Locked Budget',        // P: Budget at time of BUY signal generation
+    'Locked Allocation',    // Q: Total allocation for this stock (budget × conviction %)
+    'ADD1 Amount',          // R: Locked ADD1 amount (25% of allocation)
+    'ADD2 Amount'           // S: Locked ADD2 amount (25% of allocation)
   ]);
 
-  formatHeaderRow(sheet, sheet.getRange('A2:O2'), 40);
+  formatHeaderRow(sheet, sheet.getRange('A2:S2'), 40);
 
   sheet.setColumnWidth(1, 110);   // Symbol
   sheet.setColumnWidth(2, 200);   // Stock Name
@@ -1796,10 +1801,15 @@ function setupScreenerStockMetaSheet() {
   sheet.setColumnWidth(13, 90);   // Stop Tier
   sheet.setColumnWidth(14, 130);  // Last Fundamental Check
   sheet.setColumnWidth(15, 150);  // Notes
+  sheet.setColumnWidth(16, 110);  // Locked Budget
+  sheet.setColumnWidth(17, 120);  // Locked Allocation
+  sheet.setColumnWidth(18, 100);  // ADD1 Amount
+  sheet.setColumnWidth(19, 100);  // ADD2 Amount
 
   sheet.getRange('E:E').setNumberFormat('#,##0.00');
   sheet.getRange('F:F').setNumberFormat('#,##0.00');
   sheet.getRange('L:L').setNumberFormat('#,##0.00');
+  sheet.getRange('P:S').setNumberFormat('#,##0');
 
   applyStandardFormatting(sheet);
   sheet.setTabColor('#8b5cf6');  // Purple for screener meta
@@ -1824,11 +1834,14 @@ function setupScreenerUserConfigSheet() {
 
   // Pre-populate with defaults
   var defaults = [
-    ['STOCK_BUDGET', 300000, 'Total stock portfolio budget (₹)'],
-    ['MAX_STOCKS', 8, 'Maximum number of stock positions'],
-    ['MAX_PER_SECTOR', 2, 'Maximum stocks per sector'],
-    ['PAPER_TRADING', 'TRUE', 'Paper trading mode (TRUE/FALSE)'],
-    ['RSI_BUY_MAX', 45, 'Max RSI for BUY signal'],
+    ['STOCK_BUDGET', 1000000, 'Total stock portfolio budget (₹)'],
+    ['MAX_STOCKS', 10, 'Maximum number of stock positions'],
+    ['MAX_PER_SECTOR', 3, 'Maximum stocks per sector (with 10 stocks, 3 allows good diversification)'],
+    ['ALLOC_HIGH', 15, 'Max % of budget per HIGH conviction stock (MF QoQ >= 1%)'],
+    ['ALLOC_MODERATE', 12, 'Max % of budget per MODERATE conviction stock (MF QoQ 0.5-1%)'],
+    ['ALLOC_BASE', 10, 'Max % of budget per BASE conviction stock (no MF signal)'],
+    ['RSI_BUY_MAX', 65, 'Max RSI for BUY signal (overbought block at 70)'],
+    ['MIN_MARKET_CAP_CR', 500, 'Minimum market cap in Cr — skip micro caps'],
     ['HARD_STOP_LOSS', 30, 'Hard stop loss % from entry'],
     ['TRAILING_STOP_0_20', 25, 'Trailing stop % for 0-20% gain'],
     ['TRAILING_STOP_20_50', 20, 'Trailing stop % for 20-50% gain'],
@@ -1842,9 +1855,21 @@ function setupScreenerUserConfigSheet() {
     ['DIP_BUY_MIN_DROP', 10, 'Min drop % for dip buy'],
     ['DIP_BUY_MAX_DROP', 20, 'Max drop % for dip buy'],
     ['DIP_BUY_RSI_MAX', 30, 'Max RSI for dip buy'],
+    ['SKIP_NIFTY_GATE', 'FALSE', 'Allow BUY signals even when Nifty is below 200DMA (for testing)'],
+    ['SKIP_COOLING_PERIOD', 'FALSE', 'Skip cooling period — treat COOLING stocks as ELIGIBLE (for testing)'],
     ['NIFTY_BELOW_200DMA_ALLOCATION', 50, '% of normal allocation when Nifty below 200DMA'],
-    ['SECTOR_ALERT_PCT', 35, 'Alert when sector exceeds this % of portfolio'],
-    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze buys when portfolio drops this %']
+    ['NIFTY_CRASH_PCT', 20, 'Nifty crash % threshold — triggers CRASH_ALERT'],
+    ['SYSTEMIC_EXIT_COUNT', 3, 'Number of exit signals needed for systemic exit'],
+    ['SECTOR_ALERT_PCT', 30, 'Alert when sector exceeds this % of portfolio'],
+    ['PORTFOLIO_FREEZE_PCT', 25, 'Freeze buys when portfolio drops this %'],
+    ['STALE_AFTER_DAYS', 30, 'Mark stock STALE if not seen in screeners for this many days'],
+    ['PAPER_TRADING', 'TRUE', 'Enable paper trading — auto-execute signals without real trades'],
+    ['HOLDING_PERIOD_DAYS', 30, 'Minimum days to hold before selling (company rule compliance)'],
+    ['PAPER_HOLDING_PERIOD_DAYS', 1, 'Minimum days to hold in paper trading before auto-sell (default 1)'],
+    ['SCREENER_EMAIL_ENABLED', 'FALSE', 'Enable daily screener signal email (opt-in)'],
+    ['SCREENER_EMAIL_HOUR', 15, 'Hour to send EOD screener email (IST, 0-23)'],
+    ['HOURLY_PRICE_CHECK', 'TRUE', 'Enable hourly exit signal checks during market hours'],
+    ['SIGNAL_TRACK_DAYS', '7,14,30', 'Days after signal to track outcome prices']
   ];
 
   for (var i = 0; i < defaults.length; i++) {
@@ -1860,6 +1885,71 @@ function setupScreenerUserConfigSheet() {
   sheet.setFrozenRows(2);
 
   log('Screener_UserConfig sheet created');
+  return sheet;
+}
+
+/**
+ * Setup Screener_PaperTrades Sheet
+ * Structure: 17 columns (A-Q) — automated paper trade tracking
+ * Completely separate from StockHoldings/StockTransactions.
+ */
+function setupScreenerPaperTradesSheet() {
+  var spreadsheet = getSpreadsheet();
+  var sheet = spreadsheet.insertSheet(CONFIG.screenerPaperTradesSheet);
+
+  addDeveloperCredit(sheet, 17);
+
+  sheet.appendRow([
+    'Trade ID',           // A: PT-20260320-3
+    'Date',               // B: Trade date
+    'Trade Type',         // C: BUY or SELL
+    'Signal Type',        // D: BUY_STARTER, ADD1, TRAILING_STOP, etc.
+    'Symbol',             // E
+    'Stock Name',         // F
+    'Price',              // G: Entry or exit price
+    'Shares',             // H
+    'Amount ₹',           // I
+    'Signal ID',          // J: Reference to Screener_Signals
+    'Status',             // K: OPEN, CLOSED
+    'Exit Date',          // L
+    'Exit Price',         // M
+    'P&L ₹',             // N
+    'P&L %',             // O
+    'Holding Days',       // P
+    'Notes'               // Q
+  ]);
+
+  formatHeaderRow(sheet, sheet.getRange('A2:Q2'), 40);
+
+  sheet.setColumnWidth(1, 120);   // Trade ID
+  sheet.setColumnWidth(2, 100);   // Date
+  sheet.setColumnWidth(3, 70);    // Trade Type
+  sheet.setColumnWidth(4, 120);   // Signal Type
+  sheet.setColumnWidth(5, 100);   // Symbol
+  sheet.setColumnWidth(6, 180);   // Stock Name
+  sheet.setColumnWidth(7, 90);    // Price
+  sheet.setColumnWidth(8, 70);    // Shares
+  sheet.setColumnWidth(9, 100);   // Amount
+  sheet.setColumnWidth(10, 130);  // Signal ID
+  sheet.setColumnWidth(11, 80);   // Status
+  sheet.setColumnWidth(12, 100);  // Exit Date
+  sheet.setColumnWidth(13, 90);   // Exit Price
+  sheet.setColumnWidth(14, 100);  // P&L ₹
+  sheet.setColumnWidth(15, 70);   // P&L %
+  sheet.setColumnWidth(16, 80);   // Holding Days
+  sheet.setColumnWidth(17, 200);  // Notes
+
+  sheet.getRange('G:G').setNumberFormat('#,##0.00');
+  sheet.getRange('I:I').setNumberFormat('#,##0');
+  sheet.getRange('M:M').setNumberFormat('#,##0.00');
+  sheet.getRange('N:N').setNumberFormat('#,##0');
+  sheet.getRange('O:O').setNumberFormat('#,##0.00');
+
+  applyStandardFormatting(sheet);
+  sheet.setTabColor('#f59e0b');  // Amber for paper trades
+  sheet.setFrozenRows(2);
+
+  log('Screener_PaperTrades sheet created');
   return sheet;
 }
 

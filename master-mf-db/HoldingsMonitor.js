@@ -40,8 +40,6 @@ function updateHoldingsMarketData() {
     const totalInvested = parseFloat(data[i][6]) || 0;
     const currentPrice = parseFloat(data[i][8]) || 0;
     const oldPeak = parseFloat(data[i][11]) || 0;
-    const isCompounder = String(data[i][18]).trim() === 'YES';
-
     if (!currentPrice || !entryPrice) continue;
 
     // Avg price
@@ -67,8 +65,7 @@ function updateHoldingsMarketData() {
       entryPrice: entryPrice,
       currentPrice: currentPrice,
       peakPrice: newPeak,
-      pnlPct: pnlPct,
-      isCompounder: isCompounder
+      pnlPct: pnlPct
     }, config);
 
     sheet.getRange(row, 13).setValue(stop.stopPrice || ''); // M: Trailing Stop

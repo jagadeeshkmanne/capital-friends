@@ -106,7 +106,8 @@ function routeAction(action, params, userRecord) {
         email: userRecord.email,
         name: userRecord.displayName,
         role: userRecord.role,
-        spreadsheetId: userRecord.spreadsheetId
+        spreadsheetId: userRecord.spreadsheetId,
+        isAdmin: Session.getActiveUser().getEmail() === CONFIG.adminEmail
       };
 
     case 'auth:shared-members':
@@ -356,6 +357,40 @@ function routeAction(action, params, userRecord) {
 
     case 'screener:nifty-data':
       return readNiftyDataFromMasterDB();
+
+    // ── Paper Trading ──
+    case 'screener:paper-execute':
+      return executePaperTrades();
+
+    case 'screener:paper-portfolio':
+      return getPaperPortfolio();
+
+    case 'screener:paper-performance':
+      return getPaperPerformance();
+
+    // ── Signal Tracking ──
+    case 'screener:signal-tracking':
+      return getSignalTracking();
+
+    case 'screener:track-outcomes':
+      return trackSignalOutcomes();
+
+    // ── Screener Reset ──
+    case 'screener:reset-paper':
+      return resetPaperTrades();
+    case 'screener:reset-signals':
+      return resetSignals();
+    case 'screener:reset-all':
+      return resetScreenerAll();
+    case 'screener:reset-rerun':
+      return resetAndRerun();
+
+    // ── Admin (screener pipeline) ──
+    case 'admin:refresh-trendlyne':   return adminRefreshTrendlyne();
+    case 'admin:refresh-nifty':       return adminRefreshNifty();
+    case 'admin:rescore-watchlist':   return adminRescoreWatchlist();
+    case 'admin:run-full-pipeline':   return adminRunFullPipeline();
+    case 'admin:status':              return getAdminStatus();
 
     // ── Reminders ──
     case 'reminders:list':
@@ -771,7 +806,7 @@ function getAllSettings() {
 function updateAllSettings(params) {
   var emailSettings = ['EmailConfigured', 'EmailFrequency', 'EmailHour', 'EmailMinute', 'EmailDayOfWeek', 'EmailDayOfMonth'];
   var reminderSettings = ['ReminderNotificationsEnabled', 'ReminderCheckHour'];
-  var screenerSettings = ['ScreenerEmailEnabled', 'ScreenerEmailHour'];
+  var screenerSettings = ['ScreenerEmailEnabled', 'ScreenerEmailHour', 'HourlyPriceCheck'];
   var emailChanged = false;
   var reminderChanged = false;
   var screenerChanged = false;
@@ -810,12 +845,13 @@ function updateAllSettings(params) {
     }
   }
 
-  // Reinstall screener email trigger if screener settings changed
+  // Reinstall screener triggers if screener settings changed
   if (screenerChanged) {
     try {
       installScreenerEmailTrigger();
+      installHourlyPriceCheckTrigger();
     } catch (e) {
-      log('Error reinstalling screener email trigger: ' + e.message);
+      log('Error reinstalling screener triggers: ' + e.message);
     }
   }
 

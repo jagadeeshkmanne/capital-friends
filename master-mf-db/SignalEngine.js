@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * Core logic:
- * - checkWatchlistForBuySignals(): All 11 BUY conditions
+ * - checkWatchlistForBuySignals(): Factor score + 8 BUY conditions
  * - checkHoldingsForAddSignals(): ADD #1, ADD #2, DIP BUY
  * - checkHoldingsForExitSignals(): Hard exits, trailing stops
  * - checkPortfolioLevel(): Freeze, crash, systemic, sector alerts
@@ -25,7 +25,7 @@ function checkWatchlistForBuySignals(niftyData, config) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 25).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 40).getValues(); // A-AN (40 cols, includes factor score/rank + liquidity)
   const today = new Date();
 
   // Get current holdings count and sector breakdown
@@ -35,6 +35,7 @@ function checkWatchlistForBuySignals(niftyData, config) {
   const totalInvested = holdings.reduce(function(sum, h) { return sum + (h.totalInvested || 0); }, 0);
   const budget = config.STOCK_BUDGET || 300000;
   const cashAvailable = budget - totalInvested;
+  const candidates = []; // Collect passing stocks, then rank-select top N
 
   for (let i = 0; i < data.length; i++) {
     const row = i + 2;
@@ -47,7 +48,7 @@ function checkWatchlistForBuySignals(niftyData, config) {
 
     const dateFound = data[i][2]; // col C
     const foundPrice = parseFloat(data[i][3]) || 0;
-    const screenersStr = String(data[i][4]); // col E
+    const conviction = String(data[i][5]).trim() || 'BASE'; // col F: kept for backward compat
     const coolingEnd = data[i][6]; // col G
     const currentPrice = parseFloat(data[i][8]) || 0;
     const rsi = parseFloat(data[i][10]) || 50; // col K
@@ -58,8 +59,21 @@ function checkWatchlistForBuySignals(niftyData, config) {
     const sector = String(data[i][17]).trim(); // col R
     const marketCapCr = parseFloat(data[i][23]) || 0; // col X
     const capClass = String(data[i][24]).trim(); // col Y
+    const factorScore = parseFloat(data[i][37]) || 0; // AL: Factor Score
+    const factorRank = parseInt(data[i][38]) || 99;    // AM: Factor Rank
+    const avgTradedValCr = parseFloat(data[i][39]) || 0; // AN: Avg Daily Traded Value (Cr)
 
-    const screeners = screenersStr.split(',').map(function(s) { return parseInt(s); }).filter(function(s) { return !isNaN(s); });
+    // --- Screener overlap data (col E) ---
+    const screenersStr = String(data[i][4]).trim(); // col E: e.g. "1", "1,2", "1,2,3"
+    let screenerCount = 0;
+    if (screenersStr && screenersStr !== 'CF-Stock-Screener') {
+      screenerCount = screenersStr.split(',').filter(function(s) { return s.trim() !== ''; }).length;
+    } else if (screenersStr === 'CF-Stock-Screener') {
+      screenerCount = 1; // legacy format
+    }
+    const isMomentumOnly = screenersStr === '2'; // only in CF-Momentum
+
+    const lastSeenInScreener = data[i][21]; // col V: Last Updated (set by addToWatchlist from email parsing)
 
     // --- Check cooling period ---
     if (coolingEnd && today < new Date(coolingEnd)) {
@@ -85,92 +99,82 @@ function checkWatchlistForBuySignals(niftyData, config) {
     // Update status to ELIGIBLE if past cooling
     if (status !== 'ELIGIBLE') {
       sheet.getRange(row, 8).setValue('ELIGIBLE');
+      // Reset "last seen" timer when transitioning COOLING → ELIGIBLE
+      // Prevents false STALE for stocks with long cooling periods
+      sheet.getRange(row, 22).setValue(today); // col V
     }
 
-    // --- Evaluate ALL 11 BUY conditions ---
+    // --- STALE detection ---
+    // Col V tracks when stock was last seen in a Trendlyne screener email.
+    // If ELIGIBLE and not seen in any screener for 30+ days → mark STALE.
+    // STALE stocks skip buy evaluation but stay on watchlist.
+    // If stock re-appears in screener emails, addToWatchlist() resets to ELIGIBLE.
+    if (lastSeenInScreener) {
+      const daysSinceLastSeen = Math.floor((today - new Date(lastSeenInScreener)) / (24 * 60 * 60 * 1000));
+      const staleDays = config.STALE_AFTER_DAYS || 30;
+      if (daysSinceLastSeen > staleDays) {
+        sheet.getRange(row, 8).setValue('STALE');
+        sheet.getRange(row, 21).setValue('Not in any screener for ' + daysSinceLastSeen + ' days');
+        Logger.log(sym + ' → STALE (last seen ' + daysSinceLastSeen + ' days ago)');
+        continue;
+      }
+    }
+
+    // --- Evaluate BUY conditions ---
+    // Philosophy: Factor score is the primary gate. Hard gates only for
+    // portfolio constraints, extreme RSI, and fundamental filters.
+    // Technical conditions (golden cross, price vs 200DMA, relative strength)
+    // are INSIDE the factor score — not hard gates.
     const failed = [];
 
-    // 1. Cooling period passed ✅ (we're here, so it passed)
-
-    // 2. Passes 2+ screeners (Screener 4 = Compounder bypasses this)
-    if (screeners.length < 2 && screeners.indexOf(4) === -1) {
-      failed.push('Only ' + screeners.length + ' screener — need 2+');
+    // 1. Factor score minimum — core gate (embeds trend, momentum, quality, etc.)
+    const factorBuyMin = config.FACTOR_BUY_MIN || 50;
+    if (factorScore < factorBuyMin) {
+      failed.push('Factor score too low (' + factorScore + ', min ' + factorBuyMin + ')');
     }
 
-    // 3. RSI < 45
-    const rsiMax = config.RSI_BUY_MAX || 45;
-    if (rsi >= rsiMax) {
-      failed.push('RSI too high (' + rsi + ', max ' + rsiMax + ')');
+    // 2. RSI overbought block — only hard gate at 70+
+    // RSI 60-69 already penalized inside factor score (Trend factor: rsiScore = 20 or 10)
+    // No soft gate at 65 — avoids double punishment
+    const rsiOverbought = config.RSI_OVERBOUGHT || 70;
+    if (rsi > rsiOverbought) {
+      failed.push('RSI overbought (' + rsi + ', max ' + rsiOverbought + ')');
     }
 
-    // 4. Price change < 20%
-    // Already checked above (expired if > 20%)
-
-    // 5. Portfolio < 8 stocks
+    // 3. Portfolio < MAX_STOCKS
     const maxStocks = config.MAX_STOCKS || 8;
     if (holdingCount >= maxStocks) {
       failed.push('Portfolio full (' + holdingCount + '/' + maxStocks + ')');
     }
 
-    // 6. < 2 stocks in same sector
+    // 4. Sector limit
     const maxPerSector = config.MAX_PER_SECTOR || 2;
     if (sector && (sectorCounts[sector] || 0) >= maxPerSector) {
       failed.push(sector + ' sector full');
     }
 
-    // 7. Budget has room
-    const conviction = SCREENER_CONFIG.getConviction(screeners);
-    const maxAllocPct = SCREENER_CONFIG.getMaxAllocationPct(conviction);
-    const starterAmount = budget * (maxAllocPct / 100) * 0.5; // 50% of allocation
+    // 5. Budget has room — allocation by factor rank × overlap multiplier
+    const maxAllocPct = SCREENER_CONFIG.getAllocationByRank(factorRank, config);
+    const overlapMultiplier = SCREENER_CONFIG.getOverlapAllocationMultiplier(screenerCount);
+    const starterAmount = budget * (maxAllocPct / 100) * 0.5 * overlapMultiplier; // 50% of allocation × overlap sizing
     if (cashAvailable < starterAmount) {
       failed.push('Low cash (need ₹' + Math.round(starterAmount / 1000) + 'K)');
     }
 
-    // 8. Nifty above 200DMA
-    const niftyAbove = niftyData.aboveDMA200;
-    if (niftyAbove === false) {
-      // Not a hard block — half allocation
-      failed.push('Nifty below 200DMA');
-    }
-
-    // 9. Golden cross (50DMA > 200DMA)
-    const hasGoldenCross = dma50 > 0 && dma200 > 0 && dma50 > dma200;
-    sheet.getRange(row, 14).setValue(hasGoldenCross ? 'YES' : 'NO'); // col N
-
-    if (!hasGoldenCross) {
-      // Exception: Screener 1+3 overlap + RSI < 30
-      const hasException = screeners.includes(1) && screeners.includes(3) && rsi < 30;
-      if (!hasException) {
-        failed.push('No golden cross');
+    // 9. Momentum-only guard — max 2 momentum-only stocks in portfolio
+    if (isMomentumOnly) {
+      const momentumOnlyCount = holdings.filter(function(h) { return h.screenersStr === '2'; }).length;
+      if (momentumOnlyCount >= (SCREENER_CONFIG.MAX_MOMENTUM_ONLY_STOCKS || 2)) {
+        failed.push('Momentum-only limit reached (' + momentumOnlyCount + '/' + SCREENER_CONFIG.MAX_MOMENTUM_ONLY_STOCKS + ')');
       }
     }
 
-    // 10. Dual relative strength: must beat Nifty 50 AND cap-class benchmark
-    sheet.getRange(row, 16).setValue(niftyReturn6m); // col P
-    const beatsNifty = return6m > niftyReturn6m;
+    // 6. Market regime — scales allocation, NEVER blocks
+    const niftyAbove = niftyData.aboveDMA200;
+    const regimeMultiplier = SCREENER_CONFIG.getMarketRegimeMultiplier(niftyData);
+    // No hard block. Bear regime → 25% allocation (still trades, just smaller).
 
-    // Cap-class benchmark: LARGE=Nifty50, MID=Midcap150, SMALL=Smallcap250
-    let benchmarkReturn = niftyReturn6m;
-    let benchmarkName = 'Nifty';
-    if (capClass === 'MID' && niftyData.midcapReturn6m != null) {
-      benchmarkReturn = niftyData.midcapReturn6m;
-      benchmarkName = 'Midcap150';
-    } else if ((capClass === 'SMALL' || capClass === 'MICRO') && niftyData.smallcapReturn6m != null) {
-      benchmarkReturn = niftyData.smallcapReturn6m;
-      benchmarkName = 'Smallcap250';
-    }
-    const beatsBenchmark = return6m > benchmarkReturn;
-    const relStrength = beatsNifty && beatsBenchmark;
-
-    sheet.getRange(row, 17).setValue(relStrength ? 'PASS' : 'FAIL'); // col Q
-    if (!beatsNifty) {
-      failed.push('Weak vs Nifty (' + return6m + '% vs ' + niftyReturn6m + '%)');
-    }
-    if (!beatsBenchmark && benchmarkName !== 'Nifty') {
-      failed.push('Weak vs ' + benchmarkName + ' (' + return6m + '% vs ' + benchmarkReturn + '%)');
-    }
-
-    // 11. Market cap >= minimum (skip micro caps)
+    // 7. Market cap >= minimum (skip micro caps)
     const minMcap = config.MIN_MARKET_CAP_CR || 500;
     if (marketCapCr > 0 && marketCapCr < minMcap) {
       failed.push('Small cap (₹' + Math.round(marketCapCr) + 'Cr)');
@@ -178,38 +182,84 @@ function checkWatchlistForBuySignals(niftyData, config) {
       failed.push('Micro cap');
     }
 
-    // Update Nifty >200DMA column
+    // 8. Liquidity filter — avg daily traded value >= minimum
+    const minTradedVal = config.MIN_AVG_TRADED_VALUE_CR || 3;
+    if (avgTradedValCr > 0 && avgTradedValCr < minTradedVal) {
+      failed.push('Low liquidity (₹' + avgTradedValCr.toFixed(1) + 'Cr/day, min ₹' + minTradedVal + 'Cr)');
+    }
+
+    // --- Informational columns (NOT gates, just tracking) ---
+    const hasGoldenCross = dma50 > 0 && dma200 > 0 && dma50 > dma200;
+    sheet.getRange(row, 14).setValue(hasGoldenCross ? 'YES' : 'NO'); // col N
+
+    sheet.getRange(row, 16).setValue(niftyData.return6m || 0); // col P: Nifty 6M return
+    const beatsNifty = return6m > (niftyData.return6m || 0);
+    let benchmarkReturn = niftyData.return6m || 0;
+    if (capClass === 'MID' && niftyData.midcapReturn6m != null) benchmarkReturn = niftyData.midcapReturn6m;
+    else if ((capClass === 'SMALL' || capClass === 'MICRO') && niftyData.smallcapReturn6m != null) benchmarkReturn = niftyData.smallcapReturn6m;
+    sheet.getRange(row, 17).setValue(beatsNifty && return6m > benchmarkReturn ? 'PASS' : 'FAIL'); // col Q
+
     sheet.getRange(row, 19).setValue(niftyAbove ? 'YES' : 'NO'); // col S
 
     // --- Result ---
     const allMet = failed.length === 0;
     sheet.getRange(row, 20).setValue(allMet ? 'YES' : 'NO'); // col T
     sheet.getRange(row, 21).setValue(failed.join(' | ')); // col U
-    sheet.getRange(row, 22).setValue(today); // col V: Last Updated
+    // col V: NOT updated here — only addToWatchlist() writes it (tracks "last seen in screener email")
 
     if (allMet) {
-      // Generate BUY_STARTER signal
-      const adjustedAllocation = niftyAbove === false
-        ? starterAmount * (config.NIFTY_BELOW_200DMA_ALLOCATION || 50) / 100
-        : starterAmount;
-
-      const shares = currentPrice > 0 ? Math.floor(adjustedAllocation / currentPrice) : 0;
-
-      _createSignal({
-        type: 'BUY_STARTER',
-        symbol: sym,
-        name: String(data[i][1]),
-        amount: adjustedAllocation,
-        shares: shares,
-        triggerDetail: 'Screeners: ' + screenersStr + ', RSI: ' + rsi +
-          ', Golden Cross: ' + (hasGoldenCross ? 'YES' : 'EXCEPTION(1+3)') +
-          ', 6M vs Nifty: ' + return6m + '% vs ' + niftyReturn6m + '%' +
-          ', Cap: ' + (capClass || 'N/A') + ' (₹' + Math.round(marketCapCr) + ' Cr)',
-        conviction: conviction
+      // Collect candidate — rank-based selection happens after the loop
+      candidates.push({
+        sym: sym, name: String(data[i][1]), conviction: conviction,
+        currentPrice: currentPrice, rsi: rsi, factorScore: factorScore,
+        factorRank: factorRank, hasGoldenCross: hasGoldenCross,
+        return6m: return6m, niftyReturn6m: niftyReturn6m,
+        capClass: capClass, marketCapCr: marketCapCr,
+        starterAmount: starterAmount, regimeMultiplier: regimeMultiplier,
+        screenersStr: screenersStr, screenerCount: screenerCount,
+        overlapMultiplier: overlapMultiplier
       });
-
-      Logger.log('BUY signal generated for ' + sym + ' (' + conviction + ')');
     }
+  }
+
+  // --- RANK-BASED SELECTION: only generate signals for top N candidates ---
+  // N = remaining portfolio slots (MAX_STOCKS - current holdings)
+  const remainingSlots = Math.max(0, (config.MAX_STOCKS || 8) - holdingCount);
+  candidates.sort(function(a, b) { return b.factorScore - a.factorScore; }); // highest score first
+
+  const topN = candidates.slice(0, remainingSlots);
+  for (let c = 0; c < topN.length; c++) {
+    const cand = topN[c];
+    const signalAction = SCREENER_CONFIG.getSignalAction(cand.factorScore);
+    const adjustedAllocation = Math.round(cand.starterAmount * cand.regimeMultiplier);
+    const shares = cand.currentPrice > 0 ? Math.floor(adjustedAllocation / cand.currentPrice) : 0;
+
+    _createSignal({
+      type: 'BUY_STARTER',
+      symbol: cand.sym,
+      name: cand.name,
+      amount: adjustedAllocation,
+      shares: shares,
+      triggerDetail: 'Factor: ' + cand.factorScore + ' (Rank #' + cand.factorRank + '), ' +
+        'Screeners: ' + (cand.screenersStr || 'N/A') + ' (' + cand.screenerCount + '×, alloc ' + Math.round(cand.overlapMultiplier * 100) + '%), ' +
+        'RSI: ' + cand.rsi + ', Golden Cross: ' + (cand.hasGoldenCross ? 'YES' : 'NO') +
+        ', 6M vs Nifty: ' + cand.return6m + '% vs ' + cand.niftyReturn6m + '%' +
+        ', Regime: ' + Math.round(cand.regimeMultiplier * 100) + '%' +
+        ', Cap: ' + (cand.capClass || 'N/A') + ' (₹' + Math.round(cand.marketCapCr) + ' Cr)',
+      conviction: cand.conviction,
+      factorScore: cand.factorScore,
+      factorRank: cand.factorRank
+    });
+
+    Logger.log('BUY signal: ' + cand.sym + ' (Score:' + cand.factorScore + ', Rank:#' + cand.factorRank +
+      ', Screeners:' + (cand.screenersStr || 'N/A') + ' (' + cand.screenerCount + '×)' +
+      ', Alloc:₹' + adjustedAllocation + ', Regime:' + Math.round(cand.regimeMultiplier * 100) + '%)');
+  }
+
+  if (candidates.length > topN.length) {
+    Logger.log('Rank selection: ' + candidates.length + ' candidates, took top ' + topN.length +
+      ' (slots: ' + remainingSlots + '). Skipped: ' +
+      candidates.slice(topN.length).map(function(c) { return c.sym + '(' + c.factorScore + ')'; }).join(', '));
   }
 }
 
@@ -237,10 +287,9 @@ function checkHoldingsForAddSignals(config) {
       const minWeeks = config.ADD_MIN_WEEKS || 2;
 
       if (gainPct >= add1Min && gainPct <= add1Max && timeSinceEntry >= minWeeks * 7) {
-        // Check still passes 2+ screeners
-        const screeners = h.screenersStr ? h.screenersStr.split(',').length : 0;
-        if (screeners >= 2 && h.currentPrice > (h.dma200 || 0)) {
-          const conviction = h.conviction || 'MEDIUM';
+        // Must be above 200DMA
+        if (h.currentPrice > (h.dma200 || 0)) {
+          const conviction = h.conviction || 'BASE';
           const maxAllocPct = SCREENER_CONFIG.getMaxAllocationPct(conviction);
           const budget = config.STOCK_BUDGET || 300000;
           const addAmount = budget * (maxAllocPct / 100) * 0.25; // 25% of allocation
@@ -253,7 +302,7 @@ function checkHoldingsForAddSignals(config) {
             amount: addAmount,
             shares: addShares,
             triggerDetail: 'Gain: +' + Math.round(gainPct) + '%, ' + timeSinceEntry.toFixed(0) +
-              ' days since entry, Screeners: ' + h.screenersStr
+              ' days since entry, Conviction: ' + conviction
           });
         }
       }
@@ -267,9 +316,9 @@ function checkHoldingsForAddSignals(config) {
       const timeSinceLastAdd = (new Date() - new Date(lastAddDate)) / (1000 * 60 * 60 * 24);
 
       if (gainPct >= add2Min && timeSinceLastAdd >= minWeeks * 7) {
-        const screeners = h.screenersStr ? h.screenersStr.split(',').length : 0;
-        if (screeners >= 2 && h.currentPrice > (h.dma200 || 0)) {
-          const conviction = h.conviction || 'MEDIUM';
+        // Must be above 200DMA
+        if (h.currentPrice > (h.dma200 || 0)) {
+          const conviction = h.conviction || 'BASE';
           const maxAllocPct = SCREENER_CONFIG.getMaxAllocationPct(conviction);
           const budget = config.STOCK_BUDGET || 300000;
           const addAmount = budget * (maxAllocPct / 100) * 0.25;
@@ -282,13 +331,13 @@ function checkHoldingsForAddSignals(config) {
             amount: addAmount,
             shares: addShares,
             triggerDetail: 'Gain: +' + Math.round(gainPct) + '%, ' +
-              timeSinceLastAdd.toFixed(0) + ' days since Add #1, Screeners: ' + h.screenersStr
+              timeSinceLastAdd.toFixed(0) + ' days since Add #1, Conviction: ' + conviction
           });
         }
       }
     }
 
-    // --- DIP BUY (one-time only, Screener 1+3 overlap, RSI < 30, above 200DMA) ---
+    // --- DIP BUY (one-time only, RSI oversold, above 200DMA) ---
     if (!h.dipBuyUsed && h.pyramidStage === 'STARTER') {
       const dropPct = Math.abs(gainPct);
       const dipMin = config.DIP_BUY_MIN_DROP || 10;
@@ -296,13 +345,9 @@ function checkHoldingsForAddSignals(config) {
       const dipRsiMax = config.DIP_BUY_RSI_MAX || 30;
 
       if (gainPct < 0 && dropPct >= dipMin && dropPct <= dipMax) {
-        // Must pass Screener 1 + 3
-        const screeners = h.screenersStr ? h.screenersStr.split(',').map(Number) : [];
-        const has1and3 = screeners.includes(1) && screeners.includes(3);
-
-        if (has1and3 && h.rsi <= dipRsiMax && h.currentPrice > (h.dma200 || 0)) {
-          const conviction = h.conviction || 'MEDIUM';
-          const maxAllocPct = SCREENER_CONFIG.getMaxAllocationPct(conviction);
+        if (h.rsi <= dipRsiMax && h.currentPrice > (h.dma200 || 0)) {
+          const conviction = h.conviction || 'BASE';
+          const maxAllocPct = SCREENER_CONFIG.getMaxAllocationPct(conviction, config);
           const budget = config.STOCK_BUDGET || 300000;
           const dipAmount = budget * (maxAllocPct / 100) * 0.25;
           const dipShares = Math.floor(dipAmount / h.currentPrice);
@@ -314,7 +359,7 @@ function checkHoldingsForAddSignals(config) {
             amount: dipAmount,
             shares: dipShares,
             triggerDetail: 'Drop: -' + Math.round(dropPct) + '%, RSI: ' + h.rsi +
-              ', Screeners 1+3: YES, Above 200DMA: YES'
+              ', Above 200DMA: YES, Conviction: ' + conviction
           });
         }
       }
@@ -357,8 +402,7 @@ function checkHoldingsForExitSignals(config) {
       entryPrice: h.entryPrice,
       currentPrice: h.currentPrice,
       peakPrice: h.peakPrice,
-      pnlPct: gainPct,
-      isCompounder: h.isCompounder
+      pnlPct: gainPct
     }, config);
 
     if (stop.stopPrice && h.currentPrice <= stop.stopPrice) {
@@ -516,7 +560,7 @@ function _getActiveHoldings() {
       dipBuyUsed: String(data[i][15]).trim() === 'YES',
       screenersStr: String(data[i][16]).trim(),
       conviction: String(data[i][17]).trim(),
-      isCompounder: String(data[i][18]).trim() === 'YES',
+      // col S: isCompounder deprecated, always false
       rsi: parseFloat(data[i][21]) || 50,
       dma50: parseFloat(data[i][22]) || 0,
       dma200: parseFloat(data[i][23]) || 0,

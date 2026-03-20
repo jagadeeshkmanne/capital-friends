@@ -5,7 +5,7 @@ import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import StockSearchInput from './StockSearchInput'
 
-export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
+export default function BuyStockForm({ portfolioId, initialData, onSave, onCancel }) {
   const { stockPortfolios } = useData()
   const { selectedMember } = useFamily()
 
@@ -16,15 +16,15 @@ export default function BuyStockForm({ portfolioId, onSave, onCancel }) {
   }, [stockPortfolios, selectedMember])
 
   const [form, setForm] = useState({
-    portfolioId: portfolioId || '',
-    symbol: '',
-    companyName: '',
-    exchange: 'NSE',
-    date: new Date().toISOString().split('T')[0],
-    quantity: '',
-    pricePerShare: '',
-    brokerage: '0',
-    notes: '',
+    portfolioId: portfolioId || initialData?.portfolioId || '',
+    symbol: initialData?.symbol || '',
+    companyName: initialData?.companyName || '',
+    exchange: initialData?.exchange || 'NSE',
+    date: initialData?.date || new Date().toISOString().split('T')[0],
+    quantity: initialData?.quantity || '',
+    pricePerShare: initialData?.pricePerShare || '',
+    brokerage: initialData?.brokerage || '0',
+    notes: initialData?.notes || '',
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)

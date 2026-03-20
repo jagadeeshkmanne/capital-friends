@@ -7,19 +7,13 @@
 /**
  * Calculate trailing stop price and tier for a holding
  *
- * @param {Object} holding - { entryPrice, currentPrice, peakPrice, pnlPct, isCompounder }
+ * @param {Object} holding - { entryPrice, currentPrice, peakPrice, pnlPct }
  * @param {Object} config - from getAllScreenerConfig()
  * @returns {Object} { stopPrice, stopPct, tier, description }
  */
 function calculateTrailingStopForHolding(holding, config) {
   const pnlPct = holding.pnlPct || 0;
   const peakPrice = holding.peakPrice || holding.currentPrice || holding.entryPrice;
-  const isCompounder = holding.isCompounder;
-
-  // --- Compounder exception ---
-  if (isCompounder) {
-    return _calculateCompounderStop(holding, config, pnlPct, peakPrice);
-  }
 
   // Use MAX gain (from peak) for tier selection — tiers NEVER downgrade
   // Even if current gain drops, stop tier stays at highest level reached
@@ -59,47 +53,6 @@ function calculateTrailingStopForHolding(holding, config) {
     stopPct: stopPct,
     tier: tier,
     description: '-' + stopPct + '% from peak ₹' + peakPrice
-  };
-}
-
-/**
- * Compounder trailing stop — wider stops, no stop below +40%
- */
-function _calculateCompounderStop(holding, config, pnlPct, peakPrice) {
-  // Use MAX gain (from peak) for tier selection — tiers NEVER downgrade
-  const entryPrice = holding.entryPrice || 0;
-  const maxGainPct = entryPrice > 0 ? ((peakPrice - entryPrice) / entryPrice * 100) : pnlPct;
-
-  if (maxGainPct < 40) {
-    // No trailing stop below +40% max gain — only hard exits apply
-    return {
-      stopPrice: null,
-      stopPct: null,
-      tier: 'COMPOUNDER <40%',
-      description: 'No trailing stop (only hard exits apply)'
-    };
-  }
-
-  let stopPct;
-  let tier;
-
-  if (maxGainPct >= 200) {
-    stopPct = config.COMPOUNDER_STOP_200_PLUS || 15;
-    tier = 'COMPOUNDER 200%+';
-  } else if (maxGainPct >= 100) {
-    stopPct = config.COMPOUNDER_STOP_100_200 || 20;
-    tier = 'COMPOUNDER 100-200%';
-  } else {
-    stopPct = config.COMPOUNDER_STOP_40_100 || 25;
-    tier = 'COMPOUNDER 40-100%';
-  }
-
-  const stopPrice = peakPrice * (1 - stopPct / 100);
-  return {
-    stopPrice: Math.round(stopPrice * 100) / 100,
-    stopPct: stopPct,
-    tier: tier,
-    description: 'Compounder -' + stopPct + '% from peak ₹' + peakPrice
   };
 }
 

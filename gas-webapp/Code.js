@@ -60,6 +60,10 @@ const CONFIG = {
   screenerSignalsSheet: 'Screener_Signals',
   screenerStockMetaSheet: 'Screener_StockMeta',
   screenerUserConfigSheet: 'Screener_UserConfig',
+  screenerPaperTradesSheet: 'Screener_PaperTrades',
+
+  // Admin
+  adminEmail: 'jagadeesh.k.manne@gmail.com',
 
   // App Settings
   appName: 'Capital Friends',

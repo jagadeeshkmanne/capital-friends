@@ -230,6 +230,13 @@ export const deleteFundFromPortfolio = (portfolioId, fundCode) => callAPI('mf:de
 export const editStockTransaction = (data) => callAPI('stock-transaction:edit', data)
 export const deleteStockTransaction = (transactionId) => callAPI('stock-transaction:delete', { transactionId })
 
+// Screener — Admin
+export const adminRefreshTrendlyne = () => callAPI('admin:refresh-trendlyne')
+export const adminRefreshNifty = () => callAPI('admin:refresh-nifty')
+export const adminRescoreWatchlist = () => callAPI('admin:rescore-watchlist')
+export const adminRunFullPipeline = () => callAPI('admin:run-full-pipeline')
+export const adminGetStatus = () => callAPI('admin:status')
+
 // Screener
 export const getScreenerWatchlist = () => callAPI('screener:watchlist')
 export const getScreenerSignals = (status) => callAPI('screener:signals', { status })
@@ -243,6 +250,21 @@ export const getScreenerConfig = () => callAPI('screener:config')
 export const updateScreenerConfigValue = (key, value) =>
   callAPI('screener:config-update', { key, value })
 export const getScreenerNiftyData = () => callAPI('screener:nifty-data')
+
+// Paper Trading
+export const executePaperTrades = () => callAPI('screener:paper-execute')
+export const getPaperPortfolio = () => callAPI('screener:paper-portfolio')
+export const getPaperPerformance = () => callAPI('screener:paper-performance')
+
+// Signal Tracking
+export const getSignalTracking = () => callAPI('screener:signal-tracking')
+export const trackSignalOutcomes = () => callAPI('screener:track-outcomes')
+
+// Screener Reset
+export const resetPaperTrades = () => callAPI('screener:reset-paper')
+export const resetSignals = () => callAPI('screener:reset-signals')
+export const resetScreenerAll = () => callAPI('screener:reset-all')
+export const resetAndRerun = () => callAPI('screener:reset-rerun')
 
 // Bulk Data (for cache refresh)
 export const getAllMFHoldings = () => callAPI('mf-holdings:list')
