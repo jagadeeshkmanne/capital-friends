@@ -131,8 +131,6 @@ const SETTINGS_SECTIONS = [
       { key: 'HOLDING_PERIOD_DAYS', label: 'Min Holding Period (days)', description: 'Company rule: min days to hold before selling (real trades)', type: 'number' },
       { key: 'PAPER_HOLDING_PERIOD_DAYS', label: 'Paper Min Hold (days)', description: 'Min days before paper auto-sell (default 1)', type: 'number' },
       { key: 'HOURLY_PRICE_CHECK', label: 'Hourly Price Check', description: 'Check exit signals every hour during market hours', type: 'boolean' },
-      { key: 'SCREENER_EMAIL_ENABLED', label: 'EOD Email Alerts', description: 'Daily email after market close with signals + paper P&L', type: 'boolean' },
-      { key: 'SCREENER_EMAIL_HOUR', label: 'Email Hour (0-23 IST)', description: 'When to send EOD email (default 15 = 3 PM)', type: 'number' },
       { key: 'SIGNAL_TRACK_DAYS', label: 'Track Days', description: 'Days after signal to check outcome (e.g. 7,14,30)', type: 'text' },
     ]
   },

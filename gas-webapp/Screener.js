@@ -174,11 +174,11 @@ function _defaultNiftyData() {
  * Used for reading config and auto-creating missing keys in user sheet.
  */
 var SCREENER_DEFAULTS = {
-  STOCK_BUDGET: 1000000,
-  MAX_STOCKS: 10,
+  STOCK_BUDGET: 300000,
+  MAX_STOCKS: 8,
   BONUS_SCORE_THRESHOLD: 75,
   MAX_BONUS_SLOTS: 5,
-  MAX_PER_SECTOR: 3,
+  MAX_PER_SECTOR: 2,
   // BUY allocation by factor rank (% of budget)
   ALLOC_TOP5: 10,
   ALLOC_NEXT5: 7,
@@ -196,7 +196,6 @@ var SCREENER_DEFAULTS = {
   TRAILING_STOP_20_50: 20,
   TRAILING_STOP_50_100: 15,
   TRAILING_STOP_100_PLUS: 12,
-  PRICE_RUNUP_EXPIRE_PCT: 20,
   ADD1_GAIN_PCT: 12,
   ADD1_MAX_GAIN_PCT: 25,
   ADD2_GAIN_PCT: 30,
@@ -209,16 +208,14 @@ var SCREENER_DEFAULTS = {
   NIFTY_BELOW_200DMA_ALLOCATION: 50,
   NIFTY_CRASH_PCT: 20,
   SYSTEMIC_EXIT_COUNT: 3,
-  SECTOR_ALERT_PCT: 30,
+  SECTOR_ALERT_PCT: 35,
   PORTFOLIO_FREEZE_PCT: 25,
   STALE_AFTER_DAYS: 30,
   // Paper trading & holding lock
   PAPER_TRADING: true,
   HOLDING_PERIOD_DAYS: 30,
   PAPER_HOLDING_PERIOD_DAYS: 1,
-  // Email & triggers
-  SCREENER_EMAIL_ENABLED: false,
-  SCREENER_EMAIL_HOUR: 15,
+  // Triggers
   HOURLY_PRICE_CHECK: true,
   // Signal tracking
   SIGNAL_TRACK_DAYS: '7,14,30'
@@ -565,7 +562,7 @@ function generateUserSignals() {
     var starterAmount = budget * (maxAllocPct / 100) * 0.65 * overlapMultiplier;
 
     // Market regime multiplier (graduated, not binary)
-    var regimeMultiplier = _getMarketRegimeMultiplier(niftyData);
+    var regimeMultiplier = _getMarketRegimeMultiplier(niftyData, config);
 
     // Momentum-only guard: max 2 momentum-only stocks in portfolio + candidates
     var isMomentumOnly = screenersStr === 'CF-Momentum';
@@ -1413,11 +1410,12 @@ function _getOverlapAllocationMultiplier(screenerCount) {
  * Market regime multiplier — graduated allocation based on Nifty position.
  * Bull (above 200DMA, positive returns) → 100%
  * Caution (above 200DMA, negative returns) → 85%
- * Correction (below 200DMA < 5%) → 75%
- * Bear (below 200DMA > 5%) → 50%
+ * Correction (below 200DMA < 5%) → midpoint between 75% and bear allocation
+ * Bear (below 200DMA > 5%) → NIFTY_BELOW_200DMA_ALLOCATION% (default 50%)
  */
-function _getMarketRegimeMultiplier(niftyData) {
+function _getMarketRegimeMultiplier(niftyData, config) {
   if (!niftyData) return 1.0;
+  var bearAlloc = ((config && config.NIFTY_BELOW_200DMA_ALLOCATION) || 50) / 100;
   if (niftyData.aboveDMA200 === true) {
     return (niftyData.return6m || 0) >= 0 ? 1.0 : 0.85;
   }
@@ -1425,10 +1423,10 @@ function _getMarketRegimeMultiplier(niftyData) {
   var niftyDMA = niftyData.dma200 || 0;
   if (niftyDMA > 0) {
     var pctBelow = ((niftyPrice - niftyDMA) / niftyDMA) * 100;
-    if (pctBelow > -5) return 0.75;
-    return 0.50;
+    if (pctBelow > -5) return (1.0 + bearAlloc) / 2; // correction = midpoint
+    return bearAlloc; // bear
   }
-  return 0.75;
+  return (1.0 + bearAlloc) / 2; // default to correction
 }
 
 /**

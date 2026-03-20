@@ -15,23 +15,27 @@ const SCREENER_CONFIG = {
   // --- Default config values (written to Screener_Config sheet) ---
   defaults: {
     STOCK_BUDGET: 300000,
-    CASH_RESERVE_PCT: 15,
     MAX_STOCKS: 8,
+    BONUS_SCORE_THRESHOLD: 75,
+    MAX_BONUS_SLOTS: 5,
     MAX_PER_SECTOR: 2,
-    SECTOR_PCT_CAP: 30,
-    SECTOR_ALERT_PCT: 35,
-    ALLOC_HIGH: 15,           // MF QoQ > 1%
-    ALLOC_MODERATE: 12,       // MF QoQ 0.5-1%
-    ALLOC_BASE: 10,           // No MF signal
-    MF_HIGH_THRESHOLD: 1,     // MF QoQ % for HIGH conviction
-    MF_MODERATE_THRESHOLD: 0.5, // MF QoQ % for MODERATE conviction
+    // Factor-based allocation by rank (% of budget)
+    ALLOC_TOP5: 10,
+    ALLOC_NEXT5: 7,
+    ALLOC_REST: 5,
+    FACTOR_BUY_MIN: 50,
+    // ADD allocation by conviction (% of budget)
+    ALLOC_HIGH: 15,
+    ALLOC_MODERATE: 12,
+    ALLOC_BASE: 10,
+    RSI_OVERBOUGHT: 70,
+    MIN_MARKET_CAP_CR: 500,
+    MIN_AVG_TRADED_VALUE_CR: 3,
+    HARD_STOP_LOSS: 30,
     TRAILING_STOP_0_20: 25,
     TRAILING_STOP_20_50: 20,
     TRAILING_STOP_50_100: 15,
     TRAILING_STOP_100_PLUS: 12,
-    HARD_STOP_LOSS: 30,
-    PAPER_TRADING: true,
-    NIFTY_BELOW_200DMA_ALLOCATION: 50,  // % of normal allocation when Nifty below 200DMA
     ADD1_GAIN_PCT: 12,
     ADD1_MAX_GAIN_PCT: 25,
     ADD2_GAIN_PCT: 30,
@@ -39,19 +43,12 @@ const SCREENER_CONFIG = {
     DIP_BUY_MIN_DROP: 10,
     DIP_BUY_MAX_DROP: 20,
     DIP_BUY_RSI_MAX: 30,
-    PRICE_RUNUP_EXPIRE_PCT: 20,
-    RSI_BUY_MAX: 65,
-    RSI_OVERBOUGHT: 70,              // Block entry if RSI > 70 (overbought)
-    PORTFOLIO_FREEZE_PCT: 25,
+    NIFTY_BELOW_200DMA_ALLOCATION: 50,
     NIFTY_CRASH_PCT: 20,
     SYSTEMIC_EXIT_COUNT: 3,
-    MIN_MARKET_CAP_CR: 500,         // Minimum market cap in Cr — skip micro caps
-    MIN_AVG_TRADED_VALUE_CR: 3,     // Safety net — primary liquidity filter is on Trendlyne screener side
-    // Factor-based allocation (replaces conviction-based)
-    ALLOC_TOP5: 10,                  // Top 5 by factor rank → 10% of budget each
-    ALLOC_NEXT5: 7,                  // Rank 6-10 → 7% each
-    ALLOC_REST: 5,                   // Rank 11+ → 5% each
-    FACTOR_BUY_MIN: 50              // Minimum factor score to generate BUY signal
+    SECTOR_ALERT_PCT: 35,
+    PORTFOLIO_FREEZE_PCT: 25,
+    PAPER_TRADING: true
   },
 
   // --- 3-screener architecture for multibagger discovery ---
