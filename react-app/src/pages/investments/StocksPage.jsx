@@ -825,15 +825,32 @@ export default function StocksPage() {
 
       {/* Signal trade modals */}
       <Modal open={!!modal?.signalBuy} onClose={() => setModal(null)} title={`Buy — ${modal?.signal?.symbol || ''}`} wide>
-        <BuyStockForm
-          portfolioId={modal?.portfolioId}
-          lockPortfolio
-          onSave={handleSignalTradeSubmit}
-          onCancel={() => setModal(null)}
-        />
+        {(() => {
+          const sig = modal?.signal
+          if (!sig) return null
+          const derivedPrice = sig.shares > 0 && sig.amount > 0 ? String(Math.round(sig.amount / sig.shares)) : ''
+          const existing = (stockHoldings || []).find(h => h.symbol === sig.symbol && h.portfolioId === modal?.portfolioId)
+          return (
+            <BuyStockForm
+              portfolioId={modal?.portfolioId}
+              lockPortfolio
+              initialData={{
+                symbol: sig.symbol,
+                companyName: sig.name,
+                quantity: sig.shares ? String(sig.shares) : '',
+                pricePerShare: derivedPrice,
+                notes: `Screener: ${sig.type}`,
+              }}
+              existingHolding={existing}
+              onSave={handleSignalTradeSubmit}
+              onCancel={() => setModal(null)}
+            />
+          )
+        })()}
       </Modal>
       <Modal open={!!modal?.signalSell} onClose={() => setModal(null)} title={`Sell — ${modal?.signal?.symbol || ''}`} wide>
         <SellStockForm
+          signalDetail={modal?.signal?.triggerDetail}
           onSave={handleSignalTradeSubmit}
           onCancel={() => setModal(null)}
         />

@@ -139,7 +139,7 @@ const CONFIG_FIELDS = SETTINGS_SECTIONS.flatMap(s => s.fields)
 
 export default function ScreenerPage() {
   const { showToast, showBlockUI, hideBlockUI } = useToast()
-  const { stockPortfolios, buyStock, sellStock, addStockPortfolio, refreshStocks } = useData()
+  const { stockPortfolios, stockHoldings, buyStock, sellStock, addStockPortfolio, refreshStocks } = useData()
   const [searchParams, setSearchParams] = useSearchParams()
   const TAB_KEYS = ['signals', 'paper-trading', 'watchlist', 'how-it-works', 'settings']
   const subTab = TAB_KEYS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'signals'
@@ -890,6 +890,7 @@ export default function ScreenerPage() {
             const derivedPrice = sig.shares > 0 && sig.amount > 0
               ? String(Math.round(sig.amount / sig.shares))
               : ''
+            const existing = (stockHoldings || []).find(h => h.symbol === sig.symbol && h.portfolioId === tradeModal.portfolioId)
             return tradeModal.type === 'buy' ? (
               <BuyStockForm
                 portfolioId={tradeModal.portfolioId}
@@ -901,6 +902,7 @@ export default function ScreenerPage() {
                   pricePerShare: derivedPrice,
                   notes: `Screener: ${sig.type}`,
                 }}
+                existingHolding={existing}
                 onSave={handleTradeSubmit}
                 onCancel={() => setTradeModal(null)}
               />
@@ -913,6 +915,7 @@ export default function ScreenerPage() {
                   pricePerShare: derivedPrice,
                   notes: `Screener: ${sig.type}`,
                 }}
+                signalDetail={sig.triggerDetail}
                 onSave={handleTradeSubmit}
                 onCancel={() => setTradeModal(null)}
               />

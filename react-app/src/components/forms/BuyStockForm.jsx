@@ -5,7 +5,7 @@ import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import StockSearchInput from './StockSearchInput'
 
-export default function BuyStockForm({ portfolioId, lockPortfolio, initialData, onSave, onCancel }) {
+export default function BuyStockForm({ portfolioId, lockPortfolio, initialData, existingHolding, onSave, onCancel }) {
   const { stockPortfolios } = useData()
   const { selectedMember } = useFamily()
 
@@ -96,6 +96,26 @@ export default function BuyStockForm({ portfolioId, lockPortfolio, initialData, 
           placeholder="Search by symbol or company name..."
         />
       </FormField>
+
+      {existingHolding && (
+        <div className="bg-[var(--bg-accent)]/10 rounded-lg px-3 py-2.5 border border-[var(--border-light)]">
+          <p className="text-xs font-medium text-[var(--text-secondary)] mb-1">Existing Position</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+            <span className="text-[var(--text-secondary)]">Qty: <strong className="text-[var(--text-primary)]">{existingHolding.quantity}</strong></span>
+            <span className="text-[var(--text-secondary)]">Avg: <strong className="text-[var(--text-primary)]">{formatINR(existingHolding.avgPrice)}</strong></span>
+            <span className="text-[var(--text-secondary)]">CMP: <strong className="text-[var(--text-primary)]">{formatINR(existingHolding.currentPrice)}</strong></span>
+            <span className="text-[var(--text-secondary)]">Value: <strong className="text-[var(--text-primary)]">{formatINR(existingHolding.currentValue)}</strong></span>
+            {(existingHolding.unrealizedPL != null || existingHolding.currentValue - existingHolding.totalInvestment) && (() => {
+              const pl = existingHolding.unrealizedPL ?? (existingHolding.currentValue - existingHolding.totalInvestment)
+              return (
+                <span className={pl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                  P&L: <strong>{pl >= 0 ? '+' : ''}{formatINR(pl)}</strong>
+                </span>
+              )
+            })()}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField label="Purchase Date" required error={errors.date}>

@@ -4,8 +4,8 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
-export default function SellStockForm({ portfolioId, initialData, onSave, onCancel }) {
-  const { stockPortfolios, stockHoldings } = useData()
+export default function SellStockForm({ portfolioId, initialData, signalDetail, onSave, onCancel }) {
+  const { stockPortfolios, stockHoldings, stockTransactions } = useData()
   const { selectedMember } = useFamily()
 
   // Filter portfolios by header's selected member
@@ -40,6 +40,22 @@ export default function SellStockForm({ portfolioId, initialData, onSave, onCanc
 
   const selectedHolding = holdings.find((h) => h.symbol === form.symbol)
   const availableQty = selectedHolding?.quantity || 0
+
+  // Holding period from earliest BUY transaction
+  const holdingPeriod = useMemo(() => {
+    if (!form.portfolioId || !form.symbol) return null
+    const buys = (stockTransactions || [])
+      .filter(t => t.portfolioId === form.portfolioId && t.symbol === form.symbol && t.type === 'BUY' && t.date)
+      .map(t => new Date(t.date))
+      .filter(d => !isNaN(d))
+      .sort((a, b) => a - b)
+    if (!buys.length) return null
+    const firstBuyDate = buys[0]
+    const today = new Date()
+    const daysHeld = Math.floor((today - firstBuyDate) / (1000 * 60 * 60 * 24))
+    const daysToLTCG = 365 - daysHeld
+    return { firstBuyDate, daysHeld, daysToLTCG, isLocked: daysHeld < 30, isLTCG: daysHeld >= 365 }
+  }, [stockTransactions, form.portfolioId, form.symbol])
 
   const totalAmount = useMemo(() => {
     const qty = Number(form.quantity) || 0
@@ -103,6 +119,47 @@ export default function SellStockForm({ portfolioId, initialData, onSave, onCanc
         <FormSelect value={form.portfolioId} onChange={setPortfolio} options={portfolioOptions} placeholder="Select portfolio..." />
       </FormField>
 
+      {signalDetail && (
+        <div className="bg-amber-500/10 rounded-lg px-3 py-2.5 border border-amber-500/30">
+          <p className="text-xs font-medium text-amber-400 mb-0.5">Signal Detail</p>
+          <p className="text-xs text-[var(--text-secondary)]">{signalDetail}</p>
+        </div>
+      )}
+
+      {holdingPeriod && (
+        <div className={`rounded-lg px-3 py-2.5 border ${
+          holdingPeriod.isLocked
+            ? 'bg-red-500/10 border-red-500/30'
+            : holdingPeriod.isLTCG
+              ? 'bg-emerald-500/10 border-emerald-500/30'
+              : holdingPeriod.daysToLTCG <= 60
+                ? 'bg-amber-500/10 border-amber-500/30'
+                : 'bg-[var(--bg-inset)] border-[var(--border-light)]'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-xs font-medium mb-0.5 ${holdingPeriod.isLocked ? 'text-red-400' : holdingPeriod.isLTCG ? 'text-emerald-400' : 'text-[var(--text-secondary)]'}`}>
+                Holding Period: {holdingPeriod.daysHeld} days
+              </p>
+              <p className="text-xs text-[var(--text-dim)]">
+                First bought: {holdingPeriod.firstBuyDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+            <div className="text-right">
+              {holdingPeriod.isLocked ? (
+                <p className="text-xs font-semibold text-red-400">Min 30-day hold — {30 - holdingPeriod.daysHeld} days left</p>
+              ) : holdingPeriod.isLTCG ? (
+                <p className="text-xs font-semibold text-emerald-400">LTCG eligible (12.5% tax)</p>
+              ) : holdingPeriod.daysToLTCG <= 60 ? (
+                <p className="text-xs font-semibold text-amber-400">{holdingPeriod.daysToLTCG} days to LTCG</p>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">STCG (20% tax) — {holdingPeriod.daysToLTCG} days to LTCG</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Stock to Sell" required error={errors.symbol}>
           <FormSelect value={form.symbol} onChange={selectStock} options={holdingOptions} placeholder={form.portfolioId ? (holdings.length ? 'Select stock...' : 'No holdings in this portfolio') : 'Select portfolio first...'} />
@@ -164,7 +221,7 @@ export default function SellStockForm({ portfolioId, initialData, onSave, onCanc
         <FormInput value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." />
       </FormField>
 
-      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Sell Stock" loading={saving} />
+      <FormActions onCancel={onCancel} onSubmit={handleSubmit} submitLabel={holdingPeriod?.isLocked ? `Locked (${30 - holdingPeriod.daysHeld}d left)` : 'Sell Stock'} loading={saving} disabled={holdingPeriod?.isLocked} />
     </div>
   )
 }
