@@ -827,6 +827,7 @@ export default function StocksPage() {
       <Modal open={!!modal?.signalBuy} onClose={() => setModal(null)} title={`Buy — ${modal?.signal?.symbol || ''}`} wide>
         <BuyStockForm
           portfolioId={modal?.portfolioId}
+          lockPortfolio
           onSave={handleSignalTradeSubmit}
           onCancel={() => setModal(null)}
         />

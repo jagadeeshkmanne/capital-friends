@@ -893,6 +893,7 @@ export default function ScreenerPage() {
             return tradeModal.type === 'buy' ? (
               <BuyStockForm
                 portfolioId={tradeModal.portfolioId}
+                lockPortfolio
                 initialData={{
                   symbol: sig.symbol,
                   companyName: sig.name,
