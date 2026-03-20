@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a3a2a" />
+    <meta name="description" content="Capital Friends is a free, open-source family portfolio tracker. Track mutual funds, stocks, FDs, insurance, loans, and goals for your entire family — all stored privately in your Google Drive." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/logo-new.png" />
+    <title>Capital Friends</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      // SPA routing fix for GitHub Pages — restore path from 404 redirect
+      (function() {
+        var redirect = sessionStorage.getItem('spa-redirect');
+        if (redirect) {
+          sessionStorage.removeItem('spa-redirect');
+          window.history.replaceState(null, '', redirect);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-Cr3D_V6C.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/ag-grid-BE3jvjEY.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-P8ElqL5F.css">
+  </head>
+  <body style="margin:0;padding:0;background:#f8fafc">
+    <div id="root">
+      <!-- Static shell matching React landing page exactly — no flash on React load -->
+      <div id="cf-shell" style="font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased">
+
+        <!-- Header — matches React exactly -->
+        <header style="position:sticky;top:0;z-index:100;background:rgba(10,15,31,0.98);border-bottom:1px solid rgba(255,255,255,0.06)">
+          <div style="max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px">
+            <a href="#" style="display:flex;align-items:center;gap:8px;text-decoration:none">
+              <img src="/logo-new.png" alt="" style="height:44px;width:auto" onerror="this.style.display='none'" />
+              <span style="font-family:'Poppins',sans-serif;font-size:17px;letter-spacing:-0.3px">
+                <b style="color:#fff;font-weight:700">Capital</b> <em style="color:#34d399;font-weight:800;font-style:normal">Friends</em>
+              </span>
+            </a>
+            <button style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer">
+              Sign In
+            </button>
+          </div>
+        </header>
+
+        <!-- Hero — matches React exactly -->
+        <section style="background:#fff;border-bottom:1px solid #e2e8f0;padding:24px 20px 20px;text-align:center">
+          <h1 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.03em;line-height:1.3;margin:0 0 10px">
+            One dashboard for your family's <span style="color:#16a34a">entire wealth</span>
+          </h1>
+          <p style="font-size:13.5px;color:#475569;margin:0 auto 14px;max-width:520px;line-height:1.5">
+            Track mutual funds, stocks, insurance, loans for every family member — stored privately in your own Google Drive.
+          </p>
+          <button style="display:inline-flex;align-items:center;gap:8px;padding:9px 20px;border-radius:9px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer">
+            Sign in with Google — it's free
+          </button>
+          <div style="margin-top:10px;font-size:11.5px;color:#94a3b8">
+            Free · Open source · No bank credentials · Data stays in your Google Drive
+          </div>
+        </section>
+
+        <!-- Showcase — static tab bar + placeholder matching React exactly -->
+        <section style="background:#fff;border-bottom:1px solid #e2e8f0;overflow:hidden">
+          <!-- Tab bar — matches React nav exactly -->
+          <nav style="background:#fff;border-bottom:1px solid #e2e8f0;overflow-x:auto">
+            <div style="display:flex;justify-content:center;min-width:max-content;margin:0 auto">
+              <button style="display:flex;align-items:center;gap:6px;padding:10px 18px;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;position:relative;white-space:nowrap;color:#0f172a;font-family:'Inter',sans-serif">
+                <span style="width:5px;height:5px;border-radius:50%;background:#16a34a;flex-shrink:0"></span>
+                Family Awareness
+                <span style="position:absolute;bottom:0;left:0;right:0;height:2px;background:#16a34a"></span>
+              </button>
+              <button style="display:flex;align-items:center;gap:6px;padding:10px 18px;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;white-space:nowrap;color:#94a3b8;font-family:'Inter',sans-serif">
+                <span style="width:5px;height:5px;border-radius:50%;background:#c62828;opacity:0.3;flex-shrink:0"></span>
+                ATH Buy Signals
+              </button>
+              <button style="display:flex;align-items:center;gap:6px;padding:10px 18px;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;white-space:nowrap;color:#94a3b8;font-family:'Inter',sans-serif">
+                <span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;opacity:0.3;flex-shrink:0"></span>
+                Smart Rebalancing
+              </button>
+              <button style="display:flex;align-items:center;gap:6px;padding:10px 18px;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;white-space:nowrap;color:#94a3b8;font-family:'Inter',sans-serif">
+                <span style="width:5px;height:5px;border-radius:50%;background:#0891b2;opacity:0.3;flex-shrink:0"></span>
+                Goals &amp; Glide Path
+              </button>
+              <button style="display:flex;align-items:center;gap:6px;padding:10px 18px;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;white-space:nowrap;color:#94a3b8;font-family:'Inter',sans-serif">
+                <span style="width:5px;height:5px;border-radius:50%;background:#ea580c;opacity:0.3;flex-shrink:0"></span>
+                Retirement Buckets
+              </button>
+            </div>
+          </nav>
+          <!-- Slide 0: Family Awareness — matches React default state exactly -->
+          <div style="background:#f1f5f9;border-bottom:1px solid #e2e8f0">
+            <div style="max-width:1360px;margin:0 auto;padding:16px 24px;display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:stretch;min-height:380px">
+              <!-- Left feature panel -->
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                  <span style="display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:3px 10px;border-radius:100px;margin-bottom:14px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0">Family First</span>
+                  <div style="font-family:'Poppins',sans-serif;font-size:19px;font-weight:700;color:#0f172a;letter-spacing:-0.02em;line-height:1.25;margin-bottom:10px">Your family knows where everything is — even in your absence</div>
+                  <p style="font-size:13px;color:#475569;line-height:1.7;margin-bottom:16px">If something happens to you, your family needs instant access to every investment, policy, loan, and FD — not months of confusion.</p>
+                  <ul style="list-style:none;padding:0;margin:0 0 20px">
+                    <li style="font-size:12.5px;color:#64748b;padding:2px 0;display:flex;align-items:flex-start;gap:7px;line-height:1.5"><span style="flex-shrink:0;margin-top:1px;font-size:11px;font-weight:700;color:#16a34a">✓</span>Auto monthly email reports sent to family</li>
+                    <li style="font-size:12.5px;color:#64748b;padding:2px 0;display:flex;align-items:flex-start;gap:7px;line-height:1.5"><span style="flex-shrink:0;margin-top:1px;font-size:11px;font-weight:700;color:#16a34a">✓</span>Insurance, FD, SIP reminders for everyone</li>
+                    <li style="font-size:12.5px;color:#64748b;padding:2px 0;display:flex;align-items:flex-start;gap:7px;line-height:1.5"><span style="flex-shrink:0;margin-top:1px;font-size:11px;font-weight:700;color:#16a34a">✓</span>Family members can sign in any time</li>
+                    <li style="font-size:12.5px;color:#64748b;padding:2px 0;display:flex;align-items:flex-start;gap:7px;line-height:1.5"><span style="flex-shrink:0;margin-top:1px;font-size:11px;font-weight:700;color:#16a34a">✓</span>Combined or individual net worth view</li>
+                  </ul>
+                </div>
+                <button style="display:inline-flex;align-items:center;gap:8px;padding:9px 20px;border-radius:9px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;width:100%;justify-content:center">Get started free</button>
+              </div>
+              <!-- Right: dark placeholder matching mock browser background -->
+              <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:0 8px 32px rgba(15,23,42,.18);display:flex;flex-direction:column;background:#080d1a">
+                <div style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:#02060f;border-bottom:1px solid rgba(255,255,255,0.04)">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#ff5f57"></div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:#fec02f"></div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:#29ca41"></div>
+                  <div style="flex:1;max-width:360px;margin:0 auto;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);border-radius:4px;padding:3px 10px;font-size:10.5px;color:#64748b;text-align:center">capitalfriends.in/dashboard</div>
+                </div>
+                <div style="flex:1;background:#080d1a"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dark "why CF" section -->
+        <section style="background:#080d1a;border-top:1px solid rgba(255,255,255,.06);padding:40px 24px 48px">
+          <div style="max-width:960px;margin:0 auto">
+            <h2 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#f1f5f9;text-align:center;margin:0 0 22px;letter-spacing:-.02em;line-height:1.3">
+              What happens to your family's finances if something happens to <span style="color:#f87171">you?</span>
+            </h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div style="padding:20px 22px;border-radius:12px;background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.2)">
+                <div style="font-size:12.5px;font-weight:700;color:#fca5a5;margin-bottom:10px">Without a tracker</div>
+                <ul style="list-style:none;padding:0;margin:0;font-size:12.5px;color:#64748b;line-height:2">
+                  <li>No one knows which MFs you hold or where to redeem</li>
+                  <li>Insurance policies expire unrenewed — premiums lapse</li>
+                  <li>Loan EMIs missed — credit score damaged</li>
+                </ul>
+              </div>
+              <div style="padding:20px 22px;border-radius:12px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.2)">
+                <div style="font-size:12.5px;font-weight:700;color:#34d399;margin-bottom:10px">With Capital Friends</div>
+                <ul style="list-style:none;padding:0;margin:0;font-size:12.5px;color:#64748b;line-height:2">
+                  <li>Complete MF, stock, FD, gold, insurance &amp; loan ledger</li>
+                  <li>Monthly email report auto-sent to spouse &amp; parents</li>
+                  <li>Goals tracked — retirement, education, emergency fund</li>
+                </ul>
+              </div>
+            </div>
+            <div style="margin-top:28px;text-align:center;font-size:12.5px;color:#34d399;font-weight:500">
+              ✓ Always Free &nbsp;·&nbsp; ✓ No Credit Card &nbsp;·&nbsp; ✓ Open Source &nbsp;·&nbsp; ✓ Your Data stays in Google Drive
+            </div>
+          </div>
+        </section>
+
+        <!-- Features section -->
+        <section style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:36px 24px">
+          <div style="max-width:1280px;margin:0 auto">
+            <div style="font-family:'Poppins',sans-serif;font-size:26px;font-weight:700;color:#0f172a;text-align:center;letter-spacing:-0.02em;margin-bottom:4px">Your family's complete financial OS</div>
+            <div style="font-size:13px;color:#94a3b8;text-align:center;margin-bottom:24px">Built for Indian families · Track everything in one place</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#10b981;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Mutual Funds</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Track all your MF holdings, NAV, returns, ATH distance and rebalancing needs across portfolios.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#7c3aed;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Smart Rebalancing ★</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Get exact buy/sell/SIP amounts when your portfolio drifts from target allocation.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#0891b2;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Goal-Based Investing ★</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Link portfolios to goals. Track retirement, education, emergency fund with on-track indicators.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#f59e0b;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Family Dashboard</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Track wealth for your entire family. Switch between members, see combined or individual net worth.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#3b82f6;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Your Data, Your Drive</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Everything stored in a Google Spreadsheet in YOUR Google Drive. No servers, no database.</div>
+              </div>
+              <div style="padding:22px 24px;border-radius:10px;background:#fff;border:1px solid #e2e8f0">
+                <div style="height:3px;width:30px;border-radius:2px;background:#f43f5e;margin-bottom:11px"></div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Email Reports ★</div>
+                <div style="font-size:13px;color:#64748b;line-height:1.62">Scheduled portfolio summaries sent to you and your family. SIP reminders, insurance renewals, goal check-ins.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CTA + Footer -->
+        <section style="background:#080d1a;border-top:1px solid rgba(255,255,255,.06);padding:28px 24px 0;text-align:center">
+          <div style="max-width:600px;margin:0 auto;padding-bottom:20px">
+            <h2 style="font-family:'Poppins',sans-serif;font-size:22px;font-weight:700;color:#fff;letter-spacing:-.02em;margin:0 0 6px">Start managing your family's wealth today</h2>
+            <p style="font-size:13px;color:#475569;margin:0 0 16px">No registration form. No bank linking. Just your Google account.</p>
+            <button style="display:inline-flex;align-items:center;gap:8px;padding:9px 24px;border-radius:9px;background:linear-gradient(to right,#7c3aed,#0891b2);color:#fff;font-size:13.5px;font-weight:600;border:none;cursor:pointer">
+              Sign in with Google — it's free
+            </button>
+            <div style="margin-top:10px;font-size:11.5px;color:#475569">No bank credentials · Data stays in your Google Drive · Always free · Open source</div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,.06);padding:12px 0">
+            <div style="max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-wrap:wrap;gap:8px">
+              <span style="font-family:'Poppins',sans-serif;font-size:14px;opacity:0.4">
+                <b style="color:#fff;font-weight:700">Capital</b> <em style="color:#34d399;font-weight:800;font-style:normal">Friends</em>
+              </span>
+              <span style="font-size:11.5px;color:#334155">
+                Built with <span style="color:#f43f5e">♥</span> by <span style="color:#475569;font-weight:600">Jagadeesh Manne</span> · Free &amp; open source
+              </span>
+              <span>
+                <a href="https://capitalfriends.in/privacy" style="font-size:12px;color:#64748b;text-decoration:none;padding:4px 10px">Privacy Policy</a>
+                <span style="color:#1e293b;font-size:12px">·</span>
+                <a href="https://capitalfriends.in/terms" style="font-size:12px;color:#64748b;text-decoration:none;padding:4px 10px">Terms &amp; Conditions</a>
+              </span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+    <!-- crawler-footer: outside #root, visually hidden, crawler-visible -->
+    <div id="cf-footer" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">
+      <a href="https://capitalfriends.in/privacy">Privacy Policy</a>
+      <a href="https://capitalfriends.in/terms">Terms &amp; Conditions</a>
+    </div>
+  </body>
+</html>
