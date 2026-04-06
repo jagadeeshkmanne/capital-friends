@@ -4,10 +4,8 @@
 # =============================================================================
 #
 # ARCHITECTURE:
-#   master-mf-db/  — Master DB: screener data, Trendlyne fetch, scoring, triggers
-#                    Also serves as admin web app endpoint for React admin panel
+#   master-mf-db/  — Master DB: MF NAVs, ATH tracking, stock data
 #   gas-webapp/    — API router: React app talks to this via Execution API
-#                    Proxies admin actions to Master DB web app
 #   react-app/     — Frontend: capitalfriends.in (GitHub Pages)
 #
 # WHEN TO DEPLOY WHAT:
@@ -39,8 +37,8 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${1:-all}"
 
 # Deployment IDs (locked — never change)
-WEBAPP_DEPLOY_ID="AKfycby14ulXIXTWKmD0C-tU1FPqM7rcBVyPPOYj9RI5kEJizeTs26HPBA_59UGkS9hdwts8"
-MASTER_DEPLOY_ID="AKfycbzigz-Manuixk66aDOIIdfF7VO4rOptuiypg8gOADnBn27r73xFLUz7QZhn3eCikXuA"
+WEBAPP_DEPLOY_ID="AKfycbyFaPjl26iBGym2ZymJqHlHTDEx7-qjPoHXUKPIy51E1Hjh2svLgmDEuQsC4TGGoHT-"
+MASTER_DEPLOY_ID="AKfycbxdTWO2_k9sVKokJoHTqoEDGnqbW7Y0blVp3pe7ihlCP-h1KdhRlzTDkrvOae5nvvOK"
 
 deploy_webapp() {
   echo "🔧 Deploying gas-webapp..."

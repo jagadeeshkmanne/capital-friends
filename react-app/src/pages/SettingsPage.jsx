@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { useMask } from '../context/MaskContext'
+import { useToast } from '../context/ToastContext'
 import * as api from '../services/api'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const { members, settings, updateSettings, updateMember, healthCheckCompleted, refreshData, isRefreshing } = useData()
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
+  const { showToast } = useToast()
   const [showDonate, setShowDonate] = useState(false)
 
   const activeMembers = members.filter((m) => m.status === 'Active')
@@ -58,7 +60,7 @@ export default function SettingsPage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
-      alert('Failed to save: ' + err.message)
+      showToast(err.message || 'Failed to save', 'error')
     } finally {
       setSaving(false)
     }

@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff, ScanSearch } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -9,7 +9,7 @@ import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { formatINR } from '../data/familyData'
 import { useMask } from '../context/MaskContext'
-import MarketTicker from './MarketTicker'
+// import MarketTicker from './MarketTicker'
 import useAlerts from '../hooks/useAlerts'
 import MFBuyOpportunities from './forms/MFBuyOpportunities'
 import MFRebalanceDialog from './forms/MFRebalanceDialog'
@@ -155,14 +155,6 @@ export default function Header() {
 
   const notifCount = criticalAlerts.length + upcomingReminders.length
   const { buyOppCount, buyCount, strongBuyCount, rebalanceCount } = investmentSignals
-
-  // Screener signal count — fetch on mount
-  const [screenerCount, setScreenerCount] = useState(0)
-  useEffect(() => {
-    api.getScreenerSignals('PENDING')
-      .then(data => setScreenerCount(Array.isArray(data) ? data.length : 0))
-      .catch(() => {})
-  }, [])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -344,22 +336,6 @@ export default function Header() {
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-violet-500 rounded-full px-1">{rebalanceCount}</span>
               </button>
             )}
-
-            {/* Screener — always visible in site header */}
-            <Link
-              to="/investments/screener"
-              className={`relative p-2 rounded-lg transition-colors ${
-                location.pathname === '/investments/screener'
-                  ? 'text-violet-300 bg-violet-500/20'
-                  : 'text-[var(--text-muted)] hover:text-violet-400 hover:bg-violet-500/10'
-              }`}
-              title={screenerCount > 0 ? `${screenerCount} pending screener signal${screenerCount === 1 ? '' : 's'}` : 'Stock Screener'}
-            >
-              <ScanSearch size={18} />
-              {screenerCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-emerald-500 rounded-full px-1">{screenerCount}</span>
-              )}
-            </Link>
 
             {/* Mask toggle — desktop only, moved to avatar dropdown on mobile */}
             <button onClick={toggleMask} className={`hidden sm:block p-2 rounded-lg transition-colors ${masked ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`} title={masked ? 'Data masked — click to reveal' : 'Mask sensitive data'}>
@@ -548,8 +524,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* ── Market Ticker ── */}
-      <MarketTicker />
+      {/* Market Ticker removed */}
 
       {/* ── Navigation Strip (desktop only — mobile uses sidebar + bottom nav) ── */}
       <nav className="hidden lg:block bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)]">

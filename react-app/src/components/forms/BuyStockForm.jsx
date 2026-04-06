@@ -5,7 +5,7 @@ import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import StockSearchInput from './StockSearchInput'
 
-export default function BuyStockForm({ portfolioId, lockPortfolio, initialData, existingHolding, onSave, onCancel }) {
+export default function BuyStockForm({ portfolioId, initialData, existingHolding, onSave, onCancel }) {
   const { stockPortfolios } = useData()
   const { selectedMember } = useFamily()
 
@@ -71,13 +71,7 @@ export default function BuyStockForm({ portfolioId, lockPortfolio, initialData, 
   return (
     <div className="space-y-4">
       <FormField label="Portfolio" required error={errors.portfolioId}>
-        {lockPortfolio ? (
-          <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)] text-sm text-[var(--text-primary)] font-semibold">
-            CF_Signals
-          </div>
-        ) : (
-          <FormSelect value={form.portfolioId} onChange={(v) => set('portfolioId', v)} options={portfolioOptions} placeholder="Select portfolio..." />
-        )}
+        <FormSelect value={form.portfolioId} onChange={(v) => set('portfolioId', v)} options={portfolioOptions} placeholder="Select portfolio..." />
       </FormField>
 
       <FormField label="Stock" required error={errors.symbol}>

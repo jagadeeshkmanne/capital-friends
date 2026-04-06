@@ -377,6 +377,14 @@ export default function MutualFundsPage() {
     return allFilteredTxns.filter((t) => t.fundName === txnFundFilter)
   }, [allFilteredTxns, txnFundFilter])
 
+  // Current NAV lookup for unrealized P&L on BUY transactions
+  const currentNavMap = useMemo(() => {
+    if (!holdings) return {}
+    const map = {}
+    holdings.forEach((h) => { if (h.currentNav > 0) map[`${h.portfolioId}:${h.fundCode}`] = h.currentNav })
+    return map
+  }, [holdings])
+
   // Enrich holdings with dynamic allocation % (rebalance logic moved to dialog)
   const enrichedHoldings = useMemo(() => {
     const portfolioTotals = {}
@@ -1290,15 +1298,19 @@ export default function MutualFundsPage() {
                               <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Units</th>
                               <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">NAV</th>
                               <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Amount</th>
-                              <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Gain/Loss</th>
+                              <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">P&L</th>
                               <th className="w-8"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {fundTxns.map((t, idx) => {
                               const isBuy = t.type === 'BUY'
-                              const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
-                              const glUp = hasGL && t.gainLoss >= 0
+                              const hasRealized = !isBuy && t.gainLoss != null && t.gainLoss !== 0
+                              const hasUnrealized = isBuy && h.currentNav > 0 && t.price > 0 && t.units > 0
+                              const unrealizedPL = hasUnrealized ? (h.currentNav - t.price) * t.units : 0
+                              const unrealizedPLPct = hasUnrealized ? ((h.currentNav - t.price) / t.price) * 100 : 0
+                              const gl = hasRealized ? t.gainLoss : hasUnrealized ? unrealizedPL : null
+                              const glUp = gl != null && gl >= 0
                               const typeBadge = {
                                 INITIAL: { bg: 'bg-purple-500/15', text: 'text-purple-400' },
                                 SIP: { bg: 'bg-blue-500/15', text: 'text-blue-400' },
@@ -1319,8 +1331,11 @@ export default function MutualFundsPage() {
                                   <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">₹{t.price.toFixed(2)}</td>
                                   <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.totalAmount)}</td>
                                   <td className="py-2.5 px-3 text-right">
-                                    {hasGL ? (
-                                      <span className={`text-xs font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{glUp ? '+' : ''}{formatINR(t.gainLoss)}</span>
+                                    {(hasRealized || hasUnrealized) ? (
+                                      <div>
+                                        <span className={`text-xs font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{glUp ? '+' : ''}{formatINR(gl)}</span>
+                                        {hasUnrealized && <p className={`text-[10px] tabular-nums ${glUp ? 'text-emerald-400/70' : 'text-[var(--accent-rose)]/70'}`}>{unrealizedPLPct >= 0 ? '+' : ''}{unrealizedPLPct.toFixed(1)}%</p>}
+                                      </div>
                                     ) : (
                                       <span className="text-xs text-[var(--text-dim)]">—</span>
                                     )}
@@ -1344,8 +1359,12 @@ export default function MutualFundsPage() {
                       <div className="sm:hidden divide-y divide-[var(--border-light)]">
                         {fundTxns.map((t, idx) => {
                           const isBuy = t.type === 'BUY'
-                          const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
-                          const glUp = hasGL && t.gainLoss >= 0
+                          const hasRealized = !isBuy && t.gainLoss != null && t.gainLoss !== 0
+                          const hasUnrealized = isBuy && h.currentNav > 0 && t.price > 0 && t.units > 0
+                          const unrealizedPL = hasUnrealized ? (h.currentNav - t.price) * t.units : 0
+                          const unrealizedPLPct = hasUnrealized ? ((h.currentNav - t.price) / t.price) * 100 : 0
+                          const gl = hasRealized ? t.gainLoss : hasUnrealized ? unrealizedPL : null
+                          const glUp = gl != null && gl >= 0
                           return (
                             <div key={t.transactionId || `fd-txn-m-${idx}`} className="px-4 py-3">
                               <div className="flex items-center justify-between mb-1">
@@ -1368,9 +1387,9 @@ export default function MutualFundsPage() {
                                 <p className="text-[var(--text-dim)]">{t.units.toFixed(2)} units @ ₹{t.price.toFixed(2)}</p>
                                 <div className="text-right">
                                   <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.totalAmount)}</p>
-                                  {hasGL && (
+                                  {(hasRealized || hasUnrealized) && (
                                     <p className={`text-xs font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                      G/L: {glUp ? '+' : ''}{formatINR(t.gainLoss)}
+                                      {hasUnrealized ? 'P&L' : 'G/L'}: {glUp ? '+' : ''}{formatINR(gl)} {hasUnrealized ? `(${unrealizedPLPct >= 0 ? '+' : ''}${unrealizedPLPct.toFixed(1)}%)` : ''}
                                     </p>
                                   )}
                                 </div>
@@ -2010,15 +2029,20 @@ export default function MutualFundsPage() {
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Units</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">NAV</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Amount</th>
-                          <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Gain/Loss</th>
+                          <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">P&L</th>
                           <th className="w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {transactions.map((t, idx) => {
                           const isBuy = t.type === 'BUY'
-                          const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
-                          const glUp = hasGL && t.gainLoss >= 0
+                          const curNav = currentNavMap[`${t.portfolioId}:${t.fundCode}`]
+                          const hasRealized = !isBuy && t.gainLoss != null && t.gainLoss !== 0
+                          const hasUnrealized = isBuy && curNav > 0 && t.price > 0 && t.units > 0
+                          const unrealizedPL = hasUnrealized ? (curNav - t.price) * t.units : 0
+                          const unrealizedPLPct = hasUnrealized ? ((curNav - t.price) / t.price) * 100 : 0
+                          const gl = hasRealized ? t.gainLoss : hasUnrealized ? unrealizedPL : null
+                          const glUp = gl != null && gl >= 0
                           const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === t.portfolioId) : null
                           const typeBadge = {
                             INITIAL: { bg: 'bg-purple-500/15', text: 'text-purple-400' },
@@ -2051,10 +2075,17 @@ export default function MutualFundsPage() {
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">₹{t.price.toFixed(2)}</td>
                               <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.totalAmount)}</td>
                               <td className="py-2.5 px-3 text-right">
-                                {hasGL ? (
-                                  <span className={`text-xs font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                    {glUp ? '+' : ''}{formatINR(t.gainLoss)}
-                                  </span>
+                                {(hasRealized || hasUnrealized) ? (
+                                  <div>
+                                    <span className={`text-xs font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                      {glUp ? '+' : ''}{formatINR(gl)}
+                                    </span>
+                                    {hasUnrealized && (
+                                      <p className={`text-[10px] tabular-nums ${glUp ? 'text-emerald-400/70' : 'text-[var(--accent-rose)]/70'}`}>
+                                        {unrealizedPLPct >= 0 ? '+' : ''}{unrealizedPLPct.toFixed(1)}%
+                                      </p>
+                                    )}
+                                  </div>
                                 ) : (
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 )}
@@ -2079,8 +2110,13 @@ export default function MutualFundsPage() {
                   <div className="sm:hidden divide-y divide-[var(--border-light)]">
                     {transactions.map((t, idx) => {
                       const isBuy = t.type === 'BUY'
-                      const hasGL = !isBuy && t.gainLoss != null && t.gainLoss !== 0
-                      const glUp = hasGL && t.gainLoss >= 0
+                      const curNav = currentNavMap[`${t.portfolioId}:${t.fundCode}`]
+                      const hasRealized = !isBuy && t.gainLoss != null && t.gainLoss !== 0
+                      const hasUnrealized = isBuy && curNav > 0 && t.price > 0 && t.units > 0
+                      const unrealizedPL = hasUnrealized ? (curNav - t.price) * t.units : 0
+                      const unrealizedPLPct = hasUnrealized ? ((curNav - t.price) / t.price) * 100 : 0
+                      const gl = hasRealized ? t.gainLoss : hasUnrealized ? unrealizedPL : null
+                      const glUp = gl != null && gl >= 0
                       return (
                         <div key={t.transactionId || `txn-m-${idx}`} className="px-4 py-3">
                           <div className="flex items-center justify-between mb-1">
@@ -2109,9 +2145,9 @@ export default function MutualFundsPage() {
                             <p className="text-[var(--text-dim)]">{t.units.toFixed(2)} units @ ₹{t.price.toFixed(2)}</p>
                             <div className="text-right">
                               <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.totalAmount)}</p>
-                              {hasGL && (
+                              {(hasRealized || hasUnrealized) && (
                                 <p className={`text-xs font-semibold tabular-nums ${glUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                  G/L: {glUp ? '+' : ''}{formatINR(t.gainLoss)}
+                                  {hasUnrealized ? 'P&L' : 'G/L'}: {glUp ? '+' : ''}{formatINR(gl)} {hasUnrealized ? `(${unrealizedPLPct >= 0 ? '+' : ''}${unrealizedPLPct.toFixed(1)}%)` : ''}
                                 </p>
                               )}
                             </div>

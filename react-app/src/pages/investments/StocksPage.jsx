@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, ChevronDown, MoreVertical, Trash2,
-  Activity, ShieldAlert, AlertTriangle, ArrowUpCircle, ArrowDownCircle, RefreshCw, X, Check, Loader2, ScanSearch
+  RefreshCw, X, Check, Loader2
 } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -35,13 +35,6 @@ export default function StocksPage() {
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [txnMenuOpen, setTxnMenuOpen] = useState(null)
-
-  // Signals state
-  const [signals, setSignals] = useState(null)
-  const [paperPerf, setPaperPerf] = useState(null)
-  const [loadingSignals, setLoadingSignals] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [signalsLoaded, setSignalsLoaded] = useState(false)
 
   // Filter portfolios by member + enrich ownerName
   const portfolios = useMemo(() => {
@@ -103,6 +96,14 @@ export default function StocksPage() {
       : stockTransactions.filter((t) => t.portfolioId === selectedPortfolioId)
     return txns.sort((a, b) => new Date(b.date) - new Date(a.date))
   }, [stockTransactions, portfolios, selectedPortfolioId])
+
+  // Current price lookup for unrealized P&L on BUY transactions
+  const currentPriceMap = useMemo(() => {
+    if (!holdings) return {}
+    const map = {}
+    holdings.forEach((h) => { if (h.currentPrice > 0) map[`${h.portfolioId}:${h.symbol}`] = h.currentPrice })
+    return map
+  }, [holdings])
 
   // Loading state — after all hooks
   if (stockPortfolios === null || stockHoldings === null) return <PageLoading title="Loading stocks" cards={5} />
@@ -199,148 +200,10 @@ export default function StocksPage() {
     }
   }
 
-  // ── Signal handlers ──
-  const loadSignals = useCallback(async (force = false) => {
-    if (signalsLoaded && !force) return
-    setLoadingSignals(true)
-    try {
-      const [sigs, perf] = await Promise.allSettled([
-        api.getScreenerSignals('PENDING'),
-        api.getPaperPerformance()
-      ])
-      if (sigs.status === 'fulfilled') setSignals(sigs.value || [])
-      if (perf.status === 'fulfilled') setPaperPerf(perf.value || null)
-      setSignalsLoaded(true)
-    } catch (err) {
-      console.warn('Failed to load signals:', err)
-    } finally {
-      setLoadingSignals(false)
-    }
-  }, [signalsLoaded])
-
-  useEffect(() => {
-    if (subTab === 'signals') loadSignals()
-  }, [subTab, loadSignals])
-
-  const handleGenerate = async () => {
-    setGenerating(true)
-    try {
-      const result = await api.generateScreenerSignals()
-      setSignals(result?.signals || [])
-      if (result?.paperPerformance) setPaperPerf(result.paperPerformance)
-      showToast(`${result?.signals?.length || 0} signals generated`)
-    } catch (err) {
-      showToast(err.message || 'Failed to generate signals', 'error')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const getOrCreateSignalsPortfolio = useCallback(async () => {
-    const existing = (stockPortfolios || []).find(
-      p => p.portfolioName === 'CF_Signals' || p.portfolioName === 'PFL-CF_Signals'
-    )
-    if (existing) return existing.portfolioId
-    const result = await addStockPortfolio({ portfolioName: 'CF_Signals', investmentAccount: '', owner: '' })
-    return result?.portfolioId || result?.id || ''
-  }, [stockPortfolios, addStockPortfolio])
-
-  const handleSignalAction = async (signal, action) => {
-    if (action === 'SKIPPED') {
-      try {
-        showBlockUI('Skipping signal...')
-        await api.updateScreenerSignalStatus(signal.signalId, 'SKIPPED')
-        setSignals(prev => (prev || []).filter(s => s.signalId !== signal.signalId))
-        showToast('Signal skipped')
-      } catch (err) {
-        showToast(err.message || 'Failed to skip signal', 'error')
-      } finally {
-        hideBlockUI()
-      }
-      return
-    }
-    const isBuyType = ['BUY_STARTER', 'ADD1', 'ADD2', 'DIP_BUY'].includes(signal.type)
-    if (isBuyType) {
-      try {
-        showBlockUI('Preparing trade form...')
-        const pfId = await getOrCreateSignalsPortfolio()
-        setModal({ signalBuy: true, signal, portfolioId: pfId })
-      } catch (err) {
-        showToast(err.message || 'Failed to find/create CF_Signals portfolio', 'error')
-      } finally {
-        hideBlockUI()
-      }
-    } else {
-      try {
-        showBlockUI('Preparing trade form...')
-        const pfId = await getOrCreateSignalsPortfolio()
-        setModal({ signalSell: true, signal, portfolioId: pfId })
-      } catch (err) {
-        showToast(err.message || 'Failed to find/create CF_Signals portfolio', 'error')
-      } finally {
-        hideBlockUI()
-      }
-    }
-  }
-
-  const handleSignalTradeSubmit = async (formData) => {
-    const signal = modal?.signal
-    if (!signal) return
-    const isBuy = !!modal?.signalBuy
-    try {
-      showBlockUI(isBuy ? 'Executing buy...' : 'Executing sell...')
-      if (isBuy) await buyStock(formData)
-      else await sellStock(formData)
-      await api.updateScreenerSignalStatus(signal.signalId, 'EXECUTED', parseFloat(formData.pricePerShare) || 0)
-      if (isBuy) {
-        try {
-          const convictionMatch = signal.triggerDetail?.match(/Conviction: (\w+)/)
-          await api.recordScreenerBuy(signal.symbol, {
-            name: signal.name, signalType: signal.type,
-            screeners: signal.screeners || '',
-            conviction: convictionMatch?.[1] || 'BASE',
-            sector: signal.sector || ''
-          })
-        } catch (e) { console.warn('StockMeta update failed:', e.message) }
-      }
-      setSignals(prev => (prev || []).filter(s => s.signalId !== signal.signalId))
-      setModal(null)
-      refreshStocks?.()
-      showToast(`${isBuy ? 'Buy' : 'Sell'} executed and signal marked done`)
-    } catch (err) {
-      showToast(err.message || 'Trade failed', 'error')
-    } finally {
-      hideBlockUI()
-    }
-  }
-
   return (
     <div className="space-y-4">
-      {portfolios.length === 0 && subTab !== 'signals' ? (
+      {portfolios.length === 0 ? (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
-              <button
-                onClick={() => setSubTab('holdings')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-                  subTab !== 'signals' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                <Layers size={12} /> Portfolio
-              </button>
-              <button
-                onClick={() => setSubTab('signals')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-                  subTab === 'signals' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                <Activity size={12} /> Signals
-                {signals && signals.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">{signals.length}</span>
-                )}
-              </button>
-            </div>
-          </div>
           <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
             <BarChart3 size={32} className="text-[var(--text-dim)]" />
             <p className="text-sm text-[var(--text-muted)]">No stock portfolios yet</p>
@@ -348,32 +211,6 @@ export default function StocksPage() {
               Create your first portfolio
             </button>
           </div>
-        </div>
-      ) : portfolios.length === 0 && subTab === 'signals' ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
-              <button
-                onClick={() => setSubTab('holdings')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              >
-                <Layers size={12} /> Portfolio
-              </button>
-              <button
-                onClick={() => setSubTab('signals')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm"
-              >
-                <Activity size={12} /> Signals
-                {signals && signals.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">{signals.length}</span>
-                )}
-              </button>
-            </div>
-          </div>
-          <SignalsTabContent
-            signals={signals} paperPerf={paperPerf} loadingSignals={loadingSignals}
-            generating={generating} onGenerate={handleGenerate} onSignalAction={handleSignalAction}
-          />
         </div>
       ) : (
         <>
@@ -506,19 +343,7 @@ export default function StocksPage() {
               >
                 <List size={12} /> Transactions ({transactions.length})
               </button>
-              <button
-                onClick={() => setSubTab('signals')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-                  subTab === 'signals'
-                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                <Activity size={12} /> Signals
-                {signals && signals.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">{signals.length}</span>
-                )}
-              </button>
+              {/* Signals tab temporarily disabled */}
             </div>
 
             <div className="flex items-center gap-2">
@@ -676,15 +501,20 @@ export default function StocksPage() {
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Amount</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Brokerage</th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Net</th>
-                          <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Realized P&L</th>
+                          <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">P&L</th>
                           <th className="w-8 py-2 px-2"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {transactions.map((t) => {
                           const isBuy = t.type === 'BUY'
+                          const curPrice = currentPriceMap[`${t.portfolioId}:${t.symbol}`]
                           const hasRPL = !isBuy && t.realizedPL != null
-                          const rplUp = hasRPL && t.realizedPL >= 0
+                          const hasUPL = isBuy && curPrice > 0 && t.pricePerShare > 0 && t.quantity > 0
+                          const unrealizedPL = hasUPL ? (curPrice - t.pricePerShare) * t.quantity : 0
+                          const unrealizedPLPct = hasUPL ? ((curPrice - t.pricePerShare) / t.pricePerShare) * 100 : 0
+                          const pl = hasRPL ? t.realizedPL : hasUPL ? unrealizedPL : null
+                          const plUp = pl != null && pl >= 0
                           const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === t.portfolioId) : null
                           return (
                             <tr key={t.transactionId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
@@ -707,10 +537,17 @@ export default function StocksPage() {
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-dim)] tabular-nums">{t.brokerage > 0 ? formatINR(t.brokerage) : '—'}</td>
                               <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.netAmount)}</td>
                               <td className="py-2.5 px-3 text-right">
-                                {hasRPL ? (
-                                  <span className={`text-xs font-semibold tabular-nums ${rplUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                    {rplUp ? '+' : ''}{formatINR(t.realizedPL)}
-                                  </span>
+                                {(hasRPL || hasUPL) ? (
+                                  <div>
+                                    <span className={`text-xs font-semibold tabular-nums ${plUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                      {plUp ? '+' : ''}{formatINR(pl)}
+                                    </span>
+                                    {hasUPL && (
+                                      <p className={`text-[10px] tabular-nums ${plUp ? 'text-emerald-400/70' : 'text-[var(--accent-rose)]/70'}`}>
+                                        {unrealizedPLPct >= 0 ? '+' : ''}{unrealizedPLPct.toFixed(1)}%
+                                      </p>
+                                    )}
+                                  </div>
                                 ) : (
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 )}
@@ -735,8 +572,13 @@ export default function StocksPage() {
                   <div className="sm:hidden divide-y divide-[var(--border-light)]">
                     {transactions.map((t) => {
                       const isBuy = t.type === 'BUY'
+                      const curPrice = currentPriceMap[`${t.portfolioId}:${t.symbol}`]
                       const hasRPL = !isBuy && t.realizedPL != null
-                      const rplUp = hasRPL && t.realizedPL >= 0
+                      const hasUPL = isBuy && curPrice > 0 && t.pricePerShare > 0 && t.quantity > 0
+                      const unrealizedPL = hasUPL ? (curPrice - t.pricePerShare) * t.quantity : 0
+                      const unrealizedPLPct = hasUPL ? ((curPrice - t.pricePerShare) / t.pricePerShare) * 100 : 0
+                      const pl = hasRPL ? t.realizedPL : hasUPL ? unrealizedPL : null
+                      const plUp = pl != null && pl >= 0
                       return (
                         <div key={t.transactionId} className="px-4 py-3">
                           <div className="flex items-center justify-between mb-1">
@@ -761,9 +603,9 @@ export default function StocksPage() {
                             <p className="text-xs text-[var(--text-dim)]">{t.quantity} shares @ {formatINR(t.pricePerShare)}</p>
                             <div className="text-right">
                               <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(t.netAmount)}</p>
-                              {hasRPL && (
-                                <p className={`text-xs font-semibold tabular-nums ${rplUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                  P&L: {rplUp ? '+' : ''}{formatINR(t.realizedPL)}
+                              {(hasRPL || hasUPL) && (
+                                <p className={`text-xs font-semibold tabular-nums ${plUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                                  P&L: {plUp ? '+' : ''}{formatINR(pl)} {hasUPL ? `(${unrealizedPLPct >= 0 ? '+' : ''}${unrealizedPLPct.toFixed(1)}%)` : ''}
                                 </p>
                               )}
                             </div>
@@ -786,13 +628,7 @@ export default function StocksPage() {
             </>
           )}
 
-          {/* ── Signals Tab ── */}
-          {subTab === 'signals' && (
-            <SignalsTabContent
-              signals={signals} paperPerf={paperPerf} loadingSignals={loadingSignals}
-              generating={generating} onGenerate={handleGenerate} onSignalAction={handleSignalAction}
-            />
-          )}
+          {/* Signals tab temporarily disabled */}
         </>
       )}
 
@@ -832,409 +668,8 @@ export default function StocksPage() {
         )}
       </Modal>
 
-      {/* Signal trade modals */}
-      <Modal open={!!modal?.signalBuy} onClose={() => setModal(null)} title={`Buy — ${modal?.signal?.symbol || ''}`} wide>
-        {(() => {
-          const sig = modal?.signal
-          if (!sig) return null
-          const derivedPrice = sig.shares > 0 && sig.amount > 0 ? String(Math.round(sig.amount / sig.shares)) : ''
-          const existing = (stockHoldings || []).find(h => h.symbol === sig.symbol && h.portfolioId === modal?.portfolioId)
-          return (
-            <BuyStockForm
-              portfolioId={modal?.portfolioId}
-              lockPortfolio
-              initialData={{
-                symbol: sig.symbol,
-                companyName: sig.name,
-                quantity: sig.shares ? String(sig.shares) : '',
-                pricePerShare: derivedPrice,
-                notes: `Screener: ${sig.type}`,
-              }}
-              existingHolding={existing}
-              onSave={handleSignalTradeSubmit}
-              onCancel={() => setModal(null)}
-            />
-          )
-        })()}
-      </Modal>
-      <Modal open={!!modal?.signalSell} onClose={() => setModal(null)} title={`Sell — ${modal?.signal?.symbol || ''}`} wide>
-        <SellStockForm
-          portfolioId={modal?.portfolioId}
-          initialData={{
-            symbol: modal?.signal?.symbol || '',
-            companyName: modal?.signal?.name || '',
-            notes: `Screener: ${modal?.signal?.type || ''}`,
-          }}
-          signalDetail={modal?.signal?.triggerDetail}
-          onSave={handleSignalTradeSubmit}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
+      {/* Signal modals temporarily disabled */}
     </div>
   )
 }
 
-/* ── Stat Card ── */
-// ── Signal type styles ──
-const SIGNAL_STYLES = {
-  HARD_EXIT:      { border: 'border-l-red-500', icon: ShieldAlert, color: 'text-red-500', label: 'HARD EXIT', bg: 'bg-red-500/10' },
-  SYSTEMIC_EXIT:  { border: 'border-l-red-500', icon: ShieldAlert, color: 'text-red-500', label: 'SYSTEMIC EXIT', bg: 'bg-red-500/10' },
-  FREEZE:         { border: 'border-l-red-500', icon: ShieldAlert, color: 'text-red-500', label: 'FREEZE', bg: 'bg-red-500/10' },
-  TRAILING_STOP:  { border: 'border-l-amber-500', icon: AlertTriangle, color: 'text-amber-500', label: 'TRAILING STOP', bg: 'bg-amber-500/10' },
-  CRASH_ALERT:    { border: 'border-l-amber-500', icon: AlertTriangle, color: 'text-amber-500', label: 'CRASH ALERT', bg: 'bg-amber-500/10' },
-  SOFT_EXIT:      { border: 'border-l-amber-500', icon: AlertTriangle, color: 'text-amber-500', label: 'SOFT EXIT', bg: 'bg-amber-500/10' },
-  ADD1:           { border: 'border-l-blue-500', icon: ArrowUpCircle, color: 'text-blue-500', label: 'ADD #1', bg: 'bg-blue-500/10' },
-  ADD2:           { border: 'border-l-blue-500', icon: ArrowUpCircle, color: 'text-blue-500', label: 'ADD #2', bg: 'bg-blue-500/10' },
-  DIP_BUY:        { border: 'border-l-blue-500', icon: ArrowDownCircle, color: 'text-blue-500', label: 'DIP BUY', bg: 'bg-blue-500/10' },
-  BUY_STARTER:    { border: 'border-l-emerald-500', icon: TrendingUp, color: 'text-emerald-500', label: 'BUY', bg: 'bg-emerald-500/10' },
-  REBALANCE:      { border: 'border-l-gray-400', icon: RefreshCw, color: 'text-[var(--text-dim)]', label: 'REBALANCE', bg: 'bg-[var(--bg-inset)]' },
-  LTCG_ALERT:     { border: 'border-l-gray-400', icon: AlertTriangle, color: 'text-[var(--text-dim)]', label: 'LTCG ALERT', bg: 'bg-[var(--bg-inset)]' },
-  SECTOR_ALERT:   { border: 'border-l-gray-400', icon: AlertTriangle, color: 'text-[var(--text-dim)]', label: 'SECTOR ALERT', bg: 'bg-[var(--bg-inset)]' },
-}
-
-const stockUrl = (symbol) => `https://trendlyne.com/equity/${symbol}/latest/`
-
-function SignalsTabContent({ signals, paperPerf, loadingSignals, generating, onGenerate, onSignalAction }) {
-  return (
-    <div className="space-y-3">
-      {/* Paper trading confidence banner */}
-      {paperPerf && (paperPerf.totalTrades > 0) && (
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-2.5">
-          <div className="flex items-center gap-1.5 mb-2">
-            <ScanSearch size={12} className="text-violet-400" />
-            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Signal System Track Record (Paper)</span>
-          </div>
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <p className="text-[10px] text-[var(--text-dim)] uppercase">Win Rate</p>
-              <p className={`text-sm font-bold tabular-nums ${(paperPerf.winRate || 0) >= 50 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{paperPerf.winRate || 0}%</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-[var(--text-dim)] uppercase">CAGR</p>
-              <p className={`text-sm font-bold tabular-nums ${(paperPerf.cagr || 0) > 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{paperPerf.cagr || 0}%</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-[var(--text-dim)] uppercase">P&L</p>
-              <p className={`text-sm font-bold tabular-nums ${(paperPerf.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                {(paperPerf.totalPnl || 0) >= 0 ? '+' : ''}{formatINR(paperPerf.totalPnl || 0)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] text-[var(--text-dim)] uppercase">Trades</p>
-              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{paperPerf.totalTrades || 0}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Generate button */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--text-dim)]">
-          {signals && signals.length > 0
-            ? `${signals.length} pending signal${signals.length > 1 ? 's' : ''}`
-            : 'Generate signals to scan for opportunities'}
-        </p>
-        <button
-          onClick={onGenerate}
-          disabled={generating}
-          className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-colors shadow-sm ${
-            generating ? 'bg-violet-600/40 text-white/50 cursor-not-allowed' : 'text-white bg-violet-600 hover:bg-violet-500'
-          }`}
-        >
-          {generating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          {generating ? 'Generating...' : 'Generate Signals'}
-        </button>
-      </div>
-
-      {/* Signal cards */}
-      {loadingSignals ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={20} className="animate-spin text-[var(--text-dim)]" />
-          <span className="ml-2 text-sm text-[var(--text-dim)]">Loading signals...</span>
-        </div>
-      ) : !signals || signals.length === 0 ? (
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-10 flex flex-col items-center gap-3">
-          <Activity size={28} className="text-[var(--text-dim)]" />
-          <p className="text-sm text-[var(--text-muted)]">
-            {signals ? 'No pending signals — portfolio is up to date' : 'Click "Generate Signals" to scan'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {signals.map(signal => (
-            <SignalCard key={signal.signalId} signal={signal} onAction={onSignalAction} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function SignalCard({ signal, onAction }) {
-  const style = SIGNAL_STYLES[signal.type] || SIGNAL_STYLES.BUY_STARTER
-  const IconComp = style.icon
-  const isBuy = ['BUY_STARTER', 'ADD1', 'ADD2', 'DIP_BUY'].includes(signal.type)
-  const isSell = ['TRAILING_STOP', 'HARD_EXIT', 'SYSTEMIC_EXIT', 'SOFT_EXIT'].includes(signal.type)
-  const isInfoOnly = ['FREEZE', 'CRASH_ALERT', 'SECTOR_ALERT', 'LTCG_ALERT', 'REBALANCE'].includes(signal.type)
-
-  return (
-    <div className={`bg-[var(--bg-card)] border border-[var(--border)] border-l-[3px] ${style.border} rounded-xl p-3`}>
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${style.bg} ${style.color}`}>
-            <IconComp size={10} /> {style.label}
-          </span>
-          <a href={stockUrl(signal.symbol)} target="_blank" rel="noopener noreferrer"
-            className="text-sm font-bold text-[var(--text-primary)] hover:text-violet-400 transition-colors"
-          >{signal.symbol}</a>
-          <span className="text-xs text-[var(--text-dim)] hidden sm:inline">{signal.name}</span>
-        </div>
-        <span className="text-[10px] text-[var(--text-dim)] tabular-nums">
-          {signal.date ? new Date(signal.date).toLocaleDateString('en-IN') : ''}
-        </span>
-      </div>
-
-      <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">{signal.action}</p>
-
-      {signal.triggerDetail && (
-        <p className="text-[11px] text-[var(--text-dim)] leading-relaxed mb-1.5">{signal.triggerDetail}</p>
-      )}
-
-      <div className="flex items-center justify-between pt-1.5 border-t border-[var(--border-light)]">
-        <div className="flex items-center gap-3 text-xs">
-          {signal.amount > 0 && (
-            <span className="text-[var(--text-secondary)]">Amount: <strong className="text-[var(--text-primary)]">{formatINR(signal.amount)}</strong></span>
-          )}
-          {signal.shares > 0 && (
-            <span className="text-[var(--text-secondary)]">Shares: <strong className="text-[var(--text-primary)]">{signal.shares}</strong></span>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {isInfoOnly ? (
-            <button
-              onClick={() => onAction(signal, 'SKIPPED')}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold text-white bg-gray-600 hover:bg-gray-500 transition-colors"
-            >
-              <Check size={11} /> Acknowledge
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => onAction(signal, 'EXECUTED')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold text-white transition-colors ${
-                  isSell ? 'bg-rose-600 hover:bg-rose-500' : 'bg-emerald-600 hover:bg-emerald-500'
-                }`}
-              >
-                {isSell ? <><TrendingDown size={11} /> Sell</> : <><TrendingUp size={11} /> Buy</>}
-              </button>
-              <button
-                onClick={() => onAction(signal, 'SKIPPED')}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-inset)] hover:bg-[var(--bg-hover)] transition-colors"
-              >
-                <X size={11} /> Skip
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function StatCard({ label, value, sub, positive, bold }) {
-  return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3">
-      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-sm tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${
-        positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
-      }`}>
-        {value}
-      </p>
-      {sub && (
-        <p className={`text-xs font-semibold tabular-nums mt-0.5 ${positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-          {sub}
-        </p>
-      )}
-    </div>
-  )
-}
-
-/* ── Stock Transaction Action Menu (3-dot dropdown via portal) ── */
-function StockTxnActionMenu({ txn, isOpen, onToggle, onEdit, onDelete }) {
-  const buttonRef = useRef(null)
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-
-  if (!txn.transactionId) return null
-
-  function handleToggle(e) {
-    e.stopPropagation()
-    if (!isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-    }
-    onToggle()
-  }
-
-  return (
-    <>
-      <button
-        ref={buttonRef}
-        onClick={handleToggle}
-        className="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
-        title="Actions"
-      >
-        <MoreVertical size={14} />
-      </button>
-      {isOpen && createPortal(
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-            onClick={(e) => { e.stopPropagation(); onToggle() }}
-          />
-          <div
-            style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
-            className="bg-[var(--bg-dropdown)] border border-white/10 rounded-lg shadow-2xl py-1 min-w-[120px] animate-fade-in"
-          >
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit() }}
-              className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] flex items-center gap-2 transition-colors"
-            >
-              <Pencil size={12} /> Edit
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="w-full text-left px-3 py-2 text-xs text-[var(--accent-rose)] hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
-            >
-              <Trash2 size={12} /> Delete
-            </button>
-          </div>
-        </>,
-        document.body
-      )}
-    </>
-  )
-}
-
-/* ── Edit Stock Transaction Form ── */
-function EditStockTxnForm({ txn, onSave, onCancel }) {
-  const [date, setDate] = useState(() => {
-    if (!txn.date) return ''
-    const s = String(txn.date)
-    const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
-    if (ddmm) {
-      const d = new Date(Number(ddmm[3]), Number(ddmm[2]) - 1, Number(ddmm[1]))
-      return d.toISOString().split('T')[0]
-    }
-    const parsed = new Date(s)
-    return isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0]
-  })
-  const [quantity, setQuantity] = useState(String(txn.quantity || ''))
-  const [price, setPrice] = useState(String(txn.pricePerShare || ''))
-  const [brokerage, setBrokerage] = useState(String(txn.brokerage || '0'))
-  const [notes, setNotes] = useState(txn.notes || '')
-  const [saving, setSaving] = useState(false)
-
-  const totalAmount = (Number(quantity) || 0) * (Number(price) || 0)
-  const brokerageNum = Number(brokerage) || 0
-  const netAmount = txn.type === 'BUY' ? totalAmount + brokerageNum : totalAmount - brokerageNum
-
-  async function handleSubmit() {
-    if (!quantity || Number(quantity) <= 0) return
-    if (!price || Number(price) <= 0) return
-    setSaving(true)
-    try {
-      await onSave({
-        transactionId: txn.transactionId,
-        date,
-        quantity,
-        pricePerShare: price,
-        brokerage,
-        notes,
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
-        <p className="text-xs font-medium text-[var(--text-primary)]">{txn.companyName}</p>
-        <p className="text-xs text-[var(--text-muted)]">
-          {txn.symbol} · {txn.type} · {txn.transactionId}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Date</label>
-          <FormDateInput value={date} onChange={setDate} />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Quantity</label>
-          <input
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Price per Share</label>
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Brokerage</label>
-          <input
-            type="number"
-            value={brokerage}
-            onChange={(e) => setBrokerage(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
-          />
-        </div>
-      </div>
-
-      {totalAmount > 0 && (
-        <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)] flex items-center justify-between">
-          <div>
-            <p className="text-xs text-[var(--text-dim)]">Total Amount</p>
-            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(totalAmount)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-dim)]">Net Amount</p>
-            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(netAmount)}</p>
-          </div>
-        </div>
-      )}
-
-      <div>
-        <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Notes</label>
-        <input
-          type="text"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Optional notes..."
-          className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] rounded-lg"
-        />
-      </div>
-
-      <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--border-light)]">
-        <button onClick={onCancel} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-          Cancel
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={saving || !quantity || Number(quantity) <= 0 || !price || Number(price) <= 0}
-          className="px-4 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saving ? 'Saving...' : 'Update Transaction'}
-        </button>
-      </div>
-    </div>
-  )
-}

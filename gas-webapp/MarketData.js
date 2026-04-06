@@ -54,13 +54,17 @@ function fetchMarketData() {
   };
 
   try {
+    var start = Date.now();
     result.indices = fetchIndianIndices();
+    log('Indices fetched: ' + result.indices.length + ' in ' + (Date.now() - start) + 'ms');
   } catch (e) {
     log('Indices fetch failed: ' + e.message);
   }
 
   try {
+    var start2 = Date.now();
     result.metals = fetchMetalPrices();
+    log('Metals fetched: ' + result.metals.length + ' in ' + (Date.now() - start2) + 'ms');
   } catch (e) {
     log('Metals fetch failed: ' + e.message);
   }
@@ -97,7 +101,7 @@ var INDEX_ORDER = [
  * Fetch Indian market indices — NSE API (primary), GOOGLEFINANCE (fallback)
  */
 function fetchIndianIndices() {
-  // Try NSE India API first
+  // Try NSE India API first (fastest, most indices)
   try {
     var results = fetchIndicesFromNSE();
     if (results.length > 0) return results;
@@ -105,16 +109,21 @@ function fetchIndianIndices() {
     log('NSE API failed: ' + e.message);
   }
 
-  // Fallback: GOOGLEFINANCE via user's spreadsheet
+  // Fallback: GOOGLEFINANCE via temp sheet (reliable — Google internal)
   try {
-    var results2 = fetchIndicesViaGoogleFinance();
-    if (results2.length > 0) return results2;
+    var gfResults = fetchIndicesViaGoogleFinance();
+    if (gfResults.length > 0) return gfResults;
   } catch (e) {
     log('GOOGLEFINANCE fallback failed: ' + e.message);
   }
 
-  // Last resort: Yahoo Finance for key indices
-  return fetchIndicesViaYahoo();
+  // Last resort: Yahoo Finance
+  try {
+    return fetchIndicesViaYahoo();
+  } catch (e) {
+    log('Yahoo fallback failed: ' + e.message);
+    return [];
+  }
 }
 
 /**
@@ -124,6 +133,8 @@ function fetchIndicesFromNSE() {
   var url = 'https://www.nseindia.com/api/allIndices';
   var response = UrlFetchApp.fetch(url, {
     muteHttpExceptions: true,
+    followRedirects: true,
+    timeoutInMillis: 10000,
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       'Accept': 'application/json',
@@ -243,14 +254,20 @@ function fetchIndicesViaGoogleFinance() {
 function fetchIndicesViaYahoo() {
   var symbols = [
     { yahoo: '^NSEI', name: 'Nifty 50' },
-    { yahoo: '^NSEBANK', name: 'Bank Nifty' }
+    { yahoo: '^NSEBANK', name: 'Bank Nifty' },
+    { yahoo: '^CNXIT', name: 'Nifty IT' },
+    { yahoo: '^CNXPHARMA', name: 'Nifty Pharma' },
+    { yahoo: '^CNXAUTO', name: 'Nifty Auto' },
+    { yahoo: '^CNXMETAL', name: 'Nifty Metal' },
+    { yahoo: '^CNXREALTY', name: 'Nifty Realty' },
+    { yahoo: '^CNXENERGY', name: 'Nifty Energy' }
   ];
   var results = [];
 
   for (var i = 0; i < symbols.length; i++) {
     try {
       var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbols[i].yahoo) + '?range=1d&interval=1d';
-      var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, timeoutInMillis: 8000 });
       if (response.getResponseCode() === 200) {
         var json = JSON.parse(response.getContentText());
         var meta = json.chart.result[0].meta;
@@ -280,7 +297,7 @@ function fetchIndicesViaYahoo() {
 function fetchMetalPrices() {
   var results = [];
 
-  // Get USD/INR rate via GOOGLEFINANCE
+  // Get USD/INR rate via GOOGLEFINANCE (reliable — Google internal)
   var usdInr = 83; // default fallback
   try {
     var ss = getSpreadsheet();
@@ -290,18 +307,11 @@ function fetchMetalPrices() {
       tempSheet = ss.insertSheet(tempSheetName);
       tempSheet.hideSheet();
     }
-
     tempSheet.getRange(1, 1).setFormula('=IFERROR(GOOGLEFINANCE("CURRENCY:USDINR"), 0)');
     SpreadsheetApp.flush();
-
     var rate = parseFloat(tempSheet.getRange(1, 1).getValue());
     if (rate > 0) usdInr = rate;
-
-    try {
-      ss.deleteSheet(tempSheet);
-    } catch (e) {
-      tempSheet.clear();
-    }
+    try { ss.deleteSheet(tempSheet); } catch (e) { tempSheet.clear(); }
   } catch (e) {
     log('USD/INR fetch failed: ' + e.message);
   }

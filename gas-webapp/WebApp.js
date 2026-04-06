@@ -330,68 +330,6 @@ function routeAction(action, params, userRecord) {
     case 'stock-transaction:delete':
       return deleteStockTransaction(params.transactionId);
 
-    // ── Screener ──
-    case 'screener:watchlist':
-      return readScreenerWatchlist();
-
-    case 'screener:signals':
-      return getScreenerSignals(params.status || null);
-
-    case 'screener:generate-signals':
-      return generateUserSignals();
-
-    case 'screener:signal-update':
-      return updateSignalStatus(params.signalId, params.status, params.executedPrice);
-
-    case 'screener:stock-meta':
-      return getScreenerStockMeta();
-
-    case 'screener:record-buy':
-      return recordScreenerBuy(params.symbol, params);
-
-    case 'screener:config':
-      return readScreenerConfig();
-
-    case 'screener:config-update':
-      return updateScreenerConfig(params.key, params.value);
-
-    case 'screener:nifty-data':
-      return readNiftyDataFromMasterDB();
-
-    // ── Paper Trading ──
-    case 'screener:paper-execute':
-      return executePaperTrades();
-
-    case 'screener:paper-portfolio':
-      return getPaperPortfolio();
-
-    case 'screener:paper-performance':
-      return getPaperPerformance();
-
-    // ── Signal Tracking ──
-    case 'screener:signal-tracking':
-      return getSignalTracking();
-
-    case 'screener:track-outcomes':
-      return trackSignalOutcomes();
-
-    // ── Screener Reset ──
-    case 'screener:reset-paper':
-      return resetPaperTrades();
-    case 'screener:reset-signals':
-      return resetSignals();
-    case 'screener:reset-all':
-      return resetScreenerAll();
-    case 'screener:reset-rerun':
-      return resetAndRerun();
-
-    // ── Admin (screener pipeline) ──
-    case 'admin:refresh-trendlyne':   return adminRefreshTrendlyne();
-    case 'admin:refresh-nifty':       return adminRefreshNifty();
-    case 'admin:rescore-watchlist':   return adminRescoreWatchlist();
-    case 'admin:run-full-pipeline':   return adminRunFullPipeline();
-    case 'admin:status':              return getAdminStatus();
-
     // ── Reminders ──
     case 'reminders:list':
       return getAllReminders();
@@ -428,10 +366,6 @@ function routeAction(action, params, userRecord) {
 
     case 'data:check-freshness':
       return { stale: isMasterDataStale() };
-
-    // ── Market Data ──
-    case 'market:data':
-      return getMarketData();
 
     // ── Bulk Data (for targeted refresh) ──
     case 'mf-holdings:list':
@@ -806,10 +740,8 @@ function getAllSettings() {
 function updateAllSettings(params) {
   var emailSettings = ['EmailConfigured', 'EmailFrequency', 'EmailHour', 'EmailMinute', 'EmailDayOfWeek', 'EmailDayOfMonth'];
   var reminderSettings = ['ReminderNotificationsEnabled', 'ReminderCheckHour'];
-  var screenerSettings = ['ScreenerEmailEnabled', 'ScreenerEmailHour', 'HourlyPriceCheck'];
   var emailChanged = false;
   var reminderChanged = false;
-  var screenerChanged = false;
   var count = 0;
 
   for (var key in params) {
@@ -821,9 +753,6 @@ function updateAllSettings(params) {
     }
     if (reminderSettings.indexOf(key) !== -1) {
       reminderChanged = true;
-    }
-    if (screenerSettings.indexOf(key) !== -1) {
-      screenerChanged = true;
     }
   }
 
@@ -842,16 +771,6 @@ function updateAllSettings(params) {
       installReminderTrigger();
     } catch (e) {
       log('Error reinstalling reminder trigger: ' + e.message);
-    }
-  }
-
-  // Reinstall screener triggers if screener settings changed
-  if (screenerChanged) {
-    try {
-      installScreenerEmailTrigger();
-      installHourlyPriceCheckTrigger();
-    } catch (e) {
-      log('Error reinstalling screener triggers: ' + e.message);
     }
   }
 

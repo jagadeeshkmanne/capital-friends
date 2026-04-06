@@ -52,16 +52,6 @@ const CONFIG = {
   masterMFDataSheet: 'MF_Data',        // Mutual fund NAVs (~8,500+ funds)
   masterATHSheet: 'MF_ATH',            // All-Time High NAV data
   masterStockDataSheet: 'Stock_Data',   // Stock data (~5,292 NSE stocks)
-  // Master DB screener sheets (read-only)
-  masterScreenerWatchlistSheet: 'Screener_Watchlist',
-  masterScreenerConfigSheet: 'Screener_Config',
-
-  // Per-user screener sheets
-  screenerSignalsSheet: 'Screener_Signals',
-  screenerStockMetaSheet: 'Screener_StockMeta',
-  screenerUserConfigSheet: 'Screener_UserConfig',
-  screenerPaperTradesSheet: 'Screener_PaperTrades',
-
   // Admin
   adminEmail: 'jagadeesh.k.manne@gmail.com',
 
@@ -301,6 +291,28 @@ function getSetting(settingName) {
     if (data[i][0] === settingName) return data[i][1];
   }
   return null;
+}
+
+/**
+ * Set a single setting value in the Settings sheet.
+ * Updates existing key or appends new row.
+ */
+function updateSetting(settingName, value) {
+  var sheet = getSheet(CONFIG.settingsSheet);
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 3) {
+    var data = sheet.getRange(3, 1, lastRow - 2, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === settingName) {
+        sheet.getRange(i + 3, 2).setValue(value);
+        return;
+      }
+    }
+  }
+  // Not found — append new row
+  var newRow = Math.max(lastRow + 1, 3);
+  sheet.getRange(newRow, 1, 1, 2).setValues([[settingName, value]]);
 }
 
 /**
