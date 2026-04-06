@@ -7,19 +7,7 @@
 
 // ── Helpers ──
 
-var _imageBase64Cache = {};
-
-function _getImageBase64(url) {
-  if (_imageBase64Cache[url]) return _imageBase64Cache[url];
-  try {
-    var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) return '';
-    var b = r.getBlob();
-    var uri = 'data:' + (b.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(b.getBytes());
-    _imageBase64Cache[url] = uri;
-    return uri;
-  } catch (e) { return ''; }
-}
+// Logo rendered as text in email header (no external image fetch needed)
 
 function _escHtml(s) {
   if (!s) return '';
@@ -1061,7 +1049,7 @@ function buildSimpleEmailBody(recipientName, dashData, familyHeadName) {
   var mfI = parseFloat(d.mfInvested) || 0, mfC = parseFloat(d.mfCurrentValue) || 0;
   var skI = parseFloat(d.stkInvested) || 0, skC = parseFloat(d.stkCurrentValue) || 0;
   var oC = parseFloat(d.otherCurrentValue) || 0;
-  var eL = _getImageBase64('https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-new.png');
+  var eL = ''; // Logo rendered as text fallback (no external fetch needed)
   var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;font-family:' + ff + ';background-color:#f0f4f8;"><div style="margin:0 auto;padding:0;">';
   h += '<div style="background:linear-gradient(135deg,#059669 0%,#047857 50%,#065f46 100%);padding:32px 28px 24px;text-align:center;">';
   h += (eL ? '<img src="' + eL + '" alt="Capital Friends" style="height:44px;width:auto;display:inline-block;margin-bottom:8px;filter:brightness(0) invert(1);" />' : '<div style="margin-bottom:8px;"><span style="font-size:24px;font-weight:800;color:#fff;">Capital</span><span style="font-size:24px;font-weight:800;color:#a7f3d0;">Friends</span></div>');
