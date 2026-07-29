@@ -203,11 +203,12 @@ export default function GoalsPage() {
       const mismatch = isMapped && actualEquity !== null ? Math.round(actualEquity - recommended.equity) : null
       const needsAttention = mismatch !== null && Math.abs(mismatch) > 15
 
-      // Live gap computation based on actual currentValue
+      // Live gap computation based on actual currentValue (or planned lumpsum if higher)
       const cagr = g.expectedCAGR || 0.12
       const monthlyRate = cagr / 12
       const months = Math.max(0, Math.round(yearsLeft * 12))
-      const fvCurrent = (g.currentValue || 0) * (months > 0 ? Math.pow(1 + monthlyRate, months) : 1)
+      const assumedBase = Math.max(g.currentValue || 0, g.lumpsumInvested || 0)
+      const fvCurrent = assumedBase * (months > 0 ? Math.pow(1 + monthlyRate, months) : 1)
       const gapAtMaturity = Math.max(0, (g.targetAmount || 0) - fvCurrent)
       const liveLumpsum = gapAtMaturity > 0 && months > 0
         ? Math.round(gapAtMaturity / Math.pow(1 + monthlyRate, months)) : 0

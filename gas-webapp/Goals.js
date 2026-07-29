@@ -936,11 +936,11 @@ function setGoalFormulas(sheet, row) {
   // Uses monthly compounding: months = time to target, mr = CAGR/12
   // FV of current = I × (1+mr)^months, gap = Target - FV, SIP = PMT(mr, months, 0, gap)
   const sipFormula =
-    `=IF(OR(A${row}="",E${row}=0),0,LET(mo,MAX(1,ROUND((F${row}-TODAY())/365.25*12)),mr,R${row}/12,fvI,I${row}*POWER(1+mr,mo),gap,MAX(0,E${row}-fvI),IF(gap<=0,0,-PMT(mr,mo,0,gap))))`;
+    `=IF(OR(A${row}="",E${row}=0),0,LET(mo,MAX(1,ROUND((F${row}-TODAY())/365.25*12)),mr,R${row}/12,fvI,MAX(I${row},U${row})*POWER(1+mr,mo),gap,MAX(0,E${row}-fvI),IF(gap<=0,0,-PMT(mr,mo,0,gap))))`;
 
   // H: Lumpsum Needed = PV of target minus current allocated
   const lumpsumFormula =
-    `=IF(OR(A${row}="",E${row}=0),0,MAX(0,E${row}/POWER(1+R${row},MAX(0.08,(F${row}-TODAY())/365.25))-I${row}))`;
+    `=IF(OR(A${row}="",E${row}=0),0,MAX(0,E${row}/POWER(1+R${row},MAX(0.08,(F${row}-TODAY())/365.25))-MAX(I${row},U${row})))`;
 
   // N: Status — compares actual vs expected progress using time value of money
   // Achieved (>=100%), On Track (>=90% of expected), Behind (>=70%), Critical (<70%)
