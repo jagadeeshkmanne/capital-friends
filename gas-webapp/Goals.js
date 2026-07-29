@@ -342,6 +342,9 @@ function addGoal(goalData) {
 
     // Set LIVE FORMULAS for calculated columns (auto-update when portfolio values change)
     setGoalFormulas(sheet, newRow);
+    
+    // Force spreadsheet to evaluate formulas before returning so that immediate fetch gets correct values
+    SpreadsheetApp.flush();
 
     // Format the new row
     applyDataRowFormatting(sheet, newRow, newRow, 22);
@@ -428,6 +431,9 @@ function editGoal(goalId, goalData) {
     // Re-write live formulas for calculated columns (G, H, I, J, K, N)
     // These may need updating if E, F, or R changed
     setGoalFormulas(sheet, rowIndex);
+    
+    // Force spreadsheet to evaluate formulas before returning so that immediate fetch gets correct values
+    SpreadsheetApp.flush();
 
     log(`Goal edited: ${goalId} - ${goalData.goalName}`);
 
