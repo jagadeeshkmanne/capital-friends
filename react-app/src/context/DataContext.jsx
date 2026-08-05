@@ -378,8 +378,9 @@ export function DataProvider({ children }) {
       try {
         await api.inviteFamilyMember(data.email, data.memberName)
       } catch (e) {
-        // Non-blocking — member is still added even if sharing fails
-        console.warn('Auto-invite failed (non-blocking):', e.message)
+        // Refresh members first because they were successfully added to the sheet
+        await refreshMembers()
+        throw new Error(`Member added to list, but auto-invite failed: ${e.message}`)
       }
     }
     await refreshMembers()

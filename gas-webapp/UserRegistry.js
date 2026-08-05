@@ -227,7 +227,7 @@ function inviteToFamily(ownerRecord, memberEmail, memberName) {
 
   // Share the spreadsheet with the family member (runs as owner who owns the file)
   var file = DriveApp.getFileById(ownerRecord.spreadsheetId);
-  file.addEditor(memberEmail);
+  try { file.addEditor(memberEmail); } catch (shareErr) { throw new Error("Failed to share sheet on Google Drive. Is " + memberEmail + " a valid Google Account? (" + shareErr.message + ")"); }
 
   // Register in Script Properties as pending member
   var record = {
