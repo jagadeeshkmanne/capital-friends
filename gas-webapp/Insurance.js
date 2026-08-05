@@ -181,6 +181,8 @@ function addInsurancePolicy(policyData) {
 
     // Use dynamic fields from policyData (sent as object from HTML)
     const dynamicFields = policyData.dynamicFields || {};
+    if (policyData.premium !== undefined) dynamicFields.premium = policyData.premium;
+    if (policyData.premiumFrequency) dynamicFields.premiumFrequency = policyData.premiumFrequency;
 
     // Prepare row data (13 columns: A to M)
     const rowData = [
@@ -281,6 +283,8 @@ function getInsurancePolicyById(policyId) {
           nominee: String(row[8] || ''),         // I: Nominee
           status: String(row[9] || 'Active'),    // J: Policy Status
           dynamicFields: dynamicFields,          // K: Dynamic Fields (JSON)
+          premium: dynamicFields.premium || 0,
+          premiumFrequency: dynamicFields.premiumFrequency || 'Annual',
           notes: String(row[12] || ''),          // M: Notes
           rowIndex: i + 3 // Actual sheet row number
         };
@@ -320,6 +324,8 @@ function updateInsurancePolicy(policyId, policyData) {
 
     // Use dynamic fields from policyData (sent as object from HTML)
     const dynamicFields = policyData.dynamicFields || {};
+    if (policyData.premium !== undefined) dynamicFields.premium = policyData.premium;
+    if (policyData.premiumFrequency) dynamicFields.premiumFrequency = policyData.premiumFrequency;
 
     const now = new Date();
 

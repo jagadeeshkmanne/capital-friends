@@ -130,7 +130,6 @@ export default function InsurancePage() {
                     <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Company</th>
                     {!member && <th className="text-left py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Insured</th>}
                     <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Sum Assured</th>
-                    <th className="text-right py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Premium</th>
                     <th className="w-8 py-2.5 px-2"></th>
                   </tr>
                 </thead>
@@ -149,9 +148,6 @@ export default function InsurancePage() {
                       <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{p.company}</td>
                       {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{p.insuredMember}</td>}
                       <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.sumAssured)}</td>
-                      <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">
-                        {formatINR(p.premium)}/{p.premiumFrequency === 'Annual' ? 'yr' : 'mo'}
-                      </td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: p })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
                           <Pencil size={12} />
@@ -178,10 +174,6 @@ export default function InsurancePage() {
                     <div>
                       <p className="text-xs text-[var(--text-dim)]">Cover</p>
                       <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.sumAssured)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-[var(--text-dim)]">Premium</p>
-                      <p className="text-xs text-[var(--text-muted)] tabular-nums">{formatINR(p.premium)}/{p.premiumFrequency === 'Annual' ? 'yr' : 'mo'}</p>
                     </div>
                   </div>
                 </div>
