@@ -226,7 +226,7 @@ function inviteToFamily(ownerRecord, memberEmail, memberName) {
   }
 
   // Share the spreadsheet with the family member (runs as owner who owns the file)
-  var file = DriveApp.getFileById(ownerRecord.spreadsheetId);
+  var file = SpreadsheetApp.openById(ownerRecord.spreadsheetId);
   try { file.addEditor(memberEmail); } catch (shareErr) { throw new Error("Failed to share sheet on Google Drive. Is " + memberEmail + " a valid Google Account? (" + shareErr.message + ")"); }
 
   // Register in Script Properties as pending member
@@ -277,7 +277,7 @@ function removeFromFamily(ownerRecord, memberEmail) {
 
   // Remove spreadsheet access (runs as owner who owns the file)
   try {
-    var file = DriveApp.getFileById(ownerRecord.spreadsheetId);
+    var file = SpreadsheetApp.openById(ownerRecord.spreadsheetId);
     file.removeEditor(memberEmail);
   } catch (e) {
     log('Warning: Could not remove editor access: ' + e.toString());
