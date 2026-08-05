@@ -341,12 +341,12 @@ export default function MutualFundsPage() {
     const totalPLPct = invested > 0 ? (totalPL / invested) * 100 : 0
     const unrealizedPLPct = invested > 0 ? (unrealizedPL / invested) * 100 : 0
     const realizedPLPct = invested > 0 ? (realizedPL / invested) * 100 : 0
-    const funds = source.reduce((s, p) => s + p.fundCount, 0)
     // Monthly SIP total from holdings
     const relevantHoldings = !mfHoldings ? [] : selectedPortfolioId === 'all'
       ? mfHoldings.filter((h) => source.some((p) => p.portfolioId === h.portfolioId))
       : mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
     const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
+    const funds = new Set(relevantHoldings.map((h) => h.fundCode)).size
     return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP }
   }, [portfolioData, selectedPortfolioId, mfHoldings])
 
