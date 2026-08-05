@@ -154,7 +154,7 @@ function processAddInvestment(data) {
     }
 
     // Validate required fields
-    if (!data.investmentType || !data.investmentName || !data.currentValue) {
+    if (!data.investmentType || !data.investmentName || data.currentValue === undefined || data.currentValue === null || data.currentValue === '') {
       return { success: false, error: 'Investment Type, Name, and Current Value are required.' };
     }
 
@@ -253,7 +253,7 @@ function processEditInvestment(data) {
     }
 
     // Validate required fields
-    if (!data.investmentId || !data.investmentType || !data.investmentName || !data.currentValue) {
+    if (!data.investmentId || !data.investmentType || !data.investmentName || data.currentValue === undefined || data.currentValue === null || data.currentValue === '') {
       return { success: false, error: 'Investment ID, Type, Name, and Current Value are required.' };
     }
 
