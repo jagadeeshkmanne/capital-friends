@@ -67,6 +67,8 @@ function getAllInvestments() {
     const data = dataRange.getValues();
 
     const investments = [];
+    const liveGoldPrice24K = typeof getLiveGoldPrice === 'function' ? getLiveGoldPrice() : 0;
+
     data.forEach((row, index) => {
       // Skip empty rows
       if (!row[0]) return;
@@ -84,17 +86,31 @@ function getAllInvestments() {
         dynamicFields = {};
       }
 
+      let currentValue = row[8] || 0;
+      const investmentType = row[1];
+      
+      // Override current value with live gold price if weight is provided
+      if (dynamicFields && dynamicFields.weightGrams) {
+        const isGold = ['Physical Gold', 'Digital Gold', 'Sovereign Gold Bond'].indexOf(investmentType) !== -1;
+        if (isGold && liveGoldPrice24K > 0) {
+          const purity = dynamicFields.purity;
+          const pricePerGram = (purity === '22' || purity === '22K' || purity === '22 Karat') ? 
+                               (liveGoldPrice24K * (22/24)) : liveGoldPrice24K;
+          currentValue = Math.round(dynamicFields.weightGrams * pricePerGram);
+        }
+      }
+
       investments.push({
         rowIndex: index + 3, // Actual row number in sheet
         investmentId: row[0],
-        investmentType: row[1],
+        investmentType: investmentType,
         investmentCategory: row[2],
         investmentName: row[3],
         familyMemberId: row[4] || '',      // Column E: Family Member ID
         familyMemberName: row[5] || '',    // Column F: Family Member Name
         investmentAccount: row[6] || '',
         investedAmount: row[7] || 0,
-        currentValue: row[8] || 0,
+        currentValue: currentValue,
         linkedLiabilityId: row[9] || '',
         dynamicFields: dynamicFields,
         notes: row[11] || '',

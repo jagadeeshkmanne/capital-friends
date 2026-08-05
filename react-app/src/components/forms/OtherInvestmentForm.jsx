@@ -141,7 +141,13 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     if (!form.investmentType) e.investmentType = 'Required'
     if (form.investmentType === 'Other' && !form.customType?.trim()) e.customType = 'Specify the type'
     if (!form.investmentName.trim()) e.investmentName = 'Required'
-    if (!form.currentValue || Number(form.currentValue) < 0) e.currentValue = 'Required'
+    
+    // currentValue is required UNLESS it's a metal type with a positive weight
+    const hasMetalWeight = isMetalType(form.investmentType) && Number(weightGrams) > 0
+    if (!hasMetalWeight && (!form.currentValue || Number(form.currentValue) < 0)) {
+      e.currentValue = 'Required'
+    }
+
     if (showQuickLoan) {
       if (!quickLoan.lenderName.trim()) e.qlLender = 'Required'
       if (!quickLoan.outstandingBalance || Number(quickLoan.outstandingBalance) <= 0) e.qlOutstanding = 'Must be > 0'
@@ -152,12 +158,19 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
 
   async function handleSubmit() {
     if (!validate()) return
+    
+    // Auto-fill currentValue if it's a metal type and we have a calculated value, but user left it blank
+    let finalCurrentValue = Number(form.currentValue) || 0
+    if (isMetalType(form.investmentType) && calculatedValue !== null && !finalCurrentValue) {
+      finalCurrentValue = calculatedValue
+    }
+
     const data = {
       ...form,
       investmentType: form.investmentType === 'Other' ? form.customType.trim() : form.investmentType,
       familyMember: form.familyMemberId, // GAS expects 'familyMember'
       investedAmount: Number(form.investedAmount) || 0,
-      currentValue: Number(form.currentValue) || 0,
+      currentValue: finalCurrentValue,
       linkedLiabilityId: form.linkedLiabilityIds.join(','), // Convert array back to comma-separated for GAS
     }
     delete data.linkedLiabilityIds // Don't send the array version
@@ -217,7 +230,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
         <FormField label="Invested Amount">
           <FormInput type="number" value={form.investedAmount} onChange={(v) => set('investedAmount', v)} placeholder="e.g., 500000" />
         </FormField>
-        <FormField label="Current Value" required error={errors.currentValue}>
+        <FormField label="Current Value" required={!isMetalType(form.investmentType)} error={errors.currentValue}>
           <FormInput type="number" value={form.currentValue} onChange={(v) => set('currentValue', v)} placeholder="e.g., 537500" />
         </FormField>
       </div>

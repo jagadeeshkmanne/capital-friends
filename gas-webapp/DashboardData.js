@@ -305,20 +305,44 @@ function getMemberOtherInvestments(memberId) {
   const headers = data[1]; // Row 2 is headers
   const investments = [];
 
+  const liveGoldPrice24K = getLiveGoldPrice(); // Fetch once per run
+
   for (let i = 3; i <= sheet.getLastRow(); i++) { // Data starts from row 3
     const row = data[i - 1];
     const rowMemberId = row[4]; // Column E: Family Member ID
     const status = row[13]; // Column N: Status
 
     if (rowMemberId === memberId && status === 'Active') {
+      let currentValue = row[8] || 0;
+      const investmentType = row[1];
+      
+      // Parse dynamic fields to check for live gold calculation
+      try {
+        if (row[10]) {
+          const dynamicFields = JSON.parse(decodeHtmlEntities(row[10]));
+          if (dynamicFields && dynamicFields.weightGrams) {
+            const isGold = ['Physical Gold', 'Digital Gold', 'Sovereign Gold Bond'].indexOf(investmentType) !== -1;
+            if (isGold) {
+              const purity = dynamicFields.purity;
+              // 24K price, adjust for 22K if specified
+              const pricePerGram = (purity === '22' || purity === '22K' || purity === '22 Karat') ? 
+                                   (liveGoldPrice24K * (22/24)) : liveGoldPrice24K;
+              currentValue = Math.round(dynamicFields.weightGrams * pricePerGram);
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore parsing errors and use static currentValue
+      }
+
       investments.push({
         investmentId: row[0],
-        investmentType: row[1],
+        investmentType: investmentType,
         investmentCategory: row[2],
         investmentName: row[3],
         investedAmount: row[7] || 0,
-        currentValue: row[8] || 0,
-        gainLoss: (row[8] || 0) - (row[7] || 0)
+        currentValue: currentValue,
+        gainLoss: currentValue - (row[7] || 0)
       });
     }
   }

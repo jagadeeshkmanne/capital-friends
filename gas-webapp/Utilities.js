@@ -641,3 +641,47 @@ function escapeHtml(text) {
 // ============================================================================
 // END OF UTILITIES.GS
 // ============================================================================
+
+/**
+ * Get live gold price (24K INR per gram)
+ * Caches the result in ScriptProperties for 4 hours to avoid rate limits
+ */
+function getLiveGoldPrice() {
+  const cacheKey = 'LIVE_GOLD_PRICE_24K';
+  const props = PropertiesService.getScriptProperties();
+  const cached = props.getProperty(cacheKey);
+  
+  if (cached) {
+    const data = JSON.parse(cached);
+    // Cache for 4 hours
+    if (Date.now() - data.timestamp < 4 * 60 * 60 * 1000) {
+      return data.price;
+    }
+  }
+  
+  try {
+    const url = 'https://api.gold-api.com/price/XAU/INR';
+    const response = UrlFetchApp.fetch(url, {muteHttpExceptions: true});
+    if (response.getResponseCode() === 200) {
+      const json = JSON.parse(response.getContentText());
+      if (json && json.price) {
+        // Price is for 1 Troy Ounce (31.1034768 grams) of Spot Gold
+        const troyOunceToGrams = 31.1034768;
+        const spotPricePerGram = json.price / troyOunceToGrams;
+        // Indian physical retail gold includes 15% customs + 3% GST (1.18x premium)
+        const indianRetail24K = spotPricePerGram * 1.18;
+        
+        props.setProperty(cacheKey, JSON.stringify({
+          price: indianRetail24K,
+          timestamp: Date.now()
+        }));
+        return indianRetail24K;
+      }
+    }
+  } catch (e) {
+    Logger.log('Error fetching gold price: ' + e.message);
+  }
+  
+  // Fallback to a hardcoded safe rough estimate if API fails
+  return 8500; 
+}
