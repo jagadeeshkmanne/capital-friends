@@ -267,3 +267,6 @@ export const runDiagnostics = () => callAPI('test:diagnose')
 if (typeof window !== 'undefined') {
   window._cf = { callAPI, checkTriggers: () => callAPI('test:triggers'), diagnose: () => callAPI('test:diagnose') }
 }
+
+// Market Data
+export const getMarketData = () => callAPI('data:market')

@@ -367,6 +367,15 @@ function routeAction(action, params, userRecord) {
     case 'data:check-freshness':
       return { stale: isMasterDataStale() };
 
+    case 'data:market':
+      return {
+        metals: [{
+          name: 'Gold (24K/1g)',
+          price: typeof getLiveGoldPrice === 'function' ? getLiveGoldPrice() : 0,
+          changePct: 0
+        }]
+      };
+
     // ── Bulk Data (for targeted refresh) ──
     case 'mf-holdings:list':
       return getAllMFHoldings();
