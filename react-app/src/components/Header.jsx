@@ -186,7 +186,7 @@ export default function Header() {
     activeMF.forEach((p) => {
       const pH = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
       const value = pH.reduce((s, h) => s + h.currentValue, 0)
-      const inv = pH.reduce((s, h) => s + h.investment, 0)
+      const inv = pH.reduce((s, h) => s + (Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)), 0)
       if (value > 0) addToSection('mf', p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value, inv)
     })
 
@@ -194,7 +194,7 @@ export default function Header() {
     activeStk.forEach((p) => {
       const pH = (stockHoldings || []).filter((h) => h.portfolioId === p.portfolioId)
       const value = pH.reduce((s, h) => s + h.currentValue, 0)
-      const inv = pH.reduce((s, h) => s + h.totalInvestment, 0)
+      const inv = pH.reduce((s, h) => s + (Number(h.totalInvestment) > 1 ? Number(h.totalInvestment) : Number(h.currentValue)), 0)
       if (value > 0) addToSection('stocks', p.portfolioName, value, inv)
     })
 
@@ -202,7 +202,8 @@ export default function Header() {
     activeOther.forEach((i) => {
       // Group by investmentType — known types get own section, custom types also get own section (with dynamic color)
       const type = i.investmentType || 'Other'
-      addToSection(type, i.investmentName || type, i.currentValue, i.investedAmount || 0)
+      const inv = Number(i.investedAmount) > 1 ? Number(i.investedAmount) : Number(i.currentValue || 0)
+      addToSection(type, i.investmentName || type, i.currentValue, inv)
     })
 
     const sections = Object.entries(sectionMap)
