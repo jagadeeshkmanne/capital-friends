@@ -194,12 +194,12 @@ export default function SettingsPage() {
               </button>
             </div>
             <div className="flex items-center gap-4 text-xs text-[var(--text-dim)]">
-              <span>Last: <span className="font-medium text-[var(--text-muted)]">{formatLastSync(settings.masterDataLastSync)}</span></span>
-              {settings._stale && (
+              <span>Last: <span className="font-medium text-[var(--text-muted)]">{formatLastSync(settings?.masterDataLastSync)}</span></span>
+              {settings?._stale && (
                 <span className="font-bold text-amber-600 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-xs">STALE</span>
               )}
-              {settings._navDataDate && (
-                <span>NAV: <span className="font-medium text-[var(--text-muted)]">{settings._navDataDate}</span></span>
+              {settings?._navDataDate && (
+                <span>NAV: <span className="font-medium text-[var(--text-muted)]">{settings?._navDataDate}</span></span>
               )}
             </div>
           </div>

@@ -162,6 +162,15 @@ export default function GoalsPage() {
   const needsAttention = allActiveGoals.filter((g) => g.status === 'Needs Attention').length
   const achieved = allActiveGoals.filter((g) => g.status === 'Achieved').length
 
+  // Portfolio Utilization
+  const totalMF = mfPortfolios?.reduce((s, p) => s + (p.currentValue || 0), 0) || 0;
+  const totalStock = stockPortfolios?.reduce((s, p) => s + (p.currentValue || 0), 0) || 0;
+  const totalOther = otherInvList?.reduce((s, p) => s + (p.currentValue || 0), 0) || 0;
+  const totalNetWorth = totalMF + totalStock + totalOther;
+  const totalUnallocated = Math.max(0, totalNetWorth - totalCurrent);
+  const unallocatedPct = totalNetWorth > 0 ? (totalUnallocated / totalNetWorth) * 100 : 0;
+  const allocatedPct = totalNetWorth > 0 ? (totalCurrent / totalNetWorth) * 100 : 0;
+
   // Allocation health for ALL goals (replaces old deRiskAlerts that only checked 0-3 years)
   // Build fund breakdown lookup for accurate equity/debt split
   const goalAllocMap = useMemo(() => {
@@ -526,6 +535,38 @@ export default function GoalsPage() {
 
   return (
     <div className="space-y-4">
+      
+      {/* Portfolio Utilization Banner */}
+      {totalNetWorth > 0 && (
+        <div className="bg-gradient-to-br from-violet-500/10 to-indigo-500/5 rounded-2xl border border-violet-500/20 p-5 flex flex-col gap-3 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 relative z-10">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-[var(--text-dim)] font-semibold mb-1">Total Net Worth</p>
+              <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(totalNetWorth)}</p>
+            </div>
+            <div className="flex items-center gap-6 text-sm">
+              <div>
+                <p className="text-[var(--text-dim)] mb-0.5"><span className="inline-block w-2 h-2 rounded-full bg-violet-400 mr-1.5"></span>Allocated to Goals</p>
+                <p className="font-semibold text-violet-400 tabular-nums">{formatINR(totalCurrent)} <span className="text-xs font-medium opacity-80">({allocatedPct.toFixed(0)}%)</span></p>
+              </div>
+              <div>
+                <p className="text-[var(--text-dim)] mb-0.5"><span className="inline-block w-2 h-2 rounded-full bg-[var(--border-light)] mr-1.5"></span>Unallocated Surplus</p>
+                <p className="font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(totalUnallocated)} <span className="text-xs font-medium opacity-80">({unallocatedPct.toFixed(0)}%)</span></p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="h-2 w-full bg-[var(--bg-lighter)] rounded-full overflow-hidden mt-1 flex relative z-10">
+            <div 
+              className="h-full bg-gradient-to-r from-violet-500 to-indigo-400 transition-all duration-1000 ease-out"
+              style={{ width: `${allocatedPct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Target size={32} className="text-[var(--text-dim)]" />
@@ -560,13 +601,13 @@ export default function GoalsPage() {
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">SIP / Month</p>
-                  <p className="text-sm font-bold tabular-nums text-violet-400">{formatINR(liveTotalSIP || totalSIP)}</p>
+                  <p className="text-sm font-bold tabular-nums text-violet-400">{formatINR(liveTotalSIP ?? totalSIP)}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-0.5">for active goals</p>
                 </div>
                 <span className="text-xs font-bold text-[var(--text-dim)] mt-3 shrink-0">OR</span>
                 <div className="flex-1 min-w-0 text-right">
                   <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Lumpsum Today</p>
-                  <p className="text-sm font-bold tabular-nums text-amber-400">{formatINR(liveTotalLumpsum || totalLumpsum)}</p>
+                  <p className="text-sm font-bold tabular-nums text-amber-400">{formatINR(liveTotalLumpsum ?? totalLumpsum)}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-0.5">for active goals</p>
                 </div>
               </div>

@@ -373,12 +373,13 @@ export default function Dashboard() {
     // ── Portfolio Leaderboard ──
     const portfolioLeaderboard = activeMFPortfolios
       .map(p => {
-        const ph = activeMFHoldings.filter(h => h.portfolioId === p.portfolioId)
-        const invested = ph.reduce((s, h) => s + h.investment, 0)
-        const current = ph.reduce((s, h) => s + h.currentValue, 0)
+        const invested = p.totalInvestment || p.invested || 0
+        const current = p.currentValue || p.current || 0
+        const pl = p.totalPL || p.pl || (current - invested)
+        const plPct = p.totalPLPct || p.plPct || (invested > 0 ? (pl / invested) * 100 : 0)
         return { portfolioId: p.portfolioId, portfolioName: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName,
           ownerName: p.ownerName, invested, current,
-          pl: current - invested, plPct: invested > 0 ? ((current - invested) / invested) * 100 : 0 }
+          pl, plPct }
       })
       .filter(p => p.invested > 0)
       .sort((a, b) => b.plPct - a.plPct)
@@ -538,7 +539,12 @@ export default function Dashboard() {
     })
 
     // Goal allocation mismatches (de-risk alerts)
-    // Reuse goalAllocMap built above for fund breakdown data
+    const goalAllocMap = {}
+    if (assetAllocations) {
+      for (const a of assetAllocations) {
+        if (a.assetAllocation) goalAllocMap[a.fundCode] = a.assetAllocation
+      }
+    }
     const EQUITY_CATS_DASH = new Set(['Equity', 'ELSS', 'Index'])
     const nowD = new Date()
     filterOwner((goalList || []).filter(g => g.isActive !== false), 'familyMemberId').forEach(g => {

@@ -450,7 +450,7 @@ function sendDashboardEmailReport(reportType, sendAsPDF = true) {
     }
   } catch (error) {
     log('Error sending email reports: ' + error.toString());
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, stack: error.stack };
   }
 }
 
@@ -526,6 +526,8 @@ function buildDashboardReportData() {
     const allLiabilities = getAllLiabilities() || [];
     const allInsurance = getAllInsurancePolicies() || [];
     const allGoals = getAllGoals() || [];
+    let allGoalMappings = [];
+    try { allGoalMappings = getGoalPortfolioMappings() || []; } catch(e) { log('Goal mappings error: ' + e); }
     const allReminders = getAllReminders() || [];
     const allBankAccounts = getAllBankAccounts() || [];
     const allAssetAllocations = getAllAssetAllocationsData() || [];
@@ -640,8 +642,60 @@ function buildDashboardReportData() {
 
     const activeOther = allOtherInv.filter(function(i) { return i.status === 'Active'; });
     const activeLiabilities = allLiabilities.filter(function(l) { return l.status === 'Active'; });
-    const activeInsurance = allInsurance.filter(function(p) { return p.status === 'Active'; });
-    const activeGoals = allGoals.filter(function(g) { return g.isActive !== false; });
+    const activeInsurance = allInsurance.filter(function(p) { return p.status && p.status.trim().toLowerCase() !== 'inactive'; });
+    const activeGoals = allGoals.filter(function(g) { return g.isActive !== false; }).map(function(g) {
+      const gTarget = parseFloat(g.targetAmount) || 0;
+      
+      // Calculate live gCurrent from linked portfolios
+      let liveLinkedCurrent = 0;
+      const gMappings = allGoalMappings.filter(function(m) { return m.goalId === g.goalId; });
+      if (gMappings && gMappings.length > 0) {
+        gMappings.forEach(function(m) {
+          const pId = m.portfolioId;
+          const allocPct = parseFloat(m.allocationPct) || 100;
+          let pVal = 0;
+          // check MF
+          const mf = activeMFPortfolios.filter(function(p) { return p.portfolioId === pId; })[0];
+          if (mf) pVal = parseFloat(mf.currentValue) || 0;
+          // check Stock
+          const stk = activeStockPortfolios.filter(function(p) { return p.portfolioId === pId; })[0];
+          if (stk && pVal === 0) pVal = parseFloat(stk.currentValue) || 0;
+          // check Other
+          const oth = activeOther.filter(function(i) { return i.investmentId === pId; })[0];
+          if (oth && pVal === 0) pVal = parseFloat(oth.currentValue) || 0;
+          
+          liveLinkedCurrent += pVal * (allocPct / 100);
+        });
+      }
+      const gCurrent = liveLinkedCurrent > 0 ? liveLinkedCurrent : (parseFloat(g.currentValue) || 0);
+      let isBehind = true;
+      let fvCurrent = gCurrent;
+      
+      if (gTarget <= 0) {
+        isBehind = false;
+      } else {
+        const _now = new Date();
+        const targetDate = g.targetDate ? new Date(g.targetDate) : null;
+        const yearsLeft = targetDate ? (targetDate - _now) / (365.25 * 24 * 60 * 60 * 1000) : 0;
+        
+        if (yearsLeft <= 0) {
+          isBehind = gCurrent < gTarget;
+        } else {
+          // Assume 12% CAGR for FV calculation to match dashboard's ON TRACK logic
+          const expectedCAGR = parseFloat(g.expectedCAGR) || 0.12;
+          fvCurrent = gCurrent * Math.pow(1 + expectedCAGR, yearsLeft);
+          isBehind = fvCurrent < gTarget;
+        }
+      }
+      
+      // Compute the actual percentage to fix the 0% bug (g.progressPercent is a decimal from Google Sheets)
+      let progress = gTarget > 0 ? (gCurrent / gTarget) * 100 : 0;
+      
+      return Object.assign({}, g, {
+        computedStatus: isBehind ? 'BEHIND' : 'ON TRACK',
+        fixedProgressPercent: progress
+      });
+    });
     const activeReminders = allReminders.filter(function(r) { return r.isActive !== false && r.status !== 'Completed'; });
     const activeMembers = allMembers.filter(function(m) { return m.status === 'Active'; });
     const activeBanks = allBankAccounts.filter(function(b) { return b.status === 'Active'; });
@@ -668,9 +722,9 @@ function buildDashboardReportData() {
     const totalEMI = activeLiabilities.reduce(function(s, l) { return s + (parseFloat(l.emiAmount) || 0); }, 0);
 
     // Insurance totals
-    const lifeCover = activeInsurance.filter(function(p) { return p.policyType === 'Term Life'; })
+    const lifeCover = activeInsurance.filter(function(p) { return (p.policyType || '').toLowerCase() === 'term life' || (p.policyType || '').toLowerCase() === 'life insurance'; })
       .reduce(function(s, p) { return s + (parseFloat(p.sumAssured) || 0); }, 0);
-    const healthCover = activeInsurance.filter(function(p) { return p.policyType === 'Health'; })
+    const healthCover = activeInsurance.filter(function(p) { return (p.policyType || '').toLowerCase() === 'health' || (p.policyType || '').toLowerCase() === 'health insurance'; })
       .reduce(function(s, p) { return s + (parseFloat(p.sumAssured) || 0); }, 0);
     const totalPremium = activeInsurance.reduce(function(s, p) { return s + (parseFloat(p.premium) || 0); }, 0);
 
@@ -967,7 +1021,10 @@ function buildDashboardReportData() {
     const now = new Date();
 
     // Check term life insurance
-    const hasTermLife = activeInsurance.some(function(p) { return p.policyType === 'Term Life'; });
+    const hasTermLife = activeInsurance.some(function(p) { 
+        const type = (p.policyType || '').toLowerCase();
+        return type === 'term life' || type === 'life insurance'; 
+    });
     if (!hasTermLife) {
       actionItems.push({
         type: 'critical',
@@ -1085,9 +1142,8 @@ function buildDashboardReportData() {
 
     // ── 18. Portfolio Performance ──
     var portfolioPerf = activeMFPortfolios.map(function(p) {
-      var ph = activeMFHoldings.filter(function(h) { return h.portfolioId === p.portfolioId; });
-      var invested = ph.reduce(function(s, h) { return s + (parseFloat(h.investment) || 0); }, 0);
-      var current = ph.reduce(function(s, h) { return s + (parseFloat(h.currentValue) || 0); }, 0);
+      var invested = parseFloat(p.totalInvestment) || 0;
+      var current = parseFloat(p.currentValue) || 0;
       return { portfolioId: p.portfolioId, portfolioName: (p.portfolioName || '').replace(/^PFL-/, ''),
         ownerName: p.ownerName || '', invested: invested, current: current,
         pl: current - invested, plPct: invested > 0 ? ((current - invested) / invested) * 100 : 0 };
@@ -1106,8 +1162,6 @@ function buildDashboardReportData() {
       { maxYears: 10, equity: 75, label: 'Long-term' },
       { maxYears: Infinity, equity: 85, label: 'Long-term' }
     ];
-    var allGoalMappings = [];
-    try { allGoalMappings = getGoalPortfolioMappings() || []; } catch(e) { log('Goal mappings error: ' + e); }
 
     var goalHealth = {};
     activeGoals.forEach(function(g) {
@@ -1243,11 +1297,11 @@ function buildDashboardReportData() {
         pnlPercent: plPct,
         insuranceCover: lifeCover + healthCover,
         termInsurance: {
-          count: activeInsurance.filter(function(p) { return p.policyType === 'Term Life'; }).length,
+          count: activeInsurance.filter(function(p) { const t = (p.policyType || '').toLowerCase(); return t === 'term life' || t === 'life insurance'; }).length,
           totalCover: lifeCover
         },
         healthInsurance: {
-          count: activeInsurance.filter(function(p) { return p.policyType === 'Health'; }).length,
+          count: activeInsurance.filter(function(p) { const t = (p.policyType || '').toLowerCase(); return t === 'health' || t === 'health insurance'; }).length,
           totalCover: healthCover
         }
       },

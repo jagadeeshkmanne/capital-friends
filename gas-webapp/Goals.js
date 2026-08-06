@@ -289,20 +289,8 @@ function addGoal(goalData) {
     // Column E: Target Amount - ALWAYS inflated future value (what you need to save)
     // We removed "Amount Today" column to avoid confusion
 
-    let inflationAdjustedTarget;
-
-    if (goalData.currentCost || goalData.isRetirement) {
-      // Goals with "Current Cost Today" OR Retirement
-      // Frontend already calculated the inflated future value
-      inflationAdjustedTarget = goalData.targetAmount;
-    } else {
-      // Emergency Fund or Custom goals: targetAmount is today's value, need to inflate
-      inflationAdjustedTarget = calculateInflationAdjustedTarget(
-        goalData.targetAmount,
-        goalData.expectedInflation,
-        yearsToGo
-      );
-    }
+    // The frontend always sends targetAmount as the already inflated future value
+    const inflationAdjustedTarget = goalData.targetAmount;
 
     const lumpsumInvested = goalData.lumpsumInvested || 0;
 
@@ -748,15 +736,6 @@ function mapPortfoliosToGoal(goalId, portfolioMappings) {
       return { success: false, error: 'GoalPortfolioMapping sheet not found' };
     }
 
-    // Validate total allocation doesn't exceed 100%
-    const totalAllocation = portfolioMappings.reduce((sum, m) => sum + (m.allocationPct || m.allocationPercent || 0), 0);
-    if (totalAllocation > 100) {
-      return {
-        success: false,
-        error: `Total allocation is ${totalAllocation}%, which exceeds 100%. Please adjust.`
-      };
-    }
-
     // Delete existing mappings for this goal
     deleteGoalPortfolioMappings(goalId);
 
@@ -789,6 +768,7 @@ function mapPortfoliosToGoal(goalId, portfolioMappings) {
 
     // No need to recalculate — Goals column I has a live SUMPRODUCT formula
     // that auto-updates when GoalPortfolioMapping changes
+    SpreadsheetApp.flush(); // Force formulas to evaluate so that immediate refresh gets new current value
 
     log(`Investments mapped to goal: ${goalId}`);
 
@@ -910,18 +890,18 @@ function setGoalFormulas(sheet, row) {
   const ss = sheet.getParent();
 
   // MF term (AllPortfolios) — always exists
-  const mfTerm = `SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="MF")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(AllPortfolios!I$4:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:A$200,0)),0))`;
+  const mfTerm = `SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="MF")*GoalPortfolioMapping!F$3:F$200*IFERROR(ARRAYFORMULA(VLOOKUP(GoalPortfolioMapping!D$3:D$200,AllPortfolios!A$4:I$200,9,FALSE)),0))`;
 
   // Stock term — only if StockPortfolios sheet exists
   const hasStocks = !!ss.getSheetByName('StockPortfolios');
   const stockTerm = hasStocks
-    ? `+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Stock")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(StockPortfolios!F$3:F$200,MATCH(GoalPortfolioMapping!D$3:D$200,StockPortfolios!A$3:A$200,0)),0))`
+    ? `+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Stock")*GoalPortfolioMapping!F$3:F$200*IFERROR(ARRAYFORMULA(VLOOKUP(GoalPortfolioMapping!D$3:D$200,StockPortfolios!A$3:F$200,6,FALSE)),0))`
     : '';
 
   // Other term — only if OtherInvestments sheet exists
   const hasOther = !!ss.getSheetByName('OtherInvestments');
   const otherTerm = hasOther
-    ? `+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Other")*GoalPortfolioMapping!F$3:F$200*IFERROR(INDEX(OtherInvestments!I$3:I$200,MATCH(GoalPortfolioMapping!D$3:D$200,OtherInvestments!A$3:A$200,0)),0))`
+    ? `+SUMPRODUCT((GoalPortfolioMapping!B$3:B$200=A${row})*(GoalPortfolioMapping!G$3:G$200="Other")*GoalPortfolioMapping!F$3:F$200*IFERROR(ARRAYFORMULA(VLOOKUP(GoalPortfolioMapping!D$3:D$200,OtherInvestments!A$3:I$200,9,FALSE)),0))`
     : '';
 
   const currentAllocatedFormula = `=IFERROR(${mfTerm}${stockTerm}${otherTerm},0)`;

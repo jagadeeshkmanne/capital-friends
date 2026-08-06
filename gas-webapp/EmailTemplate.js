@@ -222,9 +222,26 @@ function buildDashboardPDFHTML(data) {
   if (questionnaireData && questionnaireData.hasData) {
     var noItems = [];
     var answers = questionnaireData.answers || [];
+    
+    // Check if user has added term/health insurance manually to suppress questionnaire alerts
+    var hasTerm = false;
+    var hasHealth = false;
+    if (d.activeInsurance && d.activeInsurance.length > 0) {
+      for (var i = 0; i < d.activeInsurance.length; i++) {
+        var pType = (d.activeInsurance[i].policyType || '').toLowerCase();
+        if (pType === 'term life' || pType === 'life insurance') hasTerm = true;
+        if (pType === 'health' || pType === 'health insurance') hasHealth = true;
+      }
+    }
+    
     for (var qi = 0; qi < answers.length; qi++) {
       if (answers[qi].answer !== 'Yes') {
-        var qcfg = _QUEST_CONFIG[answers[qi].shortLabel] || _QUEST_CONFIG[answers[qi].question];
+        var qLabel = answers[qi].shortLabel || answers[qi].question;
+        // Suppress Health/Term alerts if they added the insurance in the app
+        if (hasTerm && qLabel.indexOf('Term') > -1) continue;
+        if (hasHealth && qLabel.indexOf('Health') > -1) continue;
+        
+        var qcfg = _QUEST_CONFIG[qLabel];
         if (qcfg) noItems.push(qcfg);
       }
     }
@@ -763,9 +780,9 @@ function buildDashboardPDFHTML(data) {
       var g = activeGoals[gi];
       var gTarget = parseFloat(g.targetAmount) || 0;
       var gCurrent = parseFloat(g.currentValue) || 0;
-      var gProgress = parseFloat(g.progressPercent) || (gTarget > 0 ? Math.min(100, (gCurrent / gTarget) * 100) : 0);
-      var gColor = gProgress >= 100 ? '#059669' : gProgress >= 75 ? '#059669' : gProgress >= 40 ? '#d97706' : '#ea580c';
-      var gLabel = gProgress >= 100 ? 'ACHIEVED' : gProgress >= 75 ? 'ALMOST' : gProgress >= 40 ? 'ON TRACK' : 'BEHIND';
+      var gProgress = g.fixedProgressPercent !== undefined ? Math.min(100, g.fixedProgressPercent) : (gTarget > 0 ? Math.min(100, (gCurrent / gTarget) * 100) : 0);
+      var gLabel = g.computedStatus || (gProgress >= 100 ? 'ACHIEVED' : gProgress >= 75 ? 'ALMOST' : gProgress >= 40 ? 'ON TRACK' : 'BEHIND');
+      var gColor = gLabel === 'ACHIEVED' ? '#059669' : gLabel === 'ON TRACK' ? '#059669' : gLabel === 'ALMOST' ? '#d97706' : '#ea580c';
       var gh = goalHealth[g.goalId];
       var labelColor = gh ? (gh.label === 'Short-term' ? '#3b82f6' : gh.label === 'Medium-term' ? '#d97706' : gh.label === 'Long-term' ? '#059669' : '#64748b') : '#64748b';
       var gap = Math.max(0, gTarget - gCurrent);

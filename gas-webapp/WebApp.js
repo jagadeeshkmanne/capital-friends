@@ -68,7 +68,7 @@ function apiRouter(request) {
 
   } catch (error) {
     log('apiRouter error: ' + error.toString());
-    return { success: false, error: error.message || 'Internal server error', code: 500 };
+    return { success: false, error: error.message || 'Internal server error', stack: error.stack, code: 500 };
   }
 }
 
