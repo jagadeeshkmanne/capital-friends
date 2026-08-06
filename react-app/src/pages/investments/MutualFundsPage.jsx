@@ -590,7 +590,7 @@ export default function MutualFundsPage() {
     const xirr = cashFlows.length >= 2 ? computeXIRR(cashFlows) : null
 
     // Simple returns
-    const totalInvested = activeHoldings.reduce((s, h) => s + (Number(h.investment) > 0 ? Number(h.investment) : Number(h.currentValue)), 0)
+    const totalInvested = activeHoldings.reduce((s, h) => s + (Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)), 0)
     const totalPL = totalValue - totalInvested
     const totalPLPct = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0
 

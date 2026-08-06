@@ -119,7 +119,7 @@ export default function Dashboard() {
     const activeMFPortfolios = filterOwner((mfPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')
     const mfPortfolioIds = new Set(activeMFPortfolios.map((p) => p.portfolioId))
     const activeMFHoldings = (mfHoldings || []).filter((h) => mfPortfolioIds.has(h.portfolioId) && h.units > 0)
-    const mfInvested = activeMFHoldings.reduce((s, h) => s + (Number(h.investment) > 0 ? Number(h.investment) : Number(h.currentValue)), 0)
+    const mfInvested = activeMFHoldings.reduce((s, h) => s + (Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)), 0)
     const mfCurrentValue = activeMFHoldings.reduce((s, h) => s + (Number(h.currentValue) || 0), 0)
     const mfPL = mfCurrentValue - mfInvested
 
@@ -127,13 +127,13 @@ export default function Dashboard() {
     const activeStockPortfolios = filterOwner((stockPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')
     const stkPortfolioIds = new Set(activeStockPortfolios.map((p) => p.portfolioId))
     const activeStockHoldings = (stockHoldings || []).filter((h) => stkPortfolioIds.has(h.portfolioId))
-    const stkInvested = activeStockHoldings.reduce((s, h) => s + (Number(h.totalInvestment) > 0 ? Number(h.totalInvestment) : Number(h.currentValue)), 0)
+    const stkInvested = activeStockHoldings.reduce((s, h) => s + (Number(h.totalInvestment) > 1 ? Number(h.totalInvestment) : Number(h.currentValue)), 0)
     const stkCurrentValue = activeStockHoldings.reduce((s, h) => s + (Number(h.currentValue) || 0), 0)
     const stkPL = stkCurrentValue - stkInvested
 
     // Other Investments
     const activeOther = filterOwner((otherInvList || []).filter((i) => i.status === 'Active'), 'familyMemberId')
-    const otherInvested = activeOther.reduce((s, i) => s + (Number(i.investedAmount) > 0 ? Number(i.investedAmount) : Number(i.currentValue)), 0)
+    const otherInvested = activeOther.reduce((s, i) => s + (Number(i.investedAmount) > 1 ? Number(i.investedAmount) : Number(i.currentValue)), 0)
     const otherCurrentValue = activeOther.reduce((s, i) => s + (Number(i.currentValue) || 0), 0)
     const otherPL = otherCurrentValue - otherInvested
 

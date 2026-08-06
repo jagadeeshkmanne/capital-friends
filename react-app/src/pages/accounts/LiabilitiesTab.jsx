@@ -5,6 +5,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import LiabilityForm from '../../components/forms/LiabilityForm'
 import PageLoading from '../../components/PageLoading'
@@ -23,6 +24,7 @@ export default function LiabilitiesTab() {
   const { liabilityList, otherInvList, addLiability, updateLiability, deleteLiability } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
+  const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
 
@@ -142,7 +144,7 @@ export default function LiabilitiesTab() {
                         {l.notes && <p className="text-xs text-[var(--text-dim)] mt-1">{l.notes}</p>}
                       </td>
                       <td className="py-2.5 px-3 text-sm font-medium text-[var(--text-primary)]">{l.lenderName}</td>
-                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{l.familyMemberName}</td>}
+                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{mv(l.familyMemberName, 'name')}</td>}
                       <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--accent-rose)] tabular-nums">{formatINR(l.outstandingBalance)}</td>
                       <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">{l.emiAmount ? `${formatINR(l.emiAmount)}/mo` : '—'}</td>
                       <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">{l.interestRate ? `${l.interestRate}%` : '—'}</td>
@@ -186,7 +188,7 @@ export default function LiabilitiesTab() {
                   </div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">{l.lenderName}</p>
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-[var(--text-muted)]">{l.familyMemberName}{l.notes ? ` · ${l.notes}` : ''}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{mv(l.familyMemberName, 'name')}{l.notes ? ` · ${l.notes}` : ''}</p>
                     <div className="text-right">
                       {l.emiAmount > 0 && <p className="text-xs text-[var(--text-dim)] tabular-nums">EMI: {formatINR(l.emiAmount)}/mo</p>}
                       {l.emiAmount > 0 && l.outstandingBalance > 0 && (

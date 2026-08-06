@@ -34,7 +34,7 @@ export default function OtherInvestmentsTab() {
     return selectedMember === 'all' ? active : active.filter((i) => i.familyMemberId === selectedMember)
   }, [otherInvList, selectedMember])
 
-  const totalInvested = filtered.reduce((s, i) => s + (Number(i.investedAmount) > 0 ? Number(i.investedAmount) : Number(i.currentValue || 0)), 0)
+  const totalInvested = filtered.reduce((s, i) => s + (Number(i.investedAmount) > 1 ? Number(i.investedAmount) : Number(i.currentValue || 0)), 0)
   const totalCurrent = filtered.reduce((s, i) => s + (i.currentValue || 0), 0)
 
   // Lookup linked liabilities

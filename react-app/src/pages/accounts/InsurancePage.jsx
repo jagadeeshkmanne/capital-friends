@@ -146,7 +146,7 @@ export default function InsurancePage() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{p.company}</td>
-                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{p.insuredMember}</td>}
+                      {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{mv(p.insuredMember, 'name')}</td>}
                       <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.sumAssured)}</td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: p })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
@@ -169,7 +169,7 @@ export default function InsurancePage() {
                       {p.policyType}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)]">{p.company}{!member ? ` · ${p.insuredMember}` : ''}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{p.company}{!member ? ` · ${mv(p.insuredMember, 'name')}` : ''}</p>
                   <div className="flex items-center justify-between mt-1.5">
                     <div>
                       <p className="text-xs text-[var(--text-dim)]">Cover</p>

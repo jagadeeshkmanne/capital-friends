@@ -120,7 +120,7 @@ export default function BankAccountsPage() {
                   {filtered.map((a) => (
                     <tr key={a.accountId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors group">
                       <td className="py-2.5 px-4">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{a.accountName}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{mv(a.accountName, 'name')}</p>
                       </td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{a.bankName}</td>
                       {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{mv(a.memberName, 'name')}</td>}
@@ -147,7 +147,7 @@ export default function BankAccountsPage() {
               {filtered.map((a) => (
                 <div key={a.accountId} onClick={() => setModal({ edit: a })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{a.accountName}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{mv(a.accountName, 'name')}</p>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${typeBadge[a.accountType] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                       {a.accountType}
                     </span>

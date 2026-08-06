@@ -110,7 +110,7 @@ function findBestPortfolios(recommendedEquity, portfolios, holdings, mappings, e
 export default function GoalsPage() {
   const navigate = useNavigate()
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, updateGoalMappings, redeemMFBulk, switchMF, mfHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList, assetAllocations } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, updateGoalMappings, redeemMFBulk, switchMF, mfHoldings, stockHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList, liabilityList, banks, assetAllocations } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
 
@@ -163,10 +163,26 @@ export default function GoalsPage() {
   const achieved = allActiveGoals.filter((g) => g.status === 'Achieved').length
 
   // Portfolio Utilization
-  const totalMF = mfPortfolios?.reduce((s, p) => s + (p.currentValue || 0), 0) || 0;
-  const totalStock = stockPortfolios?.reduce((s, p) => s + (p.currentValue || 0), 0) || 0;
-  const totalOther = otherInvList?.reduce((s, p) => s + (p.currentValue || 0), 0) || 0;
-  const totalNetWorth = totalMF + totalStock + totalOther;
+  const nwActiveMFPortfolios = (mfPortfolios || []).filter((p) => p.status === 'Active')
+  const nwMfPortfolioIds = new Set(nwActiveMFPortfolios.map((p) => p.portfolioId))
+  const nwActiveMFHoldings = (mfHoldings || []).filter((h) => nwMfPortfolioIds.has(h.portfolioId) && h.units > 0)
+  const totalMF = nwActiveMFHoldings.reduce((s, h) => s + (h.currentValue || 0), 0)
+
+  const nwActiveStockPortfolios = (stockPortfolios || []).filter((p) => p.status === 'Active')
+  const nwStkPortfolioIds = new Set(nwActiveStockPortfolios.map((p) => p.portfolioId))
+  const nwActiveStockHoldings = (stockHoldings || []).filter((h) => nwStkPortfolioIds.has(h.portfolioId))
+  const totalStock = nwActiveStockHoldings.reduce((s, h) => s + (h.currentValue || 0), 0)
+
+  const nwActiveOther = (otherInvList || []).filter((i) => i.status === 'Active')
+  const totalOther = nwActiveOther.reduce((s, i) => s + (i.currentValue || 0), 0)
+
+  const nwActiveBanks = (banks || []).filter((b) => b.status === 'Active')
+  const totalCash = nwActiveBanks.reduce((s, b) => s + (b.balance || 0), 0)
+
+  const nwActiveLiabilities = (liabilityList || []).filter((l) => l.status === 'Active')
+  const totalLiabilities = nwActiveLiabilities.reduce((s, l) => s + (l.outstandingBalance || 0), 0)
+
+  const totalNetWorth = (totalMF + totalStock + totalOther + totalCash) - totalLiabilities;
   const totalUnallocated = Math.max(0, totalNetWorth - totalCurrent);
   const unallocatedPct = totalNetWorth > 0 ? (totalUnallocated / totalNetWorth) * 100 : 0;
   const allocatedPct = totalNetWorth > 0 ? (totalCurrent / totalNetWorth) * 100 : 0;
