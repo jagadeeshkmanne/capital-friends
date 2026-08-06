@@ -676,11 +676,7 @@ export default function Header() {
                     <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
                       <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Investments</p>
                       <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(nw.totalInv)}</p>
-                      {nw.totalInvested > 0 && (
-                        <p className="text-xs tabular-nums mt-0.5" style={{ color: nw.totalInv >= nw.totalInvested ? '#34d399' : '#f87171' }}>
-                          {nw.totalInv >= nw.totalInvested ? '+' : ''}{formatINR(nw.totalInv - nw.totalInvested)} P&L
-                        </p>
-                      )}
+
                     </div>
                     {nw.totalLiab > 0 ? (
                       <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(244,63,94,0.08)' }}>

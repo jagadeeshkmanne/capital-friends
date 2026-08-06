@@ -641,16 +641,7 @@ export default function Dashboard() {
               <div className="text-[34px] font-bold text-[var(--text-primary)] tabular-nums leading-tight">
                 {formatINR(data.netWorth)}
               </div>
-              {data.totalInvested > 0 && (
-                <div className="text-sm mt-1.5">
-                  <span className={`font-semibold ${plColor(data.totalPL)}`}>
-                    {plPrefix(data.totalPL)}{formatINR(Math.abs(data.totalPL))}
-                  </span>
-                  <span className="text-[var(--text-dim)] ml-1">
-                    ({plPrefix(data.totalPL)}{data.plPct.toFixed(1)}% returns)
-                  </span>
-                </div>
-              )}
+
             </div>
             <div className="text-right">
               <div className="text-xs text-[var(--text-dim)]">Total Assets</div>
