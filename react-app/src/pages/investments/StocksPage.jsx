@@ -52,7 +52,7 @@ export default function StocksPage() {
     return portfolios.map((p) => {
       const holdings = stockHoldings.filter((h) => h.portfolioId === p.portfolioId)
       const txns = (stockTransactions || []).filter((t) => t.portfolioId === p.portfolioId)
-      const invested = holdings.reduce((s, h) => s + h.totalInvestment, 0)
+      const invested = holdings.reduce((s, h) => s + (Number(h.totalInvestment) > 0 ? Number(h.totalInvestment) : Number(h.currentValue)), 0)
       const current = holdings.reduce((s, h) => s + h.currentValue, 0)
       const unrealizedPL = current - invested
       const realizedPL = txns.filter((t) => t.type === 'SELL' && t.realizedPL != null).reduce((s, t) => s + t.realizedPL, 0)

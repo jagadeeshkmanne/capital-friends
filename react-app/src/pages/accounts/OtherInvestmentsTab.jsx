@@ -5,6 +5,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
+import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import OtherInvestmentForm from '../../components/forms/OtherInvestmentForm'
 import PageLoading from '../../components/PageLoading'
@@ -22,6 +23,7 @@ export default function OtherInvestmentsTab() {
   const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
+  const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
 
@@ -32,7 +34,7 @@ export default function OtherInvestmentsTab() {
     return selectedMember === 'all' ? active : active.filter((i) => i.familyMemberId === selectedMember)
   }, [otherInvList, selectedMember])
 
-  const totalInvested = filtered.reduce((s, i) => s + (i.investedAmount || 0), 0)
+  const totalInvested = filtered.reduce((s, i) => s + (Number(i.investedAmount) > 0 ? Number(i.investedAmount) : Number(i.currentValue || 0)), 0)
   const totalCurrent = filtered.reduce((s, i) => s + (i.currentValue || 0), 0)
 
   // Lookup linked liabilities
@@ -136,7 +138,7 @@ export default function OtherInvestmentsTab() {
                             {i.investmentCategory}
                           </span>
                         </td>
-                        {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{i.familyMemberName}</td>}
+                        {!member && <td className="py-2.5 px-3 text-xs text-[var(--text-secondary)]">{mv(i.familyMemberName, 'name')}</td>}
                         <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">{formatINR(i.investedAmount)}</td>
                         <td className="py-2.5 px-3 text-right text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(i.currentValue)}</td>
                         <td className="py-2.5 px-3 text-right">
@@ -190,7 +192,7 @@ export default function OtherInvestmentsTab() {
                         {i.investmentCategory}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">{i.familyMemberName} · {i.investmentType}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{mv(i.familyMemberName, 'name')} · {i.investmentType}</p>
                     <div className="flex items-center justify-between mt-1.5">
                       <div>
                         <p className="text-xs text-[var(--text-dim)]">Invested</p>
