@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat } from 'lucide-react'
+import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -848,12 +848,14 @@ export default function MutualFundsPage() {
   async function handleDeleteFund(portfolioId, fundCode, fundName) {
     const portfolio = portfolioData.find(p => p.portfolioId === portfolioId)
     const portfolioName = portfolio ? displayName(portfolio.portfolioName) : portfolioId
-    const ok = await confirm({
-      title: 'Delete Fund from Portfolio',
-      message: `Delete "${splitFundName(fundName).main}" from ${portfolioName}?\n\nThis will permanently remove the fund and all its transactions from this portfolio. This cannot be undone.`,
-      confirmText: 'Delete',
-      danger: true,
-    })
+    const ok = await confirm(
+      `Delete "${splitFundName(fundName).main}" from ${portfolioName}?\n\nThis will permanently remove the fund and all its transactions from this portfolio. This cannot be undone.`,
+      {
+        title: 'Delete Fund from Portfolio',
+        confirmLabel: 'Delete',
+        destructive: true,
+      }
+    )
     if (!ok) return
     showBlockUI('Deleting fund...')
     try {
@@ -1243,8 +1245,8 @@ export default function MutualFundsPage() {
                   {h.athNav > 0 && (
                     <DetailRow
                       label="ATH"
-                      value={h.belowATHPct > 0 ? `↓${h.belowATHPct.toFixed(1)}% (₹${h.athNav.toFixed(2)})` : 'At All-Time High'}
-                      valueStyle={h.belowATHPct > 0 ? ath : { color: '#34d399' }}
+                      value={Math.round(h.belowATHPct * 10) / 10 > 0 ? `↓${h.belowATHPct.toFixed(1)}% (₹${h.athNav.toFixed(2)})` : 'At All-Time High'}
+                      valueStyle={Math.round(h.belowATHPct * 10) / 10 > 0 ? ath : { color: '#34d399' }}
                     />
                   )}
                   {h.ongoingSIP > 0 && (
@@ -1647,7 +1649,7 @@ export default function MutualFundsPage() {
                               <td className="py-3.5 px-2 text-center">
                                 {isPlanned ? (
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
-                                ) : h.athNav > 0 && h.belowATHPct > 0 ? (
+                                ) : h.athNav > 0 && Math.round(h.belowATHPct * 10) / 10 > 0 ? (
                                   <div>
                                     <p className="text-sm font-bold tabular-nums" style={ath}>↓{h.belowATHPct.toFixed(1)}%</p>
                                     <p className="text-xs text-[var(--text-muted)] tabular-nums mt-0.5">₹{h.athNav.toFixed(2)}</p>
@@ -1906,9 +1908,19 @@ export default function MutualFundsPage() {
                         <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Rebalance Needed</p>
                         <p className="text-xs text-[var(--text-dim)] mt-0.5">Funds drifting more than {threshold}% from target allocation</p>
                       </div>
-                      <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400">
-                        {rebalanceHoldings.length} fund{rebalanceHoldings.length !== 1 ? 's' : ''}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400">
+                          {rebalanceHoldings.length} fund{rebalanceHoldings.length !== 1 ? 's' : ''}
+                        </span>
+                        <button
+                          onClick={() => setModal({ rebalance: selectedPortfolio.portfolioId })}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 transition-colors border border-violet-500/20"
+                          title="Open Rebalance Details"
+                        >
+                          <Scale size={13} />
+                          <span className="text-[10px] uppercase tracking-wider font-bold">Rebalance</span>
+                        </button>
+                      </div>
                     </div>
                     {/* Desktop view */}
                     <div className="hidden sm:block">
@@ -2258,8 +2270,8 @@ export default function MutualFundsPage() {
         )}
       </Modal>
 
-      <Modal open={modal === 'rebalance'} onClose={() => setModal(null)} title="Rebalance Alerts" wide>
-        {modal === 'rebalance' && <MFRebalanceDialog />}
+      <Modal open={modal === 'rebalance' || !!modal?.rebalance} onClose={() => setModal(null)} title="Rebalance Alerts" wide>
+        {(modal === 'rebalance' || !!modal?.rebalance) && <MFRebalanceDialog filterPortfolioId={typeof modal?.rebalance === 'string' ? modal.rebalance : null} />}
       </Modal>
 
       <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Buy Opportunities" wide>

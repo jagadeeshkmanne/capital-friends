@@ -232,20 +232,25 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
 
   if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
 
-  // Rescale targets among active (non-restricted) funds so they sum to 100%
-  const activeTargetSum = holdings.filter((h) => h.targetAllocationPct > 0 && !h.lumpsumRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
-  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
-
   const enriched = holdings.filter((h) => h.targetAllocationPct > 0).map((h) => {
     const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-    const effectiveTarget = h.lumpsumRestricted ? h.targetAllocationPct : h.targetAllocationPct * rescale
-    return { ...h, currentPct, effectiveTarget }
+    return { ...h, currentPct }
+  })
+
+  // Funds that are lumpsumRestricted cannot receive new money.
+  // Their effective target becomes whatever their current value will represent after lumpsum addition.
+  const activeTargetSum = enriched.filter((h) => !h.lumpsumRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
+  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
+
+  const enrichedWithTarget = enriched.map((h) => {
+    const effectiveTarget = h.lumpsumRestricted ? h.currentPct : h.targetAllocationPct * rescale
+    return { ...h, effectiveTarget }
   })
 
   const suggestedAmount = useMemo(() => {
-    if (totalValue <= 0 || enriched.length === 0) return 0
+    if (totalValue <= 0 || enrichedWithTarget.length === 0) return 0
     // Exclude restricted funds — they can't receive lumpsum investments
-    const underweight = enriched.filter((h) => {
+    const underweight = enrichedWithTarget.filter((h) => {
       if (h.lumpsumRestricted) return false
       const targetVal = (h.effectiveTarget / 100) * totalValue
       return h.currentValue < targetVal
@@ -256,20 +261,29 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
     const cvUnder = underweight.reduce((s, h) => s + h.currentValue, 0)
     const amount = (pUnder / 100 * totalValue - cvUnder) / (1 - pUnder / 100)
     return amount > 0 ? Math.ceil(amount / 100) * 100 : 0
-  }, [enriched, totalValue])
+  }, [enrichedWithTarget, totalValue])
 
   const lumpsumAmount = Number(lumpsumInput) || portfolio.lumpsumTarget || suggestedAmount
 
   const distribution = useMemo(() => {
     const newTotal = lumpsumAmount > 0 ? totalValue + lumpsumAmount : totalValue
-    const all = enriched.map((h) => {
-      const targetVal = (h.effectiveTarget / 100) * newTotal
-      let invest = lumpsumAmount > 0 ? Math.max(0, targetVal - h.currentValue) : 0
-      // Lumpsum restricted: block BUY (invest > 0) but allow display of SELL candidates
-      if (h.lumpsumRestricted && invest > 0) invest = 0
-      const isOverweight = h.currentValue > targetVal + 1
-      return { ...h, invest, isOverweight }
+    // First, active funds only (they share the lumpsumAmount based on their relative targetAllocationPct)
+    const activeFunds = enrichedWithTarget.filter(h => !h.lumpsumRestricted)
+    const activeTargetSumOriginal = activeFunds.reduce((s, h) => s + h.targetAllocationPct, 0)
+    
+    const all = enrichedWithTarget.map((h) => {
+      if (h.lumpsumRestricted) {
+        return { ...h, invest: 0, isOverweight: false }
+      }
+      
+      // Calculate how much of the NEW money this active fund should get to reach its relative target
+      const relativeTarget = activeTargetSumOriginal > 0 ? h.targetAllocationPct / activeTargetSumOriginal : 0
+      const targetTotalAmount = h.currentValue + (relativeTarget * lumpsumAmount)
+      
+      let invest = lumpsumAmount > 0 ? Math.max(0, targetTotalAmount - h.currentValue) : 0
+      return { ...h, invest, isOverweight: false }
     })
+
     const totalRaw = all.reduce((s, h) => s + h.invest, 0)
     // Scale when user enters custom amount that differs from calculated need
     let final = all
@@ -280,14 +294,14 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
         invest: h.invest > 0 ? h.invest * scale : 0,
       }))
     }
-    // Calculate newPct based on actual investments (not assumed lumpsumAmount)
+    // Calculate newPct based on actual investments
     const actualInvested = final.reduce((s, h) => s + h.invest, 0)
     const actualTotal = totalValue + actualInvested
     return final.map((h) => ({
       ...h,
       newPct: actualTotal > 0 ? ((h.currentValue + h.invest) / actualTotal) * 100 : 0,
     }))
-  }, [enriched, lumpsumAmount, totalValue])
+  }, [enrichedWithTarget, lumpsumAmount, totalValue])
 
   const totalInvest = distribution.reduce((s, h) => s + h.invest, 0)
   const hasOverweight = distribution.some((h) => h.isOverweight)
@@ -445,23 +459,26 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
 
   if (!hasTargets && !hasExitCandidates) return <NoTargetsMessage />
 
-  // Rescale targets among active (non-blocked) funds so they sum to 100%
+  // A fund is blocked from buying if it's lumpsumRestricted AND it is under-allocated (current < target)
+  // We cap its effective target at its current percentage, and redistribute the remainder to active funds.
   const allWithBlocked = holdings.filter((h) => h.targetAllocationPct > 0 || h.units > 0).map((h) => {
     const isExit = h.targetAllocationPct === 0 && h.units > 0
-    const isBlocked = h.lumpsumRestricted && !isExit
-    return { ...h, isExit, isBlocked }
+    const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
+    const isBuyBlocked = h.lumpsumRestricted && !isExit && currentPct < h.targetAllocationPct
+    return { ...h, isExit, isBuyBlocked, currentPct }
   })
-  const activeTargetSum = allWithBlocked.filter((h) => !h.isBlocked && !h.isExit && h.targetAllocationPct > 0).reduce((s, h) => s + h.targetAllocationPct, 0)
-  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
+
+  const blockedTargetSum = allWithBlocked.filter((h) => h.isBuyBlocked).reduce((s, h) => s + h.currentPct, 0)
+  const remainingPct = Math.max(0, 100 - blockedTargetSum)
+  const activeTargetSum = allWithBlocked.filter((h) => !h.isBuyBlocked && !h.isExit && h.targetAllocationPct > 0).reduce((s, h) => s + h.targetAllocationPct, 0)
+  const rescale = activeTargetSum > 0 ? remainingPct / activeTargetSum : 1
 
   const buySellRaw = allWithBlocked.map((h) => {
-    const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-    const effectiveTarget = h.isBlocked ? h.targetAllocationPct : h.targetAllocationPct * rescale
-    const drifted = h.isExit || Math.abs(currentPct - effectiveTarget) > threshold
+    const effectiveTarget = h.isBuyBlocked ? h.currentPct : h.targetAllocationPct * rescale
+    const drifted = h.isExit || Math.abs(h.currentPct - effectiveTarget) > threshold
     const targetVal = (effectiveTarget / 100) * totalValue
-    const rawAmount = drifted ? targetVal - h.currentValue : 0
-    const amount = h.isBlocked && rawAmount > 0 ? 0 : rawAmount
-    return { ...h, currentPct, amount, rawAmount, effectiveTarget, isBlocked: h.isBlocked && rawAmount > 0 }
+    const amount = drifted ? targetVal - h.currentValue : 0
+    return { ...h, amount, rawAmount: amount, effectiveTarget, isBlocked: h.isBuyBlocked }
   })
 
   const buySellData = buySellRaw.filter((h) => Math.abs(h.amount) >= 500 || (h.isBlocked && h.rawAmount > 500))
@@ -555,13 +572,13 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
 /* ──────────────────────────────────────────────
    Main Rebalance Dialog
    ────────────────────────────────────────────── */
-export default function MFRebalanceDialog() {
+export default function MFRebalanceDialog({ filterPortfolioId }) {
   const { mfHoldings, mfPortfolios } = useData()
   const [mode, setMode] = useState('buysell')
 
   const portfolioGroups = useMemo(() => {
     return (mfPortfolios || [])
-      .filter((p) => p.status !== 'Inactive' && !p.skipRebalance)
+      .filter((p) => p.status !== 'Inactive' && !p.skipRebalance && (!filterPortfolioId || p.portfolioId === filterPortfolioId))
       .map((p) => {
         const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
@@ -575,8 +592,8 @@ export default function MFRebalanceDialog() {
         const hasTargets = pHoldings.some((h) => h.targetAllocationPct > 0)
         return { ...p, holdings: pHoldings, totalValue, driftedCount, exitCount, hasTargets }
       })
-      .filter((p) => p.driftedCount > 0 || p.exitCount > 0)
-  }, [mfPortfolios, mfHoldings])
+      .filter((p) => p.hasTargets && (p.driftedCount > 0 || p.exitCount > 0))
+  }, [mfPortfolios, mfHoldings, filterPortfolioId])
 
   if (portfolioGroups.length === 0) {
     const anyTargets = (mfHoldings || []).some((h) => h.targetAllocationPct > 0)

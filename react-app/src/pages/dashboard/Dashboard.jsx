@@ -388,19 +388,21 @@ export default function Dashboard() {
     const totalMonthlySIP = activeMFHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
     const activeSIPCount = activeMFHoldings.filter(h => h.ongoingSIP > 0).length
 
-    // ── Near ATH Funds (deduplicated by fund name) ──
     const nearATHMap = {}
     activeMFPortfolios.forEach(p => {
       activeMFHoldings.filter(h => h.portfolioId === p.portfolioId).forEach(h => {
-        if (h.athNav > 0 && h.belowATHPct >= 0 && h.belowATHPct < 2) {
+        if (h.athNav > 0 && h.belowATHPct >= 0 && h.belowATHPct < 1.5) {
           const name = splitFundName(h.fundName).main
           if (!nearATHMap[name] || h.belowATHPct < nearATHMap[name].belowATHPct) {
-            nearATHMap[name] = { fundName: name, belowATHPct: h.belowATHPct, isAtATH: h.belowATHPct === 0 }
+            const roundedPct = Math.round(h.belowATHPct * 10) / 10
+            nearATHMap[name] = { fundName: name, belowATHPct: roundedPct, isAtATH: roundedPct === 0 }
           }
         }
       })
     })
-    const nearATHFunds = Object.values(nearATHMap).sort((a, b) => a.belowATHPct - b.belowATHPct)
+    const nearATHFunds = Object.values(nearATHMap)
+      .sort((a, b) => a.belowATHPct - b.belowATHPct)
+      .slice(0, 5) // Limit to top 5 closest to peak to avoid dashboard clutter
 
     // ── Goal Allocation Health (for dashboard goals section) ──
     // Build fund breakdown lookup for accurate equity/debt split

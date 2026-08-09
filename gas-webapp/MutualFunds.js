@@ -1551,11 +1551,37 @@ function deleteFundFromPortfolio(params) {
     // 3. Delete the fund row from portfolio sheet
     portfolioSheet.deleteRow(fundRowIndex);
 
-    log(`Deleted fund ${fundName} (${fundCode}) from portfolio ${portfolioId}: removed fund row + ${txnDeleteCount} transactions`);
+    // 4. Automatically rescale the remaining targets to 100%
+    const remainingData = portfolioSheet.getDataRange().getValues();
+    let currentTotalTarget = 0;
+    const targetUpdates = [];
+    
+    for (let i = 3; i < remainingData.length; i++) {
+      if (remainingData[i][0]) { // Scheme code exists
+        const targetAlloc = parseFloat(remainingData[i][8]) || 0;
+        currentTotalTarget += targetAlloc;
+        targetUpdates.push({ rowIndex: i + 1, target: targetAlloc });
+      }
+    }
+    
+    let rescaledMsg = '';
+    // Only rescale if the remaining targets are less than 100% (and greater than 0 to avoid Infinity)
+    if (currentTotalTarget > 0 && currentTotalTarget < 99.99) {
+      const scale = 100 / currentTotalTarget;
+      for (const update of targetUpdates) {
+        if (update.target > 0) {
+          const newTarget = parseFloat((update.target * scale).toFixed(2));
+          portfolioSheet.getRange(update.rowIndex, 9).setValue(newTarget);
+        }
+      }
+      rescaledMsg = ' Remaining allocations have been automatically rescaled to 100%.';
+    }
+
+    log(`Deleted fund ${fundName} (${fundCode}) from portfolio ${portfolioId}: removed fund row + ${txnDeleteCount} transactions.${rescaledMsg}`);
 
     return {
       success: true,
-      message: `Deleted ${fundName} from portfolio. ${txnDeleteCount} transaction${txnDeleteCount !== 1 ? 's' : ''} removed.`,
+      message: `Deleted ${fundName} from portfolio. ${txnDeleteCount} transaction${txnDeleteCount !== 1 ? 's' : ''} removed.${rescaledMsg}`,
       data: { fundCode, fundName, transactionsDeleted: txnDeleteCount }
     };
 
