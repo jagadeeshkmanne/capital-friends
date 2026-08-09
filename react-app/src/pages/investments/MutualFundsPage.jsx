@@ -965,6 +965,9 @@ export default function MutualFundsPage() {
               <button onClick={() => setModal('addPortfolio')} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
                 <Plus size={13} /> New Portfolio
               </button>
+              <button onClick={() => setModal('consolidatedFunds')} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
+                <Layers size={12} /> All Funds
+              </button>
             </div>
           </div>
 
@@ -2222,6 +2225,93 @@ export default function MutualFundsPage() {
       )}
 
       {/* Modals */}
+      {modal === 'consolidatedFunds' && (
+        <Modal open={true} onClose={() => setModal(null)} title="Consolidated Funds" wide>
+          {(() => {
+            const map = {}
+            let totalInvestedAll = 0
+            let totalCurrentAll = 0
+            enrichedHoldings.forEach(h => {
+              if (h.units <= 0 && (!h.investment || h.investment <= 0)) return
+              const key = h.schemeCode || h.fundName
+              if (!map[key]) {
+                map[key] = {
+                  fundName: h.fundName,
+                  schemeCode: h.schemeCode,
+                  category: h.category || 'Other',
+                  investedAmount: 0,
+                  currentValue: 0,
+                  portfolios: new Set(),
+                }
+              }
+              const inv = Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)
+              map[key].investedAmount += inv
+              map[key].currentValue += (h.currentValue || 0)
+              map[key].portfolios.add(h.portfolioId)
+              
+              totalInvestedAll += inv
+              totalCurrentAll += (h.currentValue || 0)
+            })
+            
+            const arr = Object.values(map).map(f => {
+              f.pl = f.currentValue - f.investedAmount
+              f.plPct = f.investedAmount > 0 ? (f.pl / f.investedAmount) * 100 : 0
+              f.overallPct = totalCurrentAll > 0 ? (f.currentValue / totalCurrentAll) * 100 : 0
+              f.portfolioCount = f.portfolios.size
+              return f
+            })
+            arr.sort((a, b) => b.currentValue - a.currentValue)
+            
+            return (
+              <div className="max-h-[70vh] overflow-y-auto no-scrollbar pb-4">
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-[var(--bg-inset)] rounded-lg p-3 border border-[var(--border)] text-center">
+                    <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Total Invested</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)] tabular-nums">{formatINR(totalInvestedAll)}</p>
+                  </div>
+                  <div className="bg-[var(--bg-inset)] rounded-lg p-3 border border-[var(--border)] text-center">
+                    <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Total Current Value</p>
+                    <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(totalCurrentAll)}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {arr.map((f, i) => (
+                    <div key={f.schemeCode || i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border)] hover:border-violet-500/30 transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-sm font-medium text-[var(--text-primary)] leading-tight">{splitFundName(f.fundName).main}</p>
+                          {f.portfolioCount > 1 && (
+                            <span className="text-[10px] font-bold bg-violet-500/10 text-violet-400 px-1.5 py-0.5 rounded uppercase shrink-0">
+                              {f.portfolioCount} Portfolios
+                            </span>
+                          )}
+                        </div>
+                        {splitFundName(f.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(f.fundName).plan}</p>}
+                      </div>
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 sm:gap-6 sm:justify-end shrink-0">
+                        <div className="w-[60px]">
+                          <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-0.5">Weight</p>
+                          <p className="text-xs font-semibold text-[var(--text-primary)]">{f.overallPct.toFixed(1)}%</p>
+                        </div>
+                        <div className="w-[80px] text-right">
+                          <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-0.5">Invested</p>
+                          <p className="text-xs text-[var(--text-muted)] tabular-nums">{formatINR(f.investedAmount)}</p>
+                        </div>
+                        <div className="w-[80px] text-right">
+                          <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-0.5">Current</p>
+                          <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(f.currentValue)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {arr.length === 0 && <p className="text-sm text-center text-[var(--text-dim)] py-8">No active funds found.</p>}
+                </div>
+              </div>
+            )
+          })()}
+        </Modal>
+      )}
+
       <Modal open={modal === 'addPortfolio' || !!modal?.editPortfolio} onClose={() => setModal(null)} title={modal?.editPortfolio ? 'Edit Portfolio' : 'New MF Portfolio'}>
         <MFPortfolioForm
           initial={modal?.editPortfolio || undefined}

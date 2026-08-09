@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useData } from '../../context/DataContext'
 import { FormField, FormInput, FormSelect } from '../Modal'
 import { AlertTriangle } from 'lucide-react'
+import { useMask } from '../../context/MaskContext'
 
 export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers, activeInvestmentAccounts } = useData()
   const isEdit = !!initial
 
@@ -36,7 +38,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
     .filter((a) => form.ownerId ? a.memberId === form.ownerId : true)
     .map((a) => ({ value: a.accountId, label: `${a.accountName} - ${a.platformBroker}` }))
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 
   function validate() {
     const e = {}

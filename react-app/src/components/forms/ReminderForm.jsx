@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 import { useData } from '../../context/DataContext'
+import { useMask } from '../../context/MaskContext'
 
 const TYPES = [
   'SIP Due Date', 'Insurance Renewal', 'FD Maturity', 'Loan EMI', 'Investment Review', 'Custom',
@@ -20,9 +21,10 @@ const PRIORITIES = [
 ]
 
 export default function ReminderForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const isEdit = !!initial
   const { activeMembers } = useData()
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: m.memberName }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: mv(m.memberName, 'name') }))
 
   const [form, setForm] = useState({
     reminderType: initial?.reminderType || '',

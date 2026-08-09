@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { FormField, FormInput, FormSelect, FormActions, DeleteButton } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 
 export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers, activeInvestmentAccounts } = useData()
   const isEdit = !!initial
 
@@ -48,7 +50,7 @@ export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel
     try { await onSave(form) } finally { setSaving(false) }
   }
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 
   return (
     <div className="space-y-4">

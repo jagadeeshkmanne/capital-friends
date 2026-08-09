@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 
 const LIABILITY_TYPES = [
   'Home Loan', 'Car Loan', 'Personal Loan', 'Education Loan', 'Gold Loan',
@@ -15,6 +16,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers, otherInvList } = useData()
   const isEdit = !!initial
   const [form, setForm] = useState({
@@ -59,7 +61,7 @@ export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
     } finally { setSaving(false) }
   }
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 
   const activeInvestments = (otherInvList || []).filter(i => i.status !== 'Inactive')
   const investmentOptions = [

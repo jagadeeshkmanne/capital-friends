@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useData } from '../../context/DataContext'
 import { FormField, FormInput, FormSelect, FormActions, DeleteButton } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 
 const ACCOUNT_TYPES = [
   'Savings Account', 'Current Account', 'Fixed Deposit (FD)', 'Recurring Deposit (RD)',
@@ -8,6 +9,7 @@ const ACCOUNT_TYPES = [
 ].map((t) => ({ value: t, label: t }))
 
 export default function BankAccountForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers } = useData()
   const isEdit = !!initial
   const [form, setForm] = useState({
@@ -47,7 +49,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
     try { await onSave({ ...form, ifscCode: form.ifscCode.toUpperCase() }) } finally { setSaving(false) }
   }
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 
   return (
     <div className="space-y-4">

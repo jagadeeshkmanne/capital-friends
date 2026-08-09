@@ -4,6 +4,7 @@ import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActi
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
+import { useMask } from '../../context/MaskContext'
 
 const GOAL_TYPES = [
   'Retirement', 'Emergency Fund', 'Child Education', 'Home Purchase',
@@ -56,11 +57,12 @@ function getMemberDOB(member) {
 }
 
 export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent }) {
+  const { mv } = useMask()
   const isEdit = !!initial
   const { activeMembers } = useData()
   const memberOptions = (activeMembers || []).map((m) => ({
     value: m.memberId,
-    label: m.relationship ? `${m.memberName} (${m.relationship})` : m.memberName,
+    label: m.relationship ? `${mv(m.memberName, 'name')} (${m.relationship})` : m.memberName,
   }))
 
   const [step, setStep] = useState(0)

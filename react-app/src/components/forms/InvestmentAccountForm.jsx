@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { FormField, FormInput, FormSelect, FormActions, DeleteButton } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 
 const ACCOUNT_TYPES = [
   'Demat + Trading', 'Mutual Fund', 'Trading', 'Direct AMC', 'Broker',
 ].map((t) => ({ value: t, label: t }))
 
 export default function InvestmentAccountForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers, activeBanks } = useData()
   const isEdit = !!initial
   const [form, setForm] = useState({
@@ -55,7 +57,7 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     try { await onSave(form) } finally { setSaving(false) }
   }
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
   const memberBanks = useMemo(() => {
     if (!form.memberId) return []
     return activeBanks

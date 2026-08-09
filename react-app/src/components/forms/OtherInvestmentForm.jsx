@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 
 const MARKET_CACHE_KEY = 'cf_market_data'
 
@@ -68,6 +69,7 @@ function getMarketMetalPrice(metalType) {
 }
 
 export default function OtherInvestmentForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers, liabilityList } = useData()
   const isEdit = !!initial
 
@@ -198,7 +200,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   // Liability options for linking
   const activeLiabilities = (liabilityList || []).filter((l) => l.status !== 'Inactive')
 
-  const memberOptions = (activeMembers || []).map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = (activeMembers || []).map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 
   return (
     <div className="space-y-4">

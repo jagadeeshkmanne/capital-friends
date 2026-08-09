@@ -318,7 +318,7 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
             {blockedLumpsum.length} fund{blockedLumpsum.length > 1 ? 's' : ''} blocked from lumpsum — excluded from suggested amount
           </p>
           <p className="text-xs text-amber-400/70">
-            Targets rescaled among active funds: {enriched.filter((h) => !h.lumpsumRestricted).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
+            Targets rescaled among active funds: {enrichedWithTarget.filter((h) => !h.lumpsumRestricted).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
           </p>
         </div>
       )}

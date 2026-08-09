@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useData } from '../../context/DataContext'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 
 const POLICY_TYPES = [
   'Term Life', 'Health', 'Motor', 'Home Insurance', 'Travel', 'Personal Accident', 'Life Insurance', 'Others',
@@ -15,6 +16,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
+  const { mv } = useMask()
   const { activeMembers } = useData()
   const isEdit = !!initial
   const [form, setForm] = useState({
@@ -63,7 +65,7 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
     try { await onSave({ ...form, sumAssured: Number(form.sumAssured), premium: Number(form.premium) || 0 }) } finally { setSaving(false) }
   }
 
-  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${m.memberName} (${m.relationship})` }))
+  const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 
   return (
     <div className="space-y-4">
