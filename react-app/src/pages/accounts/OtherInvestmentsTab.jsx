@@ -130,7 +130,7 @@ export default function OtherInvestmentsTab() {
                     return (
                       <tr key={i.investmentId} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors group">
                         <td className="py-2.5 px-4">
-                          <p className="text-sm font-medium text-[var(--text-primary)]">{i.investmentName}</p>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{mv(i.investmentName, 'name')}</p>
                           <p className="text-xs text-[var(--text-dim)]">{i.investmentType}</p>
                         </td>
                         <td className="py-2.5 px-3">
@@ -187,7 +187,7 @@ export default function OtherInvestmentsTab() {
                 return (
                   <div key={i.investmentId} onClick={() => setModal({ edit: i })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-sm font-medium text-[var(--text-primary)] break-words min-w-0 leading-snug">{i.investmentName}</p>
+                      <p className="text-sm font-medium text-[var(--text-primary)] break-words min-w-0 leading-snug">{mv(i.investmentName, 'name')}</p>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${catBadge[i.investmentCategory] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
                         {i.investmentCategory}
                       </span>
