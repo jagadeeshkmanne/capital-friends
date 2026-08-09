@@ -159,7 +159,7 @@ export default function LiabilitiesTab() {
                           if (!linked) return <span className="text-xs text-[var(--text-dim)]">—</span>
                           return (
                             <div>
-                              <p className="text-xs text-[var(--text-primary)]">{linked.investmentName}</p>
+                              <p className="text-xs text-[var(--text-primary)]">{mv(linked.investmentName, 'name')}</p>
                               <p className="text-xs text-[var(--text-dim)]">{linked.investmentType}</p>
                             </div>
                           )
@@ -202,7 +202,7 @@ export default function LiabilitiesTab() {
                     return (
                       <div className="mt-1.5 flex items-center justify-between bg-blue-500/5 rounded px-2 py-1">
                         <span className="text-xs text-[var(--text-dim)]">Linked</span>
-                        <span className="text-xs text-[var(--text-secondary)]">{linked.investmentName}</span>
+                        <span className="text-xs text-[var(--text-secondary)]">{mv(linked.investmentName, 'name')}</span>
                       </div>
                     )
                   })()}
