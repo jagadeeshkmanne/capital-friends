@@ -2230,45 +2230,44 @@ export default function MutualFundsPage() {
       )}
 
       {/* Modals */}
-      {modal === 'consolidatedFunds' && (
-        <Modal open={true} onClose={() => setModal(null)} title="Consolidated Funds" wide>
-          {(() => {
-            const map = {}
-            let totalInvestedAll = 0
-            let totalCurrentAll = 0
-            enrichedHoldings.forEach(h => {
-              if (h.units <= 0 && (!h.investment || h.investment <= 0)) return
-              const key = h.schemeCode || h.fundName
-              if (!map[key]) {
-                map[key] = {
-                  fundName: h.fundName,
-                  schemeCode: h.schemeCode,
-                  category: h.category || 'Other',
-                  investedAmount: 0,
-                  currentValue: 0,
-                  portfolios: new Set(),
-                }
-              }
-              const inv = Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)
-              map[key].investedAmount += inv
-              map[key].currentValue += (h.currentValue || 0)
-              map[key].portfolios.add(h.portfolioId)
-              
-              totalInvestedAll += inv
-              totalCurrentAll += (h.currentValue || 0)
-            })
-            
-            const arr = Object.values(map).map(f => {
-              f.pl = f.currentValue - f.investedAmount
-              f.plPct = f.investedAmount > 0 ? (f.pl / f.investedAmount) * 100 : 0
-              f.overallPct = totalCurrentAll > 0 ? (f.currentValue / totalCurrentAll) * 100 : 0
-              f.portfolioCount = f.portfolios.size
-              return f
-            })
-            arr.sort((a, b) => b.currentValue - a.currentValue)
-            
-            return (
-              <div className="max-h-[70vh] overflow-y-auto no-scrollbar pb-4">
+      {modal === 'consolidatedFunds' && (() => {
+        const map = {}
+        let totalInvestedAll = 0
+        let totalCurrentAll = 0
+        enrichedHoldings.forEach(h => {
+          if (h.units <= 0 && (!h.investment || h.investment <= 0)) return
+          const key = h.schemeCode || h.fundName
+          if (!map[key]) {
+            map[key] = {
+              fundName: h.fundName,
+              schemeCode: h.schemeCode,
+              category: h.category || 'Other',
+              investedAmount: 0,
+              currentValue: 0,
+              portfolios: new Set(),
+            }
+          }
+          const inv = Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)
+          map[key].investedAmount += inv
+          map[key].currentValue += (h.currentValue || 0)
+          map[key].portfolios.add(h.portfolioId)
+          
+          totalInvestedAll += inv
+          totalCurrentAll += (h.currentValue || 0)
+        })
+        
+        const arr = Object.values(map).map(f => {
+          f.pl = f.currentValue - f.investedAmount
+          f.plPct = f.investedAmount > 0 ? (f.pl / f.investedAmount) * 100 : 0
+          f.overallPct = totalCurrentAll > 0 ? (f.currentValue / totalCurrentAll) * 100 : 0
+          f.portfolioCount = f.portfolios.size
+          return f
+        })
+        arr.sort((a, b) => b.currentValue - a.currentValue)
+        
+        return (
+          <Modal open={true} onClose={() => setModal(null)} title={`Consolidated Funds (${arr.length})`} wide>
+            <div className="max-h-[70vh] overflow-y-auto no-scrollbar pb-4">
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-[var(--bg-inset)] rounded-lg p-3 border border-[var(--border)] text-center">
                     <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Total Invested</p>
@@ -2312,10 +2311,9 @@ export default function MutualFundsPage() {
                   {arr.length === 0 && <p className="text-sm text-center text-[var(--text-dim)] py-8">No active funds found.</p>}
                 </div>
               </div>
-            )
-          })()}
-        </Modal>
-      )}
+          </Modal>
+        )
+      })()}
 
       <Modal open={modal === 'addPortfolio' || !!modal?.editPortfolio} onClose={() => setModal(null)} title={modal?.editPortfolio ? 'Edit Portfolio' : 'New MF Portfolio'}>
         <MFPortfolioForm
