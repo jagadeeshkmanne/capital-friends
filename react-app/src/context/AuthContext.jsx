@@ -119,6 +119,14 @@ export function AuthProvider({ children }) {
 
       // Call our backend to register/login
       const me = await api.getMe()
+      
+      // If this is a newly registered account, prompt Google to install background triggers
+      if (me.isNew) {
+        setTimeout(() => {
+          try { api.installUserTriggers() } catch(e) { console.warn('Popup blocked?', e) }
+        }, 1500)
+      }
+
       setUserAndCache({
         email: me.email || profile.email,
         name: me.name || profile.name,

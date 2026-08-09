@@ -211,6 +211,24 @@ export default function SettingsPage() {
               }
             </div>
           )}
+
+          <div className="h-px bg-[var(--border-light)] w-full my-4"></div>
+
+          {/* Background Triggers */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">Background Automation</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">Install daily auto-sync and reminders</p>
+              </div>
+              <button
+                onClick={() => api.installUserTriggers()}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                Setup Triggers
+              </button>
+            </div>
+          </div>
         </div>
       </Card>
 

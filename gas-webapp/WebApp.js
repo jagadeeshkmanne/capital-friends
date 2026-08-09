@@ -77,9 +77,45 @@ function apiRouter(request) {
 // ============================================================================
 
 /**
- * Handle GET requests (health check only)
+ * Handle GET requests (health check and trigger installation popup)
  */
 function doGet(e) {
+  // Trigger Installation Popup Handler
+  if (e && e.parameter && e.parameter.action === 'installTriggers') {
+    try {
+      var email = Session.getActiveUser().getEmail();
+      if (!email) {
+        return HtmlService.createHtmlOutput('<h2>Error</h2><p>You must be signed into a Google Account.</p>');
+      }
+      
+      // Look up user (ensure they are registered)
+      var userRecord = findUserByEmail(email);
+      if (!userRecord || !userRecord.spreadsheetId) {
+        return HtmlService.createHtmlOutput('<h2>Error</h2><p>Account not fully set up yet. Please complete setup in the main app.</p>');
+      }
+      
+      // Set context so trigger functions can read settings
+      _currentUserSpreadsheetId = userRecord.spreadsheetId;
+      
+      // Install triggers natively on the user's account
+      installDailyTriggerForUser();
+      installTriggers(false); // Installs onEdit, email schedules, and reminders
+      
+      var html = '<!DOCTYPE html><html><head><title>Setup Complete</title></head>' +
+                 '<body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding-top: 50px; background-color: #0c1222; color: white;">' +
+                 '<h2 style="color: #4ade80;">Setup Complete! ✅</h2>' +
+                 '<p style="color: #94a3b8;">Background sync triggers have been successfully installed.</p>' +
+                 '<p style="color: #94a3b8; font-size: 14px;">This window will close automatically...</p>' +
+                 '<script>setTimeout(function(){ window.close(); }, 2500);</script>' +
+                 '</body></html>';
+                 
+      return HtmlService.createHtmlOutput(html);
+    } catch (err) {
+      log('Trigger popup error: ' + err.toString());
+      return HtmlService.createHtmlOutput('<h2>Error Installing Triggers</h2><p>' + err.message + '</p>');
+    }
+  }
+
   var result = {
     status: 'ok',
     app: 'Capital Friends',
@@ -107,6 +143,7 @@ function routeAction(action, params, userRecord) {
         name: userRecord.displayName,
         role: userRecord.role,
         spreadsheetId: userRecord.spreadsheetId,
+        isNew: !!userRecord.isNew,
         isAdmin: Session.getActiveUser().getEmail() === CONFIG.adminEmail
       };
 
@@ -210,10 +247,10 @@ function routeAction(action, params, userRecord) {
       return savePortfolioAllocation({
         portfolioId: params.portfolioId,
         portfolioName: portfolio.portfolioName,
-        fundsToUpdate: allocs.filter(function(a) { return !a.isNew; }).map(function(a) {
+        fundsToUpdate: allocs.filter(function (a) { return !a.isNew; }).map(function (a) {
           return { schemeCode: a.schemeCode, fundName: a.fundName, targetPercent: a.targetAllocationPct };
         }),
-        fundsToAdd: allocs.filter(function(a) { return a.isNew; }).map(function(a) {
+        fundsToAdd: allocs.filter(function (a) { return a.isNew; }).map(function (a) {
           return { schemeCode: a.schemeCode, fundName: a.fundName, targetPercent: a.targetAllocationPct };
         })
       });
@@ -424,14 +461,14 @@ function routeAction(action, params, userRecord) {
       var subject = 'Capital Friends - Dashboard Report (' + new Date().toLocaleDateString('en-IN') + ')';
       var sent = 0;
       var errors = [];
-      recipients.forEach(function(r) {
+      recipients.forEach(function (r) {
         try {
           GmailApp.sendEmail(r.email, subject, '', {
             htmlBody: '<p>Hi ' + (r.name || '') + ',</p><p>Please find attached your Capital Friends dashboard report.</p><p style="color:#888;font-size:12px;">Generated from <a href="https://capitalfriends.in">capitalfriends.in</a></p>',
             attachments: [pdfBlob]
           });
           sent++;
-        } catch(e) {
+        } catch (e) {
           errors.push(r.email + ': ' + e.message);
           log('Email send failed to ' + r.email + ': ' + e.message);
         }
@@ -578,9 +615,9 @@ function getAllAssetAllocationsData() {
   for (var i = 0; i < data.length; i++) {
     if (!data[i][0]) continue;
     var assetAlloc = null, equityAlloc = null, geoAlloc = null;
-    try { if (data[i][2]) assetAlloc = JSON.parse(data[i][2]); } catch (e) {}
-    try { if (data[i][3]) equityAlloc = JSON.parse(data[i][3]); } catch (e) {}
-    try { if (data[i][4]) geoAlloc = JSON.parse(data[i][4]); } catch (e) {}
+    try { if (data[i][2]) assetAlloc = JSON.parse(data[i][2]); } catch (e) { }
+    try { if (data[i][3]) equityAlloc = JSON.parse(data[i][3]); } catch (e) { }
+    try { if (data[i][4]) geoAlloc = JSON.parse(data[i][4]); } catch (e) { }
     allocations.push({
       fundCode: data[i][0].toString(),
       fundName: data[i][1] || '',
@@ -904,13 +941,13 @@ function checkUserTriggers() {
     });
   }
 
-  result.hasDailySync = result.list.some(function(t) {
+  result.hasDailySync = result.list.some(function (t) {
     return t.function === 'dailyUserSync';
   });
-  result.hasEmailTrigger = result.list.some(function(t) {
+  result.hasEmailTrigger = result.list.some(function (t) {
     return t.function === 'sendScheduledDailyEmail';
   });
-  result.hasReminderTrigger = result.list.some(function(t) {
+  result.hasReminderTrigger = result.list.some(function (t) {
     return t.function === 'checkAndSendReminders';
   });
 

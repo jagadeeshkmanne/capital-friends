@@ -131,6 +131,19 @@ export async function callAPI(action, params = {}, retry = true) {
 
 // ── Convenience Methods ──
 
+export function installUserTriggers() {
+  if (!DEPLOYMENT_ID) {
+    console.error('No GAS Deployment ID found for triggers');
+    return;
+  }
+  const url = `https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=installTriggers`;
+  const width = 450;
+  const height = 350;
+  const left = window.screen.width / 2 - width / 2;
+  const top = window.screen.height / 2 - height / 2;
+  window.open(url, 'install_triggers', `width=${width},height=${height},top=${top},left=${left}`);
+}
+
 // Auth
 export const getMe = () => callAPI('auth:me')
 export const getSharedMembers = () => callAPI('auth:shared-members')
