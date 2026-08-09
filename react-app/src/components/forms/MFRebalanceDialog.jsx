@@ -73,15 +73,11 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
   if (sipTarget <= 0) return <p className="text-xs text-[var(--text-dim)] py-2">No SIP target set for this portfolio</p>
 
-  // Rescale targets among active (non-restricted) funds so they sum to 100%
-  const activeTargetSum = holdings.filter((h) => h.targetAllocationPct > 0 && !h.sipRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
-  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
-
   const allFunds = holdings
     .filter((h) => h.targetAllocationPct > 0)
     .map((h) => {
       const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
-      const effectiveTarget = h.sipRestricted ? h.targetAllocationPct : h.targetAllocationPct * rescale
+      const effectiveTarget = h.targetAllocationPct // Use true target, do not artificially inflate
       const drift = Math.abs(currentPct - effectiveTarget)
       const drifted = drift > threshold
       const targetValue = (effectiveTarget / 100) * totalValue
@@ -92,7 +88,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
 
   const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0 && !h.sipRestricted)
   const totalGap = driftedUnderweight.reduce((s, h) => s + h.gap, 0)
-  // Only use the non-restricted funds' share of SIP
+  // Only use the non-restricted funds' normal SIP pool for redistribution
   const activeSIPTotal = allFunds.filter((h) => !h.sipRestricted).reduce((s, h) => s + h.normalSIP, 0)
 
   const withSuggested = allFunds.map((h) => ({
@@ -118,9 +114,6 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
         <div className="px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 space-y-0.5">
           <p className="text-xs text-amber-400">
             {blockedFunds.length} fund{blockedFunds.length > 1 ? 's' : ''} blocked from SIP ({formatINR(blockedSIPAmount)}/mo excluded)
-          </p>
-          <p className="text-xs text-amber-400/70">
-            Targets rescaled among active funds: {allFunds.filter((h) => !h.sipRestricted).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
           </p>
         </div>
       )}
@@ -237,29 +230,29 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
     return { ...h, currentPct }
   })
 
-  // Funds that are lumpsumRestricted cannot receive new money.
-  // Their effective target becomes whatever their current value will represent after lumpsum addition.
-  const activeTargetSum = enriched.filter((h) => !h.lumpsumRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
-  const rescale = activeTargetSum > 0 ? 100 / activeTargetSum : 1
-
-  const enrichedWithTarget = enriched.map((h) => {
-    const effectiveTarget = h.lumpsumRestricted ? h.currentPct : h.targetAllocationPct * rescale
-    return { ...h, effectiveTarget }
-  })
+  const enrichedWithTarget = enriched.map((h) => ({
+    ...h,
+    effectiveTarget: h.targetAllocationPct // Use true target, do not artificially inflate
+  }))
 
   const suggestedAmount = useMemo(() => {
     if (totalValue <= 0 || enrichedWithTarget.length === 0) return 0
-    // Exclude restricted funds — they can't receive lumpsum investments
-    const underweight = enrichedWithTarget.filter((h) => {
-      if (h.lumpsumRestricted) return false
-      const targetVal = (h.effectiveTarget / 100) * totalValue
-      return h.currentValue < targetVal
+    
+    // Find the fund that is most overweight relative to its target
+    // It requires the largest overall portfolio growth to naturally dilute to its target %
+    let maxNewTotal = totalValue
+    enrichedWithTarget.forEach(h => {
+      if (h.effectiveTarget <= 0) return // Skip if target is 0
+      // We purposefully DO NOT skip lumpsumRestricted funds here!
+      // If a restricted fund is massively overweight, we still need to calculate the true newTotal 
+      // required to dilute it down to its target %, otherwise the portfolio will never balance.
+      const requiredTotalForThisFund = h.currentValue / (h.effectiveTarget / 100)
+      if (requiredTotalForThisFund > maxNewTotal) {
+        maxNewTotal = requiredTotalForThisFund
+      }
     })
-    if (underweight.length === 0) return 0
-    const pUnder = underweight.reduce((s, h) => s + h.effectiveTarget, 0)
-    if (pUnder >= 100) return 0
-    const cvUnder = underweight.reduce((s, h) => s + h.currentValue, 0)
-    const amount = (pUnder / 100 * totalValue - cvUnder) / (1 - pUnder / 100)
+    
+    const amount = maxNewTotal - totalValue
     return amount > 0 ? Math.ceil(amount / 100) * 100 : 0
   }, [enrichedWithTarget, totalValue])
 
@@ -267,39 +260,64 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
 
   const distribution = useMemo(() => {
     const newTotal = lumpsumAmount > 0 ? totalValue + lumpsumAmount : totalValue
-    // First, active funds only (they share the lumpsumAmount based on their relative targetAllocationPct)
-    const activeFunds = enrichedWithTarget.filter(h => !h.lumpsumRestricted)
-    const activeTargetSumOriginal = activeFunds.reduce((s, h) => s + h.targetAllocationPct, 0)
     
-    const all = enrichedWithTarget.map((h) => {
+    // First pass: calculate shortfall for each active fund relative to newTotal
+    let all = enrichedWithTarget.map((h) => {
       if (h.lumpsumRestricted) {
-        return { ...h, invest: 0, isOverweight: false }
+        return { ...h, invest: 0, isOverweight: false, shortfall: 0 }
       }
-      
-      // Calculate how much of the NEW money this active fund should get to reach its relative target
-      const relativeTarget = activeTargetSumOriginal > 0 ? h.targetAllocationPct / activeTargetSumOriginal : 0
-      const targetTotalAmount = h.currentValue + (relativeTarget * lumpsumAmount)
-      
-      let invest = lumpsumAmount > 0 ? Math.max(0, targetTotalAmount - h.currentValue) : 0
-      return { ...h, invest, isOverweight: false }
+      const targetAmount = (h.effectiveTarget / 100) * newTotal
+      const shortfall = Math.max(0, targetAmount - h.currentValue)
+      // A fund is considered overweight if its current value exceeds its target value under the CURRENT total value.
+      const isOverweight = h.currentValue > (h.effectiveTarget / 100) * totalValue
+      return { ...h, shortfall, isOverweight, targetAmount }
     })
 
-    const totalRaw = all.reduce((s, h) => s + h.invest, 0)
-    // Scale when user enters custom amount that differs from calculated need
-    let final = all
-    if (lumpsumAmount > 0 && totalRaw > 0 && Math.abs(totalRaw - lumpsumAmount) > 1) {
-      const scale = lumpsumAmount / totalRaw
-      final = all.map((h) => ({
-        ...h,
-        invest: h.invest > 0 ? h.invest * scale : 0,
-      }))
+    const totalShortfall = all.reduce((s, h) => s + h.shortfall, 0)
+
+    all = all.map(h => {
+      if (h.lumpsumRestricted) return h
+      
+      let invest = 0
+      if (lumpsumAmount <= 0) {
+        invest = 0
+      } else if (totalShortfall > 0) {
+        if (lumpsumAmount >= totalShortfall) {
+          // We have enough to meet all shortfalls
+          invest = h.shortfall
+        } else {
+          // Distribute proportionally to shortfall (partial rebalance)
+          invest = (h.shortfall / totalShortfall) * lumpsumAmount
+        }
+      }
+      return { ...h, invest }
+    })
+
+    // If remaining lumpsum exceeds all shortfalls, distribute the excess proportionally by target
+    if (totalShortfall > 0 && lumpsumAmount > totalShortfall) {
+       const extra = lumpsumAmount - totalShortfall
+       const activeTargetSum = all.filter(h => !h.lumpsumRestricted).reduce((s, h) => s + h.effectiveTarget, 0)
+       all = all.map(h => {
+         if (h.lumpsumRestricted) return h
+         const extraShare = activeTargetSum > 0 ? (h.effectiveTarget / activeTargetSum) * extra : 0
+         return { ...h, invest: h.invest + extraShare }
+       })
+    } else if (totalShortfall === 0 && lumpsumAmount > 0) {
+       // Everything was perfectly balanced, just distribute proportionally to target
+       const activeTargetSum = all.filter(h => !h.lumpsumRestricted).reduce((s, h) => s + h.effectiveTarget, 0)
+       all = all.map(h => {
+         if (h.lumpsumRestricted) return h
+         const share = activeTargetSum > 0 ? (h.effectiveTarget / activeTargetSum) * lumpsumAmount : 0
+         return { ...h, invest: share }
+       })
     }
+
     // Calculate newPct based on actual investments
-    const actualInvested = final.reduce((s, h) => s + h.invest, 0)
+    const actualInvested = all.reduce((s, h) => s + h.invest, 0)
     const actualTotal = totalValue + actualInvested
-    return final.map((h) => ({
+    return all.map((h) => ({
       ...h,
-      newPct: actualTotal > 0 ? ((h.currentValue + h.invest) / actualTotal) * 100 : 0,
+      newPct: actualTotal > 0 ? ((h.currentValue + (h.invest || 0)) / actualTotal) * 100 : 0,
     }))
   }, [enrichedWithTarget, lumpsumAmount, totalValue])
 
@@ -315,10 +333,7 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
       {blockedLumpsum.length > 0 && (
         <div className="px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 space-y-0.5">
           <p className="text-xs text-amber-400">
-            {blockedLumpsum.length} fund{blockedLumpsum.length > 1 ? 's' : ''} blocked from lumpsum — excluded from suggested amount
-          </p>
-          <p className="text-xs text-amber-400/70">
-            Targets rescaled among active funds: {enrichedWithTarget.filter((h) => !h.lumpsumRestricted).map((h) => `${h.targetAllocationPct.toFixed(0)}%→${h.effectiveTarget.toFixed(1)}%`).join(', ')}
+            {blockedLumpsum.length} fund{blockedLumpsum.length > 1 ? 's' : ''} blocked from lumpsum — excluded from new investments
           </p>
         </div>
       )}

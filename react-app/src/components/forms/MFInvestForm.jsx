@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 import FundSearchInput from './FundSearchInput'
 import { Search, ChevronDown } from 'lucide-react'
 
@@ -15,6 +16,7 @@ const INVEST_TYPES = [
 export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, fundName: initialFundName, transactionType, onSave, onCancel }) {
   const { mfPortfolios, mfHoldings } = useData()
   const { selectedMember } = useFamily()
+  const { mv } = useMask()
 
   const activePortfolios = useMemo(() => {
     const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
@@ -127,7 +129,8 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
 
   const portfolioOptions = activePortfolios.map((p) => {
     const name = p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName
-    const label = p.ownerName ? `${name} (${p.ownerName})` : name
+    const maskedName = mv(name, 'name')
+    const label = p.ownerName ? `${maskedName} (${mv(p.ownerName, 'name')})` : maskedName
     return { value: p.portfolioId, label }
   })
 

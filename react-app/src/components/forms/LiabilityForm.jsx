@@ -68,7 +68,7 @@ export default function LiabilityForm({ initial, onSave, onDelete, onCancel }) {
     { value: '', label: 'None' },
     ...activeInvestments.map(i => ({
       value: i.investmentId,
-      label: `${i.investmentName} (${i.investmentType} — ${formatINR(i.currentValue)})`,
+      label: `${mv(i.investmentName, 'name')} (${i.investmentType} — ${formatINR(i.currentValue)})`,
     })),
   ]
 

@@ -32,8 +32,8 @@ export default function StockPortfolioForm({ initial, onSave, onDelete, onCancel
     if (!form.ownerId) return []
     return activeInvestmentAccounts
       .filter((a) => a.memberId === form.ownerId && (a.accountType === 'Demat + Trading' || a.accountType === 'Trading'))
-      .map((a) => ({ value: a.accountId, label: `${a.accountName} - ${a.platformBroker}` }))
-  }, [activeInvestmentAccounts, form.ownerId])
+      .map((a) => ({ value: a.accountId, label: `${mv(a.accountName, 'name')} - ${a.platformBroker}` }))
+  }, [activeInvestmentAccounts, form.ownerId, mv])
 
   function validate() {
     const e = {}

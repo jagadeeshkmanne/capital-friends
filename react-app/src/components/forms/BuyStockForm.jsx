@@ -3,11 +3,13 @@ import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
+import { useMask } from '../../context/MaskContext'
 import StockSearchInput from './StockSearchInput'
 
 export default function BuyStockForm({ portfolioId, initialData, existingHolding, onSave, onCancel }) {
-  const { stockPortfolios } = useData()
+  const { stockPortfolios, stockHoldings } = useData()
   const { selectedMember } = useFamily()
+  const { mv } = useMask()
 
   // Filter portfolios by header's selected member
   const activePortfolios = useMemo(() => {
@@ -64,7 +66,8 @@ export default function BuyStockForm({ portfolioId, initialData, existingHolding
 
   const portfolioOptions = activePortfolios.map((p) => {
     const name = p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName
-    const label = p.ownerName ? `${name} (${p.ownerName})` : name
+    const maskedName = mv(name, 'name')
+    const label = p.ownerName ? `${maskedName} (${mv(p.ownerName, 'name')})` : maskedName
     return { value: p.portfolioId, label }
   })
 

@@ -36,7 +36,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
   // Investment accounts for selected member
   const mfAccounts = activeInvestmentAccounts
     .filter((a) => form.ownerId ? a.memberId === form.ownerId : true)
-    .map((a) => ({ value: a.accountId, label: `${a.accountName} - ${a.platformBroker}` }))
+    .map((a) => ({ value: a.accountId, label: `${mv(a.accountName, 'name')} - ${a.platformBroker}` }))
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
 

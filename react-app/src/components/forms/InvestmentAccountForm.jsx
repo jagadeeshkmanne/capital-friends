@@ -62,8 +62,8 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     if (!form.memberId) return []
     return activeBanks
       .filter((b) => b.memberId === form.memberId)
-      .map((b) => ({ value: b.accountId, label: `${b.accountName} - ${b.bankName}` }))
-  }, [activeBanks, form.memberId])
+      .map((b) => ({ value: b.accountId, label: `${mv(b.accountName, 'name')} - ${b.bankName}` }))
+  }, [activeBanks, form.memberId, mv])
 
   return (
     <div className="space-y-4">

@@ -516,7 +516,7 @@ function recordTransactionInHistory(transaction) {
     // Generate Transaction ID
     var lastRow = sheet.getLastRow();
     var existingIds = lastRow > 2
-      ? sheet.getRange(3, 14, lastRow - 2, 1).getValues().map(function(r) { return r[0]; })
+      ? sheet.getRange(3, 14, lastRow - 2, 1).getValues().map(function (r) { return r[0]; })
       : [];
     var transactionId = generateId('TXN', existingIds);
 
@@ -1555,7 +1555,7 @@ function deleteFundFromPortfolio(params) {
     const remainingData = portfolioSheet.getDataRange().getValues();
     let currentTotalTarget = 0;
     const targetUpdates = [];
-    
+
     for (let i = 3; i < remainingData.length; i++) {
       if (remainingData[i][0]) { // Scheme code exists
         const targetAlloc = parseFloat(remainingData[i][8]) || 0;
@@ -1563,7 +1563,7 @@ function deleteFundFromPortfolio(params) {
         targetUpdates.push({ rowIndex: i + 1, target: targetAlloc });
       }
     }
-    
+
     let rescaledMsg = '';
     // Only rescale if the remaining targets are less than 100% (and greater than 0 to avoid Infinity)
     if (currentTotalTarget > 0 && currentTotalTarget < 99.99) {
