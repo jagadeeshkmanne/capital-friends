@@ -106,7 +106,7 @@ function doGet(e) {
                  '<h2 style="color: #4ade80;">Setup Complete! ✅</h2>' +
                  '<p style="color: #94a3b8;">Background sync triggers have been successfully installed.</p>' +
                  '<p style="color: #94a3b8; font-size: 14px;">This window will close automatically...</p>' +
-                 '<script>setTimeout(function(){ window.close(); }, 2500);</script>' +
+                 '<script>setTimeout(function(){ try { window.top.close(); } catch(e){} window.close(); }, 2500);</script>' +
                  '</body></html>';
                  
       return HtmlService.createHtmlOutput(html);
