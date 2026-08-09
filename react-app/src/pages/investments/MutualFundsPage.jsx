@@ -1064,11 +1064,16 @@ export default function MutualFundsPage() {
             )}
 
             {/* Portfolio Summary Table */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolios</p>
-              <button onClick={() => setModal('addPortfolio')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
-                <Plus size={13} /> New Portfolio
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setModal('addPortfolio')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors shadow-sm">
+                  <Plus size={13} /> New Portfolio
+                </button>
+                <button onClick={() => setModal('consolidatedFunds')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors shadow-sm">
+                  <Layers size={12} /> All Funds
+                </button>
+              </div>
             </div>
             {portfolioData.length > 0 ? (
               <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
