@@ -511,6 +511,13 @@ function loadAllData() {
   // scheduled daily trigger. This keeps loadAllData fast for all users.
   // Use 'data:refresh-master' action to trigger manually from the client.
 
+  // Upgrade older Goals sheets before loading goal records.
+  try {
+    migrateGoalRetirementFields();
+  } catch (e) {
+    log('Goal retirement-field migration (non-blocking): ' + e.message);
+  }
+
   // Migrate GoalPortfolioMapping to 7-column format if needed (transparent)
   try {
     migrateGoalMappingSheet();

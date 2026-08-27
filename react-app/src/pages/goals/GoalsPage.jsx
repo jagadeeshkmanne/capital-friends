@@ -13,6 +13,7 @@ import GoalWithdrawalPlan from '../../components/forms/GoalWithdrawalPlan'
 import GlidepathRebalancePlan from '../../components/forms/GlidepathRebalancePlan'
 import RetirementBucketPlan from '../../components/forms/RetirementBucketPlan'
 import PageLoading from '../../components/PageLoading'
+import { calculateGoalFundingProjection } from '../../utils/goalProjection'
 
 const statusBadge = {
   'On Track': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -230,16 +231,16 @@ export default function GoalsPage() {
 
       // Live gap computation based on actual currentValue (or planned lumpsum if higher)
       const cagr = g.expectedCAGR || 0.12
-      const monthlyRate = cagr / 12
       const months = Math.max(0, Math.round(yearsLeft * 12))
-      const assumedBase = Math.max(g.currentValue || 0, g.lumpsumInvested || 0)
-      const fvCurrent = assumedBase * (months > 0 ? Math.pow(1 + monthlyRate, months) : 1)
-      const gapAtMaturity = Math.max(0, (g.targetAmount || 0) - fvCurrent)
-      const liveLumpsum = gapAtMaturity > 0 && months > 0
-        ? Math.round(gapAtMaturity / Math.pow(1 + monthlyRate, months)) : 0
-      const liveSIP = gapAtMaturity > 0 && months > 0
-        ? (monthlyRate > 0 ? Math.ceil(gapAtMaturity / ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)) : Math.ceil(gapAtMaturity / months))
-        : 0
+      const funding = calculateGoalFundingProjection({
+        targetAmount: g.targetAmount,
+        months,
+        annualReturn: cagr,
+        plannedLumpsum: g.lumpsumInvested,
+        linkedCurrentValue: g.currentValue,
+      })
+      const liveLumpsum = funding.requiredLumpsum
+      const liveSIP = funding.requiredSIP
 
       health[g.goalId] = { yearsLeft, label: recommended.label, recommendedEquity: recommended.equity, recommendedDebt: recommended.debt, actualEquity, isMapped, mismatch, needsAttention, liveLumpsum, liveSIP }
     }

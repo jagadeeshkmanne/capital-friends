@@ -45,7 +45,7 @@ function getAllGoals() {
   const numRows = lastDataRow - 2; // Number of rows from row 3 to lastDataRow
   Logger.log('Reading ' + numRows + ' rows starting from row 3');
 
-  const data = sheet.getRange(3, 1, numRows, 22).getValues();
+  const data = sheet.getRange(3, 1, numRows, 24).getValues();
   const goals = [];
 
   data.forEach((row, index) => {
@@ -54,7 +54,7 @@ function getAllGoals() {
 
       // Serialize dates to ISO strings for proper client-side JSON handling
       // Handle both Date objects AND string dates (in case editGoal wrote a string)
-      let targetDate, createdDate;
+      let targetDate, createdDate, dobString;
       try {
         if (row[5] instanceof Date) {
           targetDate = row[5].toISOString();
@@ -81,6 +81,18 @@ function getAllGoals() {
         createdDate = new Date().toISOString();
       }
 
+      try {
+        if (row[23] instanceof Date) {
+          dobString = row[23].toISOString();
+        } else if (row[23]) {
+          dobString = new Date(row[23]).toISOString();
+        } else {
+          dobString = null;
+        }
+      } catch (e) {
+        dobString = null;
+      }
+
       goals.push({
         goalId: row[0],                     // A
         goalType: row[1],                   // B
@@ -104,7 +116,9 @@ function getAllGoals() {
         monthlyExpenses: Number(row[18]) || null,    // S (for Retirement/Emergency Fund)
         emergencyMonths: Number(row[19]) || null,    // T (for Emergency Fund)
         lumpsumInvested: Number(row[20]) || null,    // U (user's committed lumpsum)
-        initialCost: Number(row[21]) || null          // V (today's cost for non-Retirement/Emergency goals)
+        initialCost: Number(row[21]) || null,        // V (today's cost for non-Retirement/Emergency goals)
+        retirementAge: Number(row[22]) || null,      // W (Retirement Age)
+        dob: dobString                               // X (Date of Birth)
       });
     }
   });
@@ -321,7 +335,9 @@ function addGoal(goalData) {
       goalData.monthlyExpenses || null,          // S: Monthly Expenses (for Retirement/Emergency Fund)
       goalData.emergencyMonths || null,          // T: Emergency Months (for Emergency Fund)
       lumpsumInvested || null,                   // U: Lumpsum Invested (user's committed lumpsum)
-      goalData.initialCost || null               // V: Initial (today's) cost for non-Retirement/Emergency goals
+      goalData.initialCost || null,              // V: Initial (today's) cost for non-Retirement/Emergency goals
+      goalData.retirementAge || null,            // W: Retirement Age
+      goalData.dob ? parseSheetDate(goalData.dob) : null // X: Date of Birth
     ];
 
     sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
@@ -335,7 +351,7 @@ function addGoal(goalData) {
     SpreadsheetApp.flush();
 
     // Format the new row
-    applyDataRowFormatting(sheet, newRow, newRow, 22);
+    applyDataRowFormatting(sheet, newRow, newRow, 24);
 
     log(`Goal added: ${goalId} - ${goalData.goalName}`);
 
@@ -404,8 +420,8 @@ function editGoal(goalId, goalData) {
       goalData.priority || 'Medium'              // M: Priority
     ]]);
 
-    // O-V: Flags and hidden columns
-    sheet.getRange(rowIndex, 15, 1, 8).setValues([[
+    // O-X: Flags and hidden columns
+    sheet.getRange(rowIndex, 15, 1, 10).setValues([[
       goalData.isActive !== undefined ? goalData.isActive : true, // O: Is Active
       goalData.notes || '',                      // P: Notes
       goalData.expectedInflation || 0.06,        // Q: Expected Inflation
@@ -413,7 +429,9 @@ function editGoal(goalId, goalData) {
       goalData.monthlyExpenses || null,          // S: Monthly Expenses
       goalData.emergencyMonths || null,          // T: Emergency Months
       goalData.lumpsumInvested || null,          // U: Lumpsum Invested
-      goalData.initialCost || null               // V: Initial (today's) cost
+      goalData.initialCost || null,              // V: Initial (today's) cost
+      goalData.retirementAge || null,            // W: Retirement Age
+      goalData.dob ? parseSheetDate(goalData.dob) : null // X: Date of Birth
     ]]);
 
     // Re-write live formulas for calculated columns (G, H, I, J, K, N)
@@ -1208,8 +1226,92 @@ function showGoalWithdrawalPlanDialog() {
 }
 
 // ============================================================================
-// MIGRATION — GoalPortfolioMapping column G + Goal formulas
+// MIGRATIONS — Goal schema + GoalPortfolioMapping
 // ============================================================================
+
+function migrateGoalRetirementFields() {
+  try {
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('Goals');
+    if (!sheet) return { migrated: false, reason: 'Sheet not found' };
+
+    if (sheet.getMaxColumns() < 24) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), 24 - sheet.getMaxColumns());
+    }
+
+    const expectedHeaders = [
+      [22, 'Initial Cost (₹)'],
+      [23, 'Retirement Age'],
+      [24, 'Date of Birth']
+    ];
+    let migrated = false;
+    expectedHeaders.forEach(function(entry) {
+      const cell = sheet.getRange(2, entry[0]);
+      if (cell.getValue() !== entry[1]) {
+        cell.setValue(entry[1]);
+        migrated = true;
+      }
+    });
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 3) {
+      const members = getAllFamilyMembers() || [];
+      const byName = {};
+      let selfMember = null;
+      members.forEach(function(member) {
+        byName[String(member.memberName || '').trim().toLowerCase()] = member;
+        if (String(member.relationship || '').trim().toLowerCase() === 'self') selfMember = member;
+      });
+
+      const rows = sheet.getRange(3, 1, lastRow - 2, 24).getValues();
+      const retirementValues = rows.map(function(row) {
+        let retirementAge = row[22] || '';
+        let dob = row[23] || '';
+        if (String(row[1] || '').trim().toLowerCase() !== 'retirement') {
+          return [retirementAge, dob];
+        }
+
+        const savedMember = String(row[3] || '').trim().toLowerCase();
+        const member = byName[savedMember]
+          || ((!savedMember || savedMember === 'family' || savedMember === 'self') ? selfMember : null);
+
+        if (!dob && member && member.dynamicFields) {
+          const dobKey = Object.keys(member.dynamicFields).find(function(key) {
+            return ['dob', 'date of birth', 'dateofbirth', 'birthday', 'birth date', 'date_of_birth']
+              .indexOf(String(key).toLowerCase().trim()) !== -1;
+          });
+          if (dobKey && member.dynamicFields[dobKey]) dob = parseSheetDate(member.dynamicFields[dobKey]);
+        }
+
+        if (!retirementAge && dob && row[5]) {
+          const birth = new Date(dob);
+          const target = new Date(row[5]);
+          if (!isNaN(birth.getTime()) && !isNaN(target.getTime())) {
+            retirementAge = target.getFullYear() - birth.getFullYear();
+            const beforeBirthday = target.getMonth() < birth.getMonth()
+              || (target.getMonth() === birth.getMonth() && target.getDate() < birth.getDate());
+            if (beforeBirthday) retirementAge -= 1;
+          }
+        }
+        return [retirementAge || '', dob || ''];
+      });
+
+      sheet.getRange(3, 23, retirementValues.length, 2).setValues(retirementValues);
+    }
+
+    sheet.setColumnWidth(22, 50);
+    sheet.setColumnWidth(23, 50);
+    sheet.setColumnWidth(24, 50);
+    sheet.getRange('V:V').setNumberFormat('#,##0.00');
+    sheet.getRange('X:X').setNumberFormat('yyyy-mm-dd');
+    sheet.hideColumns(17, 8);
+
+    return { migrated: migrated, message: migrated ? 'Retirement goal fields added' : 'Already migrated' };
+  } catch (e) {
+    log('Goal retirement-field migration error: ' + e.message);
+    return { migrated: false, error: e.message };
+  }
+}
 
 /**
  * Migrate GoalPortfolioMapping sheet to 7-column format and refresh goal formulas.

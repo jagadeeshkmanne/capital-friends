@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
 import { useMask } from '../../context/MaskContext'
+import { calculateGoalFundingProjection } from '../../utils/goalProjection'
 
 const GOAL_TYPES = [
   'Retirement', 'Emergency Fund', 'Child Education', 'Home Purchase',
@@ -41,7 +42,7 @@ function getSWR(retirementAge) {
   const postRet = Math.max(5, LIFE_EXPECTANCY - (retirementAge || 60))
   if (postRet >= 40) return { rate: 0.030, pct: '3.0', multiplier: 33, label: 'Very early retirement' }
   if (postRet >= 35) return { rate: 0.033, pct: '3.3', multiplier: 30, label: 'Early retirement' }
-  if (postRet >= 25) return { rate: 0.040, pct: '4.0', multiplier: 25, label: 'Standard (Trinity study)' }
+  if (postRet >= 25) return { rate: 0.040, pct: '4.0', multiplier: 25, label: '30-year planning baseline' }
   if (postRet >= 18) return { rate: 0.050, pct: '5.0', multiplier: 20, label: 'Late retirement' }
   return { rate: 0.060, pct: '6.0', multiplier: 17, label: 'Very late retirement' }
 }
@@ -54,6 +55,45 @@ function getMemberDOB(member) {
   if (!key) return null
   const d = new Date(member.dynamicFields[key])
   return isNaN(d.getTime()) ? null : d
+}
+
+function toDateInputValue(value) {
+  if (!value) return ''
+  const text = String(value)
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10)
+  const date = new Date(value)
+  return isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
+}
+
+function findGoalMember(initial, members) {
+  const list = members || []
+  if (initial?.familyMemberId) {
+    const byId = list.find((member) => member.memberId === initial.familyMemberId)
+    if (byId) return byId
+  }
+
+  const savedName = String(initial?.familyMemberName || initial?.familyMember || '').trim().toLowerCase()
+  if (savedName) {
+    const byName = list.find((member) => String(member.memberName || '').trim().toLowerCase() === savedName)
+    if (byName) return byName
+  }
+
+  if (!savedName || savedName === 'family' || savedName === 'self') {
+    return list.find((member) => String(member.relationship || '').toLowerCase() === 'self') || null
+  }
+  return null
+}
+
+function retirementAgeAtDate(dob, targetDate) {
+  if (!dob || !targetDate) return ''
+  const birth = new Date(dob)
+  const target = new Date(targetDate)
+  if (isNaN(birth.getTime()) || isNaN(target.getTime())) return ''
+  let age = target.getUTCFullYear() - birth.getUTCFullYear()
+  const beforeBirthday = target.getUTCMonth() < birth.getUTCMonth()
+    || (target.getUTCMonth() === birth.getUTCMonth() && target.getUTCDate() < birth.getUTCDate())
+  if (beforeBirthday) age -= 1
+  return age > 0 ? String(age) : ''
 }
 
 export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent }) {
@@ -85,21 +125,20 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       }
 
       // Look up memberId from familyMemberName (backend only stores the name, not the ID)
-      const matchedMember = activeMembers.find((m) => m.memberName === initial.familyMemberName)
+      const matchedMember = findGoalMember(initial, activeMembers)
 
       // Back-calculate retirement age from targetDate + member DOB (retirementAge is not stored in GAS)
       let storedRetirementAge = ''
       if (initial.goalType === 'Retirement' && initial.targetDate) {
         const dob = getMemberDOB(matchedMember)
         if (dob) {
-          const calculatedAge = Math.round((new Date(initial.targetDate) - dob) / (365.25 * 24 * 60 * 60 * 1000))
-          if (calculatedAge > 0) storedRetirementAge = calculatedAge.toString()
+          storedRetirementAge = retirementAgeAtDate(dob, initial.targetDate)
         }
       }
       let editDob = ''
       if (initial.goalType === 'Retirement' && matchedMember) {
         const dob = getMemberDOB(matchedMember)
-        if (dob) editDob = dob.toISOString().split('T')[0]
+        if (dob) editDob = toDateInputValue(dob)
       }
 
       return {
@@ -107,7 +146,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         goalName: initial.goalName || '',
         familyMemberId: matchedMember?.memberId || '',
         todaysCost: Math.round(todaysCost).toString(),
-        targetDate: initial.targetDate || '',
+        targetDate: toDateInputValue(initial.targetDate),
         lumpsum: (initial.lumpsumInvested || 0).toString(),
         monthlySIP: (initial.monthlyInvestment || 0).toString(),
         inflation: inflation.toString(),
@@ -118,8 +157,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         monthlyExpenses: (initial.monthlyExpenses || '').toString(),
         emergencyMonths: (initial.emergencyMonths || 6).toString(),
         // Retirement age
-        retirementAge: storedRetirementAge || '60',
-        dob: editDob,
+        retirementAge: (initial.retirementAge || storedRetirementAge || '').toString(),
+        dob: toDateInputValue(initial.dob) || editDob,
       }
     }
 
@@ -162,6 +201,36 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
   const isRetirement = form.goalType === 'Retirement'
   const isEmergency = form.goalType === 'Emergency Fund'
+
+  // Older goals did not persist retirement fields. Hydrate them from the
+  // selected family member once member data is available.
+  useEffect(() => {
+    if (!isEdit || !isRetirement) return
+    const member = findGoalMember(initial, activeMembers)
+    const memberDob = getMemberDOB(member)
+    const resolvedDob = toDateInputValue(initial?.dob) || toDateInputValue(memberDob)
+    const resolvedAge = initial?.retirementAge
+      ? String(initial.retirementAge)
+      : retirementAgeAtDate(resolvedDob, initial?.targetDate)
+
+    setForm((current) => {
+      const next = { ...current }
+      let changed = false
+      if (!next.familyMemberId && member?.memberId) {
+        next.familyMemberId = member.memberId
+        changed = true
+      }
+      if (!next.dob && resolvedDob) {
+        next.dob = resolvedDob
+        changed = true
+      }
+      if (!next.retirementAge && resolvedAge) {
+        next.retirementAge = resolvedAge
+        changed = true
+      }
+      return changed ? next : current
+    })
+  }, [activeMembers, initial, isEdit, isRetirement])
 
   // Retirement: derive member DOB + age for auto date calculation
   const selectedMember = isRetirement
@@ -243,38 +312,22 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
     inflatedTarget = Math.round(inflatedTarget)
 
-    // FV of lumpsum investment
-    const fvLumpsum = lumpsum > 0 && months > 0
-      ? lumpsum * Math.pow(1 + monthlyRate, months)
-      : lumpsum
-
-    // Required SIP to reach target (after accounting for lumpsum growth)
-    let requiredSIP = 0
-    if (inflatedTarget > 0 && months > 0) {
-      const remaining = inflatedTarget - fvLumpsum
-      if (remaining > 0 && monthlyRate > 0) {
-        requiredSIP = remaining / ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)
-      } else if (remaining > 0) {
-        requiredSIP = remaining / months
-      }
-      requiredSIP = Math.max(0, Math.ceil(requiredSIP))
-    }
+    const linkedCurrentValue = isEdit ? (Number(initial?.currentValue) || 0) : 0
+    const funding = calculateGoalFundingProjection({
+      targetAmount: inflatedTarget,
+      months,
+      annualReturn: cagrRate,
+      plannedLumpsum: lumpsum,
+      linkedCurrentValue,
+    })
+    const { existingValue, futureExistingValue, requiredSIP, requiredLumpsum, coversGoal } = funding
 
     // Projection: what happens if you follow the required SIP
     const fvRequiredSIP = requiredSIP > 0 && monthlyRate > 0 && months > 0
       ? requiredSIP * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)
       : requiredSIP * months
-    const planTotalInvested = Math.round(lumpsum + requiredSIP * months)
+    const planTotalInvested = Math.round(existingValue + requiredSIP * months)
     const planReturns = Math.round(inflatedTarget - planTotalInvested)
-    const lumpsumCoversGoal = lumpsum > 0 && fvLumpsum >= inflatedTarget
-
-    // Lumpsum-only path: total lumpsum today that reaches the target (no SIP)
-    // If months = 0 (retire now), need the full corpus now
-    const totalRequiredLumpsum = inflatedTarget > 0
-      ? (months > 0 ? Math.round(inflatedTarget / Math.pow(1 + monthlyRate, months)) : inflatedTarget)
-      : 0
-    // Net of what user already plans to invest as lumpsum
-    const requiredLumpsum = Math.max(0, totalRequiredLumpsum - lumpsum)
 
     const retAge = isRetirement ? (Number(form.retirementAge) || 60) : null
     const swr = isRetirement ? getSWR(retAge) : null
@@ -282,15 +335,16 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
     return {
       todaysCost, inflatedTarget, yearsToGo, months,
-      fvLumpsum: Math.round(fvLumpsum),
+      existingValue, linkedCurrentValue,
+      fvLumpsum: futureExistingValue,
       requiredSIP, fvRequiredSIP: Math.round(fvRequiredSIP),
-      planTotalInvested, planReturns, lumpsumCoversGoal, requiredLumpsum,
+      planTotalInvested, planReturns, lumpsumCoversGoal: coversGoal, requiredLumpsum,
       hasTarget: inflatedTarget > 0,
       swr, postRetYears,
     }
   }, [form.todaysCost, form.targetDate, form.lumpsum,
       form.inflation, form.cagr, form.monthlyExpenses, form.emergencyMonths,
-      form.retirementAge, isRetirement, isEmergency])
+      form.retirementAge, isRetirement, isEmergency, isEdit, initial?.currentValue])
 
   // ── Validation ──
   function validateStep(s) {
@@ -360,6 +414,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         emergencyMonths: isEmergency ? Number(form.emergencyMonths) || 6 : undefined,
         isRetirement: isRetirement,
         initialCost: (!isRetirement && !isEmergency) ? calc.todaysCost : undefined,
+        retirementAge: isRetirement ? (Number(form.retirementAge) || undefined) : undefined,
+        dob: isRetirement ? (form.dob || undefined) : undefined,
       })
     } finally { setSaving(false) }
   }
@@ -771,11 +827,10 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
           <div className="rounded-lg bg-violet-500/10 border border-violet-500/20 p-3 space-y-2">
             <p className="text-sm font-bold text-violet-400 uppercase tracking-wider">What is Safe Withdrawal Rate (SWR)?</p>
             <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-              At retirement, your corpus is invested and earns returns. You withdraw{' '}
-              <span className="text-violet-300 font-semibold">{calc.swr.pct}% per year</span> as income
-              — that's <span className="text-amber-400 font-semibold">{formatINR(annualExpAtRetirement)}/yr</span>.{' '}
-              The remaining corpus keeps growing, so the money lasts the full{' '}
-              <span className="text-[var(--text-muted)] font-semibold">{calc.postRetYears} years</span> (age {retireAge}→{LIFE_EXPECTANCY}) without running out.
+              At retirement, a <span className="text-violet-300 font-semibold">{calc.swr.pct}% starting withdrawal</span>{' '}
+              provides about <span className="text-amber-400 font-semibold">{formatINR(annualExpAtRetirement)}/yr</span>.{' '}
+              Later withdrawals may rise with inflation while the remaining corpus stays invested. Capital Friends uses{' '}
+              <span className="text-[var(--text-muted)] font-semibold">{calc.postRetYears} years</span> (age {retireAge}→{LIFE_EXPECTANCY}) as the planning horizon; actual longevity depends on returns, inflation, fees, taxes, asset allocation and spending changes.
             </p>
             <p className="text-xs text-[var(--text-dim)]">
               Corpus = {formatINR(annualExpAtRetirement)}/yr ÷ {calc.swr.pct}% ={' '}
@@ -787,7 +842,7 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
 
         {/* SWR reference table — compact grid */}
         <div className="border-t border-violet-500/15 pt-2">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-2">SWR by retirement age — the earlier you retire, the safer you must be</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-2">Planning withdrawal assumptions by retirement horizon</p>
           <div className="grid grid-cols-5 gap-1 text-center">
             {SWR_TIERS.map((tier) => {
               const isActive = calc.postRetYears >= tier.postRet &&
@@ -851,22 +906,43 @@ function MissingFieldsHint({ form, isRetirement, isEmergency, calc }) {
 
 function ProjectionPanel({ calc, lumpsum, compact }) {
   const lsNum = Number(lumpsum) || 0
+  const hasLinkedValue = calc.linkedCurrentValue > 0
+  const fundingLabel = hasLinkedValue ? 'Current linked investments' : 'Lumpsum'
+  const coveredLabel = hasLinkedValue
+    ? 'Current linked investments cover this goal!'
+    : 'Lumpsum alone covers this goal!'
+  const sipLabel = hasLinkedValue ? 'Additional SIP' : 'SIP Required'
+  const lumpsumLabel = hasLinkedValue || lsNum > 0 ? 'Additional Lumpsum' : 'Lumpsum Today'
 
   if (compact) {
     return (
       <div className="rounded-lg border p-3 bg-violet-500/5 border-violet-500/15">
         {calc.lumpsumCoversGoal ? (
-          <p className="text-sm font-bold text-emerald-400">Lumpsum alone covers this goal!</p>
+          <div>
+            <p className="text-sm font-bold text-emerald-400">{coveredLabel}</p>
+            {hasLinkedValue && (
+              <p className="mt-1 text-xs text-[var(--text-dim)]">
+                {formatINR(calc.linkedCurrentValue)} linked is included in this projection.
+              </p>
+            )}
+          </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="text-center">
-              <p className="text-xs text-violet-400 font-semibold mb-0.5">SIP Required</p>
-              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal">/mo</span></p>
+          <div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="text-center">
+                <p className="text-xs text-violet-400 font-semibold mb-0.5">{sipLabel}</p>
+                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal">/mo</span></p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-amber-400 font-semibold mb-0.5">{lumpsumLabel}</p>
+                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-xs text-amber-400 font-semibold mb-0.5">{lsNum > 0 ? 'Additional Lumpsum' : 'Lumpsum Today'}</p>
-              <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
-            </div>
+            {hasLinkedValue && (
+              <p className="mt-2 text-center text-xs text-[var(--text-dim)]">
+                After including {formatINR(calc.linkedCurrentValue)} already linked.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -880,16 +956,16 @@ function ProjectionPanel({ calc, lumpsum, compact }) {
       {calc.lumpsumCoversGoal ? (
         <div className="flex items-center gap-2">
           <CheckCircle2 size={14} className="text-emerald-400" />
-          <p className="text-sm font-bold text-emerald-400">Lumpsum alone covers this goal!</p>
+          <p className="text-sm font-bold text-emerald-400">{coveredLabel}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg p-3 bg-violet-500/10 border border-violet-500/20 text-center">
-            <p className="text-xs text-violet-400 font-semibold mb-1">SIP Required</p>
+            <p className="text-xs text-violet-400 font-semibold mb-1">{sipLabel}</p>
             <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredSIP)}<span className="text-xs font-normal text-[var(--text-dim)]">/mo</span></p>
           </div>
           <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/20 text-center">
-            <p className="text-xs text-amber-400 font-semibold mb-1">{lsNum > 0 ? 'Additional Lumpsum' : 'Lumpsum Today'}</p>
+            <p className="text-xs text-amber-400 font-semibold mb-1">{lumpsumLabel}</p>
             <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.requiredLumpsum)}</p>
           </div>
         </div>
@@ -898,9 +974,9 @@ function ProjectionPanel({ calc, lumpsum, compact }) {
       {/* Breakdown */}
       {calc.planTotalInvested > 0 && (
         <div className="border-t border-[var(--border-light)] pt-3 space-y-1.5">
-          {lsNum > 0 && (
+          {calc.existingValue > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--text-dim)]">Lumpsum {formatINR(lsNum)} grows to</span>
+              <span className="text-xs text-[var(--text-dim)]">{fundingLabel} {formatINR(calc.existingValue)} grows to</span>
               <span className="text-xs font-semibold text-emerald-400 tabular-nums">{formatINR(calc.fvLumpsum)}</span>
             </div>
           )}
@@ -943,13 +1019,13 @@ function SWRPanel({ swr, postRetYears }) {
       </div>
       <p className="text-xs text-[var(--text-dim)] leading-relaxed">
         Your corpus must last <span className="text-[var(--text-muted)] font-semibold">~{postRetYears} years</span> (retire → age {LIFE_EXPECTANCY}).
-        Research shows <span className="text-[var(--text-muted)] font-semibold">{swr.pct}%</span> is a safe annual withdrawal for this duration — so you need <span className="text-[var(--text-muted)] font-semibold">{swr.multiplier}×</span> your annual expenses as corpus today.
-        {swr.multiplier !== 25 && <span className="text-violet-400"> (Standard 4% / 25× is only for 25-yr retirements.)</span>}
+        Capital Friends uses <span className="text-[var(--text-muted)] font-semibold">{swr.pct}%</span> as a planning assumption for this horizon, which produces a starting corpus of about <span className="text-[var(--text-muted)] font-semibold">{swr.multiplier}×</span> annual expenses.
+        <span className="text-violet-400"> This is a rule of thumb, not a guarantee; stress-test lower rates and review the plan regularly.</span>
       </p>
 
       {/* SWR reference table */}
       <div className="border-t border-violet-500/15 pt-2">
-        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Safe Withdrawal Rate by retirement age</p>
+        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Planning withdrawal assumptions by retirement horizon</p>
         <div className="space-y-0.5">
           {SWR_TIERS.map((tier) => {
             const isActive = postRetYears >= tier.postRet &&

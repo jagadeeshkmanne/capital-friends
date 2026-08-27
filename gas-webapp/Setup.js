@@ -1508,7 +1508,7 @@ function setupRemindersSheet() {
 
 /**
  * Setup Goals Sheet
- * Structure: 21 columns (A-U) for managing financial goals
+ * Structure: 24 columns (A-X) for managing financial goals
  */
 function setupGoalsSheet() {
   const spreadsheet = getSpreadsheet();
@@ -1535,7 +1535,10 @@ function setupGoalsSheet() {
     'Expected CAGR (%)',        // R: Hidden - for calculations
     'Monthly Expenses (₹)',     // S: Hidden - for Retirement/Emergency
     'Emergency Months',         // T: Hidden - for Emergency Fund
-    'Lumpsum Invested (₹)'     // U: Hidden - user's committed lumpsum
+    'Lumpsum Invested (₹)',     // U: Hidden - user's committed lumpsum
+    'Initial Cost (₹)',         // V: Hidden - today's cost for non-retirement goals
+    'Retirement Age',           // W: Hidden - retirement age selected by user
+    'Date of Birth'             // X: Hidden - DOB used for retirement date
   ];
 
   // Add developer credit (Row 1)
@@ -1569,6 +1572,9 @@ function setupGoalsSheet() {
   sheet.setColumnWidth(19, 50);  // S: Monthly Expenses (hidden)
   sheet.setColumnWidth(20, 50);  // T: Emergency Months (hidden)
   sheet.setColumnWidth(21, 50);  // U: Lumpsum Invested (hidden)
+  sheet.setColumnWidth(22, 50);  // V: Initial Cost (hidden)
+  sheet.setColumnWidth(23, 50);  // W: Retirement Age (hidden)
+  sheet.setColumnWidth(24, 50);  // X: Date of Birth (hidden)
 
   // Freeze header rows
   sheet.setFrozenRows(2);
@@ -1584,13 +1590,15 @@ function setupGoalsSheet() {
   sheet.getRange('R:R').setNumberFormat('0.00%');     // R: Expected CAGR (hidden)
   sheet.getRange('S:S').setNumberFormat('#,##0.00');  // S: Monthly Expenses (hidden)
   sheet.getRange('U:U').setNumberFormat('#,##0.00');  // U: Lumpsum Invested (hidden)
+  sheet.getRange('V:V').setNumberFormat('#,##0.00');  // V: Initial Cost (hidden)
 
   // Format date columns
   sheet.getRange('F:F').setNumberFormat('yyyy-mm-dd'); // F: Target Date
   sheet.getRange('L:L').setNumberFormat('yyyy-mm-dd'); // L: Created Date
+  sheet.getRange('X:X').setNumberFormat('yyyy-mm-dd'); // X: Date of Birth
 
-  // Hide internal columns (Q through U)
-  sheet.hideColumns(17, 5); // Hide columns Q (17) through U (21)
+  // Hide internal columns (Q through X)
+  sheet.hideColumns(17, 8); // Hide columns Q (17) through X (24)
 
   // Apply standard formatting
   applyStandardFormatting(sheet);
