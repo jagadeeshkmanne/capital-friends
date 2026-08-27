@@ -154,7 +154,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         monthlyExpenses: (initial.monthlyExpenses || '').toString(),
         emergencyMonths: (initial.emergencyMonths || 6).toString(),
         // Retirement age
-        retirementAge: (initial.retirementAge || storedRetirementAge || '').toString(),
+        retirementAge: (storedRetirementAge || initial.retirementAge || '').toString(),
         dob: toDateInputValue(initial.dob) || editDob,
       }
     }
@@ -206,9 +206,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     const member = findGoalMember(initial, activeMembers)
     const memberDob = getMemberDOB(member)
     const resolvedDob = toDateInputValue(initial?.dob) || toDateInputValue(memberDob)
-    const resolvedAge = initial?.retirementAge
-      ? String(initial.retirementAge)
-      : retirementAgeAtDate(resolvedDob, initial?.targetDate)
+    const resolvedAge = retirementAgeAtDate(resolvedDob, initial?.targetDate)
+      || (initial?.retirementAge ? String(initial.retirementAge) : '')
 
     setForm((current) => {
       const next = { ...current }
@@ -221,7 +220,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         next.dob = resolvedDob
         changed = true
       }
-      if (!next.retirementAge && resolvedAge) {
+      if (resolvedAge && next.retirementAge !== resolvedAge) {
         next.retirementAge = resolvedAge
         changed = true
       }
