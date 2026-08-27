@@ -1283,14 +1283,11 @@ function migrateGoalRetirementFields() {
           if (dobKey && member.dynamicFields[dobKey]) dob = parseSheetDate(member.dynamicFields[dobKey]);
         }
 
-        if (!retirementAge && dob && row[5]) {
+        if (dob && row[5]) {
           const birth = new Date(dob);
           const target = new Date(row[5]);
           if (!isNaN(birth.getTime()) && !isNaN(target.getTime())) {
-            retirementAge = target.getFullYear() - birth.getFullYear();
-            const beforeBirthday = target.getMonth() < birth.getMonth()
-              || (target.getMonth() === birth.getMonth() && target.getDate() < birth.getDate());
-            if (beforeBirthday) retirementAge -= 1;
+            retirementAge = Math.round((target.getTime() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
           }
         }
         return [retirementAge || '', dob || ''];

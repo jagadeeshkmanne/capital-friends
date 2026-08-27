@@ -89,10 +89,7 @@ function retirementAgeAtDate(dob, targetDate) {
   const birth = new Date(dob)
   const target = new Date(targetDate)
   if (isNaN(birth.getTime()) || isNaN(target.getTime())) return ''
-  let age = target.getUTCFullYear() - birth.getUTCFullYear()
-  const beforeBirthday = target.getUTCMonth() < birth.getUTCMonth()
-    || (target.getUTCMonth() === birth.getUTCMonth() && target.getUTCDate() < birth.getUTCDate())
-  if (beforeBirthday) age -= 1
+  const age = Math.round((target.getTime() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
   return age > 0 ? String(age) : ''
 }
 
