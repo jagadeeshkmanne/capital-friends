@@ -502,10 +502,7 @@ function ActionsPanel({
       </div>
 
       {!executionEnabled ? (
-        <div className="border border-blue-500/25 bg-blue-500/10 rounded-lg px-4 py-4">
-          <p className="text-sm font-semibold text-blue-400">Actions unlock {actionYear ? `around ${actionYear}` : 'in the final three years'}</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">Bucket transfers open only during the final three years before retirement. Until then, this screen shows targets and current fund roles without moving long-term growth money early.</p>
-        </div>
+        <PreviewActions plan={plan} actionYear={actionYear} />
       ) : (
         <>
           <div className="flex items-center justify-between gap-4 bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
@@ -570,6 +567,63 @@ function ActionsPanel({
         <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-400" />
         <p>Fund suggestions use bucket role and goal-owned value. Before confirming, review exit load, taxes, lock-in, credit quality and suitability. Capital Friends records the reviewed transaction; it does not place an order with the fund house.</p>
       </div>
+    </div>
+  )
+}
+
+function PreviewActions({ plan, actionYear }) {
+  const steps = [
+    {
+      label: 'Build B1 income reserve',
+      amount: plan.targets.b1,
+      detail: `${formatINR(plan.expense.monthlyExpense)}/month is withdrawn from B1 after retirement.`,
+      tone: 'text-emerald-400',
+    },
+    {
+      label: 'Build B2 stability reserve',
+      amount: plan.targets.b2,
+      detail: 'B2 refills B1 only from money above its own target.',
+      tone: 'text-amber-400',
+    },
+    {
+      label: 'Keep B3 invested for growth',
+      amount: plan.targets.b3,
+      detail: 'B3 supports later retirement years and is not moved entirely to debt.',
+      tone: 'text-violet-400',
+    },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <div className="border border-blue-500/25 bg-blue-500/10 rounded-lg px-4 py-3">
+        <p className="text-sm font-semibold text-blue-400">Illustrative retirement setup</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">These are target amounts for the retirement date. No transaction, unit or NAV is changed in this preview.</p>
+      </div>
+
+      <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+        {steps.map((step, index) => (
+          <div key={step.label} className="grid grid-cols-[28px_minmax(0,1fr)_auto] gap-3 items-center px-4 py-3 border-t first:border-t-0 border-[var(--border-light)]">
+            <span className="w-7 h-7 rounded-full bg-[var(--bg-inset)] grid place-items-center text-xs font-bold text-[var(--text-muted)]">{index + 1}</span>
+            <div>
+              <p className={`text-sm font-semibold ${step.tone}`}>{step.label}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">{step.detail}</p>
+            </div>
+            <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(step.amount)}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-center border border-emerald-500/25 bg-emerald-500/10 rounded-lg px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-emerald-400">Sample first monthly withdrawal</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">Paid from B1. Later, B1 is reviewed and refilled from bucket surplus.</p>
+        </div>
+        <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(plan.expense.monthlyExpense)}</p>
+      </div>
+
+      <p className="text-xs text-[var(--text-dim)]">
+        Exact fund names, switch amounts and units unlock {actionYear ? `around ${actionYear}` : 'in the final three years'}, when the app can use the then-current corpus, holdings and NAV.
+      </p>
     </div>
   )
 }

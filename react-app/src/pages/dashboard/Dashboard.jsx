@@ -9,7 +9,7 @@ import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR, splitFundName } from '../../data/familyData'
-import { GLIDE_PATH } from '../../data/glidePath'
+import { getRecommendedAllocation } from '../../data/glidePath'
 
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-red-400' }
 function plPrefix(val) { return val >= 0 ? '+' : '' }
@@ -422,7 +422,7 @@ export default function Dashboard() {
       if (yearsLeft <= 0) return
       const rec = g.goalType === 'Emergency Fund'
         ? { equity: 0, debt: 100, label: 'Safety' }
-        : (() => { const s = GLIDE_PATH.find(s => yearsLeft <= s.maxYears); return { equity: s.equity, debt: 100 - s.equity, label: s.label } })()
+        : getRecommendedAllocation(g.goalType, yearsLeft)
       const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
       let totalVal = 0, eqVal = 0
       for (const m of maps) {

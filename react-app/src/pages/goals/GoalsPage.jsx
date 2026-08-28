@@ -254,7 +254,10 @@ export default function GoalsPage() {
   // De-risk alerts derived from allocationHealth (over-equity goals)
   const deRiskAlerts = useMemo(() => {
     return filtered
-      .filter(g => { const h = allocationHealth[g.goalId]; return h && h.needsAttention && h.mismatch > 0 })
+      .filter(g => {
+        const h = allocationHealth[g.goalId]
+        return g.goalType !== 'Retirement' && h && h.needsAttention && h.mismatch > 0
+      })
       .map(g => {
         const h = allocationHealth[g.goalId]
         return { goalId: g.goalId, goalName: g.goalName, yearsLeft: h.yearsLeft.toFixed(1), equityPct: h.actualEquity, maxEquity: h.recommendedEquity, excessPct: h.mismatch }
@@ -897,7 +900,11 @@ export default function GoalsPage() {
                         </span>
                       </div>
                       {h.needsAttention && h.mismatch > 0 && (
-                        <p className="text-xs text-amber-400">⚠ {h.mismatch}% over equity — consider shifting to debt</p>
+                        <p className="text-xs text-amber-400">
+                          {g.goalType === 'Retirement'
+                            ? `Review ${h.mismatch}% excess equity against the retirement buckets`
+                            : `${h.mismatch}% over equity — consider shifting to debt`}
+                        </p>
                       )}
                       {h.needsAttention && h.mismatch < 0 && (
                         <p className="text-xs text-blue-400">ℹ {Math.abs(h.mismatch)}% under equity — room for growth</p>
