@@ -80,11 +80,14 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   // Parse dynamic fields from initial data
   const initDynamic = initial?.dynamicFields ? (typeof initial.dynamicFields === 'string' ? JSON.parse(initial.dynamicFields) : initial.dynamicFields) : {}
 
+  const initType = initial?.investmentType || ''
+  const isStandardType = !initType || INVESTMENT_TYPES.some(t => t.value === initType)
+
   const [form, setForm] = useState({
-    investmentType: initial?.investmentType || '',
+    investmentType: isStandardType ? initType : 'Other',
     investmentCategory: initial?.investmentCategory || '',
     investmentName: initial?.investmentName || '',
-    customType: initial?.customType || '',
+    customType: isStandardType ? (initial?.customType || '') : initType,
     familyMemberId: initial?.familyMemberId || '',
     investedAmount: initial?.investedAmount || '',
     currentValue: initial?.currentValue || '',

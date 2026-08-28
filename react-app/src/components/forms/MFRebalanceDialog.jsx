@@ -390,14 +390,14 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
                       <span className="text-[var(--text-dim)]"> → {h.newPct.toFixed(1)}%</span>
                     </td>
                     <td className="py-2 px-2 text-right font-semibold tabular-nums">
-                      {h.isOverweight ? (
-                        <span className="text-amber-400/70 text-xs">Overweight</span>
-                      ) : h.lumpsumRestricted && h.sipRestricted ? (
+                      {h.lumpsumRestricted && h.sipRestricted ? (
                         <span className="text-red-400/80 text-xs">Blocked</span>
                       ) : h.lumpsumRestricted ? (
                         <span className="text-amber-400/80 text-xs">SIP only</span>
                       ) : h.invest > 0 ? (
                         <span className="text-emerald-400">{fmt(h.invest)}</span>
+                      ) : h.isOverweight ? (
+                        <span className="text-amber-400/70 text-xs">Overweight</span>
                       ) : (
                         <span className="text-[var(--text-dim)] text-xs">Balanced</span>
                       )}
@@ -423,14 +423,14 @@ function PortfolioLumpsumSection({ portfolio, holdings, totalValue }) {
                 <div className="flex items-start justify-between gap-2">
                   <FundCardName fundName={h.fundName} />
                   <div className="text-right shrink-0">
-                    {h.isOverweight ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
-                    ) : h.lumpsumRestricted && h.sipRestricted ? (
+                    {h.lumpsumRestricted && h.sipRestricted ? (
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Blocked</span>
                     ) : h.lumpsumRestricted ? (
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">SIP only</span>
                     ) : h.invest > 0 ? (
                       <p className="text-xs font-bold text-emerald-400 tabular-nums">{fmt(h.invest)}</p>
+                    ) : h.isOverweight ? (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Overweight</span>
                     ) : (
                       <span className="text-xs text-[var(--text-dim)]">Balanced</span>
                     )}
@@ -664,7 +664,7 @@ export default function MFRebalanceDialog({ filterPortfolioId }) {
 
       {/* Per-portfolio sections */}
       {portfolioGroups.map((p, i) => (
-        <div key={p.portfolioId} className="border border-[var(--border-light)] border-l-2 border-l-violet-500/50 rounded-lg overflow-hidden">
+        <div key={p.portfolioId} className="border border-[var(--border-light)] border-l-2 border-l-violet-500/50 rounded-lg">
           {/* Portfolio header — desktop: single row, mobile: stacked */}
           <div className="px-3 py-2.5 bg-[var(--bg-inset)]">
             {/* Desktop header */}

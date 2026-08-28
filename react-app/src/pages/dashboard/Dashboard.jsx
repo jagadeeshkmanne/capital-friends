@@ -104,6 +104,7 @@ export default function Dashboard() {
     reminderList, goalList, goalPortfolioMappings,
     assetAllocations,
     activeMembers, activeBanks, activeInvestmentAccounts,
+    healthCheckCompleted, healthCheckAnswers
   } = useData()
 
   const [showRebalanceDialog, setShowRebalanceDialog] = useState(false)
@@ -478,30 +479,76 @@ export default function Dashboard() {
     const items = []
     const activeInsurance = filterOwner((insurancePolicies || []).filter((p) => p.status === 'Active'), 'memberId')
 
-    // Check term life insurance
-    const hasTermLife = activeInsurance.some((p) => p.policyType === 'Term Life')
-    if (!hasTermLife) {
+    if (healthCheckCompleted === false) {
       items.push({
-        type: 'critical', title: 'No Term Life Insurance',
-        description: 'Family loses its sole income source if primary earner passes away. Get 10-15x annual income cover.',
-        action: 'Add Policy', navigateTo: '/insurance',
+        type: 'warning', title: 'Financial Health Check Pending',
+        description: 'Complete your family financial health check to uncover critical risks and missing policies.',
+        action: 'Start Check', navigateTo: '/health-check',
       })
     }
 
-    // Check health insurance
-    const healthCover = activeInsurance.filter((p) => p.policyType === 'Health').reduce((s, p) => s + p.sumAssured, 0)
-    if (healthCover === 0) {
-      items.push({
-        type: 'critical', title: 'No Health Insurance',
-        description: 'Medical emergencies without cover can wipe out years of savings. Get minimum 10L family cover.',
-        action: 'Add Policy', navigateTo: '/insurance',
-      })
-    } else if (healthCover < 500000) {
-      items.push({
-        type: 'warning', title: 'Inadequate Health Insurance',
-        description: `Current cover ${formatINR(healthCover)} may not cover a single hospital stay. Consider upgrading.`,
-        navigateTo: '/insurance',
-      })
+    if (healthCheckCompleted && healthCheckAnswers) {
+      if (healthCheckAnswers.termLife !== 'yes') {
+        items.push({
+          type: 'critical', title: 'No Term Life Insurance',
+          description: 'Family loses its sole income source if primary earner passes away. Get 10-15x annual income cover.',
+          action: 'Add Policy', navigateTo: '/insurance',
+        })
+      }
+      if (healthCheckAnswers.healthIns !== 'yes') {
+        items.push({
+          type: 'critical', title: 'No Health Insurance',
+          description: 'Medical emergencies without cover can wipe out years of savings. Get minimum 10L family cover.',
+          action: 'Add Policy', navigateTo: '/insurance',
+        })
+      }
+      if (healthCheckAnswers.hasWill !== 'yes') {
+        items.push({
+          type: 'warning', title: 'Create a Legal Will',
+          description: 'A registered Will ensures smooth transfer of assets to your heirs without family disputes.',
+          action: 'Update', navigateTo: '/health-check',
+        })
+      }
+      if (healthCheckAnswers.nominees !== 'yes') {
+        items.push({
+          type: 'warning', title: 'Missing Nominees',
+          description: 'Ensure nominees are updated on all your bank, demat, and insurance accounts.',
+          action: 'Update', navigateTo: '/health-check',
+        })
+      }
+      if (healthCheckAnswers.familyAware !== 'yes') {
+        items.push({
+          type: 'warning', title: 'Family Not Aware',
+          description: 'Your family is unaware of your investments. Ensure they know how to access this dashboard.',
+          action: 'Update', navigateTo: '/health-check',
+        })
+      }
+    } else {
+      // Check term life insurance
+      const hasTermLife = activeInsurance.some((p) => p.policyType === 'Term Life')
+      if (!hasTermLife) {
+        items.push({
+          type: 'critical', title: 'No Term Life Insurance',
+          description: 'Family loses its sole income source if primary earner passes away. Get 10-15x annual income cover.',
+          action: 'Add Policy', navigateTo: '/insurance',
+        })
+      }
+
+      // Check health insurance
+      const healthCover = activeInsurance.filter((p) => p.policyType === 'Health').reduce((s, p) => s + p.sumAssured, 0)
+      if (healthCover === 0) {
+        items.push({
+          type: 'critical', title: 'No Health Insurance',
+          description: 'Medical emergencies without cover can wipe out years of savings. Get minimum 10L family cover.',
+          action: 'Add Policy', navigateTo: '/insurance',
+        })
+      } else if (healthCover < 500000) {
+        items.push({
+          type: 'warning', title: 'Inadequate Health Insurance',
+          description: `Current cover ${formatINR(healthCover)} may not cover a single hospital stay. Consider upgrading.`,
+          navigateTo: '/insurance',
+        })
+      }
     }
 
     // Check emergency fund goals
@@ -582,7 +629,7 @@ export default function Dashboard() {
     })
 
     return items.slice(0, 6)
-  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, mfHoldings])
+  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, mfHoldings, healthCheckCompleted, healthCheckAnswers])
 
   // ── Upcoming Reminders (sorted by due date) ──
   const upcomingReminders = useMemo(() => {

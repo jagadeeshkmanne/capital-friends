@@ -24,7 +24,7 @@ export default function PrivacyPolicy() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-slate-500 mb-10">Last updated: March 13, 2026</p>
+        <p className="text-sm text-slate-500 mb-10">Last updated: August 25, 2026</p>
 
         {/* Overview */}
         <Section icon={<Shield size={20} />} color="emerald" title="Overview">
@@ -106,9 +106,9 @@ export default function PrivacyPolicy() {
         <Section icon={<Eye size={20} />} color="amber" title="How We Use Google User Data">
           <p>Capital Friends accesses Google user data exclusively to provide its core portfolio tracking functionality. Below is a complete disclosure of how each type of data is used:</p>
           <ul className="mt-3 space-y-3">
-            <Li><strong className="text-white">Google Sheets data:</strong> Your financial data (mutual fund holdings, stock portfolios, insurance policies, loan records, family members, goals, and transaction history) is read from and written to a single Google Spreadsheet that the app creates in your Google Drive. This data is used solely to render your dashboard, portfolio views, reports, and goal tracking within the app. It is never copied, cached on any server, or transmitted outside your browser session.</Li>
+            <Li><strong className="text-white">Google Sheets data:</strong> Your financial data (mutual fund holdings, stock portfolios, insurance policies, loan records, family members, goals, and transaction history) is read from and written to the Capital Friends spreadsheet in your Google Drive. It is processed through Google APIs and Apps Script to render the app and run features you enable. Capital Friends does not keep a separate server-side copy of this portfolio data.</Li>
             <Li><strong className="text-white">Google Drive access:</strong> Used only to create the Capital Friends spreadsheet during first-time setup. No other files in your Drive are listed, accessed, read, or modified.</Li>
-            <Li><strong className="text-white">Gmail (send only):</strong> Used exclusively to send scheduled portfolio summary emails and reminder notifications (SIP reminders, insurance renewal alerts, goal progress) from your own Gmail account to recipients you configure. Email content is generated on-the-fly from your spreadsheet data and is not stored anywhere. We do not read, search, or delete any emails.</Li>
+            <Li><strong className="text-white">Gmail (send only):</strong> Used exclusively to send scheduled portfolio summary emails and reminder notifications (SIP reminders, insurance renewal alerts, goal progress) from your own Gmail account to recipients you configure. Capital Friends does not keep a separate copy of the generated email; normal retention in your Sent folder and recipients&apos; mailboxes still applies. We do not read, search, or delete your emails.</Li>
             <Li><strong className="text-white">Apps Script triggers:</strong> Used to schedule background tasks that refresh mutual fund NAV prices daily and send automated email reports. These triggers run entirely within Google&apos;s infrastructure under your authenticated session.</Li>
             <Li><strong className="text-white">Profile information:</strong> Your name, email, and profile picture (from Google Sign-In) are displayed within the app&apos;s UI for identification purposes only. This information is not stored on any server or shared with any third party.</Li>
           </ul>
@@ -122,7 +122,7 @@ export default function PrivacyPolicy() {
             <Li><strong className="text-white">No server-side storage:</strong> Your financial data is never transmitted to or stored on any server owned or operated by Capital Friends. All data resides exclusively in your Google Drive, protected by Google&apos;s enterprise-grade security infrastructure.</Li>
             <Li><strong className="text-white">Encryption in transit:</strong> All communication between your browser and Google APIs is encrypted using HTTPS/TLS. The app is served over HTTPS from GitHub Pages.</Li>
             <Li><strong className="text-white">Encryption at rest:</strong> Your spreadsheet data is stored in Google Drive, which encrypts all data at rest using AES-256 encryption as part of Google&apos;s standard infrastructure security.</Li>
-            <Li><strong className="text-white">OAuth 2.0 authentication:</strong> The app uses Google&apos;s OAuth 2.0 protocol for authentication. Access tokens are stored only in your browser&apos;s session memory and are never persisted to disk, local storage, or any server.</Li>
+            <Li><strong className="text-white">OAuth 2.0 authentication:</strong> The app uses Google&apos;s OAuth 2.0 protocol for authentication. To restore your session, the access token and its expiry are stored in your browser&apos;s local storage and removed when you sign out or when the token expires. They are not stored on a Capital Friends server. Anyone who can access the same browser profile may be able to access local session data, so sign out on shared devices.</Li>
             <Li><strong className="text-white">Minimal data access:</strong> The app accesses only the single spreadsheet it created. It does not scan, index, or access any other files in your Google Drive, emails in your Gmail, or data in any other Google service.</Li>
             <Li><strong className="text-white">No third-party data sharing:</strong> Your Google user data is never shared with, disclosed to, or made accessible to any third party, including analytics services, advertising networks, or data brokers.</Li>
             <Li><strong className="text-white">Open source:</strong> The entire application source code is publicly available on <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">GitHub</a>, allowing independent verification of all data handling practices.</Li>
@@ -148,7 +148,7 @@ export default function PrivacyPolicy() {
           <p>If you enable email reports in Settings, the app uses Google Apps Script (running under your authenticated session) to send a portfolio summary email via your Gmail account.</p>
           <ul className="mt-3 space-y-2">
             <Li>Emails are sent <strong className="text-white">from your Gmail</strong> to recipients you configure (yourself and/or family members)</Li>
-            <Li>Email content is generated on-the-fly from your spreadsheet data — it is not stored anywhere</Li>
+            <Li>Email content is generated on-the-fly from your spreadsheet data; Capital Friends does not keep a separate copy, while normal Gmail and recipient-mailbox retention applies</Li>
             <Li>We cannot read, access, search, or delete your emails — the <code className="text-xs text-violet-400 bg-violet-500/10 px-1 rounded">gmail.send</code> scope only permits sending</Li>
             <Li>You can disable email reports at any time from Settings</Li>
           </ul>

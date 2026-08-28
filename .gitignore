@@ -25,6 +25,8 @@ temp/
 funds/
 copy-trade/data/
 *.csv
+capital-friends-data.json
+youtube-studio/
 
 # Claude settings
 .claude/settings.json

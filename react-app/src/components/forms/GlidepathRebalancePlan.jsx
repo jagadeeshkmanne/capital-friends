@@ -226,7 +226,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
           const totalSwitchValue = pd.suggestedSells.reduce((s, sell) => s + getSellUnits(sell.schemeCode, sell.suggestedUnits, sell.units) * getSellNav(sell.schemeCode, sell.currentNav), 0)
 
           return (
-            <div key={pd.portfolioId} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+            <div key={pd.portfolioId} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)]">
               {/* Portfolio header */}
               <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between">
                 <div>
