@@ -4,13 +4,15 @@ const EQUITY_CATEGORY_WORDS = [
   'thematic', 'international',
 ]
 
-const HYBRID_CATEGORY_WORDS = [
-  'hybrid', 'multi-asset', 'multi asset', 'balanced advantage',
-  'dynamic asset allocation', 'equity savings', 'arbitrage',
+const B1_CATEGORY_WORDS = [
+  'liquid', 'overnight', 'money market', 'ultra short', 'ultra-short',
+  'low duration', 'short duration', 'cash',
 ]
 
-const DEBT_CATEGORY_WORDS = [
-  'liquid', 'debt', 'gilt', 'duration', 'overnight', 'money market',
+const B2_CATEGORY_WORDS = [
+  'hybrid', 'multi-asset', 'multi asset', 'balanced advantage',
+  'dynamic asset allocation', 'equity savings', 'arbitrage', 'debt', 'gilt',
+  'medium duration', 'long duration',
   'corporate bond', 'banking & psu', 'credit risk', 'floater',
 ]
 
@@ -46,6 +48,13 @@ export function getRetirementExpenseBasis(goal, planDate = new Date()) {
 }
 
 export function classifyRetirementHolding(holding, assetAllocation) {
+  const category = holding?.category || ''
+  // B1 is intentionally limited to cash-like and short-duration categories.
+  // A generic debt label is not enough because duration and credit risk matter.
+  if (includesAny(category, B1_CATEGORY_WORDS)) {
+    return { bucket: 'b1', reason: category || 'Liquid/short debt', equity: 0, confidence: 'category' }
+  }
+
   const allocation = assetAllocation || null
   if (allocation) {
     const equity = Number(allocation.Equity) || 0
@@ -53,17 +62,17 @@ export function classifyRetirementHolding(holding, assetAllocation) {
     const cash = Number(allocation.Cash) || 0
     const knownTotal = Object.values(allocation).reduce((sum, value) => sum + (Number(value) || 0), 0)
 
-    if (equity >= 70) return { bucket: 'b3', reason: `${equity.toFixed(0)}% equity`, equity }
-    if (equity >= 30) return { bucket: 'b2', reason: `${equity.toFixed(0)}% equity`, equity }
-    if (debt + cash >= 70) return { bucket: 'b1', reason: `${(debt + cash).toFixed(0)}% debt/cash`, equity }
-    if (knownTotal >= 70) return { bucket: null, reason: 'Mixed assets need review', equity }
+    if (equity >= 70) return { bucket: 'b3', reason: `${equity.toFixed(0)}% equity`, equity, confidence: 'allocation' }
+    if (equity >= 30) return { bucket: 'b2', reason: `${equity.toFixed(0)}% equity`, equity, confidence: 'allocation' }
+    if (debt + cash >= 70 && includesAny(category, B2_CATEGORY_WORDS)) {
+      return { bucket: 'b2', reason: `${(debt + cash).toFixed(0)}% debt/cash`, equity, confidence: 'allocation' }
+    }
+    if (knownTotal >= 70) return { bucket: null, reason: 'Asset mix needs review', equity, confidence: 'review' }
   }
 
-  const category = holding?.category || ''
-  if (includesAny(category, EQUITY_CATEGORY_WORDS)) return { bucket: 'b3', reason: category, equity: 100 }
-  if (includesAny(category, HYBRID_CATEGORY_WORDS)) return { bucket: 'b2', reason: category, equity: 50 }
-  if (includesAny(category, DEBT_CATEGORY_WORDS)) return { bucket: 'b1', reason: category, equity: 0 }
-  return { bucket: null, reason: category || 'Category unavailable', equity: null }
+  if (includesAny(category, EQUITY_CATEGORY_WORDS)) return { bucket: 'b3', reason: category, equity: 100, confidence: 'category' }
+  if (includesAny(category, B2_CATEGORY_WORDS)) return { bucket: 'b2', reason: category, equity: 40, confidence: 'category' }
+  return { bucket: null, reason: category || 'Category unavailable', equity: null, confidence: 'review' }
 }
 
 function allocateFromFunds(funds, requestedAmount, committedUnits = {}) {
@@ -148,6 +157,7 @@ export function buildRetirementBucketPlan({
         bucket: classification.bucket,
         bucketReason: classification.reason,
         equityPercent: classification.equity,
+        classificationConfidence: classification.confidence,
       })
     }
   }
@@ -159,11 +169,20 @@ export function buildRetirementBucketPlan({
     unclassified: allFunds.filter(fund => !fund.bucket).sort((a, b) => b.goalValue - a.goalValue),
   }
 
+  const b2RefillSources = [...byBucket.b2].sort((a, b) =>
+    (a.equityPercent ?? 100) - (b.equityPercent ?? 100) || b.goalValue - a.goalValue,
+  )
+  const b3RefillSources = [...byBucket.b3].sort((a, b) =>
+    (b.equityPercent ?? 0) - (a.equityPercent ?? 0) || b.goalValue - a.goalValue,
+  )
+
   const totals = Object.fromEntries(
     Object.entries(byBucket).map(([bucket, funds]) => [bucket, funds.reduce((sum, fund) => sum + fund.goalValue, 0)]),
   )
   const b1Target = expense.monthlyExpense * b1TargetMonths
   const b2Target = expense.monthlyExpense * b2TargetMonths
+  const retirementTarget = Math.max(0, Number(goal?.targetAmount) || 0)
+  const b3Target = Math.max(0, retirementTarget - b1Target - b2Target)
   const b1Deficit = Math.max(0, b1Target - totals.b1)
 
   const committedUnits = {}
@@ -171,22 +190,40 @@ export function buildRetirementBucketPlan({
   // fills B1 directly so the medium-term reserve remains intact.
   const b2Surplus = Math.max(0, totals.b2 - b2Target)
   const b2ToB1Requested = Math.min(b1Deficit, b2Surplus)
-  const b2ToB1 = allocateFromFunds(byBucket.b2, b2ToB1Requested, committedUnits)
-  const b3ToB1Requested = Math.max(0, b1Deficit - b2ToB1.fundedAmount)
-  const b3ToB1 = allocateFromFunds(byBucket.b3, b3ToB1Requested, committedUnits)
+  const b2ToB1 = allocateFromFunds(b2RefillSources, b2ToB1Requested, committedUnits)
+  // B3 may fund another bucket only from the amount above its own retirement
+  // target. This avoids draining growth assets while the goal is underfunded.
+  const b3Surplus = Math.max(0, totals.b3 - b3Target)
+  const b3ToB1Requested = Math.min(
+    Math.max(0, b1Deficit - b2ToB1.fundedAmount),
+    b3Surplus,
+  )
+  const b3ToB1 = allocateFromFunds(b3RefillSources, b3ToB1Requested, committedUnits)
 
   const b2AfterB1 = totals.b2 - b2ToB1.fundedAmount
-  const b3ToB2Requested = Math.max(0, b2Target - b2AfterB1)
-  const b3ToB2 = allocateFromFunds(byBucket.b3, b3ToB2Requested, committedUnits)
+  const b3SurplusAfterB1 = Math.max(0, b3Surplus - b3ToB1.fundedAmount)
+  const b3ToB2Requested = Math.min(Math.max(0, b2Target - b2AfterB1), b3SurplusAfterB1)
+  const b3ToB2 = allocateFromFunds(b3RefillSources, b3ToB2Requested, committedUnits)
+
+  const b1AfterMoves = totals.b1 + b2ToB1.fundedAmount + b3ToB1.fundedAmount
+  const b2AfterMoves = totals.b2 - b2ToB1.fundedAmount + b3ToB2.fundedAmount
+  const totalClassified = totals.b1 + totals.b2 + totals.b3
+  const fundingGap = Math.max(0, retirementTarget - totalClassified)
 
   return {
     expense,
     allFunds,
     byBucket,
     totals,
-    totalClassified: totals.b1 + totals.b2 + totals.b3,
+    totalClassified,
     totalGoalValue: allFunds.reduce((sum, fund) => sum + fund.goalValue, 0),
-    targets: { b1: b1Target, b2: b2Target },
+    targets: { b1: b1Target, b2: b2Target, b3: b3Target, total: retirementTarget },
+    gaps: {
+      b1: Math.max(0, b1Target - b1AfterMoves),
+      b2: Math.max(0, b2Target - b2AfterMoves),
+      b3: Math.max(0, b3Target - totals.b3 + b3ToB1.fundedAmount + b3ToB2.fundedAmount),
+    },
+    fundingGap,
     plannedSWR: Number(goal?.targetAmount) > 0
       ? (expense.monthlyExpense * 12) / Number(goal.targetAmount)
       : 0,
@@ -194,7 +231,10 @@ export function buildRetirementBucketPlan({
       { id: 'b2-to-b1', from: 'b2', to: 'b1', label: 'B2 to B1', ...b2ToB1 },
       { id: 'b3-to-b1', from: 'b3', to: 'b1', label: 'B3 to B1', ...b3ToB1 },
       { id: 'b3-to-b2', from: 'b3', to: 'b2', label: 'B3 to B2', ...b3ToB2 },
-    ].filter(operation => operation.fundedAmount > 0.01 || operation.shortfall > 0.01),
-    targetShortfall: b3ToB1.shortfall + b3ToB2.shortfall,
+    ].filter(operation => operation.fundedAmount > 0.01),
+    targetShortfall: Math.max(
+      fundingGap,
+      Math.max(0, b1Target - b1AfterMoves) + Math.max(0, b2Target - b2AfterMoves),
+    ),
   }
 }

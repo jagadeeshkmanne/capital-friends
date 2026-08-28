@@ -1,19 +1,66 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRightLeft, ShieldCheck, TrendingUp, Wallet } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  CheckCircle2,
+  Info,
+  ShieldCheck,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import FundSearchInput from './FundSearchInput'
 import { allocateBucketWithdrawal, buildRetirementBucketPlan } from '../../utils/retirementBuckets'
 
 const BUCKETS = {
-  b1: { label: 'B1 · Income', period: 'Years 0–2', tone: 'emerald', icon: Wallet },
-  b2: { label: 'B2 · Stability', period: 'Years 2–7', tone: 'amber', icon: ShieldCheck },
-  b3: { label: 'B3 · Growth', period: 'Year 7 onward', description: 'Remaining long-term corpus in growth equity', tone: 'violet', icon: TrendingUp },
+  b1: {
+    shortLabel: 'B1',
+    label: 'Income reserve',
+    period: 'First 2 years',
+    description: 'Monthly withdrawals from liquid and short-duration debt funds.',
+    eligible: 'Liquid, overnight, money-market and short-duration debt',
+    tone: 'emerald',
+    icon: Wallet,
+  },
+  b2: {
+    shortLabel: 'B2',
+    label: 'Stability reserve',
+    period: 'Next 5 years',
+    description: 'The bridge between near-term income and long-term growth.',
+    eligible: 'Hybrid, asset-allocation and suitable medium-term debt funds',
+    tone: 'amber',
+    icon: ShieldCheck,
+  },
+  b3: {
+    shortLabel: 'B3',
+    label: 'Growth bucket',
+    period: 'Year 8 onward',
+    description: 'The remaining retirement corpus stays invested for long-term growth.',
+    eligible: 'Equity-heavy funds, normally 70% equity or more',
+    tone: 'violet',
+    icon: TrendingUp,
+  },
 }
 
 const TONE = {
-  emerald: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-  amber: { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-  violet: { text: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
+  emerald: {
+    text: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/25',
+    active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  },
+  amber: {
+    text: 'text-amber-400',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/25',
+    active: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  },
+  violet: {
+    text: 'text-violet-400',
+    bg: 'bg-violet-500/10',
+    border: 'border-violet-500/25',
+    active: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+  },
 }
 
 function inputNumber(map, key, fallback, max = Infinity) {
@@ -32,6 +79,12 @@ function groupAllocations(operation) {
   }, {})
 }
 
+function yearsUntil(value) {
+  const target = value ? new Date(value) : null
+  if (!target || Number.isNaN(target.getTime())) return null
+  return Math.max(0, (target.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000))
+}
+
 export default function RetirementBucketPlan({
   goal,
   goalPortfolioMappings,
@@ -43,6 +96,7 @@ export default function RetirementBucketPlan({
   onConfirmPlan,
 }) {
   const today = new Date().toISOString().split('T')[0]
+  const [activeTab, setActiveTab] = useState('b1')
   const [rebalanceDate, setRebalanceDate] = useState(today)
   const [b1TargetMonths, setB1TargetMonths] = useState(24)
   const [b2TargetMonths, setB2TargetMonths] = useState(60)
@@ -66,25 +120,6 @@ export default function RetirementBucketPlan({
     planDate: new Date(`${rebalanceDate}T00:00:00`),
   }), [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, b1TargetMonths, b2TargetMonths, rebalanceDate])
 
-  const linkedPortfolios = useMemo(() => {
-    if (!plan?.allFunds) return []
-    const grouped = {}
-    for (const fund of plan.allFunds) {
-      if (!grouped[fund.portfolioId]) {
-        grouped[fund.portfolioId] = {
-          portfolioId: fund.portfolioId,
-          portfolioName: fund.portfolioName,
-          allocationPct: fund.allocationPct,
-          portfolioValue: 0,
-          goalValue: 0,
-        }
-      }
-      grouped[fund.portfolioId].portfolioValue += Number(fund.currentValue) || (fund.currentNav * Number(fund.units || 0))
-      grouped[fund.portfolioId].goalValue += fund.goalValue
-    }
-    return Object.values(grouped)
-  }, [plan])
-
   useEffect(() => {
     if (!plan) return
     if (withdrawAmount === '') setWithdrawAmount(String(Math.round(plan.expense.monthlyExpense)))
@@ -104,7 +139,9 @@ export default function RetirementBucketPlan({
   if (!plan) return <EmptyState title="No portfolios linked to this goal" detail="Link a mutual-fund portfolio to see the bucket plan." onClose={onClose} />
   if (plan.noExpenses) return <EmptyState title="Monthly expenses not set" detail="Edit the retirement goal and enter monthly expenses before opening the bucket plan." onClose={onClose} />
 
+  const retirementYears = yearsUntil(goal.targetDate)
   const withdrawal = allocateBucketWithdrawal(plan.byBucket.b1, withdrawAmount)
+  const hasUnclassified = plan.totals.unclassified > 1
 
   function sellKey(operation, allocation) {
     return `${operation.id}::${allocation.key}`
@@ -144,7 +181,7 @@ export default function RetirementBucketPlan({
           fromFundPrice,
           toFundPrice,
           switchDate: rebalanceDate,
-          notes: `Retirement ${operation.label} — ${goal.goalName}`,
+          notes: `Retirement ${operation.label} - ${goal.goalName}`,
         })
       }
     }
@@ -161,7 +198,7 @@ export default function RetirementBucketPlan({
         salePrice,
         saleDate: rebalanceDate,
         totalAmount: units * salePrice,
-        notes: `Retirement B1 monthly withdrawal — ${goal.goalName}`,
+        notes: `Retirement B1 monthly withdrawal - ${goal.goalName}`,
       }
     }).filter(item => item.units > 0 && item.salePrice > 0) : []
 
@@ -175,215 +212,369 @@ export default function RetirementBucketPlan({
       return !destination || inputNumber(buyNavs, key, destination.currentNav) <= 0
     }),
   )
-  const hasUnclassified = plan.totals.unclassified > 1
   const transactions = buildTransactions()
   const canConfirm = executionEnabled && !hasUnclassified && plan.targetShortfall <= 1 && !missingDestination
     && (transactions.switches.length > 0 || transactions.redemptions.length > 0)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {!executionEnabled && (
-        <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-3">
-          <p className="text-sm font-semibold text-blue-400">Preview only</p>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">Transactions unlock during the final three years before retirement. You can review the structure now without moving any data or units.</p>
+        <div className="flex items-start gap-3 border border-blue-500/25 bg-blue-500/10 px-4 py-3 rounded-lg">
+          <Info size={18} className="text-blue-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-blue-400">Retirement-day preview</p>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">
+              This shows how the target corpus can be organised at retirement. It does not recommend moving funds today.
+            </p>
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
-        <div>
-          <p className="text-xs font-bold text-[var(--text-dim)] uppercase">Expense used for bucket targets</p>
-          <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-            <span className="text-xl font-bold text-[var(--text-primary)]">{formatINR(plan.expense.monthlyExpense)}/mo</span>
-            <span className="text-xs text-[var(--text-dim)]">at retirement · from {formatINR(plan.expense.todayExpense)} today · {(plan.expense.inflation * 100).toFixed(1)}% inflation</span>
+      <div className="grid grid-cols-2 xl:grid-cols-4 border border-[var(--border-light)] rounded-lg overflow-hidden">
+        <Metric label="Retirement target" value={formatINR(plan.targets.total)} />
+        <Metric label="Monthly need at retirement" value={`${formatINR(plan.expense.monthlyExpense)}/mo`} />
+        <Metric label="Goal-linked value today" value={formatINR(plan.totalGoalValue)} />
+        <Metric label="Time to retirement" value={retirementYears === null ? '-' : `${retirementYears.toFixed(1)} years`} />
+      </div>
+
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+          <div>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">Target structure at retirement</h3>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">The bucket amount is fixed first. Suitable funds are then assigned to that role.</p>
           </div>
-          <p className="text-xs text-violet-400 mt-1">
-            Target-implied starting SWR: {(plan.plannedSWR * 100).toFixed(1)}% yearly · {formatINR(plan.expense.monthlyExpense * 12)} in the first retirement year
-          </p>
+          <p className="text-xs text-[var(--text-dim)]">Starting SWR: {(plan.plannedSWR * 100).toFixed(1)}% · First-year income: {formatINR(plan.expense.monthlyExpense * 12)}</p>
         </div>
-        <label className="text-xs text-[var(--text-dim)]">
-          Plan date
-          <input type="date" value={rebalanceDate} max={today} onChange={event => setRebalanceDate(event.target.value)}
-            className="block mt-1 text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]" />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] gap-3">
-        <section className="bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
-          <p className="text-xs font-bold text-[var(--text-dim)] uppercase">Portfolio share linked to this goal</p>
-          <div className="mt-2 space-y-2">
-            {linkedPortfolios.map(portfolio => (
-              <div key={portfolio.portfolioId} className="flex items-center justify-between gap-3 rounded bg-[var(--bg-card)] px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{portfolio.portfolioName}</p>
-                  <p className="text-xs text-[var(--text-dim)]">{formatINR(portfolio.goalValue)} of {formatINR(portfolio.portfolioValue)} belongs to this goal</p>
-                </div>
-                <span className="text-sm font-bold text-violet-400 shrink-0">{portfolio.allocationPct}% linked</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
-          <p className="text-xs font-bold text-[var(--text-dim)] uppercase">How SWR becomes monthly income</p>
-          <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 mt-3 text-center">
-            <FlowValue label="Retirement target" value={formatINR(goal.targetAmount)} />
-            <span className="text-[var(--text-dim)]">×</span>
-            <FlowValue label="Starting SWR" value={`${(plan.plannedSWR * 100).toFixed(1)}%`} />
-            <span className="text-[var(--text-dim)]">=</span>
-            <FlowValue label="First-year income" value={formatINR(plan.expense.monthlyExpense * 12)} accent />
-          </div>
-          <p className="text-xs text-[var(--text-muted)] mt-3 text-center">That first-year income is paid as {formatINR(plan.expense.monthlyExpense)} per month from B1. SWR is calculated on the total retirement corpus, not only on B1.</p>
-        </section>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        {Object.keys(BUCKETS).map(bucket => (
-          <BucketCard key={bucket} bucket={bucket} plan={plan}
-            months={bucket === 'b1' ? b1TargetMonths : bucket === 'b2' ? b2TargetMonths : null}
-            b1Months={b1TargetMonths}
-            setMonths={bucket === 'b1' ? setB1TargetMonths : bucket === 'b2' ? setB2TargetMonths : null} />
-        ))}
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {Object.keys(BUCKETS).map(bucket => (
+            <TargetCard key={bucket} bucket={bucket} plan={plan}
+              months={bucket === 'b1' ? b1TargetMonths : bucket === 'b2' ? b2TargetMonths : null}
+              setMonths={bucket === 'b1' ? setB1TargetMonths : bucket === 'b2' ? setB2TargetMonths : null}
+              onOpen={() => setActiveTab(bucket)} />
+          ))}
+        </div>
+      </section>
 
       {hasUnclassified && (
-        <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 space-y-2">
-          <div className="flex gap-2 items-start">
-            <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
+        <div className="border border-rose-500/25 bg-rose-500/10 rounded-lg px-4 py-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={17} className="text-rose-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-rose-400">Classify these funds before confirming</p>
-              <p className="text-xs text-[var(--text-muted)]">Their asset mix is unclear, so their value is not silently treated as cash, hybrid, or equity.</p>
+              <p className="text-sm font-semibold text-rose-400">{plan.byBucket.unclassified.length} fund(s) need classification review</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">They are excluded from automatic bucket actions until their role is clear.</p>
             </div>
           </div>
-          {plan.byBucket.unclassified.map(fund => <FundLine key={fund.key} fund={fund} />)}
         </div>
       )}
 
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-bold text-[var(--text-primary)]">Recommended refill plan</p>
-          <p className="text-xs text-[var(--text-dim)]">B2 is used only when it has more than its five-year target. Otherwise B3 fills B1 directly, then fills any B2 shortage.</p>
-        </div>
-
-        {plan.operations.length === 0 ? (
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
-            <p className="text-sm font-semibold text-emerald-400">B1 and B2 are fully funded</p>
-            <p className="text-xs text-[var(--text-muted)]">No bucket movement is currently required.</p>
-          </div>
-        ) : plan.operations.map(operation => (
-          <OperationCard key={operation.id} operation={operation} plan={plan}
-            destinations={destinations} setDestinations={setDestinations}
-            sellUnits={sellUnits} setSellUnits={setSellUnits}
-            sellNavs={sellNavs} setSellNavs={setSellNavs}
-            buyNavs={buyNavs} setBuyNavs={setBuyNavs} />
-        ))}
-
-        {plan.targetShortfall > 1 && (
-          <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
-            The linked retirement allocation is short by {formatINR(plan.targetShortfall)} for the selected B1 and B2 targets. No transaction can be confirmed until the shortage is resolved or the assumptions are adjusted.
-          </p>
-        )}
-      </div>
-
-      <div className="bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-light)]">
-          <div>
-            <p className="text-sm font-bold text-[var(--text-primary)]">Monthly withdrawal from B1</p>
-            <p className="text-xs text-[var(--text-dim)]">One monthly amount distributed across the B1 funds linked to this goal.</p>
-          </div>
-          <button onClick={() => setWithdrawEnabled(value => !value)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${withdrawEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-[var(--text-muted)] bg-[var(--bg-card)]'}`}>
-            {withdrawEnabled ? 'Included' : 'Add withdrawal'}
+      <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+        <div className="flex overflow-x-auto bg-[var(--bg-inset)] border-b border-[var(--border-light)] p-1">
+          {Object.keys(BUCKETS).map(bucket => {
+            const meta = BUCKETS[bucket]
+            const tone = TONE[meta.tone]
+            return (
+              <button key={bucket} onClick={() => setActiveTab(bucket)}
+                className={`min-w-36 flex-1 px-4 py-2.5 rounded-md border text-sm font-semibold transition-colors ${activeTab === bucket ? tone.active : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+                {meta.shortLabel} · {meta.label}
+                <span className="ml-2 text-xs opacity-75">{plan.byBucket[bucket].length}</span>
+              </button>
+            )
+          })}
+          <button onClick={() => setActiveTab('actions')}
+            className={`min-w-36 flex-1 px-4 py-2.5 rounded-md border text-sm font-semibold transition-colors ${activeTab === 'actions' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+            Actions {plan.operations.length > 0 && <span className="ml-2 text-xs">{plan.operations.length}</span>}
           </button>
         </div>
-        {withdrawEnabled && (
-          <div className="p-4 space-y-3">
-            <label className="block max-w-xs text-xs text-[var(--text-dim)]">Withdrawal amount
-              <input type="number" min="0" max={plan.totals.b1} step="1000" value={withdrawAmount} onChange={event => setWithdrawAmount(event.target.value)}
-                className="mt-1 w-full text-sm font-bold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]" />
-            </label>
-            {withdrawal.allocations.map(allocation => {
-              const key = `withdraw::${allocation.key}`
-              return <EditableSellLine key={key} allocation={allocation} inputKey={key}
-                unitsMap={withdrawUnits} setUnitsMap={setWithdrawUnits} navMap={withdrawNavs} setNavMap={setWithdrawNavs} />
-            })}
-            {withdrawal.shortfall > 1 && <p className="text-xs text-rose-400">B1 is short by {formatINR(withdrawal.shortfall)} for this withdrawal.</p>}
-          </div>
-        )}
+
+        <div className="p-4 sm:p-5">
+          {activeTab === 'actions' ? (
+            <ActionsPanel
+              executionEnabled={executionEnabled}
+              plan={plan}
+              rebalanceDate={rebalanceDate}
+              setRebalanceDate={setRebalanceDate}
+              today={today}
+              destinations={destinations}
+              setDestinations={setDestinations}
+              sellUnits={sellUnits}
+              setSellUnits={setSellUnits}
+              sellNavs={sellNavs}
+              setSellNavs={setSellNavs}
+              buyNavs={buyNavs}
+              setBuyNavs={setBuyNavs}
+              withdrawEnabled={withdrawEnabled}
+              setWithdrawEnabled={setWithdrawEnabled}
+              withdrawAmount={withdrawAmount}
+              setWithdrawAmount={setWithdrawAmount}
+              withdrawal={withdrawal}
+              withdrawUnits={withdrawUnits}
+              setWithdrawUnits={setWithdrawUnits}
+              withdrawNavs={withdrawNavs}
+              setWithdrawNavs={setWithdrawNavs}
+            />
+          ) : (
+            <BucketPanel bucket={activeTab} plan={plan} executionEnabled={executionEnabled} />
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-light)]">
-        <button onClick={onClose} className="px-5 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)]">Close</button>
-        <button onClick={() => onConfirmPlan(transactions.switches, transactions.redemptions)} disabled={!canConfirm}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
-          <Wallet size={13} /> Confirm Plan
+        <button onClick={onClose} className="px-5 py-2 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)]">Close</button>
+        {executionEnabled && (
+          <button onClick={() => onConfirmPlan(transactions.switches, transactions.redemptions)} disabled={!canConfirm}
+            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+            <CheckCircle2 size={16} /> Confirm reviewed actions
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Metric({ label, value }) {
+  return (
+    <div className="px-4 py-3 border-r border-b xl:border-b-0 last:border-r-0 border-[var(--border-light)] bg-[var(--bg-inset)]">
+      <p className="text-xs text-[var(--text-dim)]">{label}</p>
+      <p className="text-lg font-bold text-[var(--text-primary)] mt-1 tabular-nums">{value}</p>
+    </div>
+  )
+}
+
+function TargetCard({ bucket, plan, months, setMonths, onOpen }) {
+  const meta = BUCKETS[bucket]
+  const tone = TONE[meta.tone]
+  const Icon = meta.icon
+  const target = plan.targets[bucket]
+  const targetPct = plan.targets.total > 0 ? (target / plan.targets.total) * 100 : 0
+
+  return (
+    <div className={`text-left border ${tone.border} ${tone.bg} rounded-lg px-4 py-4`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className={`w-9 h-9 rounded-lg grid place-items-center bg-[var(--bg-card)] ${tone.text}`}><Icon size={19} /></div>
+          <div>
+            <p className={`text-sm font-bold ${tone.text}`}>{meta.shortLabel} · {meta.label}</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{meta.period}</p>
+          </div>
+        </div>
+        {months && (
+          <select value={months} onChange={event => setMonths(Number(event.target.value))}
+            className="text-xs bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border)] rounded px-2 py-1">
+            {(bucket === 'b1' ? [12, 18, 24, 36] : [36, 48, 60, 84]).map(value => <option key={value} value={value}>{value} mo</option>)}
+          </select>
+        )}
+      </div>
+      <div className="flex items-end justify-between mt-5 gap-3">
+        <div>
+          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(target)}</p>
+          <p className="text-xs font-semibold text-[var(--text-muted)] mt-1">{targetPct.toFixed(0)}% of target</p>
+        </div>
+        <button type="button" onClick={onOpen} className={`text-xs font-semibold ${tone.text} hover:underline`}>
+          View funds
         </button>
       </div>
     </div>
   )
 }
 
-function FlowValue({ label, value, accent = false }) {
-  return <div className="min-w-0"><p className="text-xs text-[var(--text-dim)]">{label}</p><p className={`text-base sm:text-lg font-bold ${accent ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{value}</p></div>
-}
-
-function BucketCard({ bucket, plan, months, b1Months, setMonths }) {
+function BucketPanel({ bucket, plan, executionEnabled }) {
   const meta = BUCKETS[bucket]
   const tone = TONE[meta.tone]
   const Icon = meta.icon
-  const value = plan.totals[bucket]
-  const target = plan.targets[bucket]
-  const funded = !target || value >= target
-  const description = bucket === 'b1'
-    ? `${months} months in liquid and short-duration debt`
-    : bucket === 'b2'
-      ? `Next ${months} months in hybrid and stable assets`
-      : meta.description
-  const period = bucket === 'b1'
-    ? `Years 0–${months / 12}`
-    : bucket === 'b2'
-      ? `Years ${b1Months / 12}–${(b1Months + months) / 12}`
-      : meta.period
+  const funds = plan.byBucket[bucket]
 
   return (
-    <section className={`rounded-lg border ${tone.border} bg-[var(--bg-inset)] overflow-hidden`}>
-      <div className={`${tone.bg} px-4 py-3 border-b ${tone.border}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Icon size={16} className={tone.text} />
-            <div><p className={`text-sm font-bold ${tone.text}`}>{meta.label}</p><p className="text-xs text-[var(--text-muted)]">{period}</p></div>
+    <div className="space-y-4">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        <div className="flex items-start gap-3 max-w-3xl">
+          <div className={`w-10 h-10 rounded-lg grid place-items-center ${tone.bg} ${tone.text}`}><Icon size={21} /></div>
+          <div>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{meta.shortLabel} · {meta.label}</h3>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{meta.description}</p>
+            <p className="text-xs text-[var(--text-dim)] mt-2">Typical role: {meta.eligible}.</p>
           </div>
-          {months && (
-            <select value={months} onChange={event => setMonths(Number(event.target.value))}
-              className="text-xs bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border)] rounded px-2 py-1">
-              {(bucket === 'b1' ? [12, 18, 24, 36] : [36, 48, 60, 84]).map(value => <option key={value} value={value}>{value} mo</option>)}
-            </select>
-          )}
         </div>
-        <p className="text-xs text-[var(--text-dim)] mt-2">{description}</p>
-      </div>
-      <div className="p-3 space-y-3">
-        <div className="flex items-end justify-between gap-2">
-          <div><p className="text-xs text-[var(--text-dim)]">Current</p><p className="text-lg font-bold text-[var(--text-primary)]">{formatINR(value)}</p></div>
-          {target ? <div className="text-right"><p className="text-xs text-[var(--text-dim)]">Target</p><p className={`text-sm font-bold ${funded ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(target)}</p></div>
-            : <p className="text-xs font-semibold text-violet-400">Remaining growth corpus</p>}
-        </div>
-        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-          {plan.byBucket[bucket].length ? plan.byBucket[bucket].map(fund => <FundLine key={fund.key} fund={fund} />)
-            : <p className="text-xs text-[var(--text-dim)] py-2">No linked fund currently falls in this bucket.</p>}
+        <div className="grid grid-cols-2 gap-5 min-w-64">
+          <div>
+            <p className="text-xs text-[var(--text-dim)]">Target at retirement</p>
+            <p className={`text-lg font-bold mt-1 ${tone.text}`}>{formatINR(plan.targets[bucket])}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--text-dim)]">Mapped today</p>
+            <p className="text-lg font-bold text-[var(--text-primary)] mt-1">{formatINR(plan.totals[bucket])}</p>
+          </div>
         </div>
       </div>
-    </section>
+
+      {!executionEnabled && (
+        <div className="bg-[var(--bg-inset)] border-l-2 border-blue-500 px-3 py-2 text-xs text-[var(--text-muted)]">
+          “Mapped today” is the current value of matching funds. “Target” is the amount needed at retirement, so they are not same-date values.
+        </div>
+      )}
+
+      <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+        <div className="hidden md:grid grid-cols-[minmax(260px,1.5fr)_minmax(170px,.8fr)_minmax(180px,.8fr)_120px_130px] gap-3 px-4 py-2.5 bg-[var(--bg-inset)] text-xs font-semibold text-[var(--text-dim)]">
+          <span>Fund</span><span>Portfolio</span><span>Why this bucket</span><span className="text-right">Goal share</span><span className="text-right">Value today</span>
+        </div>
+        {funds.length ? funds.map(fund => <FundRow key={fund.key} fund={fund} />) : (
+          <div className="px-5 py-10 text-center">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">No linked fund currently matches {meta.shortLabel}</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">When this bucket is built, use {meta.eligible.toLowerCase()}.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
+        <Info size={15} className="shrink-0 mt-0.5" />
+        <p>
+          Goal links are portfolio-level: if a portfolio is 55% linked, 55% of each fund in it is counted for this goal. The bucket target is a total amount, not a fixed percentage per fund. Each fund has one operational role, so the same portfolio can supply different funds to B1, B2 and B3.
+        </p>
+      </div>
+    </div>
   )
 }
 
-function FundLine({ fund }) {
+function FundRow({ fund }) {
+  const equity = fund.equityPercent === null ? null : `${Math.round(fund.equityPercent)}% equity`
+  const showReason = !equity || fund.bucketReason !== equity
   return (
-    <div className="rounded bg-[var(--bg-card)] px-2.5 py-2">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs text-[var(--text-secondary)] line-clamp-2">{splitFundName(fund.fundName).main}</p>
-        <p className="text-xs font-bold text-[var(--text-primary)] shrink-0">{formatINR(fund.goalValue)}</p>
+    <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,1.5fr)_minmax(170px,.8fr)_minmax(180px,.8fr)_120px_130px] gap-2 md:gap-3 px-4 py-3 border-t border-[var(--border-light)] text-sm items-center">
+      <div className="min-w-0">
+        <p className="font-semibold text-[var(--text-primary)] break-words">{splitFundName(fund.fundName).main}</p>
+        <p className="text-xs text-[var(--text-dim)] mt-0.5">{fund.category || 'Category unavailable'}</p>
       </div>
-      <p className="text-xs text-[var(--text-dim)] mt-0.5">{fund.portfolioName} · {fund.allocationPct}% linked · {fund.bucketReason}</p>
+      <p className="text-[var(--text-secondary)]">{fund.portfolioName}</p>
+      <div>
+        <p className="text-[var(--text-secondary)]">{equity || fund.bucketReason}</p>
+        {showReason && equity && <p className="text-xs text-[var(--text-dim)] mt-0.5">{fund.bucketReason}</p>}
+      </div>
+      <div className="md:text-right">
+        <p className="font-semibold text-violet-400">{fund.allocationPct}%</p>
+        <p className="text-xs text-[var(--text-dim)]">of this fund</p>
+      </div>
+      <p className="font-bold text-[var(--text-primary)] md:text-right tabular-nums">{formatINR(fund.goalValue)}</p>
+    </div>
+  )
+}
+
+function ActionsPanel({
+  executionEnabled,
+  plan,
+  rebalanceDate,
+  setRebalanceDate,
+  today,
+  destinations,
+  setDestinations,
+  sellUnits,
+  setSellUnits,
+  sellNavs,
+  setSellNavs,
+  buyNavs,
+  setBuyNavs,
+  withdrawEnabled,
+  setWithdrawEnabled,
+  withdrawAmount,
+  setWithdrawAmount,
+  withdrawal,
+  withdrawUnits,
+  setWithdrawUnits,
+  withdrawNavs,
+  setWithdrawNavs,
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-base font-bold text-[var(--text-primary)]">Bucket refill rules</h3>
+        <p className="text-sm text-[var(--text-muted)] mt-1">The app recommends a review only when a source bucket has more than its own target.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Rule number="1" title="Protect B2" detail="Only B2 surplus can refill B1. Lower-equity B2 funds are reviewed first." />
+        <Rule number="2" title="Protect B3" detail="Only B3 surplus can refill B1 or B2. Higher-equity B3 funds are reviewed first." />
+        <Rule number="3" title="No forced sale" detail="If the corpus is short, the app shows the gap instead of draining growth." />
+      </div>
+
+      {!executionEnabled ? (
+        <div className="border border-blue-500/25 bg-blue-500/10 rounded-lg px-4 py-4">
+          <p className="text-sm font-semibold text-blue-400">No transaction is suggested in preview mode</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">The actionable review opens during the final three years before retirement. Until then, use the B1, B2 and B3 tabs to understand the future structure and current fund roles.</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-4 bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Review date</p>
+              <p className="text-xs text-[var(--text-dim)] mt-0.5">Amounts use the recorded units and NAV available on this date.</p>
+            </div>
+            <input type="date" value={rebalanceDate} max={today} onChange={event => setRebalanceDate(event.target.value)}
+              className="text-sm font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]" />
+          </div>
+
+          {plan.targetShortfall > 1 && (
+            <div className="border border-amber-500/25 bg-amber-500/10 rounded-lg px-4 py-3">
+              <p className="text-sm font-semibold text-amber-400">No complete automatic refill plan</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">The goal-linked corpus is short by {formatINR(plan.targetShortfall)} for this retirement structure. The app will not drain B3 below its growth target.</p>
+            </div>
+          )}
+
+          {plan.operations.length === 0 && plan.targetShortfall <= 1 ? (
+            <div className="border border-emerald-500/25 bg-emerald-500/10 rounded-lg px-4 py-3">
+              <p className="text-sm font-semibold text-emerald-400">No bucket transfer is required</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">B1, B2 and B3 are within their target structure.</p>
+            </div>
+          ) : plan.operations.map(operation => (
+            <OperationCard key={operation.id} operation={operation} plan={plan}
+              destinations={destinations} setDestinations={setDestinations}
+              sellUnits={sellUnits} setSellUnits={setSellUnits}
+              sellNavs={sellNavs} setSellNavs={setSellNavs}
+              buyNavs={buyNavs} setBuyNavs={setBuyNavs} />
+          ))}
+
+          <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-[var(--bg-inset)]">
+              <div>
+                <p className="text-sm font-bold text-[var(--text-primary)]">Monthly withdrawal from B1</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">Optional: record one retirement-income withdrawal after B1 is funded.</p>
+              </div>
+              <button onClick={() => setWithdrawEnabled(value => !value)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${withdrawEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-[var(--text-muted)] bg-[var(--bg-card)]'}`}>
+                {withdrawEnabled ? 'Included' : 'Add withdrawal'}
+              </button>
+            </div>
+            {withdrawEnabled && (
+              <div className="p-4 space-y-3 border-t border-[var(--border-light)]">
+                <label className="block max-w-xs text-xs text-[var(--text-dim)]">Withdrawal amount
+                  <input type="number" min="0" max={plan.totals.b1} step="1000" value={withdrawAmount} onChange={event => setWithdrawAmount(event.target.value)}
+                    className="mt-1 w-full text-sm font-bold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]" />
+                </label>
+                {withdrawal.allocations.map(allocation => {
+                  const key = `withdraw::${allocation.key}`
+                  return <EditableSellLine key={key} allocation={allocation} inputKey={key}
+                    unitsMap={withdrawUnits} setUnitsMap={setWithdrawUnits} navMap={withdrawNavs} setNavMap={setWithdrawNavs} />
+                })}
+                {withdrawal.shortfall > 1 && <p className="text-xs text-rose-400">B1 is short by {formatINR(withdrawal.shortfall)} for this withdrawal.</p>}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
+        <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-400" />
+        <p>Fund suggestions use bucket role and goal-owned value. Before confirming, review exit load, taxes, lock-in, credit quality and suitability. Capital Friends records the reviewed transaction; it does not place an order with the fund house.</p>
+      </div>
+    </div>
+  )
+}
+
+function Rule({ number, title, detail }) {
+  return (
+    <div className="border border-[var(--border-light)] rounded-lg px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span className="w-6 h-6 rounded-full bg-blue-500/15 text-blue-400 grid place-items-center text-xs font-bold">{number}</span>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      </div>
+      <p className="text-xs text-[var(--text-muted)] mt-2">{detail}</p>
     </div>
   )
 }
@@ -394,42 +585,49 @@ function OperationCard({ operation, plan, destinations, setDestinations, sellUni
   const groups = groupAllocations(operation)
 
   return (
-    <div className="bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg overflow-hidden">
-      <div className="px-4 py-3 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><span className="text-xs font-bold">{from.label}</span><ArrowRightLeft size={13} className="text-[var(--text-dim)]" /><span className="text-xs font-bold">{to.label}</span></div>
-        <p className="text-sm font-bold text-[var(--text-primary)]">{formatINR(operation.fundedAmount)}</p>
+    <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+      <div className="px-4 py-3 bg-[var(--bg-inset)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
+            <span>{from.shortLabel}</span><ArrowRightLeft size={14} className="text-[var(--text-dim)]" /><span>{to.shortLabel}</span>
+          </div>
+          <p className="text-xs text-[var(--text-dim)] mt-1">Review {formatINR(operation.fundedAmount)} from source-bucket surplus.</p>
+        </div>
+        <p className="text-lg font-bold text-[var(--text-primary)]">{formatINR(operation.fundedAmount)}</p>
       </div>
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-5">
         {Object.entries(groups).map(([portfolioId, allocations]) => {
           const destKey = `${operation.id}::${portfolioId}`
           const destination = destinations[destKey]
           const candidates = plan.byBucket[operation.to].filter(fund => fund.portfolioId === portfolioId)
           return (
-            <div key={portfolioId} className="space-y-3">
-              <p className="text-xs font-bold text-[var(--text-muted)]">{allocations[0].portfolioName}</p>
-              {allocations.map(allocation => {
-                const key = `${operation.id}::${allocation.key}`
-                return <EditableSellLine key={key} allocation={allocation} inputKey={key}
-                  unitsMap={sellUnits} setUnitsMap={setSellUnits} navMap={sellNavs} setNavMap={setSellNavs} />
-              })}
-              <div className="pl-4 border-l-2 border-[var(--border)] space-y-2">
-                <p className="text-xs text-[var(--text-dim)]">Move into {to.label} in the same portfolio</p>
+            <div key={portfolioId} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Review source · {allocations[0].portfolioName}</p>
+                {allocations.map(allocation => {
+                  const key = `${operation.id}::${allocation.key}`
+                  return <EditableSellLine key={key} allocation={allocation} inputKey={key}
+                    unitsMap={sellUnits} setUnitsMap={setSellUnits} navMap={sellNavs} setNavMap={setSellNavs} />
+                })}
+              </div>
+              <div className="space-y-3 lg:border-l lg:border-[var(--border-light)] lg:pl-4">
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Choose destination in the same portfolio</p>
                 {candidates.length ? (
                   <select value={destination ? destination.key : ''}
                     onChange={event => setDestinations(previous => ({ ...previous, [destKey]: candidates.find(item => item.key === event.target.value) }))}
-                    className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]">
+                    className="w-full text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]">
                     {candidates.map(candidate => <option key={candidate.key} value={candidate.key}>{splitFundName(candidate.fundName).main}</option>)}
                   </select>
                 ) : (
                   <FundSearchInput value={destination ? { schemeCode: destination.schemeCode, fundName: destination.fundName } : null}
                     onSelect={({ schemeCode, fundName, nav }) => setDestinations(previous => ({ ...previous, [destKey]: { schemeCode: String(schemeCode), fundName, currentNav: nav || 0, portfolioId } }))}
-                    placeholder={`Search a ${operation.to === 'b1' ? 'liquid/debt' : 'hybrid'} fund...`} />
+                    placeholder={`Search a ${operation.to === 'b1' ? 'liquid/short-debt' : 'hybrid/stability'} fund...`} />
                 )}
                 {destination && (
-                  <label className="block text-xs text-[var(--text-dim)]">Buy NAV ₹
+                  <label className="block text-xs text-[var(--text-dim)]">Buy NAV
                     <input type="number" min="0.01" step="0.01" value={buyNavs[destKey] ?? ''} placeholder={Number(destination.currentNav || 0).toFixed(4)}
                       onChange={event => setBuyNavs(previous => ({ ...previous, [destKey]: event.target.value }))}
-                      className="mt-1 w-28 text-xs bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
+                      className="mt-1 w-36 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
                   </label>
                 )}
               </div>
@@ -445,24 +643,27 @@ function EditableSellLine({ allocation, inputKey, unitsMap, setUnitsMap, navMap,
   const units = inputNumber(unitsMap, inputKey, allocation.units, allocation.units)
   const nav = inputNumber(navMap, inputKey, allocation.currentNav)
   return (
-    <div className="rounded-lg border border-[var(--border-light)] px-3 py-2 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div><p className="text-xs text-[var(--text-secondary)]">{splitFundName(allocation.fundName).main}</p><p className="text-xs text-[var(--text-dim)]">{allocation.portfolioName}</p></div>
-        <p className="text-xs font-bold text-[var(--text-primary)]">{formatINR(units * nav)}</p>
+    <div className="border border-[var(--border-light)] rounded-lg px-3 py-3 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--text-secondary)]">{splitFundName(allocation.fundName).main}</p>
+          <p className="text-xs text-[var(--text-dim)] mt-0.5">{allocation.bucketReason} · goal-owned units only</p>
+        </div>
+        <p className="text-sm font-bold text-[var(--text-primary)] shrink-0">{formatINR(units * nav)}</p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-[var(--text-dim)]">Units
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs text-[var(--text-dim)]">Units to review
           <input type="number" min="0" max={allocation.units} step="0.0001" value={unitsMap[inputKey] ?? ''} placeholder={allocation.units.toFixed(4)}
             onChange={event => setUnitsMap(previous => ({ ...previous, [inputKey]: event.target.value }))}
-            className="mt-1 w-full text-xs bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
+            className="mt-1 w-full text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
         </label>
-        <label className="text-xs text-[var(--text-dim)]">Sell NAV ₹
+        <label className="text-xs text-[var(--text-dim)]">NAV
           <input type="number" min="0.01" step="0.01" value={navMap[inputKey] ?? ''} placeholder={allocation.currentNav.toFixed(4)}
             onChange={event => setNavMap(previous => ({ ...previous, [inputKey]: event.target.value }))}
-            className="mt-1 w-full text-xs bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
+            className="mt-1 w-full text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
         </label>
       </div>
-      <p className="text-xs text-[var(--text-dim)]">Maximum for this move: {allocation.units.toFixed(4)} goal-owned units</p>
+      <p className="text-xs text-[var(--text-dim)]">Maximum goal-owned units for this action: {allocation.units.toFixed(4)}</p>
     </div>
   )
 }
