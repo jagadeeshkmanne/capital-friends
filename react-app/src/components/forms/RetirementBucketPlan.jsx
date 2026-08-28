@@ -280,7 +280,7 @@ export default function RetirementBucketPlan({
           })}
           <button onClick={() => setActiveTab('actions')}
             className={`min-w-36 flex-1 px-4 py-2.5 rounded-md border text-sm font-semibold transition-colors ${activeTab === 'actions' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-            Actions {plan.operations.length > 0 && <span className="ml-2 text-xs">{plan.operations.length}</span>}
+            Actions {!executionEnabled ? <span className="ml-1 text-xs opacity-75">· Preview</span> : plan.operations.length > 0 && <span className="ml-2 text-xs">{plan.operations.length}</span>}
           </button>
         </div>
 
@@ -309,6 +309,7 @@ export default function RetirementBucketPlan({
               setWithdrawUnits={setWithdrawUnits}
               withdrawNavs={withdrawNavs}
               setWithdrawNavs={setWithdrawNavs}
+              targetDate={goal.targetDate}
             />
           ) : (
             <BucketPanel bucket={activeTab} plan={plan} executionEnabled={executionEnabled} />
@@ -344,6 +345,9 @@ function TargetCard({ bucket, plan, months, setMonths, onOpen }) {
   const Icon = meta.icon
   const target = plan.targets[bucket]
   const targetPct = plan.targets.total > 0 ? (target / plan.targets.total) * 100 : 0
+  const formula = bucket === 'b3'
+    ? 'Corpus minus B1 and B2'
+    : `${months} months × ${formatINR(plan.expense.monthlyExpense)}`
 
   return (
     <div className={`text-left border ${tone.border} ${tone.bg} rounded-lg px-3 py-2.5`}>
@@ -365,7 +369,8 @@ function TargetCard({ bucket, plan, months, setMonths, onOpen }) {
       <div className="flex items-end justify-between mt-2 gap-3">
         <div>
           <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(target)}</p>
-          <p className="text-xs font-semibold text-[var(--text-muted)]">{targetPct.toFixed(0)}% of target</p>
+          <p className="text-xs text-[var(--text-dim)]">{formula}</p>
+          <p className="text-xs font-semibold text-[var(--text-muted)]">{targetPct.toFixed(0)}% of retirement target</p>
         </div>
         <button type="button" onClick={onOpen} className={`text-xs font-semibold ${tone.text} hover:underline`}>
           View funds
@@ -412,7 +417,7 @@ function BucketPanel({ bucket, plan, executionEnabled }) {
 
       <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
         <div className="hidden md:grid grid-cols-[minmax(240px,1.5fr)_minmax(150px,.8fr)_minmax(160px,.8fr)_105px_120px] gap-3 px-4 py-2 bg-[var(--bg-inset)] text-xs font-semibold text-[var(--text-dim)]">
-          <span>Fund</span><span>Portfolio</span><span>Why this bucket</span><span className="text-right">Goal share</span><span className="text-right">Value today</span>
+          <span>Fund</span><span>Portfolio</span><span>Why this bucket</span><span className="text-right">Portfolio link</span><span className="text-right">Goal value</span>
         </div>
         {funds.length ? funds.map(fund => <FundRow key={fund.key} fund={fund} />) : (
           <div className="px-5 py-6 text-center">
@@ -434,7 +439,7 @@ function BucketPanel({ bucket, plan, executionEnabled }) {
 
 function FundRow({ fund }) {
   const equity = fund.equityPercent === null ? null : `${Math.round(fund.equityPercent)}% equity`
-  const showReason = !equity || fund.bucketReason !== equity
+  const showReason = !equity || (fund.bucketReason !== equity && fund.bucketReason !== fund.category)
   return (
     <div className="grid grid-cols-1 md:grid-cols-[minmax(240px,1.5fr)_minmax(150px,.8fr)_minmax(160px,.8fr)_105px_120px] gap-2 md:gap-3 px-4 py-2.5 border-t border-[var(--border-light)] text-sm items-center">
       <div className="min-w-0">
@@ -448,7 +453,7 @@ function FundRow({ fund }) {
       </div>
       <div className="md:text-right">
         <p className="font-semibold text-violet-400">{fund.allocationPct}%</p>
-        <p className="text-xs text-[var(--text-dim)]">of this fund</p>
+        <p className="text-xs text-[var(--text-dim)]">applied to this fund</p>
       </div>
       <p className="font-bold text-[var(--text-primary)] md:text-right tabular-nums">{formatINR(fund.goalValue)}</p>
     </div>
@@ -478,7 +483,11 @@ function ActionsPanel({
   setWithdrawUnits,
   withdrawNavs,
   setWithdrawNavs,
+  targetDate,
 }) {
+  const targetYear = targetDate ? new Date(targetDate).getFullYear() : null
+  const actionYear = Number.isFinite(targetYear) ? targetYear - 3 : null
+
   return (
     <div className="space-y-5">
       <div>
@@ -494,8 +503,8 @@ function ActionsPanel({
 
       {!executionEnabled ? (
         <div className="border border-blue-500/25 bg-blue-500/10 rounded-lg px-4 py-4">
-          <p className="text-sm font-semibold text-blue-400">No transaction is suggested in preview mode</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">The actionable review opens during the final three years before retirement. Until then, use the B1, B2 and B3 tabs to understand the future structure and current fund roles.</p>
+          <p className="text-sm font-semibold text-blue-400">Actions unlock {actionYear ? `around ${actionYear}` : 'in the final three years'}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Bucket transfers open only during the final three years before retirement. Until then, this screen shows targets and current fund roles without moving long-term growth money early.</p>
         </div>
       ) : (
         <>
