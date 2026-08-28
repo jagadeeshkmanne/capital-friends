@@ -217,15 +217,13 @@ export default function RetirementBucketPlan({
     && (transactions.switches.length > 0 || transactions.redemptions.length > 0)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {!executionEnabled && (
-        <div className="flex items-start gap-3 border border-blue-500/25 bg-blue-500/10 px-4 py-3 rounded-lg">
-          <Info size={18} className="text-blue-400 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-blue-400">Retirement-day preview</p>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">
-              This shows how the target corpus can be organised at retirement. It does not recommend moving funds today.
-            </p>
+        <div className="flex items-center gap-2 border border-blue-500/25 bg-blue-500/10 px-3 py-2 rounded-lg">
+          <Info size={15} className="text-blue-400 shrink-0" />
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <p className="text-xs font-semibold text-blue-400">Retirement-day preview</p>
+            <p className="text-xs text-[var(--text-muted)]">This is the target structure, not a recommendation to move funds today.</p>
           </div>
         </div>
       )}
@@ -237,15 +235,15 @@ export default function RetirementBucketPlan({
         <Metric label="Time to retirement" value={retirementYears === null ? '-' : `${retirementYears.toFixed(1)} years`} />
       </div>
 
-      <section>
-        <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Target structure at retirement</h3>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">The bucket amount is fixed first. Suitable funds are then assigned to that role.</p>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Target structure at retirement</h3>
+            <p className="text-xs text-[var(--text-muted)]">Set each bucket amount first, then review the funds assigned to it.</p>
           </div>
           <p className="text-xs text-[var(--text-dim)]">Starting SWR: {(plan.plannedSWR * 100).toFixed(1)}% · First-year income: {formatINR(plan.expense.monthlyExpense * 12)}</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {Object.keys(BUCKETS).map(bucket => (
             <TargetCard key={bucket} bucket={bucket} plan={plan}
               months={bucket === 'b1' ? b1TargetMonths : bucket === 'b2' ? b2TargetMonths : null}
@@ -286,7 +284,7 @@ export default function RetirementBucketPlan({
           </button>
         </div>
 
-        <div className="p-4 sm:p-5">
+        <div className="p-3 sm:p-4">
           {activeTab === 'actions' ? (
             <ActionsPanel
               executionEnabled={executionEnabled}
@@ -333,9 +331,9 @@ export default function RetirementBucketPlan({
 
 function Metric({ label, value }) {
   return (
-    <div className="px-4 py-3 border-r border-b xl:border-b-0 last:border-r-0 border-[var(--border-light)] bg-[var(--bg-inset)]">
+    <div className="px-3 py-2 border-r border-b xl:border-b-0 last:border-r-0 border-[var(--border-light)] bg-[var(--bg-inset)]">
       <p className="text-xs text-[var(--text-dim)]">{label}</p>
-      <p className="text-lg font-bold text-[var(--text-primary)] mt-1 tabular-nums">{value}</p>
+      <p className="text-base font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">{value}</p>
     </div>
   )
 }
@@ -348,12 +346,12 @@ function TargetCard({ bucket, plan, months, setMonths, onOpen }) {
   const targetPct = plan.targets.total > 0 ? (target / plan.targets.total) * 100 : 0
 
   return (
-    <div className={`text-left border ${tone.border} ${tone.bg} rounded-lg px-4 py-4`}>
+    <div className={`text-left border ${tone.border} ${tone.bg} rounded-lg px-3 py-2.5`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-lg grid place-items-center bg-[var(--bg-card)] ${tone.text}`}><Icon size={19} /></div>
+          <div className={`w-8 h-8 rounded-md grid place-items-center bg-[var(--bg-card)] ${tone.text}`}><Icon size={17} /></div>
           <div>
-            <p className={`text-sm font-bold ${tone.text}`}>{meta.shortLabel} · {meta.label}</p>
+            <p className={`text-xs font-bold ${tone.text}`}>{meta.shortLabel} · {meta.label}</p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{meta.period}</p>
           </div>
         </div>
@@ -364,10 +362,10 @@ function TargetCard({ bucket, plan, months, setMonths, onOpen }) {
           </select>
         )}
       </div>
-      <div className="flex items-end justify-between mt-5 gap-3">
+      <div className="flex items-end justify-between mt-2 gap-3">
         <div>
-          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(target)}</p>
-          <p className="text-xs font-semibold text-[var(--text-muted)] mt-1">{targetPct.toFixed(0)}% of target</p>
+          <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(target)}</p>
+          <p className="text-xs font-semibold text-[var(--text-muted)]">{targetPct.toFixed(0)}% of target</p>
         </div>
         <button type="button" onClick={onOpen} className={`text-xs font-semibold ${tone.text} hover:underline`}>
           View funds
@@ -384,24 +382,24 @@ function BucketPanel({ bucket, plan, executionEnabled }) {
   const funds = plan.byBucket[bucket]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div className="flex items-start gap-3 max-w-3xl">
-          <div className={`w-10 h-10 rounded-lg grid place-items-center ${tone.bg} ${tone.text}`}><Icon size={21} /></div>
+          <div className={`w-9 h-9 rounded-lg grid place-items-center ${tone.bg} ${tone.text}`}><Icon size={19} /></div>
           <div>
-            <h3 className="text-base font-bold text-[var(--text-primary)]">{meta.shortLabel} · {meta.label}</h3>
-            <p className="text-sm text-[var(--text-muted)] mt-1">{meta.description}</p>
-            <p className="text-xs text-[var(--text-dim)] mt-2">Typical role: {meta.eligible}.</p>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">{meta.shortLabel} · {meta.label}</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{meta.description}</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">Typical role: {meta.eligible}.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-5 min-w-64">
           <div>
             <p className="text-xs text-[var(--text-dim)]">Target at retirement</p>
-            <p className={`text-lg font-bold mt-1 ${tone.text}`}>{formatINR(plan.targets[bucket])}</p>
+            <p className={`text-base font-bold mt-0.5 ${tone.text}`}>{formatINR(plan.targets[bucket])}</p>
           </div>
           <div>
             <p className="text-xs text-[var(--text-dim)]">Mapped today</p>
-            <p className="text-lg font-bold text-[var(--text-primary)] mt-1">{formatINR(plan.totals[bucket])}</p>
+            <p className="text-base font-bold text-[var(--text-primary)] mt-0.5">{formatINR(plan.totals[bucket])}</p>
           </div>
         </div>
       </div>
@@ -413,11 +411,11 @@ function BucketPanel({ bucket, plan, executionEnabled }) {
       )}
 
       <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
-        <div className="hidden md:grid grid-cols-[minmax(260px,1.5fr)_minmax(170px,.8fr)_minmax(180px,.8fr)_120px_130px] gap-3 px-4 py-2.5 bg-[var(--bg-inset)] text-xs font-semibold text-[var(--text-dim)]">
+        <div className="hidden md:grid grid-cols-[minmax(240px,1.5fr)_minmax(150px,.8fr)_minmax(160px,.8fr)_105px_120px] gap-3 px-4 py-2 bg-[var(--bg-inset)] text-xs font-semibold text-[var(--text-dim)]">
           <span>Fund</span><span>Portfolio</span><span>Why this bucket</span><span className="text-right">Goal share</span><span className="text-right">Value today</span>
         </div>
         {funds.length ? funds.map(fund => <FundRow key={fund.key} fund={fund} />) : (
-          <div className="px-5 py-10 text-center">
+          <div className="px-5 py-6 text-center">
             <p className="text-sm font-semibold text-[var(--text-primary)]">No linked fund currently matches {meta.shortLabel}</p>
             <p className="text-sm text-[var(--text-muted)] mt-1">When this bucket is built, use {meta.eligible.toLowerCase()}.</p>
           </div>
@@ -427,7 +425,7 @@ function BucketPanel({ bucket, plan, executionEnabled }) {
       <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
         <Info size={15} className="shrink-0 mt-0.5" />
         <p>
-          Goal links are portfolio-level: if a portfolio is 55% linked, 55% of each fund in it is counted for this goal. The bucket target is a total amount, not a fixed percentage per fund. Each fund has one operational role, so the same portfolio can supply different funds to B1, B2 and B3.
+          A 55% portfolio link counts 55% of every fund for this goal. Bucket targets are totals that one or more funds may fill, and each fund is assigned to one bucket.
         </p>
       </div>
     </div>
@@ -438,7 +436,7 @@ function FundRow({ fund }) {
   const equity = fund.equityPercent === null ? null : `${Math.round(fund.equityPercent)}% equity`
   const showReason = !equity || fund.bucketReason !== equity
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,1.5fr)_minmax(170px,.8fr)_minmax(180px,.8fr)_120px_130px] gap-2 md:gap-3 px-4 py-3 border-t border-[var(--border-light)] text-sm items-center">
+    <div className="grid grid-cols-1 md:grid-cols-[minmax(240px,1.5fr)_minmax(150px,.8fr)_minmax(160px,.8fr)_105px_120px] gap-2 md:gap-3 px-4 py-2.5 border-t border-[var(--border-light)] text-sm items-center">
       <div className="min-w-0">
         <p className="font-semibold text-[var(--text-primary)] break-words">{splitFundName(fund.fundName).main}</p>
         <p className="text-xs text-[var(--text-dim)] mt-0.5">{fund.category || 'Category unavailable'}</p>

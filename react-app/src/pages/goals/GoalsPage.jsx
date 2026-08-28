@@ -1176,7 +1176,7 @@ export default function GoalsPage() {
         )}
       </Modal>
 
-      <Modal open={!!bucketGoal} onClose={() => setBucketGoal(null)} title={`Retirement Bucket Plan — ${bucketGoal?.goalName || ''}`} maxWidth="max-w-[96rem]" maxHeight="max-h-[92vh]">
+      <Modal open={!!bucketGoal} onClose={() => setBucketGoal(null)} title={`Retirement Bucket Plan — ${bucketGoal?.goalName || ''}`} maxWidth="max-w-6xl" maxHeight="max-h-[88vh]">
         {bucketGoal && (
           <RetirementBucketPlan
             goal={bucketGoal}
