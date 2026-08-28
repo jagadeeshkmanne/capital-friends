@@ -251,6 +251,7 @@ function processRedeem(formData) {
     const portfolioData = portfolioSheet.getDataRange().getValues();
     let fundExists = false;
     let avgBuyPrice = 0;
+    let availableUnits = 0;
 
     // Portfolio structure: Row 1=Watermark, Row 2=Group Headers, Row 3=Column Headers, Row 4+=Data
     // Columns: A=Code, B=Name, C=Units, D=Avg NAV ₹, E=Current NAV, F=Investment...
@@ -259,6 +260,7 @@ function processRedeem(formData) {
       const rowFundCode = portfolioData[i][0];
       if (rowFundCode && rowFundCode.toString() === fundCode.toString()) {
         fundExists = true;
+        availableUnits = parseFloat(portfolioData[i][2]) || 0;  // Column C = current units
         avgBuyPrice = parseFloat(portfolioData[i][3]) || 0;  // Column D (index 3) = Avg NAV ₹
         log(`Found fund ${baseFundName} in portfolio. Avg Buy Price: ₹${avgBuyPrice}`);
         break;
@@ -271,6 +273,9 @@ function processRedeem(formData) {
       log(`Portfolio data rows checked: ${portfolioData.length - 3}`);
       log(`First 5 fund codes in portfolio: ${portfolioData.slice(3, 8).map(row => row[0]).join(', ')}`);
       throw new Error(`Fund ${baseFundName} (Code: ${fundCode}) not found in portfolio ${portfolioName}`);
+    }
+    if (units > availableUnits + 0.0001) {
+      throw new Error(`Cannot redeem ${units.toFixed(4)} units of ${baseFundName}. Only ${availableUnits.toFixed(4)} units are currently available.`);
     }
 
     // Record transaction in TransactionHistory with P&L calculation
@@ -296,7 +301,7 @@ function processRedeem(formData) {
 
     return {
       success: true,
-      message: `Redemption recorded successfully! ${units.toFixed(4)} units of ${baseFundName} redeemed from ${portfolioName} for �${totalAmount.toFixed(2)}.`
+      message: `Redemption recorded successfully! ${units.toFixed(4)} units of ${baseFundName} redeemed from ${portfolioName} for ₹${totalAmount.toFixed(2)}.`
     };
 
   } catch (error) {
@@ -315,6 +320,36 @@ function processRedeem(formData) {
 function processRedeemBulk(params) {
   const redemptions = params.redemptions || [];
   if (!redemptions.length) return { success: false, message: 'No redemptions provided' };
+
+  // Validate aggregate units before recording the first transaction. This prevents
+  // two entries for the same fund from each passing an individual stale-units check.
+  const requestedByFund = {};
+  for (const item of redemptions) {
+    const key = `${item.portfolioId}::${item.fundCode}`;
+    requestedByFund[key] = (requestedByFund[key] || 0) + (parseFloat(item.units) || 0);
+  }
+  const portfolios = getAllPortfolios();
+  for (const key in requestedByFund) {
+    const parts = key.split('::');
+    const portfolioId = parts[0];
+    const fundCode = parts.slice(1).join('::');
+    const portfolio = portfolios.find(p => p.portfolioId === portfolioId);
+    if (!portfolio) return { success: false, message: `Portfolio not found: ${portfolioId}` };
+    const sheet = getPortfolioSheet(portfolioId);
+    if (!sheet) return { success: false, message: `Portfolio sheet not found: ${portfolioId}` };
+    const data = sheet.getDataRange().getValues();
+    let available = 0;
+    for (let i = 3; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === fundCode.toString()) {
+        available = parseFloat(data[i][2]) || 0;
+        break;
+      }
+    }
+    if (requestedByFund[key] > available + 0.0001) {
+      return { success: false, message: `Requested ${requestedByFund[key].toFixed(4)} units from ${fundCode}, but only ${available.toFixed(4)} are available.` };
+    }
+  }
+
   const results = [];
   for (const item of redemptions) {
     const result = processRedeem(item);
@@ -405,16 +440,21 @@ function processSwitchFunds(formData) {
     const fromPortfolioData = fromPortfolioSheet.getDataRange().getValues();
     let fromFundExists = false;
     let avgBuyPrice = 0;
+    let availableFromUnits = 0;
     for (let i = 3; i < fromPortfolioData.length; i++) {
       const rowFundCode = fromPortfolioData[i][0];
       if (rowFundCode && rowFundCode.toString() === fromFundCode.toString()) {
         fromFundExists = true;
+        availableFromUnits = parseFloat(fromPortfolioData[i][2]) || 0;
         avgBuyPrice = parseFloat(fromPortfolioData[i][3]) || 0;
         log(`Found from fund ${baseFromFundName}. Avg Buy Price: ₹${avgBuyPrice}`);
       }
     }
     if (!fromFundExists) {
       throw new Error(`From fund ${baseFromFundName} (Code: ${fromFundCode}) not found in portfolio ${fromPortfolioName}`);
+    }
+    if (units > availableFromUnits + 0.0001) {
+      throw new Error(`Cannot switch ${units.toFixed(4)} units of ${baseFromFundName}. Only ${availableFromUnits.toFixed(4)} units are currently available.`);
     }
 
     // Check if to fund already exists in destination portfolio
@@ -423,6 +463,17 @@ function processSwitchFunds(formData) {
     for (let i = 3; i < toPortfolioData.length; i++) {
       const rowFundCode = toPortfolioData[i][0];
       if (rowFundCode && rowFundCode.toString() === toFundCode.toString()) toFundExists = true;
+    }
+
+    // Validate the destination allocation before recording either side of the switch.
+    if (!toFundExists && targetAllocation > 0) {
+      const currentTotalAllocation = calculateTotalAllocation(toPortfolioSheet);
+      const newTotalAllocation = currentTotalAllocation + targetAllocation;
+      if (newTotalAllocation > 100) {
+        throw new Error(
+          `Total allocation would exceed 100%!\n\nCurrent total: ${currentTotalAllocation.toFixed(2)}%\nAdding: ${targetAllocation.toFixed(2)}%\nNew total: ${newTotalAllocation.toFixed(2)}%\n\nPlease adjust the target allocation to keep total at or below 100%.`
+        );
+      }
     }
 
     // Record SELL against source portfolio
@@ -458,15 +509,6 @@ function processSwitchFunds(formData) {
 
     // Add to fund to destination portfolio sheet if it doesn't exist
     if (!toFundExists) {
-      if (targetAllocation > 0) {
-        const currentTotalAllocation = calculateTotalAllocation(toPortfolioSheet);
-        const newTotalAllocation = currentTotalAllocation + targetAllocation;
-        if (newTotalAllocation > 100) {
-          throw new Error(
-            `Total allocation would exceed 100%!\n\nCurrent total: ${currentTotalAllocation.toFixed(2)}%\nAdding: ${targetAllocation.toFixed(2)}%\nNew total: ${newTotalAllocation.toFixed(2)}%\n\nPlease adjust the target allocation to keep total at or below 100%.`
-          );
-        }
-      }
       addFundToPortfolioSheet(toPortfolioSheet, toPortfolioId, toPortfolioName, toFundCode, targetAllocation);
     }
 
@@ -487,6 +529,79 @@ function processSwitchFunds(formData) {
       success: false,
       message: error.message
     };
+  }
+}
+
+/**
+ * Execute a reviewed multi-step MF plan under one document lock. All source
+ * units are validated in aggregate before the first transaction is recorded.
+ */
+function processMutualFundPlan(params) {
+  const switches = params.switches || [];
+  const redemptions = params.redemptions || [];
+  if (!switches.length && !redemptions.length) {
+    return { success: false, message: 'No transactions provided' };
+  }
+
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30000)) {
+    return { success: false, message: 'Another portfolio update is running. Please try again.' };
+  }
+
+  try {
+    const requestedByFund = {};
+    switches.forEach(function (item) {
+      const portfolioId = item.fromPortfolioId || item.portfolioId;
+      const key = `${portfolioId}::${item.fromFundCode}`;
+      requestedByFund[key] = (requestedByFund[key] || 0) + (parseFloat(item.units) || 0);
+    });
+    redemptions.forEach(function (item) {
+      const key = `${item.portfolioId}::${item.fundCode}`;
+      requestedByFund[key] = (requestedByFund[key] || 0) + (parseFloat(item.units) || 0);
+    });
+
+    for (const key in requestedByFund) {
+      const parts = key.split('::');
+      const portfolioId = parts[0];
+      const fundCode = parts.slice(1).join('::');
+      const sheet = getPortfolioSheet(portfolioId);
+      if (!sheet) return { success: false, message: `Portfolio sheet not found: ${portfolioId}` };
+      const data = sheet.getDataRange().getValues();
+      let available = 0;
+      for (let i = 3; i < data.length; i++) {
+        if (data[i][0] && data[i][0].toString() === fundCode.toString()) {
+          available = parseFloat(data[i][2]) || 0;
+          break;
+        }
+      }
+      if (requestedByFund[key] <= 0) return { success: false, message: `Units must be greater than 0 for ${fundCode}` };
+      if (requestedByFund[key] > available + 0.0001) {
+        return { success: false, message: `Plan requests ${requestedByFund[key].toFixed(4)} units from ${fundCode}, but only ${available.toFixed(4)} are available.` };
+      }
+    }
+
+    const results = [];
+    for (const item of switches) {
+      const result = processSwitchFunds(item);
+      results.push({ type: 'SWITCH', fundCode: item.fromFundCode, ...result });
+      if (!result.success) {
+        return { success: false, partial: results.some(entry => entry.success), message: result.message, results };
+      }
+    }
+    for (const item of redemptions) {
+      const result = processRedeem(item);
+      results.push({ type: 'REDEEM', fundCode: item.fundCode, ...result });
+      if (!result.success) {
+        return { success: false, partial: results.some(entry => entry.success), message: result.message, results };
+      }
+    }
+
+    return { success: true, message: `${results.length} retirement plan transaction(s) recorded.`, results };
+  } catch (error) {
+    log(`Error in processMutualFundPlan: ${error.toString()}`);
+    return { success: false, message: error.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 

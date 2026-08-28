@@ -606,6 +606,12 @@ export function DataProvider({ children }) {
     return result
   }, [refreshMF])
 
+  const executeMFPlan = useCallback(async (switches, redemptions) => {
+    const result = await api.executeMFPlan(switches, redemptions)
+    await Promise.all([refreshMF(), refreshGoals()])
+    return result
+  }, [refreshMF, refreshGoals])
+
   const updateHoldingAllocations = useCallback(async (portfolioId, allocations) => {
     await api.updateAllocations(portfolioId, allocations)
     await refreshMF()
@@ -703,6 +709,7 @@ export function DataProvider({ children }) {
       reminderList, addReminder, updateReminder, deleteReminder,
       // Goal-Portfolio Mappings
       goalPortfolioMappings, updateGoalMappings, assetAllocations, updateAssetAllocation,
+      executeMFPlan,
       // Stock data
       stockPortfolios, stockHoldings, stockTransactions,
       // Stock CRUD

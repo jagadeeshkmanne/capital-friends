@@ -1,56 +1,35 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownCircle, AlertTriangle } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
+import { buildGoalWithdrawalPlan } from '../../utils/goalWithdrawal'
 
 export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal }) {
   const { goalPortfolioMappings, mfPortfolios, mfHoldings } = useData()
-
   const today = new Date().toISOString().split('T')[0]
   const [redeemDate, setRedeemDate] = useState(today)
-  const [actualNavs, setActualNavs] = useState({})   // schemeCode -> nav string
-  const [actualUnits, setActualUnits] = useState({})  // schemeCode -> units string
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [actualNavs, setActualNavs] = useState({})
+  const [actualUnits, setActualUnits] = useState({})
 
-  const plan = useMemo(() => {
-    const mappings = (goalPortfolioMappings || []).filter((m) => m.goalId === goal.goalId)
-    if (mappings.length === 0) return null
+  const basePlan = useMemo(() => buildGoalWithdrawalPlan({
+    goal,
+    mappings: goalPortfolioMappings,
+    portfolios: mfPortfolios,
+    holdings: mfHoldings,
+  }), [goal, goalPortfolioMappings, mfPortfolios, mfHoldings])
 
-    const portfolioDetails = mappings.map((m) => {
-      const portfolio = (mfPortfolios || []).find((p) => p.portfolioId === m.portfolioId)
-      if (!portfolio) return null
-      const holdings = (mfHoldings || []).filter((h) => h.portfolioId === m.portfolioId && h.units > 0)
-      const portfolioValue = holdings.reduce((s, h) => s + h.currentValue, 0)
-      const linkedValue = (portfolioValue * m.allocationPct) / 100
+  useEffect(() => {
+    if (basePlan && withdrawAmount === '') setWithdrawAmount(String(Math.round(basePlan.defaultAmount)))
+  }, [basePlan, withdrawAmount])
 
-      const fundWithdrawals = holdings.map((h) => {
-        const fundPct = portfolioValue > 0 ? h.currentValue / portfolioValue : 0
-        const withdrawValue = linkedValue * fundPct
-        const suggestedUnits = h.currentNav > 0 ? withdrawValue / h.currentNav : 0
-        return {
-          fundName: h.fundName,
-          schemeCode: h.schemeCode,
-          portfolioId: m.portfolioId,
-          currentValue: h.currentValue,
-          suggestedUnits: Math.min(suggestedUnits, h.units),
-          currentNav: h.currentNav,
-          avgNav: h.avgNav,
-          availableUnits: h.units,
-        }
-      }).filter((f) => f.suggestedUnits > 0)
-
-      return {
-        portfolioName: portfolio.portfolioName,
-        ownerName: portfolio.ownerName,
-        allocationPct: m.allocationPct,
-        portfolioValue,
-        linkedValue,
-        fundWithdrawals,
-      }
-    }).filter(Boolean)
-
-    const totalLinked = portfolioDetails.reduce((s, p) => s + p.linkedValue, 0)
-    return { portfolioDetails, totalLinked }
-  }, [goal, goalPortfolioMappings, mfPortfolios, mfHoldings])
+  const plan = useMemo(() => buildGoalWithdrawalPlan({
+    goal,
+    mappings: goalPortfolioMappings,
+    portfolios: mfPortfolios,
+    holdings: mfHoldings,
+    requestedAmount: withdrawAmount === '' ? undefined : withdrawAmount,
+  }), [goal, goalPortfolioMappings, mfPortfolios, mfHoldings, withdrawAmount])
 
   if (!plan) {
     return (
@@ -58,127 +37,109 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
         <AlertTriangle size={24} className="mx-auto text-amber-400" />
         <p className="text-sm text-[var(--text-muted)]">No portfolios linked to this goal</p>
         <p className="text-xs text-[var(--text-dim)]">Link portfolios first to generate a withdrawal plan</p>
-        <button onClick={onClose} className="mt-2 px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
-          Close
-        </button>
+        <button onClick={onClose} className="mt-2 px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">Close</button>
       </div>
     )
   }
 
-  const progress = goal.targetAmount > 0 ? (plan.totalLinked / goal.targetAmount) * 100 : 0
-
-  // Compute per-fund redemption amounts using actual NAV (or current NAV as default)
-  function getNav(schemeCode, currentNav) {
-    const v = actualNavs[schemeCode]
-    return v !== undefined && v !== '' ? parseFloat(v) || currentNav : currentNav
+  function getNav(item) {
+    const value = actualNavs[item.key]
+    return value !== undefined && value !== '' ? parseFloat(value) || item.currentNav : item.currentNav
   }
 
-  function getUnits(schemeCode, suggestedUnits, availableUnits) {
-    const v = actualUnits[schemeCode]
-    if (v !== undefined && v !== '') {
-      const u = parseFloat(v)
-      return isNaN(u) ? suggestedUnits : Math.min(u, availableUnits)
-    }
-    return suggestedUnits
+  function getUnits(item) {
+    const value = actualUnits[item.key]
+    if (value === undefined || value === '') return item.suggestedUnits
+    const units = parseFloat(value)
+    if (Number.isNaN(units)) return item.suggestedUnits
+    return Math.max(0, Math.min(units, item.availableUnits))
   }
 
   function buildRedemptions() {
-    const list = []
-    for (const pd of plan.portfolioDetails) {
-      for (const fw of pd.fundWithdrawals) {
-        const nav = getNav(fw.schemeCode, fw.currentNav)
-        const units = parseFloat(getUnits(fw.schemeCode, fw.suggestedUnits, fw.availableUnits).toFixed(4))
-        list.push({
-          portfolioId: fw.portfolioId,
-          fundCode: fw.schemeCode,
-          units,
-          salePrice: nav,
-          saleDate: redeemDate,
-          totalAmount: units * nav,
-        })
+    return plan.withdrawals.map(item => {
+      const nav = getNav(item)
+      const units = parseFloat(getUnits(item).toFixed(4))
+      return {
+        portfolioId: item.portfolioId,
+        fundCode: item.schemeCode,
+        units,
+        salePrice: nav,
+        saleDate: redeemDate,
+        totalAmount: units * nav,
+        notes: `Goal withdrawal — ${goal.goalName}`,
       }
-    }
-    return list
+    }).filter(item => item.units > 0)
   }
+
+  const grouped = plan.withdrawals.reduce((map, item) => {
+    if (!map[item.portfolioId]) map[item.portfolioId] = { name: item.portfolioName, owner: item.ownerName, items: [] }
+    map[item.portfolioId].items.push(item)
+    return map
+  }, {})
+
+  const actualTotal = plan.withdrawals.reduce((sum, item) => sum + getUnits(item) * getNav(item), 0)
+  const requestedTooHigh = Number(withdrawAmount) > plan.totalLinked
 
   return (
     <div className="space-y-4">
-      {/* Redemption date */}
-      <div className="flex items-center gap-3 bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] px-4 py-3">
-        <span className="text-xs text-[var(--text-dim)] shrink-0">Redemption Date</span>
-        <input
-          type="date" value={redeemDate} max={today}
-          onChange={e => setRedeemDate(e.target.value)}
-          className="flex-1 text-xs font-semibold bg-transparent text-[var(--text-primary)] border-none outline-none text-right"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] px-4 py-3">
+        <label className="space-y-1">
+          <span className="text-xs text-[var(--text-dim)]">Amount required now</span>
+          <input type="number" min="0" max={plan.totalLinked} step="1000" value={withdrawAmount}
+            onChange={event => setWithdrawAmount(event.target.value)}
+            className="w-full text-sm font-bold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-emerald-500" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-[var(--text-dim)]">Redemption date</span>
+          <input type="date" value={redeemDate} max={today} onChange={event => setRedeemDate(event.target.value)}
+            className="w-full text-sm font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-emerald-500" />
+        </label>
       </div>
 
-      {/* Summary */}
-      <div className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] p-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-dim)]">Goal Target</span>
-          <span className="text-sm font-bold text-[var(--text-primary)]">{formatINR(goal.targetAmount)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-dim)]">Available from Linked Portfolios</span>
-          <span className={`text-sm font-bold ${plan.totalLinked >= goal.targetAmount ? 'text-emerald-400' : 'text-amber-400'}`}>{formatINR(plan.totalLinked)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-2 bg-[var(--bg-card)] rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
-          </div>
-          <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{progress.toFixed(0)}%</span>
-        </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Summary label="Goal target" value={goal.targetAmount} />
+        <Summary label="Linked value" value={plan.totalLinked} tone="emerald" />
+        <Summary label="Redeem now" value={actualTotal} tone="amber" />
       </div>
 
-      {/* Per-portfolio breakdown with editable NAV */}
-      {plan.portfolioDetails.map((pd) => (
-        <div key={pd.portfolioName} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
-          <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{pd.portfolioName}</p>
-              <p className="text-xs text-[var(--text-dim)]">{pd.ownerName} · {pd.allocationPct}% allocated to goal</p>
-            </div>
-            <span className="text-xs font-bold text-[var(--text-primary)]">{formatINR(pd.linkedValue)}</span>
+      {requestedTooHigh && (
+        <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+          The requested amount is above the value currently linked to this goal. The plan is capped at {formatINR(plan.totalLinked)}.
+        </p>
+      )}
+
+      {Object.entries(grouped).map(([portfolioId, group]) => (
+        <div key={portfolioId} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+          <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)]">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">{group.name}</p>
+            <p className="text-xs text-[var(--text-dim)]">{group.owner}</p>
           </div>
-          <div className="px-4 py-2 space-y-3">
-            {pd.fundWithdrawals.map((fw) => {
-              const nav = getNav(fw.schemeCode, fw.currentNav)
-              const units = getUnits(fw.schemeCode, fw.suggestedUnits, fw.availableUnits)
-              const amount = units * nav
-              const gain = amount - (units * fw.avgNav)
+          <div className="divide-y divide-[var(--border-light)]">
+            {group.items.map(item => {
+              const nav = getNav(item)
+              const units = getUnits(item)
               return (
-                <div key={fw.schemeCode} className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
+                <div key={item.key} className="px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs text-[var(--text-secondary)] truncate">{splitFundName(fw.fundName).main}</p>
-                      {splitFundName(fw.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(fw.fundName).plan}</p>}
+                      <p className="text-xs text-[var(--text-secondary)] truncate">{splitFundName(item.fundName).main}</p>
+                      <p className="text-xs text-[var(--text-dim)]">Goal-owned value {formatINR(item.availableValue)}</p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{formatINR(amount)}</p>
-                      <p className={`text-xs tabular-nums ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {gain >= 0 ? '+' : ''}{formatINR(gain)} gain
-                      </p>
-                    </div>
+                    <p className="text-xs font-bold text-emerald-400 tabular-nums">{formatINR(units * nav)}</p>
                   </div>
-                  <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5 flex-wrap">
-                    <span className="text-xs text-[var(--text-dim)] shrink-0">Units</span>
-                    <input
-                      type="number" step="0.0001" min="0.0001" max={fw.availableUnits}
-                      placeholder={fw.suggestedUnits.toFixed(4)}
-                      value={actualUnits[fw.schemeCode] ?? ''}
-                      onChange={e => setActualUnits(prev => ({ ...prev, [fw.schemeCode]: e.target.value }))}
-                      className="w-24 text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
-                    />
-                    <span className="text-xs text-[var(--text-dim)]">/ {fw.availableUnits.toFixed(4)} avail</span>
-                    <span className="text-xs text-[var(--text-dim)] shrink-0 ml-auto">NAV ₹</span>
-                    <input
-                      type="number" step="0.01" min="0.01"
-                      placeholder={fw.currentNav.toFixed(4)}
-                      value={actualNavs[fw.schemeCode] ?? ''}
-                      onChange={e => setActualNavs(prev => ({ ...prev, [fw.schemeCode]: e.target.value }))}
-                      className="w-20 text-xs text-right font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-[var(--text-dim)]">Units
+                      <input type="number" min="0" max={item.availableUnits} step="0.0001"
+                        value={actualUnits[item.key] ?? ''} placeholder={item.suggestedUnits.toFixed(4)}
+                        onChange={event => setActualUnits(previous => ({ ...previous, [item.key]: event.target.value }))}
+                        className="mt-1 w-full text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
+                    </label>
+                    <label className="text-xs text-[var(--text-dim)]">NAV ₹
+                      <input type="number" min="0.01" step="0.01"
+                        value={actualNavs[item.key] ?? ''} placeholder={item.currentNav.toFixed(4)}
+                        onChange={event => setActualNavs(previous => ({ ...previous, [item.key]: event.target.value }))}
+                        className="mt-1 w-full text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
+                    </label>
                   </div>
                 </div>
               )
@@ -188,24 +149,26 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
       ))}
 
       <p className="text-xs text-[var(--text-dim)] px-1">
-        Units and NAV are pre-filled based on your portfolio allocation — edit both to match what you actually executed in your AMC/broker.
-        After confirming, redemptions will be recorded and remaining goal allocations will auto-adjust to 100%.
+        The default redemption is capped at the goal target and distributed proportionally across only the units linked to this goal. Other goals and unallocated portfolio capacity are left unchanged.
       </p>
 
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-light)]">
-        <button onClick={onClose} className="px-5 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
-          Close
+        <button onClick={onClose} className="px-5 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">Close</button>
+        <button onClick={() => onConfirmWithdrawal?.(buildRedemptions())} disabled={actualTotal <= 0 || requestedTooHigh}
+          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          <ArrowDownCircle size={13} /> Confirm Redemption
         </button>
-        {onConfirmWithdrawal && (
-          <button
-            onClick={() => onConfirmWithdrawal(buildRedemptions())}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors"
-          >
-            <ArrowDownCircle size={13} />
-            Confirm Redemption
-          </button>
-        )}
       </div>
+    </div>
+  )
+}
+
+function Summary({ label, value, tone = 'default' }) {
+  const toneClass = tone === 'emerald' ? 'text-emerald-400' : tone === 'amber' ? 'text-amber-400' : 'text-[var(--text-primary)]'
+  return (
+    <div className="bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-3 py-2 text-center">
+      <p className="text-xs text-[var(--text-dim)]">{label}</p>
+      <p className={`text-sm font-bold tabular-nums ${toneClass}`}>{formatINR(value)}</p>
     </div>
   )
 }

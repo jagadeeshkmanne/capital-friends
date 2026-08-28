@@ -240,6 +240,9 @@ function routeAction(action, params, userRecord) {
     case 'mf:switch':
       return processSwitchFunds(params);
 
+    case 'mf:plan-batch':
+      return processMutualFundPlan(params);
+
     case 'mf:allocations-update': {
       var portfolio = getPortfolioById(params.portfolioId);
       if (!portfolio) throw new Error('Portfolio not found: ' + params.portfolioId);

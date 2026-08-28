@@ -111,7 +111,7 @@ function findBestPortfolios(recommendedEquity, portfolios, holdings, mappings, e
 export default function GoalsPage() {
   const navigate = useNavigate()
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, updateGoalMappings, redeemMFBulk, switchMF, mfHoldings, stockHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList, liabilityList, banks, assetAllocations } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, updateGoalMappings, switchMF, executeMFPlan, mfHoldings, stockHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList, liabilityList, banks, assetAllocations } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
 
@@ -520,13 +520,10 @@ export default function GoalsPage() {
   async function handleConfirmBucketPlan(switches, redemptions) {
     showBlockUI('Recording bucket plan...')
     try {
-      for (const sw of switches) {
-        const result = await switchMF(sw)
-        if (!result?.success) throw new Error(result?.message || 'Switch failed')
-      }
-      if (redemptions?.length) {
-        const result = await redeemMFBulk(redemptions)
-        if (!result?.success) throw new Error(result?.message || 'Redemption failed')
+      const result = await executeMFPlan(switches, redemptions || [])
+      if (!result?.success) {
+        const detail = result?.partial ? ' Some earlier transactions may have been recorded; refresh and review before retrying.' : ''
+        throw new Error((result?.message || 'Bucket plan failed') + detail)
       }
       setBucketGoal(null)
       const total = switches.length + (redemptions?.length || 0)
@@ -925,9 +922,9 @@ export default function GoalsPage() {
                         <ArrowDownCircle size={11} /> Withdraw
                       </button>
                     )}
-                    {g.goalType === 'Retirement' && (isPastDue || g.status === 'Achieved' || parseFloat(yearsLeft) <= 3) && (
+                    {g.goalType === 'Retirement' && (
                       <button onClick={() => setBucketGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
-                        <Wallet size={11} /> Buckets
+                        <Wallet size={11} /> {isPastDue || g.status === 'Achieved' || parseFloat(yearsLeft) <= 3 ? 'Buckets' : 'Bucket Preview'}
                       </button>
                     )}
                     <button onClick={() => setModal({ edit: g })} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-white/5 rounded-lg transition-colors ml-auto">
@@ -1187,6 +1184,7 @@ export default function GoalsPage() {
             mfHoldings={mfHoldings}
             mfPortfolios={mfPortfolios}
             assetAllocations={assetAllocations}
+            executionEnabled={bucketGoal.status === 'Achieved' || getYearsLeft(bucketGoal) === '0' || parseFloat(getYearsLeft(bucketGoal)) <= 3}
             onClose={() => setBucketGoal(null)}
             onConfirmPlan={handleConfirmBucketPlan}
           />
@@ -1203,61 +1201,17 @@ export default function GoalsPage() {
               const myMappings = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
               if (!myMappings.length) { setWithdrawalGoal(null); return }
 
-              // Collect remaining goals on same portfolios BEFORE clearing
-              const activeGoalIds = new Set((goalList || []).filter(gl => gl.status !== 'Achieved' && gl.goalId !== g.goalId).map(gl => gl.goalId))
-              // goalChanges: { goalId -> { goalName, changes: { portfolioId -> newPct } } }
-              // Merge all per-portfolio changes per affected goal to avoid overwrite on multi-portfolio goals
-              const goalChanges = {}
-              for (const m of myMappings) {
-                const remaining = (goalPortfolioMappings || []).filter(o => o.portfolioId === m.portfolioId && activeGoalIds.has(o.goalId))
-                if (remaining.length === 0) continue
-                const remainingTotal = remaining.reduce((s, o) => s + o.allocationPct, 0)
-                if (remainingTotal <= 0) continue
-                // Scale proportionally to 100%; assign rounding remainder to the largest goal
-                const scaled = remaining.map(o => ({ ...o, newPct: Math.floor((o.allocationPct / remainingTotal) * 100) }))
-                const remainder = 100 - scaled.reduce((s, o) => s + o.newPct, 0)
-                if (remainder > 0) {
-                  const largest = scaled.reduce((a, b) => b.allocationPct > a.allocationPct ? b : a)
-                  largest.newPct += remainder
-                }
-                for (const o of scaled) {
-                  if (!goalChanges[o.goalId]) {
-                    goalChanges[o.goalId] = { goalName: (goalList || []).find(gl => gl.goalId === o.goalId)?.goalName || o.goalId, changes: {} }
-                  }
-                  goalChanges[o.goalId].changes[m.portfolioId] = o.newPct
-                }
-              }
-              // Build final newMappings per affected goal (single updateGoalMappings call per goal)
-              const autoRedistribute = Object.entries(goalChanges).map(([goalId, { goalName, changes }]) => {
-                const allMapsForGoal = (goalPortfolioMappings || []).filter(x => x.goalId === goalId)
-                const newMappings = allMapsForGoal.map(x => ({
-                  portfolioId: x.portfolioId,
-                  allocationPct: changes[x.portfolioId] ?? x.allocationPct,
-                  investmentType: x.investmentType || 'MF',
-                })).filter(x => x.allocationPct > 0)
-                const newPct = Object.values(changes).join('+')
-                return { goalId, goalName, newPct, newMappings }
-              })
-
               showBlockUI('Recording redemption...')
               try {
-                // 1. Record actual redemptions in TransactionHistory (single bulk call)
                 if (redemptions?.length) {
-                  const result = await redeemMFBulk(redemptions)
+                  const result = await executeMFPlan([], redemptions)
                   if (!result?.success) throw new Error(result?.message || 'Redemption failed')
                 }
-                // 2. Clear goal mappings
+                // The completed goal releases its allocation. Other goals retain their
+                // existing percentages; deliberately unallocated capacity stays free.
                 await updateGoalMappings(g.goalId, [])
-                // 3. Auto-redistribute remaining goals to 100%
-                for (const item of autoRedistribute) {
-                  await updateGoalMappings(item.goalId, item.newMappings)
-                }
                 setWithdrawalGoal(null)
-                const redistributedNames = autoRedistribute.map(i => i.goalName)
-                const toastMsg = redistributedNames.length
-                  ? `Redemption recorded. Allocations auto-adjusted for: ${redistributedNames.join(', ')}`
-                  : 'Redemption recorded'
-                showToast(toastMsg)
+                showToast('Redemption recorded. Other goal allocations were not changed.')
               } catch (err) {
                 showToast(err.message || 'Failed to record redemption', 'error')
               } finally {
