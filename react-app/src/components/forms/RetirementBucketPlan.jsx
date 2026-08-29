@@ -465,7 +465,11 @@ function ActionsPanel({
       </div>
 
       {!executionEnabled ? (
-        <PreviewActions plan={plan} />
+        <PreviewActions plan={plan}
+          destinations={destinations} setDestinations={setDestinations}
+          sellUnits={sellUnits} setSellUnits={setSellUnits}
+          sellNavs={sellNavs} setSellNavs={setSellNavs}
+          buyNavs={buyNavs} setBuyNavs={setBuyNavs} />
       ) : (
         <>
           <div className="flex items-center justify-between gap-4 bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
@@ -536,7 +540,48 @@ function ActionsPanel({
   )
 }
 
-function PreviewActions({ plan }) {
+function buildPreviewOperations(plan) {
+  const sources = plan.byBucket.b3.map(fund => ({ ...fund, available: fund.goalValue }))
+  const needs = [
+    { bucket: 'b1', gap: Math.max(0, plan.targets.b1 - plan.totals.b1) },
+    { bucket: 'b2', gap: Math.max(0, plan.targets.b2 - plan.totals.b2) },
+  ]
+
+  return needs.map(need => {
+    let remaining = need.gap
+    const allocations = []
+    for (const source of sources) {
+      if (remaining <= 1 || source.available <= 1) continue
+      const amount = Math.min(remaining, source.available)
+      allocations.push({
+        ...source,
+        units: source.currentNav > 0 ? amount / source.currentNav : 0,
+      })
+      source.available -= amount
+      remaining -= amount
+    }
+    return {
+      id: `preview-b3-to-${need.bucket}`,
+      from: 'b3',
+      to: need.bucket,
+      label: `B3 to ${need.bucket.toUpperCase()}`,
+      fundedAmount: need.gap - remaining,
+      allocations,
+    }
+  }).filter(operation => operation.fundedAmount > 1)
+}
+
+function PreviewActions({
+  plan,
+  destinations,
+  setDestinations,
+  sellUnits,
+  setSellUnits,
+  sellNavs,
+  setSellNavs,
+  buyNavs,
+  setBuyNavs,
+}) {
   const steps = Object.entries(BUCKETS).map(([bucket, meta]) => ({
     bucket,
     meta,
@@ -544,6 +589,21 @@ function PreviewActions({ plan }) {
     current: plan.totals[bucket],
     gap: Math.max(0, plan.targets[bucket] - plan.totals[bucket]),
   }))
+  const previewOperations = useMemo(() => buildPreviewOperations(plan), [plan])
+
+  useEffect(() => {
+    const defaults = {}
+    for (const operation of previewOperations) {
+      for (const portfolioId of Object.keys(groupAllocations(operation))) {
+        const key = `${operation.id}::${portfolioId}`
+        if (destinations[key]) continue
+        const candidate = plan.byBucket[operation.to].find(fund => fund.portfolioId === portfolioId)
+        if (candidate) defaults[key] = candidate
+      }
+    }
+    if (Object.keys(defaults).length) setDestinations(previous => ({ ...defaults, ...previous }))
+  }, [destinations, plan, previewOperations, setDestinations])
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -566,7 +626,24 @@ function PreviewActions({ plan }) {
         })}
       </div>
 
-      <IllustrativeSwitch plan={plan} />
+      <div className="border border-violet-500/25 rounded-lg overflow-hidden">
+        <div className="px-3 py-2 bg-violet-500/10 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-bold text-violet-400">Switch preview</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Income gap first, followed by the Stability gap.</p>
+          </div>
+          <span className="px-2 py-1 rounded bg-blue-500/10 text-[10px] font-bold text-blue-400">Using today’s holdings</span>
+        </div>
+        <div className="p-3 space-y-3">
+          {previewOperations.map(operation => (
+            <OperationCard key={operation.id} operation={operation} plan={plan} preview
+              destinations={destinations} setDestinations={setDestinations}
+              sellUnits={sellUnits} setSellUnits={setSellUnits}
+              sellNavs={sellNavs} setSellNavs={setSellNavs}
+              buyNavs={buyNavs} setBuyNavs={setBuyNavs} />
+          ))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-center border border-emerald-500/25 bg-emerald-500/10 rounded-lg px-3 py-2.5">
         <div>
@@ -579,85 +656,7 @@ function PreviewActions({ plan }) {
   )
 }
 
-function IllustrativeSwitch({ plan }) {
-  const sources = plan.byBucket.b3.map(fund => ({ ...fund, available: fund.goalValue }))
-  const needs = [
-    {
-      bucket: 'b1',
-      gap: Math.max(0, plan.targets.b1 - plan.totals.b1),
-      destination: plan.byBucket.b1[0],
-      fallback: 'Select liquid or short-duration debt fund',
-    },
-    {
-      bucket: 'b2',
-      gap: Math.max(0, plan.targets.b2 - plan.totals.b2),
-      destination: plan.byBucket.b2[0],
-      fallback: 'Select hybrid or asset-allocation fund',
-    },
-  ]
-  const switches = []
-
-  for (const need of needs) {
-    let remaining = need.gap
-    for (const source of sources) {
-      if (remaining <= 1 || source.available <= 1) continue
-      const amount = Math.min(remaining, source.available)
-      switches.push({
-        source,
-        bucket: need.bucket,
-        destination: need.destination,
-        fallback: need.fallback,
-        amount,
-        units: source.currentNav > 0 ? amount / source.currentNav : 0,
-      })
-      source.available -= amount
-      remaining -= amount
-    }
-  }
-
-  if (!switches.length) return null
-
-  return (
-    <div className="border border-violet-500/25 rounded-lg overflow-hidden">
-      <div className="px-3 py-2 bg-violet-500/10 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-bold text-violet-400">Switch preview</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Fills the Income gap first, followed by the Stability gap.</p>
-        </div>
-        <span className="px-2 py-1 rounded bg-blue-500/10 text-[10px] font-bold text-blue-400">Using today’s holdings</span>
-      </div>
-      <div className="divide-y divide-[var(--border-light)]">
-        {switches.map((item, index) => {
-          const destinationName = item.destination ? splitFundName(item.destination.fundName).main : item.fallback
-          const destinationTone = item.bucket === 'b1' ? 'text-emerald-400' : 'text-amber-400'
-          return (
-            <div key={`${item.bucket}-${item.source.key}-${index}`} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_32px_minmax(0,1fr)_110px_130px] gap-2.5 items-center px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">From growth</p>
-                <p className="text-xs font-semibold text-[var(--text-primary)] mt-0.5 truncate" title={splitFundName(item.source.fundName).main}>{splitFundName(item.source.fundName).main}</p>
-              </div>
-              <ArrowRightLeft size={14} className="text-violet-400" />
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">To {BUCKETS[item.bucket].label}</p>
-                <p className={`text-xs font-semibold mt-0.5 truncate ${destinationTone}`} title={destinationName}>{destinationName}</p>
-              </div>
-              <div className="md:text-right">
-                <p className="text-[10px] text-[var(--text-dim)] uppercase">Switch</p>
-                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(item.amount)}</p>
-              </div>
-              <div className="md:text-right">
-                <p className="text-[10px] text-[var(--text-dim)] uppercase">Estimated units</p>
-                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{item.units.toFixed(4)}</p>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function OperationCard({ operation, plan, destinations, setDestinations, sellUnits, setSellUnits, sellNavs, setSellNavs, buyNavs, setBuyNavs }) {
+function OperationCard({ operation, plan, preview = false, destinations, setDestinations, sellUnits, setSellUnits, sellNavs, setSellNavs, buyNavs, setBuyNavs }) {
   const from = BUCKETS[operation.from]
   const to = BUCKETS[operation.to]
   const groups = groupAllocations(operation)
@@ -667,9 +666,9 @@ function OperationCard({ operation, plan, destinations, setDestinations, sellUni
       <div className="px-4 py-3 bg-[var(--bg-inset)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-            <span>{from.shortLabel}</span><ArrowRightLeft size={14} className="text-[var(--text-dim)]" /><span>{to.shortLabel}</span>
+            <span>{preview ? from.label : from.shortLabel}</span><ArrowRightLeft size={14} className="text-[var(--text-dim)]" /><span>{preview ? to.label : to.shortLabel}</span>
           </div>
-          <p className="text-xs text-[var(--text-dim)] mt-1">Review {formatINR(operation.fundedAmount)} from source-bucket surplus.</p>
+          <p className="text-xs text-[var(--text-dim)] mt-1">{preview ? 'Suggested from today’s goal-owned units.' : `Review ${formatINR(operation.fundedAmount)} from source-bucket surplus.`}</p>
         </div>
         <p className="text-lg font-bold text-[var(--text-primary)]">{formatINR(operation.fundedAmount)}</p>
       </div>
@@ -678,10 +677,17 @@ function OperationCard({ operation, plan, destinations, setDestinations, sellUni
           const destKey = `${operation.id}::${portfolioId}`
           const destination = destinations[destKey]
           const candidates = plan.byBucket[operation.to].filter(fund => fund.portfolioId === portfolioId)
+          const switchValue = allocations.reduce((sum, allocation) => {
+            const key = `${operation.id}::${allocation.key}`
+            const units = inputNumber(sellUnits, key, allocation.units, allocation.goalUnits || allocation.units)
+            const nav = inputNumber(sellNavs, key, allocation.currentNav)
+            return sum + units * nav
+          }, 0)
+          const buyNav = destination ? inputNumber(buyNavs, destKey, destination.currentNav) : 0
           return (
             <div key={portfolioId} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Review source · {allocations[0].portfolioName}</p>
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Sell (Growth) · {allocations[0].portfolioName}</p>
                 {allocations.map(allocation => {
                   const key = `${operation.id}::${allocation.key}`
                   return <EditableSellLine key={key} allocation={allocation} inputKey={key}
@@ -689,7 +695,7 @@ function OperationCard({ operation, plan, destinations, setDestinations, sellUni
                 })}
               </div>
               <div className="space-y-3 lg:border-l lg:border-[var(--border-light)] lg:pl-4">
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Choose destination in the same portfolio</p>
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Switch Into ({to.label})</p>
                 {candidates.length ? (
                   <select value={destination ? destination.key : ''}
                     onChange={event => setDestinations(previous => ({ ...previous, [destKey]: candidates.find(item => item.key === event.target.value) }))}
@@ -697,16 +703,21 @@ function OperationCard({ operation, plan, destinations, setDestinations, sellUni
                     {candidates.map(candidate => <option key={candidate.key} value={candidate.key}>{splitFundName(candidate.fundName).main}</option>)}
                   </select>
                 ) : (
-                  <FundSearchInput value={destination ? { schemeCode: destination.schemeCode, fundName: destination.fundName } : null}
-                    onSelect={({ schemeCode, fundName, nav }) => setDestinations(previous => ({ ...previous, [destKey]: { schemeCode: String(schemeCode), fundName, currentNav: nav || 0, portfolioId } }))}
-                    placeholder={`Search a ${operation.to === 'b1' ? 'liquid/short-debt' : 'hybrid/stability'} fund...`} />
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-1.5">No matching destination fund is linked in this portfolio.</p>
+                    <FundSearchInput value={destination ? { schemeCode: destination.schemeCode, fundName: destination.fundName } : null}
+                      onSelect={({ schemeCode, fundName, nav }) => setDestinations(previous => ({ ...previous, [destKey]: { schemeCode: String(schemeCode), fundName, currentNav: nav || 0, portfolioId } }))}
+                      placeholder={`Search a ${operation.to === 'b1' ? 'liquid/short-debt' : 'hybrid/stability'} fund...`} />
+                  </div>
                 )}
                 {destination && (
-                  <label className="block text-xs text-[var(--text-dim)]">Buy NAV
+                  <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5">
+                    <span className="text-xs text-[var(--text-dim)] flex-1">Est. units bought: <b className="text-[var(--text-primary)] tabular-nums">{buyNav > 0 ? (switchValue / buyNav).toFixed(4) : '—'}</b></span>
+                    <span className="text-xs text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
                     <input type="number" min="0.01" step="0.01" value={buyNavs[destKey] ?? ''} placeholder={Number(destination.currentNav || 0).toFixed(4)}
                       onChange={event => setBuyNavs(previous => ({ ...previous, [destKey]: event.target.value }))}
-                      className="mt-1 w-36 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
-                  </label>
+                      className="w-20 text-xs text-right font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)]" />
+                  </div>
                 )}
               </div>
             </div>
@@ -718,7 +729,8 @@ function OperationCard({ operation, plan, destinations, setDestinations, sellUni
 }
 
 function EditableSellLine({ allocation, inputKey, unitsMap, setUnitsMap, navMap, setNavMap }) {
-  const units = inputNumber(unitsMap, inputKey, allocation.units, allocation.units)
+  const availableUnits = allocation.goalUnits || allocation.units
+  const units = inputNumber(unitsMap, inputKey, allocation.units, availableUnits)
   const nav = inputNumber(navMap, inputKey, allocation.currentNav)
   return (
     <div className="border border-[var(--border-light)] rounded-lg px-3 py-3 space-y-3">
@@ -731,7 +743,7 @@ function EditableSellLine({ allocation, inputKey, unitsMap, setUnitsMap, navMap,
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs text-[var(--text-dim)]">Units to review
-          <input type="number" min="0" max={allocation.units} step="0.0001" value={unitsMap[inputKey] ?? ''} placeholder={allocation.units.toFixed(4)}
+          <input type="number" min="0" max={availableUnits} step="0.0001" value={unitsMap[inputKey] ?? ''} placeholder={allocation.units.toFixed(4)}
             onChange={event => setUnitsMap(previous => ({ ...previous, [inputKey]: event.target.value }))}
             className="mt-1 w-full text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
         </label>
@@ -741,7 +753,7 @@ function EditableSellLine({ allocation, inputKey, unitsMap, setUnitsMap, navMap,
             className="mt-1 w-full text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
         </label>
       </div>
-      <p className="text-xs text-[var(--text-dim)]">Maximum goal-owned units for this action: {allocation.units.toFixed(4)}</p>
+      <p className="text-xs text-[var(--text-dim)]">{allocation.units.toFixed(4)} suggested / {availableUnits.toFixed(4)} goal-owned units available</p>
     </div>
   )
 }
