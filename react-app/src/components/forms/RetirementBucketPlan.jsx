@@ -297,7 +297,6 @@ export default function RetirementBucketPlan({
               setWithdrawUnits={setWithdrawUnits}
               withdrawNavs={withdrawNavs}
               setWithdrawNavs={setWithdrawNavs}
-              targetDate={goal.targetDate}
             />
           ) : (
             <BucketPanel bucket={activeTab} plan={plan}
@@ -454,11 +453,7 @@ function ActionsPanel({
   setWithdrawUnits,
   withdrawNavs,
   setWithdrawNavs,
-  targetDate,
 }) {
-  const targetYear = targetDate ? new Date(targetDate).getFullYear() : null
-  const actionYear = Number.isFinite(targetYear) ? targetYear - 3 : null
-
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-3 py-2 text-xs">
@@ -470,7 +465,7 @@ function ActionsPanel({
       </div>
 
       {!executionEnabled ? (
-        <PreviewActions plan={plan} actionYear={actionYear} />
+        <PreviewActions plan={plan} />
       ) : (
         <>
           <div className="flex items-center justify-between gap-4 bg-[var(--bg-inset)] border border-[var(--border-light)] rounded-lg px-4 py-3">
@@ -531,15 +526,17 @@ function ActionsPanel({
         </>
       )}
 
-      <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
-        <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-400" />
-        <p>Fund suggestions use bucket role and goal-owned value. Before confirming, review exit load, taxes, lock-in, credit quality and suitability. Capital Friends records the reviewed transaction; it does not place an order with the fund house.</p>
-      </div>
+      {executionEnabled && (
+        <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-400" />
+          <p>Review the latest NAV, tax and exit load before confirming a recorded transaction.</p>
+        </div>
+      )}
     </div>
   )
 }
 
-function PreviewActions({ plan, actionYear }) {
+function PreviewActions({ plan }) {
   const steps = Object.entries(BUCKETS).map(([bucket, meta]) => ({
     bucket,
     meta,
@@ -547,37 +544,8 @@ function PreviewActions({ plan, actionYear }) {
     current: plan.totals[bucket],
     gap: Math.max(0, plan.targets[bucket] - plan.totals[bucket]),
   }))
-  const suggestions = [
-    {
-      bucket: 'b1',
-      title: `Build ${formatINR(steps[0].gap)} for monthly income`,
-      detail: 'Use liquid, overnight, money-market or short-duration debt funds.',
-      matches: plan.byBucket.b1,
-      empty: 'No matching income fund is linked today.',
-    },
-    {
-      bucket: 'b2',
-      title: `Build the remaining ${formatINR(steps[1].gap)} stability reserve`,
-      detail: 'Hybrid and asset-allocation funds can support years three to seven.',
-      matches: plan.byBucket.b2,
-      empty: 'No matching stability fund is linked today.',
-    },
-    {
-      bucket: 'b3',
-      title: `Continue building the ${formatINR(steps[2].gap)} growth gap`,
-      detail: 'Keep later-year money in suitable equity-heavy funds while the goal is still years away.',
-      matches: plan.byBucket.b3,
-      empty: 'No matching growth fund is linked today.',
-    },
-  ]
-
   return (
     <div className="space-y-3">
-      <div className="border border-blue-500/25 bg-blue-500/10 rounded-lg px-3 py-2.5">
-        <p className="text-sm font-semibold text-blue-400">Plan now. Execute with current data later.</p>
-        <p className="text-xs text-[var(--text-muted)] mt-1">The app can show the bucket targets and today’s matching funds now. Exact switch units use the holdings and NAV available near retirement.</p>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         {steps.map(({ bucket, meta, target, current, gap }) => {
           const Icon = meta.icon
@@ -598,16 +566,6 @@ function PreviewActions({ plan, actionYear }) {
         })}
       </div>
 
-      <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
-        <div className="px-3 py-2 bg-[var(--bg-inset)] flex items-center justify-between gap-3">
-          <p className="text-xs font-bold text-[var(--text-primary)]">Suggested next step for each gap</p>
-          <span className="text-[10px] font-semibold text-blue-400">Planning guidance · no switch today</span>
-        </div>
-        <div className="divide-y divide-[var(--border-light)]">
-          {suggestions.map(suggestion => <PreviewSuggestion key={suggestion.bucket} {...suggestion} />)}
-        </div>
-      </div>
-
       <IllustrativeSwitch plan={plan} />
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-center border border-emerald-500/25 bg-emerald-500/10 rounded-lg px-3 py-2.5">
@@ -617,72 +575,83 @@ function PreviewActions({ plan, actionYear }) {
         </div>
         <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{formatINR(plan.expense.monthlyExpense)}</p>
       </div>
-
-      <p className="text-xs text-[var(--text-dim)]">
-        Exact source fund, destination fund, switch amount and units unlock {actionYear ? `around ${actionYear}` : 'in the final three years'}, using the then-current corpus, holdings and NAV.
-      </p>
     </div>
   )
 }
 
 function IllustrativeSwitch({ plan }) {
-  const source = plan.byBucket.b3[0] || plan.byBucket.b2[0]
-  if (!source) return null
+  const sources = plan.byBucket.b3.map(fund => ({ ...fund, available: fund.goalValue }))
+  const needs = [
+    {
+      bucket: 'b1',
+      gap: Math.max(0, plan.targets.b1 - plan.totals.b1),
+      destination: plan.byBucket.b1[0],
+      fallback: 'Select liquid or short-duration debt fund',
+    },
+    {
+      bucket: 'b2',
+      gap: Math.max(0, plan.targets.b2 - plan.totals.b2),
+      destination: plan.byBucket.b2[0],
+      fallback: 'Select hybrid or asset-allocation fund',
+    },
+  ]
+  const switches = []
 
-  const incomeGap = Math.max(0, plan.targets.b1 - plan.totals.b1)
-  const amount = Math.min(incomeGap, source.goalValue)
-  const units = source.currentNav > 0 ? amount / source.currentNav : 0
-  const existingDestination = plan.byBucket.b1[0]
+  for (const need of needs) {
+    let remaining = need.gap
+    for (const source of sources) {
+      if (remaining <= 1 || source.available <= 1) continue
+      const amount = Math.min(remaining, source.available)
+      switches.push({
+        source,
+        bucket: need.bucket,
+        destination: need.destination,
+        fallback: need.fallback,
+        amount,
+        units: source.currentNav > 0 ? amount / source.currentNav : 0,
+      })
+      source.available -= amount
+      remaining -= amount
+    }
+  }
+
+  if (!switches.length) return null
 
   return (
     <div className="border border-violet-500/25 rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-violet-500/10 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-bold text-violet-400">Sample switch preview</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Shows how the app will present a reviewed action near retirement.</p>
+          <p className="text-xs font-bold text-violet-400">Switch preview</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Fills the Income gap first, followed by the Stability gap.</p>
         </div>
-        <span className="px-2 py-1 rounded bg-amber-500/10 text-[10px] font-bold text-amber-400">Example only · not for execution today</span>
+        <span className="px-2 py-1 rounded bg-blue-500/10 text-[10px] font-bold text-blue-400">Using today’s holdings</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">Review source fund</p>
-          <p className="text-xs font-semibold text-[var(--text-primary)] mt-1 truncate" title={splitFundName(source.fundName).main}>{splitFundName(source.fundName).main}</p>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Growth bucket · goal-owned units only</p>
-        </div>
-        <span className="w-9 h-9 rounded-full bg-[var(--bg-inset)] grid place-items-center text-violet-400"><ArrowRightLeft size={15} /></span>
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">Income-bucket destination</p>
-          <p className="text-xs font-semibold text-emerald-400 mt-1 truncate">
-            {existingDestination ? splitFundName(existingDestination.fundName).main : 'Choose a liquid or short-duration debt fund'}
-          </p>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">The destination is reviewed before confirmation.</p>
-        </div>
-        <div className="md:text-right shrink-0">
-          <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(amount)}</p>
-          <p className="text-[11px] text-[var(--text-muted)] tabular-nums">about {units.toFixed(4)} units at today’s NAV</p>
-        </div>
-      </div>
-      <p className="px-3 pb-3 text-[10px] text-[var(--text-dim)]">This preview uses today’s holding and NAV only to explain the workflow. The executable plan is recalculated with the actual corpus, funds, taxes, exit loads and NAV near retirement.</p>
-    </div>
-  )
-}
-
-function PreviewSuggestion({ bucket, title, detail, matches, empty }) {
-  const meta = BUCKETS[bucket]
-  const tone = TONE[meta.tone]
-  const Icon = meta.icon
-  return (
-    <div className="px-3 py-2.5 grid grid-cols-[28px_minmax(0,1fr)] sm:grid-cols-[28px_minmax(0,1.15fr)_minmax(0,.85fr)] gap-2.5 items-center">
-      <span className={`w-7 h-7 rounded-md grid place-items-center ${tone.bg} ${tone.text}`}><Icon size={14} /></span>
-      <div>
-        <p className={`text-xs font-semibold ${tone.text}`}>{title}</p>
-        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{detail}</p>
-      </div>
-      <div className="col-start-2 sm:col-start-auto min-w-0">
-        <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">Matching linked funds</p>
-        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate" title={matches.map(fund => splitFundName(fund.fundName).main).join(', ')}>
-          {matches.length ? matches.slice(0, 2).map(fund => splitFundName(fund.fundName).main).join(' · ') : empty}
-        </p>
+      <div className="divide-y divide-[var(--border-light)]">
+        {switches.map((item, index) => {
+          const destinationName = item.destination ? splitFundName(item.destination.fundName).main : item.fallback
+          const destinationTone = item.bucket === 'b1' ? 'text-emerald-400' : 'text-amber-400'
+          return (
+            <div key={`${item.bucket}-${item.source.key}-${index}`} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_32px_minmax(0,1fr)_110px_130px] gap-2.5 items-center px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">From growth</p>
+                <p className="text-xs font-semibold text-[var(--text-primary)] mt-0.5 truncate" title={splitFundName(item.source.fundName).main}>{splitFundName(item.source.fundName).main}</p>
+              </div>
+              <ArrowRightLeft size={14} className="text-violet-400" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">To {BUCKETS[item.bucket].label}</p>
+                <p className={`text-xs font-semibold mt-0.5 truncate ${destinationTone}`} title={destinationName}>{destinationName}</p>
+              </div>
+              <div className="md:text-right">
+                <p className="text-[10px] text-[var(--text-dim)] uppercase">Switch</p>
+                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(item.amount)}</p>
+              </div>
+              <div className="md:text-right">
+                <p className="text-[10px] text-[var(--text-dim)] uppercase">Estimated units</p>
+                <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{item.units.toFixed(4)}</p>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
