@@ -237,8 +237,6 @@ export default function RetirementBucketPlan({
         </div>
       </div>
 
-      <BucketJourney plan={plan} />
-
       {showHelp && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-px overflow-hidden rounded-lg border border-blue-500/20 bg-blue-500/20">
           <HelpLine title="Income bucket (B1)" detail="Pays the first two years of monthly retirement income." />
@@ -260,14 +258,15 @@ export default function RetirementBucketPlan({
       )}
 
       <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-2 md:grid-cols-4 bg-[var(--bg-inset)] border-b border-[var(--border-light)] p-1 gap-1">
+        <div className="grid grid-cols-2 md:grid-cols-4 bg-[var(--bg-inset)] border-b border-[var(--border-light)]" role="tablist" aria-label="Retirement buckets">
           {Object.keys(BUCKETS).map(bucket => {
             return (
               <BucketTab key={bucket} bucket={bucket} plan={plan} active={activeTab === bucket} onClick={() => setActiveTab(bucket)} />
             )
           })}
           <button onClick={() => setActiveTab('actions')}
-            className={`min-h-[54px] px-3 py-2 rounded-md border text-left transition-colors ${activeTab === 'actions' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+            role="tab" aria-selected={activeTab === 'actions'}
+            className={`min-h-[58px] px-4 py-2.5 border-b-2 text-left transition-colors ${activeTab === 'actions' ? 'bg-blue-500/10 text-blue-400 border-blue-400' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}>
             <span className="flex items-center gap-1.5 text-xs font-bold"><ArrowRightLeft size={13} /> Actions</span>
             <span className="block text-[11px] mt-1 opacity-75">Refill and income plan</span>
           </button>
@@ -329,26 +328,6 @@ function SummaryItem({ label, value }) {
   )
 }
 
-function BucketJourney({ plan }) {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)]">
-      {Object.entries(BUCKETS).map(([bucket, meta]) => {
-        const Icon = meta.icon
-        const tone = TONE[meta.tone]
-        return (
-          <div key={bucket} className="flex items-center gap-2.5 px-3 py-2 border-t first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0 border-[var(--border-light)]">
-            <span className={`w-8 h-8 rounded-md grid place-items-center shrink-0 ${tone.bg} ${tone.text}`}><Icon size={16} /></span>
-            <div className="min-w-0">
-              <p className={`text-[11px] font-bold ${tone.text}`}>{meta.label} <span className="text-[var(--text-dim)]">({meta.shortLabel})</span></p>
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{meta.period} <span className="font-normal text-[var(--text-dim)]">· {formatINR(plan.targets[bucket])}</span></p>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 function HelpLine({ title, detail }) {
   return <div className="bg-[var(--bg-card)] px-3 py-2"><p className="text-xs font-semibold text-blue-400">{title}</p><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{detail}</p></div>
 }
@@ -357,17 +336,13 @@ function BucketTab({ bucket, plan, active, onClick }) {
   const meta = BUCKETS[bucket]
   const tone = TONE[meta.tone]
   const Icon = meta.icon
-  const target = plan.targets[bucket]
-  const current = plan.totals[bucket]
 
   return (
     <button type="button" onClick={onClick}
-      className={`min-h-[54px] px-3 py-2 rounded-md border text-left transition-colors ${active ? tone.active : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+      role="tab" aria-selected={active}
+      className={`min-h-[58px] px-4 py-2.5 border-b-2 text-left transition-colors ${active ? `${tone.bg} ${tone.text} ${bucket === 'b1' ? 'border-emerald-400' : bucket === 'b2' ? 'border-amber-400' : 'border-violet-400'}` : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}>
       <span className={`flex items-center gap-1.5 text-xs font-bold ${active ? tone.text : ''}`}><Icon size={13} /> {meta.label} <span className="opacity-70">{meta.shortLabel}</span></span>
-      <span className="flex items-center justify-between gap-2 mt-1 text-[11px] tabular-nums">
-        <span><span className="text-[var(--text-dim)]">Target </span><b>{formatINR(target)}</b></span>
-        <span><span className="text-[var(--text-dim)]">Today </span><b>{formatINR(current)}</b></span>
-      </span>
+      <span className="block mt-1 text-[11px] text-[var(--text-dim)]">{meta.period}</span>
     </button>
   )
 }
@@ -572,7 +547,29 @@ function PreviewActions({ plan, actionYear }) {
     current: plan.totals[bucket],
     gap: Math.max(0, plan.targets[bucket] - plan.totals[bucket]),
   }))
-  const currentFunds = [...plan.byBucket.b1, ...plan.byBucket.b2, ...plan.byBucket.b3]
+  const suggestions = [
+    {
+      bucket: 'b1',
+      title: `Build ${formatINR(steps[0].gap)} for monthly income`,
+      detail: 'Use liquid, overnight, money-market or short-duration debt funds.',
+      matches: plan.byBucket.b1,
+      empty: 'No matching income fund is linked today.',
+    },
+    {
+      bucket: 'b2',
+      title: `Build the remaining ${formatINR(steps[1].gap)} stability reserve`,
+      detail: 'Hybrid and asset-allocation funds can support years three to seven.',
+      matches: plan.byBucket.b2,
+      empty: 'No matching stability fund is linked today.',
+    },
+    {
+      bucket: 'b3',
+      title: `Continue building the ${formatINR(steps[2].gap)} growth gap`,
+      detail: 'Keep later-year money in suitable equity-heavy funds while the goal is still years away.',
+      matches: plan.byBucket.b3,
+      empty: 'No matching growth fund is linked today.',
+    },
+  ]
 
   return (
     <div className="space-y-3">
@@ -602,9 +599,12 @@ function PreviewActions({ plan, actionYear }) {
       </div>
 
       <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
-        <div className="px-3 py-2 bg-[var(--bg-inset)]"><p className="text-xs font-bold text-[var(--text-primary)]">Current linked funds by role</p></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[var(--border-light)]">
-          {currentFunds.slice(0, 4).map(fund => <PreviewFund key={fund.key} fund={fund} />)}
+        <div className="px-3 py-2 bg-[var(--bg-inset)] flex items-center justify-between gap-3">
+          <p className="text-xs font-bold text-[var(--text-primary)]">Suggested next step for each gap</p>
+          <span className="text-[10px] font-semibold text-blue-400">Planning guidance · no switch today</span>
+        </div>
+        <div className="divide-y divide-[var(--border-light)]">
+          {suggestions.map(suggestion => <PreviewSuggestion key={suggestion.bucket} {...suggestion} />)}
         </div>
       </div>
 
@@ -623,16 +623,23 @@ function PreviewActions({ plan, actionYear }) {
   )
 }
 
-function PreviewFund({ fund }) {
-  const meta = BUCKETS[fund.bucket]
+function PreviewSuggestion({ bucket, title, detail, matches, empty }) {
+  const meta = BUCKETS[bucket]
   const tone = TONE[meta.tone]
+  const Icon = meta.icon
   return (
-    <div className="bg-[var(--bg-card)] px-3 py-2.5 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{splitFundName(fund.fundName).main}</p>
-        <p className={`text-[10px] mt-0.5 ${tone.text}`}>{meta.label} · {fund.bucketReason}</p>
+    <div className="px-3 py-2.5 grid grid-cols-[28px_minmax(0,1fr)] sm:grid-cols-[28px_minmax(0,1.15fr)_minmax(0,.85fr)] gap-2.5 items-center">
+      <span className={`w-7 h-7 rounded-md grid place-items-center ${tone.bg} ${tone.text}`}><Icon size={14} /></span>
+      <div>
+        <p className={`text-xs font-semibold ${tone.text}`}>{title}</p>
+        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{detail}</p>
       </div>
-      <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(fund.goalValue)}</p>
+      <div className="col-start-2 sm:col-start-auto min-w-0">
+        <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">Matching linked funds</p>
+        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate" title={matches.map(fund => splitFundName(fund.fundName).main).join(', ')}>
+          {matches.length ? matches.slice(0, 2).map(fund => splitFundName(fund.fundName).main).join(' · ') : empty}
+        </p>
+      </div>
     </div>
   )
 }
