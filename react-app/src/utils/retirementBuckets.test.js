@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   allocateBucketWithdrawal,
+  allocateFromFundsByTarget,
+  buildGoalAdjustedTargets,
   buildRetirementBucketPlan,
   classifyRetirementHolding,
   getRetirementExpenseBasis,
@@ -131,4 +133,31 @@ test('one linked portfolio can supply a different fund to each bucket', () => {
   assert.equal(plan.byBucket.b1[0].goalValue, 50000)
   assert.equal(plan.byBucket.b2[0].goalValue, 50000)
   assert.equal(plan.byBucket.b3[0].goalValue, 50000)
+})
+
+test('retirement glide path creates goal-specific fund targets', () => {
+  const funds = buildGoalAdjustedTargets([
+    { key: 'P1::E1', portfolioId: 'P1', bucket: 'b3', targetAllocationPct: 70, goalValue: 700, equityPercent: 100 },
+    { key: 'P1::D1', portfolioId: 'P1', bucket: 'b2', targetAllocationPct: 30, goalValue: 300, equityPercent: 0 },
+  ], 60)
+
+  assert.equal(Math.round(funds.find(fund => fund.key === 'P1::E1').effectiveTargetAllocationPct), 60)
+  assert.equal(Math.round(funds.find(fund => fund.key === 'P1::D1').effectiveTargetAllocationPct), 40)
+})
+
+test('target-aware switches reduce an overweight growth fund first', () => {
+  const result = allocateFromFundsByTarget([
+    {
+      key: 'P1::E1', portfolioId: 'P1', goalValue: 350, portfolioGoalValue: 1000,
+      goalUnits: 350, currentNav: 1, targetAllocationPct: 40, equityPercent: 90,
+    },
+    {
+      key: 'P1::E2', portfolioId: 'P1', goalValue: 250, portfolioGoalValue: 1000,
+      goalUnits: 250, currentNav: 1, targetAllocationPct: 15, equityPercent: 100,
+    },
+  ], 80)
+
+  assert.equal(result.allocations.length, 1)
+  assert.equal(result.allocations[0].key, 'P1::E2')
+  assert.equal(result.allocations[0].amount, 80)
 })

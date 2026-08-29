@@ -10,7 +10,11 @@ import {
 } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import FundSearchInput from './FundSearchInput'
-import { allocateBucketWithdrawal, buildRetirementBucketPlan } from '../../utils/retirementBuckets'
+import {
+  allocateBucketWithdrawal,
+  allocateFromFundsByTarget,
+  buildRetirementBucketPlan,
+} from '../../utils/retirementBuckets'
 
 const BUCKETS = {
   b1: {
@@ -79,6 +83,17 @@ function groupAllocations(operation) {
   }, {})
 }
 
+function destinationPriority(fund) {
+  const targetPct = Number(fund.effectiveTargetAllocationPct ?? fund.targetAllocationPct) || 0
+  return (Number(fund.portfolioGoalValue) || 0) * targetPct / 100 - (Number(fund.goalValue) || 0)
+}
+
+function destinationCandidates(plan, bucket, portfolioId) {
+  return plan.byBucket[bucket]
+    .filter(fund => fund.portfolioId === portfolioId)
+    .sort((a, b) => destinationPriority(b) - destinationPriority(a))
+}
+
 function yearsUntil(value) {
   const target = value ? new Date(value) : null
   if (!target || Number.isNaN(target.getTime())) return null
@@ -87,6 +102,7 @@ function yearsUntil(value) {
 
 export default function RetirementBucketPlan({
   goal,
+  health,
   goalPortfolioMappings,
   mfHoldings,
   mfPortfolios,
@@ -116,10 +132,11 @@ export default function RetirementBucketPlan({
     holdings: mfHoldings,
     portfolios: mfPortfolios,
     assetAllocations,
+    targetEquityPct: health?.recommendedEquity,
     b1TargetMonths,
     b2TargetMonths,
     planDate: new Date(`${rebalanceDate}T00:00:00`),
-  }), [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, b1TargetMonths, b2TargetMonths, rebalanceDate])
+  }), [goal, health?.recommendedEquity, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, b1TargetMonths, b2TargetMonths, rebalanceDate])
 
   useEffect(() => {
     if (!plan) return
@@ -130,7 +147,7 @@ export default function RetirementBucketPlan({
       for (const portfolioId of Object.keys(groupAllocations(operation))) {
         const key = `${operation.id}::${portfolioId}`
         if (destinations[key]) continue
-        const candidate = plan.byBucket[operation.to].find(fund => fund.portfolioId === portfolioId)
+        const candidate = destinationCandidates(plan, operation.to, portfolioId)[0]
         if (candidate) defaults[key] = candidate
       }
     }
@@ -226,6 +243,7 @@ export default function RetirementBucketPlan({
           <SummaryItem label="Retires in" value={retirementYears === null ? '-' : `${retirementYears.toFixed(1)}y`} />
           <SummaryItem label="First withdrawal" value={`${formatINR(plan.expense.monthlyExpense)}/mo`} />
           <SummaryItem label="SWR" value={`${(plan.plannedSWR * 100).toFixed(1)}%`} />
+          {plan.targetEquityPct !== null && <SummaryItem label="Glide-path equity" value={`${plan.targetEquityPct.toFixed(0)}%`} />}
         </div>
         <div className="flex items-center gap-2">
           {!executionEnabled && <span className="text-xs font-semibold text-blue-400">No changes will be saved</span>}
@@ -541,32 +559,20 @@ function ActionsPanel({
 }
 
 function buildPreviewOperations(plan) {
-  const sources = plan.byBucket.b3.map(fund => ({ ...fund, available: fund.goalValue }))
+  const committedUnits = {}
   const needs = [
     { bucket: 'b1', gap: Math.max(0, plan.targets.b1 - plan.totals.b1) },
     { bucket: 'b2', gap: Math.max(0, plan.targets.b2 - plan.totals.b2) },
   ]
 
   return needs.map(need => {
-    let remaining = need.gap
-    const allocations = []
-    for (const source of sources) {
-      if (remaining <= 1 || source.available <= 1) continue
-      const amount = Math.min(remaining, source.available)
-      allocations.push({
-        ...source,
-        units: source.currentNav > 0 ? amount / source.currentNav : 0,
-      })
-      source.available -= amount
-      remaining -= amount
-    }
+    const result = allocateFromFundsByTarget(plan.byBucket.b3, need.gap, committedUnits)
     return {
       id: `preview-b3-to-${need.bucket}`,
       from: 'b3',
       to: need.bucket,
       label: `B3 to ${need.bucket.toUpperCase()}`,
-      fundedAmount: need.gap - remaining,
-      allocations,
+      ...result,
     }
   }).filter(operation => operation.fundedAmount > 1)
 }
@@ -630,9 +636,9 @@ function PreviewActions({
         <div className="px-3 py-2 bg-violet-500/10 flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-xs font-bold text-violet-400">Switch preview</p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Income gap first, followed by the Stability gap.</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Income gap first. Existing fund overweights are reduced before the remaining switch is spread by target mix.</p>
           </div>
-          <span className="px-2 py-1 rounded bg-blue-500/10 text-[10px] font-bold text-blue-400">Using today’s holdings</span>
+          <span className="px-2 py-1 rounded bg-blue-500/10 text-[10px] font-bold text-blue-400">Target-aware preview</span>
         </div>
         <div className="p-3 space-y-3">
           {previewOperations.map(operation => (
@@ -676,7 +682,7 @@ function OperationCard({ operation, plan, preview = false, destinations, setDest
         {Object.entries(groups).map(([portfolioId, allocations]) => {
           const destKey = `${operation.id}::${portfolioId}`
           const destination = destinations[destKey]
-          const candidates = plan.byBucket[operation.to].filter(fund => fund.portfolioId === portfolioId)
+          const candidates = destinationCandidates(plan, operation.to, portfolioId)
           const switchValue = allocations.reduce((sum, allocation) => {
             const key = `${operation.id}::${allocation.key}`
             const units = inputNumber(sellUnits, key, allocation.units, allocation.goalUnits || allocation.units)
@@ -711,12 +717,18 @@ function OperationCard({ operation, plan, preview = false, destinations, setDest
                   </div>
                 )}
                 {destination && (
-                  <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5">
-                    <span className="text-xs text-[var(--text-dim)] flex-1">Est. units bought: <b className="text-[var(--text-primary)] tabular-nums">{buyNav > 0 ? (switchValue / buyNav).toFixed(4) : '—'}</b></span>
-                    <span className="text-xs text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
-                    <input type="number" min="0.01" step="0.01" value={buyNavs[destKey] ?? ''} placeholder={Number(destination.currentNav || 0).toFixed(4)}
-                      onChange={event => setBuyNavs(previous => ({ ...previous, [destKey]: event.target.value }))}
-                      className="w-20 text-xs text-right font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)]" />
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-[var(--text-dim)]">
+                      Goal allocation {destination.portfolioGoalValue > 0 ? ((destination.goalValue / destination.portfolioGoalValue) * 100).toFixed(1) : '0.0'}%
+                      {' → '}<b className="text-emerald-400">{Number(destination.effectiveTargetAllocationPct ?? (destination.targetAllocationPct || 0)).toFixed(1)}% glide target</b>
+                    </p>
+                    <div className="flex items-center gap-2 bg-[var(--bg-card)] rounded px-2 py-1.5">
+                      <span className="text-xs text-[var(--text-dim)] flex-1">Est. units bought: <b className="text-[var(--text-primary)] tabular-nums">{buyNav > 0 ? (switchValue / buyNav).toFixed(4) : '—'}</b></span>
+                      <span className="text-xs text-[var(--text-dim)] shrink-0">Buy NAV ₹</span>
+                      <input type="number" min="0.01" step="0.01" value={buyNavs[destKey] ?? ''} placeholder={Number(destination.currentNav || 0).toFixed(4)}
+                        onChange={event => setBuyNavs(previous => ({ ...previous, [destKey]: event.target.value }))}
+                        className="w-20 text-xs text-right font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-primary)]" />
+                    </div>
                   </div>
                 )}
               </div>
@@ -741,6 +753,10 @@ function EditableSellLine({ allocation, inputKey, unitsMap, setUnitsMap, navMap,
         </div>
         <p className="text-sm font-bold text-[var(--text-primary)] shrink-0">{formatINR(units * nav)}</p>
       </div>
+      <p className="text-[11px] text-[var(--text-dim)]">
+        Goal allocation {allocation.portfolioGoalValue > 0 ? ((allocation.goalValue / allocation.portfolioGoalValue) * 100).toFixed(1) : '0.0'}%
+        {' → '}<b className="text-amber-400">{Number(allocation.effectiveTargetAllocationPct ?? (allocation.targetAllocationPct || 0)).toFixed(1)}% glide target</b>
+      </p>
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs text-[var(--text-dim)]">Units to review
           <input type="number" min="0" max={availableUnits} step="0.0001" value={unitsMap[inputKey] ?? ''} placeholder={allocation.units.toFixed(4)}

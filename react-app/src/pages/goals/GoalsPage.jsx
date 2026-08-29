@@ -1187,6 +1187,7 @@ export default function GoalsPage() {
         {bucketGoal && (
           <RetirementBucketPlan
             goal={bucketGoal}
+            health={allocationHealth[bucketGoal.goalId]}
             goalPortfolioMappings={goalPortfolioMappings}
             mfHoldings={mfHoldings}
             mfPortfolios={mfPortfolios}

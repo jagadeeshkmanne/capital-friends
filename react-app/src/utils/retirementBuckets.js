@@ -75,6 +75,64 @@ export function classifyRetirementHolding(holding, assetAllocation) {
   return { bucket: null, reason: category || 'Category unavailable', equity: null, confidence: 'review' }
 }
 
+export function buildGoalAdjustedTargets(funds, targetEquityPct) {
+  const targetEquity = Math.max(0, Math.min(100, Number(targetEquityPct)))
+  if (!Number.isFinite(targetEquity)) return funds || []
+
+  const byPortfolio = (funds || []).reduce((groups, fund) => {
+    if (!groups[fund.portfolioId]) groups[fund.portfolioId] = []
+    groups[fund.portfolioId].push(fund)
+    return groups
+  }, {})
+
+  const adjusted = new Map()
+  for (const portfolioFunds of Object.values(byPortfolio)) {
+    const savedTargetTotal = portfolioFunds.reduce((sum, fund) => sum + (Number(fund.targetAllocationPct) || 0), 0)
+    const currentTotal = portfolioFunds.reduce((sum, fund) => sum + (Number(fund.goalValue) || 0), 0)
+    const withBaseline = portfolioFunds.map(fund => ({
+      fund,
+      baseline: savedTargetTotal > 0
+        ? (Number(fund.targetAllocationPct) || 0) / savedTargetTotal
+        : currentTotal > 0 ? (Number(fund.goalValue) || 0) / currentTotal : 0,
+      equity: Math.max(0, Math.min(1, (Number(fund.equityPercent) || 0) / 100)),
+    }))
+    const growth = withBaseline.filter(item => item.fund.bucket === 'b3')
+    const defensive = withBaseline.filter(item => item.fund.bucket !== 'b3')
+    const growthWeight = growth.reduce((sum, item) => sum + item.baseline, 0)
+    const defensiveWeight = defensive.reduce((sum, item) => sum + item.baseline, 0)
+    const growthEquity = growthWeight > 0
+      ? growth.reduce((sum, item) => sum + item.baseline * item.equity, 0) / growthWeight
+      : 1
+    const defensiveEquity = defensiveWeight > 0
+      ? defensive.reduce((sum, item) => sum + item.baseline * item.equity, 0) / defensiveWeight
+      : 0
+
+    let adjustedGrowthWeight = growthWeight
+    if (growth.length && defensive.length && growthEquity > defensiveEquity) {
+      adjustedGrowthWeight = Math.max(0, Math.min(1,
+        (targetEquity / 100 - defensiveEquity) / (growthEquity - defensiveEquity),
+      ))
+    }
+    const adjustedDefensiveWeight = 1 - adjustedGrowthWeight
+
+    for (const item of growth) {
+      const withinGroup = growthWeight > 0 ? item.baseline / growthWeight : 1 / growth.length
+      adjusted.set(item.fund.key, adjustedGrowthWeight * withinGroup * 100)
+    }
+    for (const item of defensive) {
+      const withinGroup = defensiveWeight > 0 ? item.baseline / defensiveWeight : 1 / defensive.length
+      adjusted.set(item.fund.key, adjustedDefensiveWeight * withinGroup * 100)
+    }
+  }
+
+  return (funds || []).map(fund => ({
+    ...fund,
+    effectiveTargetAllocationPct: adjusted.has(fund.key)
+      ? adjusted.get(fund.key)
+      : (Number(fund.targetAllocationPct) || 0),
+  }))
+}
+
 function allocateFromFunds(funds, requestedAmount, committedUnits = {}) {
   let remaining = Math.max(0, requestedAmount)
   const allocations = []
@@ -100,6 +158,108 @@ function allocateFromFunds(funds, requestedAmount, committedUnits = {}) {
   }
 }
 
+function availableFundValue(fund, committedUnits) {
+  const alreadyCommitted = committedUnits[fund.key] || 0
+  const availableUnits = Math.max(0, fund.goalUnits - alreadyCommitted)
+  return {
+    availableUnits,
+    availableValue: availableUnits * fund.currentNav,
+  }
+}
+
+// Use the saved fund targets as the baseline for source selection. Existing
+// overweights are reduced first; any remaining sale is spread across the
+// source bucket in the same relative target mix instead of draining the
+// largest fund first.
+export function allocateFromFundsByTarget(funds, requestedAmount, committedUnits = {}) {
+  const requested = Math.max(0, Number(requestedAmount) || 0)
+  if (requested <= 0) return { allocations: [], fundedAmount: 0, shortfall: 0 }
+
+  const portfolioTotals = {}
+  for (const fund of funds || []) {
+    const knownPortfolioTotal = Number(fund.portfolioGoalValue) || 0
+    if (knownPortfolioTotal > 0) {
+      portfolioTotals[fund.portfolioId] = Math.max(portfolioTotals[fund.portfolioId] || 0, knownPortfolioTotal)
+    } else {
+      portfolioTotals[fund.portfolioId] = (portfolioTotals[fund.portfolioId] || 0) + (Number(fund.goalValue) || 0)
+    }
+  }
+
+  const working = (funds || []).map(fund => {
+    const { availableUnits, availableValue } = availableFundValue(fund, committedUnits)
+    const targetPct = Math.max(0, Number(fund.effectiveTargetAllocationPct ?? fund.targetAllocationPct) || 0)
+    const targetValue = (portfolioTotals[fund.portfolioId] || 0) * targetPct / 100
+    return {
+      fund,
+      availableUnits,
+      availableValue,
+      targetPct,
+      overweightValue: Math.max(0, (Number(fund.goalValue) || 0) - targetValue),
+    }
+  }).filter(item => item.availableValue > 0.01)
+
+  let remaining = requested
+  const amounts = new Map()
+
+  function commit(item, requestedValue) {
+    if (remaining <= 0.01 || requestedValue <= 0.01) return
+    const alreadyAllocated = amounts.get(item.fund.key) || 0
+    const available = Math.max(0, item.availableValue - alreadyAllocated)
+    const amount = Math.min(remaining, available, requestedValue)
+    if (amount <= 0.01) return
+    amounts.set(item.fund.key, alreadyAllocated + amount)
+    remaining -= amount
+  }
+
+  // First correct fund-level drift that already exists inside each portfolio.
+  for (const item of [...working].sort((a, b) =>
+    b.overweightValue - a.overweightValue
+      || (b.fund.equityPercent || 0) - (a.fund.equityPercent || 0),
+  )) {
+    commit(item, item.overweightValue)
+  }
+
+  // Then preserve the saved relative mix among the remaining source funds.
+  // Iterate because a small holding may hit its available-value cap.
+  while (remaining > 0.01) {
+    const eligible = working.filter(item => {
+      const allocated = amounts.get(item.fund.key) || 0
+      return item.availableValue - allocated > 0.01
+    })
+    if (!eligible.length) break
+    const targetWeightTotal = eligible.reduce((sum, item) => sum + item.targetPct, 0)
+    const valueWeightTotal = eligible.reduce((sum, item) => {
+      const allocated = amounts.get(item.fund.key) || 0
+      return sum + Math.max(0, item.availableValue - allocated)
+    }, 0)
+    const before = remaining
+    for (const item of eligible) {
+      const allocated = amounts.get(item.fund.key) || 0
+      const available = Math.max(0, item.availableValue - allocated)
+      const weight = targetWeightTotal > 0
+        ? item.targetPct / targetWeightTotal
+        : available / valueWeightTotal
+      commit(item, before * weight)
+    }
+    if (Math.abs(before - remaining) <= 0.01) break
+  }
+
+  const allocations = working.flatMap(item => {
+    const amount = amounts.get(item.fund.key) || 0
+    if (amount <= 0.01) return []
+    const units = item.fund.currentNav > 0 ? amount / item.fund.currentNav : 0
+    const alreadyCommitted = committedUnits[item.fund.key] || 0
+    committedUnits[item.fund.key] = alreadyCommitted + units
+    return [{ ...item.fund, amount, units }]
+  })
+
+  return {
+    allocations,
+    fundedAmount: Math.max(0, requested - remaining),
+    shortfall: Math.max(0, remaining),
+  }
+}
+
 export function allocateBucketWithdrawal(bucketFunds, requestedAmount) {
   return allocateFromFunds(
     [...(bucketFunds || [])].sort((a, b) => b.goalValue - a.goalValue),
@@ -113,6 +273,7 @@ export function buildRetirementBucketPlan({
   holdings,
   portfolios,
   assetAllocations,
+  targetEquityPct,
   b1TargetMonths = 24,
   b2TargetMonths = 60,
   planDate = new Date(),
@@ -154,6 +315,8 @@ export function buildRetirementBucketPlan({
         currentNav,
         goalUnits,
         goalValue,
+        portfolioGoalValue: 0,
+        targetAllocationPct: Math.max(0, Number(holding.targetAllocationPct) || 0),
         bucket: classification.bucket,
         bucketReason: classification.reason,
         equityPercent: classification.equity,
@@ -162,11 +325,18 @@ export function buildRetirementBucketPlan({
     }
   }
 
+  const portfolioGoalTotals = {}
+  for (const fund of allFunds) {
+    portfolioGoalTotals[fund.portfolioId] = (portfolioGoalTotals[fund.portfolioId] || 0) + fund.goalValue
+  }
+  for (const fund of allFunds) fund.portfolioGoalValue = portfolioGoalTotals[fund.portfolioId] || 0
+
+  const adjustedFunds = buildGoalAdjustedTargets(allFunds, targetEquityPct)
   const byBucket = {
-    b1: allFunds.filter(fund => fund.bucket === 'b1').sort((a, b) => b.goalValue - a.goalValue),
-    b2: allFunds.filter(fund => fund.bucket === 'b2').sort((a, b) => b.goalValue - a.goalValue),
-    b3: allFunds.filter(fund => fund.bucket === 'b3').sort((a, b) => b.goalValue - a.goalValue),
-    unclassified: allFunds.filter(fund => !fund.bucket).sort((a, b) => b.goalValue - a.goalValue),
+    b1: adjustedFunds.filter(fund => fund.bucket === 'b1').sort((a, b) => b.goalValue - a.goalValue),
+    b2: adjustedFunds.filter(fund => fund.bucket === 'b2').sort((a, b) => b.goalValue - a.goalValue),
+    b3: adjustedFunds.filter(fund => fund.bucket === 'b3').sort((a, b) => b.goalValue - a.goalValue),
+    unclassified: adjustedFunds.filter(fund => !fund.bucket).sort((a, b) => b.goalValue - a.goalValue),
   }
 
   const b2RefillSources = [...byBucket.b2].sort((a, b) =>
@@ -190,7 +360,7 @@ export function buildRetirementBucketPlan({
   // fills B1 directly so the medium-term reserve remains intact.
   const b2Surplus = Math.max(0, totals.b2 - b2Target)
   const b2ToB1Requested = Math.min(b1Deficit, b2Surplus)
-  const b2ToB1 = allocateFromFunds(b2RefillSources, b2ToB1Requested, committedUnits)
+  const b2ToB1 = allocateFromFundsByTarget(b2RefillSources, b2ToB1Requested, committedUnits)
   // B3 may fund another bucket only from the amount above its own retirement
   // target. This avoids draining growth assets while the goal is underfunded.
   const b3Surplus = Math.max(0, totals.b3 - b3Target)
@@ -198,12 +368,12 @@ export function buildRetirementBucketPlan({
     Math.max(0, b1Deficit - b2ToB1.fundedAmount),
     b3Surplus,
   )
-  const b3ToB1 = allocateFromFunds(b3RefillSources, b3ToB1Requested, committedUnits)
+  const b3ToB1 = allocateFromFundsByTarget(b3RefillSources, b3ToB1Requested, committedUnits)
 
   const b2AfterB1 = totals.b2 - b2ToB1.fundedAmount
   const b3SurplusAfterB1 = Math.max(0, b3Surplus - b3ToB1.fundedAmount)
   const b3ToB2Requested = Math.min(Math.max(0, b2Target - b2AfterB1), b3SurplusAfterB1)
-  const b3ToB2 = allocateFromFunds(b3RefillSources, b3ToB2Requested, committedUnits)
+  const b3ToB2 = allocateFromFundsByTarget(b3RefillSources, b3ToB2Requested, committedUnits)
 
   const b1AfterMoves = totals.b1 + b2ToB1.fundedAmount + b3ToB1.fundedAmount
   const b2AfterMoves = totals.b2 - b2ToB1.fundedAmount + b3ToB2.fundedAmount
@@ -212,7 +382,7 @@ export function buildRetirementBucketPlan({
 
   return {
     expense,
-    allFunds,
+    allFunds: adjustedFunds,
     byBucket,
     totals,
     totalClassified,
@@ -227,6 +397,7 @@ export function buildRetirementBucketPlan({
     plannedSWR: Number(goal?.targetAmount) > 0
       ? (expense.monthlyExpense * 12) / Number(goal.targetAmount)
       : 0,
+    targetEquityPct: Number.isFinite(Number(targetEquityPct)) ? Number(targetEquityPct) : null,
     operations: [
       { id: 'b2-to-b1', from: 'b2', to: 'b1', label: 'B2 to B1', ...b2ToB1 },
       { id: 'b3-to-b1', from: 'b3', to: 'b1', label: 'B3 to B1', ...b3ToB1 },
