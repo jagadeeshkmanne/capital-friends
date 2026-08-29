@@ -608,6 +608,8 @@ function PreviewActions({ plan, actionYear }) {
         </div>
       </div>
 
+      <IllustrativeSwitch plan={plan} />
+
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-center border border-emerald-500/25 bg-emerald-500/10 rounded-lg px-3 py-2.5">
         <div>
           <p className="text-sm font-semibold text-emerald-400">Sample first monthly withdrawal</p>
@@ -619,6 +621,48 @@ function PreviewActions({ plan, actionYear }) {
       <p className="text-xs text-[var(--text-dim)]">
         Exact source fund, destination fund, switch amount and units unlock {actionYear ? `around ${actionYear}` : 'in the final three years'}, using the then-current corpus, holdings and NAV.
       </p>
+    </div>
+  )
+}
+
+function IllustrativeSwitch({ plan }) {
+  const source = plan.byBucket.b3[0] || plan.byBucket.b2[0]
+  if (!source) return null
+
+  const incomeGap = Math.max(0, plan.targets.b1 - plan.totals.b1)
+  const amount = Math.min(incomeGap, source.goalValue)
+  const units = source.currentNav > 0 ? amount / source.currentNav : 0
+  const existingDestination = plan.byBucket.b1[0]
+
+  return (
+    <div className="border border-violet-500/25 rounded-lg overflow-hidden">
+      <div className="px-3 py-2 bg-violet-500/10 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold text-violet-400">Sample switch preview</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Shows how the app will present a reviewed action near retirement.</p>
+        </div>
+        <span className="px-2 py-1 rounded bg-amber-500/10 text-[10px] font-bold text-amber-400">Example only · not for execution today</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">Review source fund</p>
+          <p className="text-xs font-semibold text-[var(--text-primary)] mt-1 truncate" title={splitFundName(source.fundName).main}>{splitFundName(source.fundName).main}</p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Growth bucket · goal-owned units only</p>
+        </div>
+        <span className="w-9 h-9 rounded-full bg-[var(--bg-inset)] grid place-items-center text-violet-400"><ArrowRightLeft size={15} /></span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">Income-bucket destination</p>
+          <p className="text-xs font-semibold text-emerald-400 mt-1 truncate">
+            {existingDestination ? splitFundName(existingDestination.fundName).main : 'Choose a liquid or short-duration debt fund'}
+          </p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">The destination is reviewed before confirmation.</p>
+        </div>
+        <div className="md:text-right shrink-0">
+          <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(amount)}</p>
+          <p className="text-[11px] text-[var(--text-muted)] tabular-nums">about {units.toFixed(4)} units at today’s NAV</p>
+        </div>
+      </div>
+      <p className="px-3 pb-3 text-[10px] text-[var(--text-dim)]">This preview uses today’s holding and NAV only to explain the workflow. The executable plan is recalculated with the actual corpus, funds, taxes, exit loads and NAV near retirement.</p>
     </div>
   )
 }
