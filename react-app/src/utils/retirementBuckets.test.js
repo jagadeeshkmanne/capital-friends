@@ -5,6 +5,7 @@ import {
   allocateFromFundsByTarget,
   buildGoalAdjustedTargets,
   buildRetirementBucketPlan,
+  buildTargetAwareBucketPreview,
   classifyRetirementHolding,
   getRetirementExpenseBasis,
 } from './retirementBuckets.js'
@@ -160,4 +161,60 @@ test('target-aware switches reduce an overweight growth fund first', () => {
   assert.equal(result.allocations.length, 1)
   assert.equal(result.allocations[0].key, 'P1::E2')
   assert.equal(result.allocations[0].amount, 80)
+})
+
+test('far-future preview corrects only today glide-path gap', () => {
+  const operations = buildTargetAwareBucketPreview({
+    allFunds: [
+      {
+        key: 'P1::E1', portfolioId: 'P1', bucket: 'b3', goalValue: 700,
+        portfolioGoalValue: 1000, goalUnits: 700, currentNav: 1,
+        targetAllocationPct: 70, effectiveTargetAllocationPct: 60, equityPercent: 100,
+      },
+      {
+        key: 'P1::H1', portfolioId: 'P1', bucket: 'b2', goalValue: 300,
+        portfolioGoalValue: 1000, goalUnits: 300, currentNav: 1,
+        targetAllocationPct: 30, effectiveTargetAllocationPct: 40, equityPercent: 0,
+      },
+    ],
+    // These future bucket targets must not determine today's switch amount.
+    targets: { b1: 250, b2: 500, b3: 250 },
+  })
+
+  assert.equal(operations.length, 1)
+  assert.equal(operations[0].id, 'preview-P1-b3-to-b2')
+  assert.equal(operations[0].fundedAmount, 100)
+  assert.equal(operations[0].allocations[0].units, 100)
+})
+
+test('target-aware preview never transfers between linked portfolios', () => {
+  const operations = buildTargetAwareBucketPreview({
+    allFunds: [
+      {
+        key: 'P1::E1', portfolioId: 'P1', bucket: 'b3', goalValue: 800,
+        portfolioGoalValue: 1000, goalUnits: 800, currentNav: 1,
+        effectiveTargetAllocationPct: 60, equityPercent: 100,
+      },
+      {
+        key: 'P1::H1', portfolioId: 'P1', bucket: 'b2', goalValue: 200,
+        portfolioGoalValue: 1000, goalUnits: 200, currentNav: 1,
+        effectiveTargetAllocationPct: 40, equityPercent: 0,
+      },
+      {
+        key: 'P2::E1', portfolioId: 'P2', bucket: 'b3', goalValue: 400,
+        portfolioGoalValue: 1000, goalUnits: 400, currentNav: 1,
+        effectiveTargetAllocationPct: 60, equityPercent: 100,
+      },
+      {
+        key: 'P2::H1', portfolioId: 'P2', bucket: 'b2', goalValue: 600,
+        portfolioGoalValue: 1000, goalUnits: 600, currentNav: 1,
+        effectiveTargetAllocationPct: 40, equityPercent: 0,
+      },
+    ],
+  })
+
+  assert.equal(operations.length, 1)
+  assert.equal(operations[0].portfolioId, 'P1')
+  assert.equal(operations[0].fundedAmount, 200)
+  assert.ok(operations[0].allocations.every(item => item.portfolioId === 'P1'))
 })

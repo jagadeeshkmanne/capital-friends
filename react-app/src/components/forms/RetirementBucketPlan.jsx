@@ -12,8 +12,8 @@ import { formatINR, splitFundName } from '../../data/familyData'
 import FundSearchInput from './FundSearchInput'
 import {
   allocateBucketWithdrawal,
-  allocateFromFundsByTarget,
   buildRetirementBucketPlan,
+  buildTargetAwareBucketPreview,
 } from '../../utils/retirementBuckets'
 
 const BUCKETS = {
@@ -558,25 +558,6 @@ function ActionsPanel({
   )
 }
 
-function buildPreviewOperations(plan) {
-  const committedUnits = {}
-  const needs = [
-    { bucket: 'b1', gap: Math.max(0, plan.targets.b1 - plan.totals.b1) },
-    { bucket: 'b2', gap: Math.max(0, plan.targets.b2 - plan.totals.b2) },
-  ]
-
-  return needs.map(need => {
-    const result = allocateFromFundsByTarget(plan.byBucket.b3, need.gap, committedUnits)
-    return {
-      id: `preview-b3-to-${need.bucket}`,
-      from: 'b3',
-      to: need.bucket,
-      label: `B3 to ${need.bucket.toUpperCase()}`,
-      ...result,
-    }
-  }).filter(operation => operation.fundedAmount > 1)
-}
-
 function PreviewActions({
   plan,
   destinations,
@@ -595,7 +576,7 @@ function PreviewActions({
     current: plan.totals[bucket],
     gap: Math.max(0, plan.targets[bucket] - plan.totals[bucket]),
   }))
-  const previewOperations = useMemo(() => buildPreviewOperations(plan), [plan])
+  const previewOperations = useMemo(() => buildTargetAwareBucketPreview(plan), [plan])
 
   useEffect(() => {
     const defaults = {}
@@ -636,18 +617,23 @@ function PreviewActions({
         <div className="px-3 py-2 bg-violet-500/10 flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-xs font-bold text-violet-400">Switch preview</p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Income gap first. Existing fund overweights are reduced before the remaining switch is spread by target mix.</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Only today’s glide-path gap is considered. Existing fund overweights are reduced first.</p>
           </div>
           <span className="px-2 py-1 rounded bg-blue-500/10 text-[10px] font-bold text-blue-400">Target-aware preview</span>
         </div>
         <div className="p-3 space-y-3">
-          {previewOperations.map(operation => (
-            <OperationCard key={operation.id} operation={operation} plan={plan} preview
-              destinations={destinations} setDestinations={setDestinations}
-              sellUnits={sellUnits} setSellUnits={setSellUnits}
-              sellNavs={sellNavs} setSellNavs={setSellNavs}
-              buyNavs={buyNavs} setBuyNavs={setBuyNavs} />
-          ))}
+          {previewOperations.length ? previewOperations.map(operation => (
+              <OperationCard key={operation.id} operation={operation} plan={plan} preview
+                destinations={destinations} setDestinations={setDestinations}
+                sellUnits={sellUnits} setSellUnits={setSellUnits}
+                sellNavs={sellNavs} setSellNavs={setSellNavs}
+                buyNavs={buyNavs} setBuyNavs={setBuyNavs} />
+            )) : (
+              <div className="rounded-lg bg-emerald-500/10 px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-emerald-400">Current linked funds already match the glide-path target</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">No target-allocation switch is suggested today.</p>
+              </div>
+            )}
         </div>
       </div>
 
@@ -674,7 +660,7 @@ function OperationCard({ operation, plan, preview = false, destinations, setDest
           <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
             <span>{preview ? from.label : from.shortLabel}</span><ArrowRightLeft size={14} className="text-[var(--text-dim)]" /><span>{preview ? to.label : to.shortLabel}</span>
           </div>
-          <p className="text-xs text-[var(--text-dim)] mt-1">{preview ? 'Suggested from today’s goal-owned units.' : `Review ${formatINR(operation.fundedAmount)} from source-bucket surplus.`}</p>
+          <p className="text-xs text-[var(--text-dim)] mt-1">{preview ? 'Suggested only to move this goal toward today’s glide-path target.' : `Review ${formatINR(operation.fundedAmount)} from source-bucket surplus.`}</p>
         </div>
         <p className="text-lg font-bold text-[var(--text-primary)]">{formatINR(operation.fundedAmount)}</p>
       </div>

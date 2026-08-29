@@ -260,6 +260,47 @@ export function allocateFromFundsByTarget(funds, requestedAmount, committedUnits
   }
 }
 
+// Build an advisory switch preview for the goal's current glide-path target.
+// This intentionally does not use the full retirement-date bucket gaps: those
+// reserves are built later. Each linked portfolio is balanced independently so
+// one portfolio is never used to repair another portfolio's allocation.
+export function buildTargetAwareBucketPreview(plan) {
+  const funds = plan?.allFunds || []
+  const committedUnits = {}
+  const portfolioIds = [...new Set(funds.map(fund => fund.portfolioId).filter(Boolean))]
+  const operations = []
+
+  for (const portfolioId of portfolioIds) {
+    const portfolioFunds = funds.filter(fund => fund.portfolioId === portfolioId)
+    const portfolioTotal = Number(portfolioFunds[0]?.portfolioGoalValue) || 0
+    const growthSources = portfolioFunds.filter(fund => fund.bucket === 'b3')
+
+    for (const bucket of ['b1', 'b2']) {
+      const bucketFunds = portfolioFunds.filter(fund => fund.bucket === bucket)
+      const current = bucketFunds.reduce((sum, fund) => sum + (Number(fund.goalValue) || 0), 0)
+      const target = bucketFunds.reduce((sum, fund) => {
+        const targetPct = Number(fund.effectiveTargetAllocationPct ?? fund.targetAllocationPct) || 0
+        return sum + portfolioTotal * targetPct / 100
+      }, 0)
+      const gap = Math.max(0, target - current)
+      if (gap <= 1) continue
+
+      const result = allocateFromFundsByTarget(growthSources, gap, committedUnits)
+      if (result.fundedAmount <= 1) continue
+      operations.push({
+        id: `preview-${portfolioId}-b3-to-${bucket}`,
+        from: 'b3',
+        to: bucket,
+        label: `B3 to ${bucket.toUpperCase()}`,
+        portfolioId,
+        ...result,
+      })
+    }
+  }
+
+  return operations
+}
+
 export function allocateBucketWithdrawal(bucketFunds, requestedAmount) {
   return allocateFromFunds(
     [...(bucketFunds || [])].sort((a, b) => b.goalValue - a.goalValue),
