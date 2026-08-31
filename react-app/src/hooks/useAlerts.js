@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useData } from '../context/DataContext'
 import { useFamily } from '../context/FamilyContext'
 import { formatINR } from '../data/familyData'
+import { isBuyOpportunity, isStrongBuyOpportunity } from '../utils/buyOpportunities'
 
 export default function useAlerts() {
   const { selectedMember } = useFamily()
@@ -28,8 +29,8 @@ export default function useAlerts() {
       const threshold = (p.rebalanceThreshold || 0.05) * 100
 
       pHoldings.forEach((h) => {
-        if (h.athNav > 0 && h.belowATHPct >= 10) strongBuyCount++
-        else if (h.athNav > 0 && h.belowATHPct >= 5) buyCount++
+        if (isStrongBuyOpportunity(h)) strongBuyCount++
+        else if (isBuyOpportunity(h)) buyCount++
         if (!p.skipRebalance && h.targetAllocationPct > 0 && pValue > 0) {
           const currentPct = (h.currentValue / pValue) * 100
           if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalanceCount++

@@ -18,6 +18,7 @@ import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
 import FundAllocationForm from '../../components/forms/FundAllocationForm'
 import PageLoading from '../../components/PageLoading'
+import { isBuyOpportunity } from '../../utils/buyOpportunities'
 
 // Strip PFL- prefix for display
 const displayName = (name) => name?.replace(/^PFL-/, '') || name
@@ -428,7 +429,7 @@ export default function MutualFundsPage() {
       let buyOpp = 0
       let rebalance = 0
       pHoldings.forEach((h) => {
-        if (h.athNav > 0 && h.belowATHPct >= 5) buyOpp++
+        if (isBuyOpportunity(h)) buyOpp++
         if (!p.skipRebalance) {
           const currentPct = totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
           if (h.targetAllocationPct > 0 && Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++
@@ -557,7 +558,7 @@ export default function MutualFundsPage() {
     if (totalValue === 0) return null
 
     // ATH Analysis — weighted average drawdown (only 5%+ below ATH is meaningful)
-    const athHoldings = activeHoldings.filter(h => h.athNav > 0 && h.belowATHPct >= 5)
+    const athHoldings = activeHoldings.filter(isBuyOpportunity)
     const weightedDrawdown = athHoldings.length > 0
       ? athHoldings.reduce((s, h) => s + (h.belowATHPct * h.currentValue), 0) / totalValue
       : 0
@@ -2733,4 +2734,3 @@ function DonutCard({ title, data, bgMap }) {
     </div>
   )
 }
-

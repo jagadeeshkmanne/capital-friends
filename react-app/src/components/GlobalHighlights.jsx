@@ -3,6 +3,7 @@ import { TrendingDown, RefreshCw, ChevronDown } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import MFBuyOpportunities from './forms/MFBuyOpportunities'
 import MFRebalanceDialog from './forms/MFRebalanceDialog'
+import { isBuyOpportunity } from '../utils/buyOpportunities'
 
 export default function GlobalHighlights() {
   const { mfHoldings, mfPortfolios } = useData()
@@ -20,7 +21,7 @@ export default function GlobalHighlights() {
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
         const threshold = (p.rebalanceThreshold || 0.05) * 100
         pHoldings.forEach((h) => {
-          if (h.athNav > 0 && h.belowATHPct >= 1) buyOpp++
+          if (isBuyOpportunity(h)) buyOpp++
           if (!p.skipRebalance && h.targetAllocationPct > 0 && totalValue > 0) {
             const currentPct = (h.currentValue / totalValue) * 100
             if (Math.abs(currentPct - h.targetAllocationPct) > threshold) rebalance++

@@ -30,6 +30,7 @@ youtube-studio/
 
 # Claude settings
 .claude/settings.json
+.agents/
 
 # Logs
 *.log

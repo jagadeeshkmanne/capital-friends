@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
+import { isBuyOpportunity } from '../../utils/buyOpportunities'
 
 function belowColor(pct) {
   if (pct >= 20) return 'bg-rose-500/20 text-[var(--accent-rose)]'
@@ -26,7 +27,7 @@ export default function MFBuyOpportunities() {
         const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
         const totalValue = pHoldings.reduce((s, h) => s + h.currentValue, 0)
         const opps = pHoldings
-          .filter((h) => h.athNav > 0 && h.belowATHPct >= 1)
+          .filter(isBuyOpportunity)
           .sort((a, b) => b.belowATHPct - a.belowATHPct)
           .map((h) => ({
             ...h,
@@ -51,7 +52,7 @@ export default function MFBuyOpportunities() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-[var(--text-dim)] px-1">
-        Funds below their All-Time High NAV. Higher discount = better opportunity.
+        Funds 5% or more below their All-Time High NAV. Higher discount = stronger opportunity.
       </p>
 
       {portfolioGroups.map((p, i) => (

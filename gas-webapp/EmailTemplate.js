@@ -98,8 +98,7 @@ function buildDashboardPDFHTML(data) {
   var logoUrl = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-new.png';
 
   // ── Extract data ──
-  var netWorth = d.netWorth || 0, totalAssets = d.totalAssets || 0, totalInvested = d.totalInvested || 0;
-  var totalPL = d.totalPL || 0, plPct = d.plPct || (totalInvested > 0 ? (totalPL / totalInvested * 100) : 0);
+  var netWorth = d.netWorth || 0, totalAssets = d.totalAssets || 0;
   var totalLiabilities = d.totalLiabilities || 0, totalEMI = d.totalEMI || 0;
   var lifeCover = d.lifeCover || 0, healthCover = d.healthCover || 0;
   var assetClassList = d.assetClassList || [], allocByType = d.allocByType || [];
@@ -180,8 +179,6 @@ function buildDashboardPDFHTML(data) {
     memberTotals.push({ memberId: mtm.memberId, name: mtm.memberName, assets: mtMF + mtStk + mtOth, liabilities: mtLiab, netWorth: mtNW });
   }
 
-  var plCol = totalPL >= 0 ? '#059669' : '#dc2626';
-  var plS = totalPL >= 0 ? '+' : '';
 
   // ══════════════════════════════════════════════════════════════════
   // BUILD HTML
@@ -281,8 +278,7 @@ function buildDashboardPDFHTML(data) {
   // Content
   h += '<div style="padding:28px 24px 24px">';
   h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:20px"><tbody><tr>';
-  h += '<td style="vertical-align:bottom"><div style="font-size:34px;font-weight:700;color:#1e293b;line-height:1.1;margin-bottom:6px">' + _fmtCur(netWorth) + '</div>';
-  h += '<div style="font-size:14px"><span style="color:' + plCol + ';font-weight:600">' + plS + _fmtCur(Math.abs(totalPL)) + '</span> <span style="color:#64748b;margin-left:4px">(' + plS + plPct.toFixed(1) + '% returns)</span></div></td>';
+  h += '<td style="vertical-align:bottom"><div style="font-size:34px;font-weight:700;color:#1e293b;line-height:1.1;margin-bottom:6px">' + _fmtCur(netWorth) + '</div></td>';
   h += '<td style="vertical-align:top;text-align:right">';
   h += '<div style="font-size:13px;color:#64748b">Total Assets</div><div style="font-size:18px;font-weight:600;color:#475569;margin-bottom:8px">' + _fmtCur(totalAssets) + '</div>';
   h += '<div style="font-size:13px;color:#64748b">Liabilities</div><div style="font-size:18px;font-weight:600;color:#dc2626">' + _fmtCur(totalLiabilities) + '</div>';
@@ -362,8 +358,7 @@ function buildDashboardPDFHTML(data) {
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
     h += '<td style="width:48%;background:rgba(139,92,246,0.08);border-radius:8px;padding:12px;text-align:center">';
     h += '<div style="font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Assets</div>';
-    h += '<div style="font-size:14px;font-weight:700;color:#1e293b">' + _fmtCur(totalAssets) + '</div>';
-    h += '<div style="font-size:13px;color:' + plCol + ';margin-top:3px">' + plS + _fmtCur(Math.abs(totalPL)) + ' P&amp;L</div></td>';
+    h += '<div style="font-size:14px;font-weight:700;color:#1e293b">' + _fmtCur(totalAssets) + '</div></td>';
     h += '<td style="width:4%"></td>';
     h += '<td style="width:48%;background:rgba(244,63,94,0.08);border-radius:8px;padding:12px;text-align:center">';
     h += '<div style="font-size:13px;color:#e11d48;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Liabilities</div>';
@@ -1072,9 +1067,7 @@ function buildSimpleEmailBody(recipientName, dashData, familyHeadName) {
   var ff = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif";
   var familyLabel = 'Your Family';
   if (familyHeadName) { var pts = familyHeadName.trim().split(/\s+/); familyLabel = (pts.length > 1 ? pts[pts.length - 1] : pts[0]) + ' Family'; }
-  var nw = d.netWorth || 0, ta = d.totalAssets || 0, ti = d.totalInvested || 0, tl = d.totalLiabilities || 0;
-  var tPL = d.totalPL || 0, pp = d.plPct || (ti > 0 ? ((tPL / ti) * 100) : 0);
-  var pc = tPL >= 0 ? '#059669' : '#dc2626', ps = tPL >= 0 ? '+' : '';
+  var nw = d.netWorth || 0, ta = d.totalAssets || 0, tl = d.totalLiabilities || 0;
   var mfI = parseFloat(d.mfInvested) || 0, mfC = parseFloat(d.mfCurrentValue) || 0;
   var skI = parseFloat(d.stkInvested) || 0, skC = parseFloat(d.stkCurrentValue) || 0;
   var oC = parseFloat(d.otherCurrentValue) || 0;
@@ -1086,8 +1079,7 @@ function buildSimpleEmailBody(recipientName, dashData, familyHeadName) {
   h += '<div style="background:#065f46;padding:12px 28px;text-align:center;"><span style="font-size:13px;color:rgba(255,255,255,0.6);">' + _escHtml(date) + '</span><span style="color:rgba(255,255,255,0.3);margin:0 8px;">\u2022</span><span style="font-size:13px;font-weight:700;color:#fff;">' + _escHtml(familyLabel) + '</span></div>';
   h += '<div style="background:#fff;padding:28px;"><p style="margin:0 0 20px;font-size:16px;color:#1e293b;font-weight:600;">' + greeting + (name ? ', ' + _escHtml(name) : '') + '</p>';
   h += '<p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">Here\'s your ' + _escHtml(familyLabel) + ' financial summary for <strong>' + _escHtml(date) + '</strong>. Scroll down for the complete report.</p>';
-  h += '<div style="background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:20px;text-align:center;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:6px;">Net Worth</div><div style="font-size:32px;font-weight:800;color:#065f46;">' + formatEmailCurrency(nw) + '</div>';
-  h += '<div style="margin-top:8px;"><span style="font-size:12px;color:' + pc + ';font-weight:600;">' + ps + formatEmailCurrency(tPL) + ' (' + ps + (typeof pp === 'number' ? pp.toFixed(1) : pp) + '%)</span><span style="font-size:12px;color:#94a3b8;margin-left:4px;">overall P&amp;L</span></div></div>';
+  h += '<div style="background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:20px;text-align:center;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:6px;">Net Worth</div><div style="font-size:32px;font-weight:800;color:#065f46;">' + formatEmailCurrency(nw) + '</div></div>';
   h += '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:20px;"><tr>' + _emailMetricCard('Mutual Funds', formatEmailCurrency(mfC), mfC - mfI, '#10b981') + '<td style="width:12px;"></td>' + _emailMetricCard('Stocks', formatEmailCurrency(skC), skC - skI, '#3b82f6') + '<td style="width:12px;"></td>' + _emailMetricCard('Other Inv.', formatEmailCurrency(oC), null, '#8b5cf6') + '</tr></table>';
   if (tl > 0) h += '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:20px;"><tr><td style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;"><div style="font-size:11px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;">Total Liabilities</div><div style="font-size:18px;font-weight:700;color:#dc2626;margin-top:2px;">' + formatEmailCurrency(tl) + '</div></td><td style="width:12px;"></td><td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;"><div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Total Investments</div><div style="font-size:18px;font-weight:700;color:#0f172a;margin-top:2px;">' + formatEmailCurrency(ta) + '</div></td></tr></table>';
   h += '</div>';

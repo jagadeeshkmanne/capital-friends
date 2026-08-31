@@ -10,6 +10,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
+import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-red-400' }
 function plPrefix(val) { return val >= 0 ? '+' : '' }
@@ -240,10 +241,10 @@ export default function Dashboard() {
     activeMFPortfolios.forEach((p) => {
       const pHoldings = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && h.units > 0)
       pHoldings.forEach((h) => {
-        if (h.athNav > 0 && h.belowATHPct >= 5) {
+        if (isBuyOpportunity(h)) {
           const { main } = splitFundName(h.fundName)
           if (!buyOppMap[main] || h.belowATHPct > buyOppMap[main].belowATHPct) {
-            buyOppMap[main] = { fundName: main, belowATHPct: h.belowATHPct, isStrongBuy: h.belowATHPct >= 10 }
+            buyOppMap[main] = { fundName: main, belowATHPct: h.belowATHPct, isStrongBuy: isStrongBuyOpportunity(h) }
           }
         }
       })
