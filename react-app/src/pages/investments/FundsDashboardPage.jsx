@@ -50,6 +50,7 @@ const REASON_TEXT = {
   'opening-balance': { short: 'set purchase date', long: 'This holding was added as an opening balance dated less than a year ago, so annualising it would be misleading. Edit that transaction and set the real purchase date to get XIRR and CAGR.' },
   'too-new': { short: 'under 3 months', long: 'Held for less than three months. Annualised returns are not meaningful yet.' },
   'funds-unreliable': { short: '', long: 'One or more funds in this selection cannot be annualised, so the combined XIRR and CAGR are hidden.' },
+  'varied-dates': { short: 'see XIRR', long: 'Money went in on different dates, so a single point-to-point CAGR does not apply. XIRR is the right number for this selection.' },
 }
 function reasonShort(r) { return r ? REASON_TEXT[r]?.short || '' : '' }
 function reasonLong(r) { return r ? REASON_TEXT[r]?.long || '' : undefined }
@@ -230,13 +231,16 @@ export default function FundsDashboardPage() {
         {/* ── Summary ── */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 sm:p-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-x-6 gap-y-4">
-            <Stat label="Invested" value={amt(t.invested)} muted />
+            <Stat label="Net invested" value={amt(t.netInvested ?? t.invested)} muted
+              sub={t.netInvested != null && Math.abs(t.netInvested - t.invested) > Math.max(1, t.invested * 0.01) ? `cost basis ${amt(t.invested)}` : 'cash in minus cash out'} />
             <Stat label="Current" value={amt(t.currentValue)} bold />
-            <Stat label="P&L" bold cls={plClass(t.pl)}
-              value={<>{hideAmounts ? '' : `${t.pl >= 0 ? '+' : ''}${formatINR(t.pl)} `}<span className={`text-sm font-semibold ${hideAmounts ? '' : 'opacity-80'}`}>{pct(t.plPct)}</span></>} />
+            <Stat label="Total gain" bold cls={plClass(t.totalGain ?? t.pl)}
+              value={<>{hideAmounts ? '' : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)} `}<span className={`text-sm font-semibold ${hideAmounts ? '' : 'opacity-80'}`}>{pct(t.totalGain != null ? t.totalGainPct : t.plPct)}</span></>}
+              sub={t.totalGain != null && Math.abs(t.totalGain - t.pl) > Math.max(1, Math.abs(t.pl) * 0.01) ? `unrealised ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : null} />
             <Stat label="XIRR" bold cls={plClass(t.xirr)} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)}
               sub={t.unreliableCount > 0 ? <span className="text-amber-500/90">{t.unreliableCount} fund{t.unreliableCount === 1 ? '' : 's'} need{t.unreliableCount === 1 ? 's' : ''} dates</span> : null} />
-            <Stat label="CAGR" cls={plClass(t.cagr)} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)} sub={t.cagr != null ? `since ${monthYear(t.since)}` : null} />
+            <Stat label="CAGR" cls={plClass(t.cagr)} value={ratePct(t.cagr)} title={reasonLong(t.cagrReason)}
+              sub={t.cagr != null ? `since ${monthYear(t.since)}` : (t.cagrReason === 'varied-dates' ? <span className="text-[var(--text-dim)]">{reasonShort(t.cagrReason)}</span> : null)} />
             <Stat label="Buy opportunities" bold cls={t.buyOppCount > 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]'} value={String(t.buyOppCount)}
               sub={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
           </div>
@@ -385,7 +389,7 @@ export default function FundsDashboardPage() {
 
         <p className="flex items-start gap-1.5 text-xs text-[var(--text-dim)] px-1">
           <Info size={13} className="shrink-0 mt-0.5" />
-          <span>XIRR is the money-weighted annual return from every recorded purchase and redemption. CAGR is the simple point-to-point return from the first purchase, so it understates SIP returns. Both are hidden for holdings added as an opening balance less than a year ago; edit that transaction's date to the real purchase date to enable them. Below ATH compares each fund's NAV to its own all-time high.</span>
+          <span>Net invested is cash put in minus cash taken out; switches between funds cancel out. Total gain is current value minus net invested, so it includes gains realised through switches. XIRR is the money-weighted annual return from every recorded purchase and redemption. CAGR is the point-to-point return and only applies when the money went in at one time. Both are N/A for holdings added as an opening balance less than a year ago; edit that transaction and set the real first purchase date. Below ATH compares each fund's NAV to its own all-time high.</span>
         </p>
       </div>
     </div>
@@ -459,7 +463,7 @@ function Stat({ label, value, sub, cls = 'text-[var(--text-primary)]', bold, mut
   return (
     <div title={title}>
       <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-base tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${muted ? 'text-[var(--text-muted)]' : cls}`}>{value}</p>
+      <p className={`text-base tabular-nums whitespace-nowrap ${bold ? 'font-bold' : 'font-semibold'} ${muted ? 'text-[var(--text-muted)]' : cls}`}>{value}</p>
       {sub && <p className="text-xs text-[var(--text-dim)]">{sub}</p>}
     </div>
   )

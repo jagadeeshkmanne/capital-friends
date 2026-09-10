@@ -24,11 +24,17 @@ export function resolvePortfolioOwners(mfPortfolios, investmentAccounts, members
 function toFlows(txns) {
   return txns
     .map((t) => ({
-      date: parseDate(t.date), amount: Number(t.totalAmount) || 0,
+      date: parseDate(t.date), amount: Number(t.totalAmount) || 0, units: Number(t.units) || 0,
       type: String(t.type || '').toUpperCase(), subType: String(t.transactionType || '').toUpperCase(),
     }))
     .filter((t) => t.date && t.amount > 0)
-    .map((t) => ({ date: t.date, amount: t.type === 'SELL' ? t.amount : -t.amount, opening: t.subType === 'INITIAL' }))
+    .map((t) => ({
+      date: t.date,
+      amount: t.type === 'SELL' ? t.amount : -t.amount,
+      units: (Number(t.units) || 0) * (t.type === 'SELL' ? -1 : 1),
+      opening: t.subType === 'INITIAL',
+      switch: t.subType === 'SWITCH',
+    }))
 }
 
 const DAY = 86400000
@@ -44,9 +50,10 @@ export const OPENING_BALANCE_SHARE = 0.5      // ...when it makes up this share 
  *                     so its date is almost certainly the setup date, not the purchase date
  *   'too-new'         less than MIN_HISTORY_DAYS of history
  */
-export function returnsReason(flows, invested, today) {
-  if (!historyCovers(flows, invested)) return 'no-history'
-  const buys = flows.filter((cf) => cf.amount < 0)
+export function returnsReason(flows, invested, today, heldUnits) {
+  if (!historyCovers(flows, invested, heldUnits)) return 'no-history'
+  // Opening-balance share is judged against fresh money only; switch-in buys are the same money again
+  const buys = flows.filter((cf) => cf.amount < 0 && !cf.switch)
   const totalBuy = buys.reduce((s, cf) => s - cf.amount, 0)
   const openingBuy = buys.filter((cf) => cf.opening).reduce((s, cf) => s - cf.amount, 0)
   if (totalBuy > 0 && openingBuy / totalBuy >= OPENING_BALANCE_SHARE) {
@@ -61,11 +68,20 @@ export function returnsReason(flows, invested, today) {
 // Buys recorded in the transaction log should cover the cost basis of what is held.
 // When they do not (holdings migrated without their history), XIRR and CAGR would be wildly wrong.
 const HISTORY_COVERAGE_MIN = 0.9
-function historyCovers(flows, invested) {
+const UNIT_TOLERANCE = 0.02
+function historyCovers(flows, invested, heldUnits) {
+  if (heldUnits > 0) {
+    const netUnits = flows.reduce((s, cf) => s + (cf.units || 0), 0)
+    return Math.abs(netUnits - heldUnits) <= Math.max(0.01, heldUnits * UNIT_TOLERANCE)
+  }
   if (!(invested > 0)) return false
   const buys = flows.reduce((s, cf) => s + (cf.amount < 0 ? -cf.amount : 0), 0)
   return buys >= invested * HISTORY_COVERAGE_MIN
 }
+
+// External cash only: switch legs are internal transfers and cancel out within a selection.
+function cashIn(flows) { return flows.reduce((s, cf) => s + (cf.amount < 0 ? -cf.amount : 0), 0) }
+function cashOut(flows) { return flows.reduce((s, cf) => s + (cf.amount > 0 ? cf.amount : 0), 0) }
 
 function earliest(flows) {
   return flows.length ? flows.reduce((m, cf) => (cf.date < m ? cf.date : m), flows[0].date) : null
@@ -124,7 +140,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
 
     const posFlows = toFlows((txnsByFund[key] || []).filter((t) => t.portfolioId === h.portfolioId))
     const pl = currentValue - invested
-    const posReason = returnsReason(posFlows, invested, today)
+    const posReason = returnsReason(posFlows, invested, today, Number(h.units) || 0)
     const pTotal = portfolioTotals[h.portfolioId] || 0
     const currentAllocPct = pTotal > 0 ? (currentValue / pTotal) * 100 : 0
     const targetAllocPct = Number(h.targetAllocationPct) || 0
@@ -149,7 +165,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
     const since = earliest(flows)
     const pl = f.currentValue - f.invested
     const holding = { fundName: f.fundName, athNav: f.athNav, belowATHPct: f.belowATHPct }
-    const reason = returnsReason(flows, f.invested, today)
+    const reason = returnsReason(flows, f.invested, today, f.units)
     return {
       ...f,
       members: [...f.members],
@@ -177,13 +193,26 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   const firstDate = earliest(allFlows)
   const unreliable = funds.filter((f) => f.returnsReason)
   const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : returnsReason(allFlows, totalInvested, today)
+  // Money actually put in (switch legs cancel), and the gain on it including what was realised along the way
+  const netInvested = cashIn(allFlows) - cashOut(allFlows)
+  const hasCashFlows = allFlows.length > 0 && netInvested > 0
+  const totalGain = hasCashFlows ? totalValue - netInvested : null
+  // A portfolio CAGR only means something when the money went in at (roughly) one time
+  const inflowDates = allFlows.filter((cf) => cf.amount < 0 && !cf.switch).map((cf) => cf.date)
+  const inflowSpanDays = inflowDates.length ? (Math.max(...inflowDates) - Math.min(...inflowDates)) / DAY : 0
+  const singleLumpsum = inflowDates.length > 0 && inflowSpanDays <= MIN_HISTORY_DAYS
+  const cagrReason = totalsReason || (singleLumpsum ? null : 'varied-dates')
   const totals = {
-    invested: totalInvested,
+    invested: totalInvested,           // cost basis of what is held now
+    netInvested: hasCashFlows ? netInvested : null,
+    totalGain,
+    totalGainPct: totalGain != null && netInvested > 0 ? (totalGain / netInvested) * 100 : null,
     currentValue: totalValue,
-    pl: totalPL,
+    pl: totalPL,                       // unrealised, on current holdings
     plPct: totalInvested > 0 ? (totalPL / totalInvested) * 100 : null,
     xirr: totalsReason ? null : computeXIRR([...allFlows, { date: today, amount: totalValue }]),
-    cagr: totalsReason ? null : computeCAGR(totalInvested, totalValue, firstDate, today),
+    cagr: cagrReason ? null : computeCAGR(netInvested, totalValue, firstDate, today),
+    cagrReason,
     returnsReason: totalsReason,
     unreliableCount: unreliable.length,
     unreliableByReason: unreliable.reduce((acc, f) => { acc[f.returnsReason] = (acc[f.returnsReason] || 0) + 1; return acc }, {}),

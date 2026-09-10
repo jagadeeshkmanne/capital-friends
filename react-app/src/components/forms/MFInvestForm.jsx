@@ -243,8 +243,11 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <FormField label="Date" required error={errors.date}>
+        <FormField label={form.transactionType === 'INITIAL' ? 'First purchase date' : 'Date'} required error={errors.date}>
           <FormDateInput value={form.date} onChange={(v) => set('date', v)} />
+          {form.transactionType === 'INITIAL' && (
+            <p className="text-[11px] text-[var(--text-dim)] mt-1">When you first bought this fund, not today. Returns (XIRR, CAGR) are calculated from this date.</p>
+          )}
         </FormField>
         <FormField label="Units" required error={errors.units}>
           <FormInput type="number" value={form.units} onChange={(v) => set('units', v)} placeholder="e.g., 150.50" />

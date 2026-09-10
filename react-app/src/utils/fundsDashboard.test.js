@@ -77,6 +77,35 @@ test('allocation is per portfolio and only surfaced at fund level when unambiguo
   Object.values(byPortfolio).forEach((sum) => assert.ok(Math.abs(sum - 100) < 1e-6))
 })
 
+test('history coverage is judged by units when the holding provides them', () => {
+  const today = new Date(2026, 8, 10)
+  const flows = [{ date: new Date(2023, 0, 1), amount: -50000, units: 100, opening: true }]
+  // Amount is far below cost basis (user entered original cost) but units match: trusted
+  assert.equal(returnsReason(flows, 90000, today, 100), null)
+  // Units do not match: history is missing
+  assert.equal(returnsReason(flows, 90000, today, 250), 'no-history')
+})
+
+test('switch legs cancel at portfolio level and do not count as fresh money', () => {
+  const today = new Date(2026, 8, 10)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active' }]
+  const holdings = [{ portfolioId: 'P1', schemeCode: 'B', fundName: 'Fund B - Direct Growth', units: 1000, avgNav: 90, investment: 90000, currentNav: 97, currentValue: 97000 }]
+  const transactions = [
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'BUY', transactionType: 'INITIAL', date: '2023-09-10', units: 630, price: 100, totalAmount: 63000 },
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'SELL', transactionType: 'SWITCH', date: '2026-06-10', units: 630, price: 142.857, totalAmount: 90000 },
+    { portfolioId: 'P1', fundCode: 'B', fundName: 'Fund B', type: 'BUY', transactionType: 'SWITCH', date: '2026-06-10', units: 1000, price: 90, totalAmount: 90000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.netInvested, 63000)
+  assert.equal(m.totals.totalGain, 34000)
+  assert.equal(m.totals.invested, 90000)
+  assert.ok(Math.abs(m.totals.xirr - 0.155) < 0.01, `xirr ${m.totals.xirr}`)
+  assert.ok(Math.abs(m.totals.cagr - 0.155) < 0.01, `cagr ${m.totals.cagr}`)
+  // The switched-in fund itself is only three months old
+  assert.equal(m.funds[0].returnsReason, null)
+  assert.ok(m.funds[0].xirr > 0)
+})
+
 test('opening balances dated recently do not get annualised', () => {
   const today = new Date(2026, 8, 10)
   const recent = [{ date: new Date(2026, 7, 5), amount: -100000, opening: true }]
