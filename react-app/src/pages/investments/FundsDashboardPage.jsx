@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Layers, Search, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
-  Eye, EyeOff, Wallet, Info, X,
+  Eye, EyeOff, Wallet, Check, Info, X,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
@@ -54,10 +54,27 @@ const COLUMNS = [
   { key: 'currentValue', label: 'Current', align: 'right' },
   { key: 'pl', label: 'P&L', sub: 'Absolute', align: 'right' },
   { key: 'xirr', label: 'XIRR', sub: 'Annualised', align: 'right' },
-  { key: 'cagr', label: 'CAGR', sub: 'Since first buy', align: 'right' },
+  { key: 'cagr', label: 'CAGR', sub: 'First buy', align: 'right' },
   { key: 'weight', label: 'Weight', align: 'right' },
-  { key: 'belowATHPct', label: 'Below ATH', align: 'right' },
+  { key: 'allocSort', label: 'Alloc', sub: 'Cur / Target', align: 'right' },
+  { key: 'belowATHPct', label: 'ATH', sub: 'Below peak', align: 'right' },
 ]
+
+function allocText(pos) {
+  if (!pos) return null
+  const cur = `${pos.currentAllocPct.toFixed(1)}%`
+  return pos.targetAllocPct > 0 ? `${cur} / ${pos.targetAllocPct.toFixed(0)}%` : `${cur} / —`
+}
+function driftClass(pos) {
+  if (!pos || pos.driftPct == null) return 'text-[var(--text-dim)]'
+  if (pos.needsRebalance) return pos.driftPct > 0 ? 'text-[var(--accent-rose)]' : 'text-[var(--accent-amber)]'
+  return 'text-[var(--text-dim)]'
+}
+function driftText(pos) {
+  if (!pos || pos.driftPct == null) return ''
+  const d = Math.abs(pos.driftPct) < 0.05 ? 0 : pos.driftPct
+  return `${d > 0 ? '+' : ''}${d.toFixed(1)} pts`
+}
 
 export default function FundsDashboardPage() {
   const navigate = useNavigate()
@@ -65,12 +82,14 @@ export default function FundsDashboardPage() {
   const { mfPortfolios, mfHoldings, mfTransactions, activeMembers, activeInvestmentAccounts } = useData()
   const { mv } = useMask()
 
-  const [portfolioFilter, setPortfolioFilter] = useState('all')
+  // Multi-select filters. An empty set means "all".
+  // Members start from the header selector so navigating from a member view keeps that context.
+  const [memberSel, setMemberSel] = useState(() => new Set(selectedMember && selectedMember !== 'all' ? [selectedMember] : []))
+  const [portfolioSel, setPortfolioSel] = useState(() => new Set())
   const [category, setCategory] = useState('all')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ key: 'currentValue', dir: 'desc' })
   const [expanded, setExpanded] = useState(() => new Set())
-  const [portfolioMenuOpen, setPortfolioMenuOpen] = useState(false)
   const [hideAmounts, setHideAmounts] = useState(() => {
     try { return localStorage.getItem(HIDE_KEY) === 'true' } catch { return false }
   })
@@ -86,21 +105,35 @@ export default function FundsDashboardPage() {
     [mfPortfolios, activeInvestmentAccounts, activeMembers],
   )
 
-  // Member filter comes from the global header selector
+  // Portfolios owned by the ticked members (all members when none ticked)
   const memberPortfolios = useMemo(
-    () => (selectedMember === 'all' ? enrichedPortfolios : enrichedPortfolios.filter((p) => p.ownerId === selectedMember)),
-    [enrichedPortfolios, selectedMember],
+    () => (memberSel.size === 0 ? enrichedPortfolios : enrichedPortfolios.filter((p) => memberSel.has(p.ownerId))),
+    [enrichedPortfolios, memberSel],
   )
 
-  // Reset the portfolio filter when the member changes and the selection is no longer valid
+  // Drop ticked portfolios that no longer belong to the ticked members
   useEffect(() => {
-    if (portfolioFilter !== 'all' && !memberPortfolios.some((p) => p.portfolioId === portfolioFilter)) setPortfolioFilter('all')
-  }, [memberPortfolios, portfolioFilter])
+    if (portfolioSel.size === 0) return
+    const valid = new Set(memberPortfolios.map((p) => p.portfolioId))
+    if ([...portfolioSel].some((id) => !valid.has(id))) {
+      setPortfolioSel(new Set([...portfolioSel].filter((id) => valid.has(id))))
+    }
+  }, [memberPortfolios, portfolioSel])
 
   const scopedPortfolios = useMemo(
-    () => (portfolioFilter === 'all' ? memberPortfolios : memberPortfolios.filter((p) => p.portfolioId === portfolioFilter)),
-    [memberPortfolios, portfolioFilter],
+    () => (portfolioSel.size === 0 ? memberPortfolios : memberPortfolios.filter((p) => portfolioSel.has(p.portfolioId))),
+    [memberPortfolios, portfolioSel],
   )
+
+  function toggleIn(setter) {
+    return (id) => setter((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  const toggleMember = toggleIn(setMemberSel)
+  const togglePortfolio = toggleIn(setPortfolioSel)
 
   // One row per fund, consolidated across the selected portfolios
   const model = useMemo(
@@ -120,9 +153,10 @@ export default function FundsDashboardPage() {
     if (category !== 'all') list = list.filter((f) => f.category === category)
     if (q) list = list.filter((f) => f.fundName.toLowerCase().includes(q) || f.members.some((m) => m.toLowerCase().includes(q)))
     const dir = sort.dir === 'asc' ? 1 : -1
+    const sortVal = (f) => (sort.key === 'allocSort' ? (f.allocation?.driftPct != null ? Math.abs(f.allocation.driftPct) : null) : f[sort.key])
     return [...list].sort((a, b) => {
-      const av = a[sort.key]
-      const bv = b[sort.key]
+      const av = sortVal(a)
+      const bv = sortVal(b)
       if (sort.key === 'fundName') return dir * String(av).localeCompare(String(bv))
       const an = av == null || !Number.isFinite(av) ? -Infinity : av
       const bn = bv == null || !Number.isFinite(bv) ? -Infinity : bv
@@ -141,10 +175,9 @@ export default function FundsDashboardPage() {
     })
   }
 
-  const memberLabel = selectedMember === 'all'
+  const memberLabel = memberSel.size === 0
     ? 'Everyone'
-    : (familyMembers.find((m) => m.memberId === selectedMember)?.memberName || 'Member')
-  const selectedPortfolio = memberPortfolios.find((p) => p.portfolioId === portfolioFilter)
+    : familyMembers.filter((m) => memberSel.has(m.memberId)).map((m) => mv(m.memberName, 'name')).join(', ')
 
   if (!enrichedPortfolios.length) {
     return (
@@ -169,43 +202,48 @@ export default function FundsDashboardPage() {
           <div>
             <h1 className="text-base font-bold text-[var(--text-primary)] leading-tight">All Funds</h1>
             <p className="text-xs text-[var(--text-dim)]">
-              {mv(memberLabel, 'name')} · {scopedPortfolios.length} portfolio{scopedPortfolios.length === 1 ? '' : 's'} · {t.fundCount} fund{t.fundCount === 1 ? '' : 's'}
+              {memberLabel} · {scopedPortfolios.length} portfolio{scopedPortfolios.length === 1 ? '' : 's'} · {t.fundCount} fund{t.fundCount === 1 ? '' : 's'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Portfolio filter */}
-          <div className="relative">
-            <button onClick={() => setPortfolioMenuOpen((o) => !o)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors max-w-[220px]">
-              <span className="truncate">{selectedPortfolio ? selectedPortfolio.portfolioName : 'All Portfolios'}</span>
-              <ChevronDown size={13} className="shrink-0" />
-            </button>
-            {portfolioMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setPortfolioMenuOpen(false)} />
-                <div className="absolute right-0 mt-1 w-64 max-h-72 overflow-y-auto bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl z-40 py-1">
-                  <button onClick={() => { setPortfolioFilter('all'); setPortfolioMenuOpen(false) }}
-                    className={`w-full text-left px-3 py-2 text-sm ${portfolioFilter === 'all' ? 'text-violet-400 bg-violet-500/10' : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}>
-                    All Portfolios
-                  </button>
-                  {memberPortfolios.map((p) => (
-                    <button key={p.portfolioId} onClick={() => { setPortfolioFilter(p.portfolioId); setPortfolioMenuOpen(false) }}
-                      className={`w-full text-left px-3 py-2 ${portfolioFilter === p.portfolioId ? 'bg-violet-500/10' : 'hover:bg-[var(--bg-hover)]'}`}>
-                      <p className={`text-sm truncate ${portfolioFilter === p.portfolioId ? 'text-violet-400' : 'text-[var(--text-primary)]'}`}>{p.portfolioName}</p>
-                      <p className="text-xs text-[var(--text-dim)] truncate">{mv(p.ownerName, 'name')}</p>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
           <button onClick={() => setHideAmounts((v) => !v)} title={hideAmounts ? 'Show amounts' : 'Hide amounts (percent-only view)'}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg transition-colors ${hideAmounts ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border-[var(--border)]'}`}>
             {hideAmounts ? <EyeOff size={13} /> : <Eye size={13} />}
             <span className="hidden sm:inline">{hideAmounts ? 'Amounts hidden' : 'Hide amounts'}</span>
           </button>
         </div>
+      </div>
+
+      {/* ── Member + portfolio filters (tick any combination) ── */}
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 space-y-2.5">
+        <FilterRow
+          label="Members"
+          allLabel="Everyone"
+          allActive={memberSel.size === 0}
+          onAll={() => setMemberSel(new Set())}
+          items={familyMembers.map((m) => ({
+            id: m.memberId,
+            title: mv(m.memberName, 'name'),
+            hint: `${enrichedPortfolios.filter((p) => p.ownerId === m.memberId).length}`,
+            active: memberSel.has(m.memberId),
+          }))}
+          onToggle={toggleMember}
+        />
+        <FilterRow
+          label="Portfolios"
+          allLabel="All Portfolios"
+          allActive={portfolioSel.size === 0}
+          onAll={() => setPortfolioSel(new Set())}
+          items={memberPortfolios.map((p) => ({
+            id: p.portfolioId,
+            title: p.portfolioName,
+            hint: memberSel.size === 1 ? '' : mv(p.ownerName, 'name'),
+            active: portfolioSel.has(p.portfolioId),
+          }))}
+          onToggle={togglePortfolio}
+          empty="No portfolios for the selected members"
+        />
       </div>
 
       {/* ── Summary (Zerodha-style) ── */}
@@ -282,7 +320,7 @@ export default function FundsDashboardPage() {
                 <th className="w-8"></th>
                 {COLUMNS.map((c) => (
                   <th key={c.key} onClick={() => toggleSort(c.key)}
-                    className={`py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider select-none cursor-pointer hover:text-[var(--text-primary)] ${c.align === 'left' ? 'text-left' : 'text-right'}`}>
+                    className={`py-2.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider select-none cursor-pointer whitespace-nowrap hover:text-[var(--text-primary)] ${c.align === 'left' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center gap-1 ${c.align === 'left' ? '' : 'justify-end'}`}>
                       <span>{c.label}</span>
                       <SortIcon active={sort.key === c.key} dir={sort.dir} />
@@ -301,7 +339,7 @@ export default function FundsDashboardPage() {
                     <tr onClick={() => toggleExpand(f.key)}
                       className={`border-b border-[var(--border-light)] cursor-pointer transition-colors ${isOpen ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}>
                       <td className="pl-3 text-[var(--text-dim)]">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                      <td className="py-2.5 px-3 max-w-[280px]">
+                      <td className="py-2.5 px-2 max-w-[260px]">
                         <p className="text-[var(--text-primary)] font-medium leading-snug truncate" title={f.fundName}>{main}</p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase" style={{ background: `${CATEGORY_COLORS[f.category] || CATEGORY_COLORS.Other}20`, color: CATEGORY_COLORS[f.category] || CATEGORY_COLORS.Other }}>{f.category}</span>
@@ -312,29 +350,41 @@ export default function FundsDashboardPage() {
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-[var(--text-muted)]">{f.units.toFixed(3)}</td>
-                      <td className="py-2.5 px-3 text-right tabular-nums">
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right tabular-nums text-[var(--text-muted)]">{f.units.toFixed(3)}</td>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right tabular-nums">
                         <div className="text-[var(--text-primary)]">₹{f.currentNav.toFixed(2)}</div>
                         <div className="text-xs text-[var(--text-dim)]">₹{f.avgNav.toFixed(2)}</div>
                       </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-[var(--text-muted)]">{amt(f.invested)}</td>
-                      <td className="py-2.5 px-3 text-right tabular-nums font-semibold text-[var(--text-primary)]">{amt(f.currentValue)}</td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${plClass(f.pl)}`}>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right tabular-nums text-[var(--text-muted)]">{amt(f.invested)}</td>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right tabular-nums font-semibold text-[var(--text-primary)]">{amt(f.currentValue)}</td>
+                      <td className={`py-2.5 px-2 whitespace-nowrap text-right tabular-nums ${plClass(f.pl)}`}>
                         {!hideAmounts && <div className="font-semibold">{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</div>}
                         <div className={hideAmounts ? 'font-semibold' : 'text-xs opacity-80'}>{pct(f.plPct)}</div>
                       </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums font-semibold ${plClass(f.xirr)}`} title={f.historyComplete ? undefined : INCOMPLETE_HINT}>{ratePct(f.xirr)}</td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${plClass(f.cagr)}`} title={f.historyComplete ? undefined : INCOMPLETE_HINT}>
+                      <td className={`py-2.5 px-2 whitespace-nowrap text-right tabular-nums font-semibold ${plClass(f.xirr)}`} title={f.historyComplete ? undefined : INCOMPLETE_HINT}>{ratePct(f.xirr)}</td>
+                      <td className={`py-2.5 px-2 whitespace-nowrap text-right tabular-nums ${plClass(f.cagr)}`} title={f.historyComplete ? undefined : INCOMPLETE_HINT}>
                         <div>{ratePct(f.cagr)}</div>
                         <div className="text-xs text-[var(--text-dim)]">{f.historyComplete ? holdingSince(f.since) : 'no history'}</div>
                       </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums">
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right tabular-nums">
                         <div className="flex items-center justify-end gap-2">
                           <div className="w-14 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className="h-full rounded-full bg-violet-500/70" style={{ width: `${Math.min(100, f.weight)}%` }} /></div>
                           <span className="text-[var(--text-primary)] w-12">{f.weight.toFixed(1)}%</span>
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 text-right">
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right tabular-nums">
+                        {f.allocation ? (
+                          <>
+                            <div className="text-[var(--text-primary)]">{allocText(f.allocation)}</div>
+                            <div className={`text-xs ${driftClass(f.allocation)}`}>{f.allocation.needsRebalance ? `${driftText(f.allocation)} · rebalance` : driftText(f.allocation)}</div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-[var(--text-dim)]">
+                            {f.positions.length} portfolios{f.rebalanceCount > 0 && <span className="text-[var(--accent-amber)]"> · {f.rebalanceCount} to rebalance</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-right">
                         {f.athNav > 0
                           ? <span className={`inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full tabular-nums ${athBadgeClass(f.belowATHPct)}`}>{f.belowATHPct <= 0 ? 'At ATH' : `−${f.belowATHPct.toFixed(1)}%`}</span>
                           : <span className="text-xs text-[var(--text-dim)]">—</span>}
@@ -391,6 +441,7 @@ export default function FundsDashboardPage() {
                   <span>{f.units.toFixed(3)} units</span>
                   <span>NAV ₹{f.currentNav.toFixed(2)} · Avg ₹{f.avgNav.toFixed(2)}</span>
                   <span>Inv {amt(f.invested)}</span>
+                  {f.allocation && <span>Alloc {allocText(f.allocation)}{f.allocation.needsRebalance && <span className={driftClass(f.allocation)}> · rebalance</span>}</span>}
                 </div>
               </button>
               {isOpen && (
@@ -409,6 +460,34 @@ export default function FundsDashboardPage() {
         <span>XIRR is the money-weighted annual return from every recorded purchase and redemption. CAGR is the simple point-to-point return from the first purchase, so it understates SIP returns. Below ATH compares each fund's NAV to its own all-time high.</span>
       </p>
     </div>
+  )
+}
+
+function FilterRow({ label, allLabel, allActive, onAll, items, onToggle, empty }) {
+  return (
+    <div className="flex items-start gap-3">
+      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider w-[74px] shrink-0 pt-1.5">{label}</p>
+      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        <CheckChip active={allActive} onClick={onAll} title={allLabel} />
+        {items.map((it) => (
+          <CheckChip key={it.id} active={it.active && !allActive} onClick={() => onToggle(it.id)} title={it.title} hint={it.hint} />
+        ))}
+        {items.length === 0 && empty && <span className="text-xs text-[var(--text-dim)] py-1.5">{empty}</span>}
+      </div>
+    </div>
+  )
+}
+
+function CheckChip({ active, onClick, title, hint }) {
+  return (
+    <button onClick={onClick} aria-pressed={active}
+      className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1 text-xs font-medium rounded-full border transition-colors max-w-[240px] ${active ? 'text-[var(--accent-violet)] bg-violet-500/15 border-violet-500/40' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-inset)] border-[var(--border)]'}`}>
+      <span className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${active ? 'bg-violet-500 border-violet-500' : 'border-[var(--text-dim)]'}`}>
+        {active && <Check size={10} strokeWidth={3} className="text-white" />}
+      </span>
+      <span className="truncate">{title}</span>
+      {hint && <span className="text-[10px] text-[var(--text-dim)] shrink-0">{hint}</span>}
+    </button>
   )
 }
 
@@ -483,11 +562,12 @@ function PositionsTable({ fund, amt, mv, hideAmounts, onOpen, compact }) {
                 </div>
               </div>
               <p className="text-[10px] text-[var(--text-dim)] mt-1 tabular-nums">{p.units.toFixed(3)} units · avg ₹{p.avgNav.toFixed(2)} · inv {amt(p.invested)}{p.ongoingSIP > 0 ? ` · SIP ${amt(p.ongoingSIP)}/mo` : ''}</p>
+              <p className="text-[10px] tabular-nums mt-0.5"><span className="text-[var(--text-dim)]">Alloc {allocText(p)}</span>{p.driftPct != null && <span className={driftClass(p)}> · {driftText(p)}{p.needsRebalance ? ' · rebalance' : ''}</span>}</p>
             </div>
           ))}
         </div>
       ) : (
-        <table className="w-full text-xs">
+        <table className="w-full text-xs whitespace-nowrap">
           <thead>
             <tr className="text-[var(--text-dim)] uppercase tracking-wider">
               <th className="text-left py-1 pr-3 font-semibold">Portfolio</th>
@@ -496,6 +576,7 @@ function PositionsTable({ fund, amt, mv, hideAmounts, onOpen, compact }) {
               <th className="text-right py-1 pr-3 font-semibold">Avg NAV</th>
               <th className="text-right py-1 pr-3 font-semibold">Invested</th>
               <th className="text-right py-1 pr-3 font-semibold">Current</th>
+              <th className="text-right py-1 pr-3 font-semibold">Alloc / Target</th>
               <th className="text-right py-1 pr-3 font-semibold">P&L</th>
               <th className="text-right py-1 pr-3 font-semibold">XIRR</th>
               <th className="text-right py-1 pr-3 font-semibold">Since</th>
@@ -511,6 +592,10 @@ function PositionsTable({ fund, amt, mv, hideAmounts, onOpen, compact }) {
                 <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">₹{p.avgNav.toFixed(2)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{amt(p.invested)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums font-semibold text-[var(--text-primary)]">{amt(p.currentValue)}</td>
+                <td className="py-1.5 pr-3 text-right tabular-nums">
+                  <div className="text-[var(--text-primary)]">{allocText(p)}</div>
+                  {p.driftPct != null && <div className={`text-[10px] ${driftClass(p)}`}>{p.needsRebalance ? `${driftText(p)} · rebalance` : driftText(p)}</div>}
+                </td>
                 <td className={`py-1.5 pr-3 text-right tabular-nums font-semibold ${plClass(p.pl)}`}>{hideAmounts ? '' : `${p.pl >= 0 ? '+' : ''}${formatINR(p.pl)} `}{pct(p.plPct)}</td>
                 <td className={`py-1.5 pr-3 text-right tabular-nums font-semibold ${plClass(p.xirr)}`}>{ratePct(p.xirr)}</td>
                 <td className="py-1.5 pr-3 text-right text-[var(--text-dim)]">{monthYear(p.since)}</td>

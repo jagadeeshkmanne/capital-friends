@@ -59,3 +59,19 @@ test('empty inputs produce an empty model', () => {
   assert.equal(m.totals.currentValue, 0)
   assert.equal(m.totals.xirr, null)
 })
+
+test('allocation is per portfolio and only surfaced at fund level when unambiguous', () => {
+  const m = buildFundsModel({ portfolios, holdings: mfHoldings, transactions: mfTransactions, today })
+  m.funds.forEach((f) => {
+    f.positions.forEach((pos) => {
+      assert.ok(pos.currentAllocPct >= 0 && pos.currentAllocPct <= 100.0001, `${f.fundName} alloc in range`)
+      assert.equal(typeof pos.targetAllocPct, 'number')
+    })
+    if (f.positions.length === 1) assert.equal(f.allocation, f.positions[0])
+    else assert.equal(f.allocation, null)
+  })
+  // Each portfolio's current allocations sum to 100
+  const byPortfolio = {}
+  m.funds.forEach((f) => f.positions.forEach((pos) => { byPortfolio[pos.portfolioId] = (byPortfolio[pos.portfolioId] || 0) + pos.currentAllocPct }))
+  Object.values(byPortfolio).forEach((sum) => assert.ok(Math.abs(sum - 100) < 1e-6))
+})

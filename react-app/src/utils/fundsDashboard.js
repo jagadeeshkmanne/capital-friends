@@ -57,6 +57,10 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   const activeHoldings = (holdings || []).filter((h) => inScope(h.portfolioId) && Number(h.units) > 0)
   const txns = (transactions || []).filter((t) => inScope(t.portfolioId))
 
+  // Portfolio totals for allocation % (a portfolio's holdings are all in scope when it is)
+  const portfolioTotals = {}
+  activeHoldings.forEach((h) => { portfolioTotals[h.portfolioId] = (portfolioTotals[h.portfolioId] || 0) + (Number(h.currentValue) || 0) })
+
   const txnsByFund = {}
   txns.forEach((t) => {
     const key = fundKey(t.fundCode, t.fundName)
@@ -91,7 +95,14 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
     const posFlows = toFlows((txnsByFund[key] || []).filter((t) => t.portfolioId === h.portfolioId))
     const pl = currentValue - invested
     const posComplete = historyCovers(posFlows, invested)
+    const pTotal = portfolioTotals[h.portfolioId] || 0
+    const currentAllocPct = pTotal > 0 ? (currentValue / pTotal) * 100 : 0
+    const targetAllocPct = Number(h.targetAllocationPct) || 0
+    const thresholdPct = (Number(p?.rebalanceThreshold) || 0.05) * 100
+    const driftPct = targetAllocPct > 0 ? currentAllocPct - targetAllocPct : null
     f.positions.push({
+      currentAllocPct, targetAllocPct, driftPct, thresholdPct,
+      needsRebalance: Boolean(driftPct != null && !p?.skipRebalance && Math.abs(driftPct) > thresholdPct),
       portfolioId: h.portfolioId, portfolioName: p?.portfolioName || '', ownerName: p?.ownerName || '', ownerId: p?.ownerId || '',
       units: Number(h.units) || 0, avgNav: Number(h.avgNav) || 0, invested, currentValue, pl,
       plPct: invested > 0 ? (pl / invested) * 100 : null,
@@ -121,6 +132,9 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
       weight: totalValue > 0 ? (f.currentValue / totalValue) * 100 : 0,
       isBuyOpp: isBuyOpportunity(holding),
       isStrongBuy: isStrongBuyOpportunity(holding),
+      // Allocation targets are per portfolio, so only meaningful at fund level when held in one portfolio
+      allocation: f.positions.length === 1 ? f.positions[0] : null,
+      rebalanceCount: f.positions.filter((pos) => pos.needsRebalance).length,
       positions: f.positions.sort((a, b) => b.currentValue - a.currentValue),
     }
   })
