@@ -62,7 +62,7 @@ const COLUMNS = [
   { key: 'fundName', label: 'Fund', align: 'left' },
   { key: 'invested', label: 'Amount', sub: 'Current / Invested', align: 'right' },
   { key: 'pl', label: 'Gain', sub: 'Amount / %', align: 'right' },
-  { key: 'xirr', label: 'XIRR', align: 'right' },
+  { key: 'xirr', label: 'Returns', sub: 'XIRR / CAGR', align: 'right' },
   { key: 'weight', label: 'Weight', align: 'right' },
   { key: 'belowATHPct', label: 'ATH', sub: 'Below peak', align: 'right' },
 ]
@@ -317,7 +317,10 @@ export default function FundsDashboardPage() {
                           {!hideAmounts && <p className={`font-semibold ${plClass(f.pl)}`}>{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</p>}
                           <p className={`${hideAmounts ? 'font-semibold' : 'mt-0.5'} ${plClass(f.pl)} ${hideAmounts ? '' : 'opacity-70'}`}>{pct(f.plPct)}</p>
                         </td>
-                        <td className={`${sz.row} px-3 text-right ${sz.num} font-semibold tabular-nums ${plClass(f.xirr)}`} title={reasonLong(f.returnsReason)}>{ratePct(f.xirr)}</td>
+                        <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} tabular-nums`} title={reasonLong(f.returnsReason)}>
+                          <p className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</p>
+                          <p className={`mt-0.5 ${f.cagr == null ? 'text-[var(--text-dim)]' : `${plClass(f.cagr)} opacity-70`}`}>{ratePct(f.cagr)}</p>
+                        </td>
                         <td className={`${sz.row} px-3 text-right ${sz.num} text-[var(--text-secondary)] tabular-nums`}>{f.weight.toFixed(1)}%</td>
                         <td className={`${sz.row} px-3 text-right`}><ATHBadge fund={f} cls={sz.num} /></td>
                       </tr>
@@ -546,8 +549,10 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
                 <div>Gain</div>
                 <div className="text-xs font-medium normal-case tracking-normal text-[var(--text-dim)]">Amount / %</div>
               </th>
-              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">XIRR</th>
-              {!quiet && <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">CAGR</th>}
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">
+                <div>Returns</div>
+                <div className="text-xs font-medium normal-case tracking-normal text-[var(--text-dim)]">XIRR / CAGR</div>
+              </th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Share</th>
             </tr>
           </thead>
@@ -566,8 +571,10 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
                   {!hideAmounts && <p className={`font-semibold ${plClass(r.gain)}`}>{r.gain >= 0 ? '+' : ''}{formatINR(r.gain)}</p>}
                   <p className={`${hideAmounts ? 'font-semibold' : 'mt-0.5 opacity-70'} ${plClass(r.gain)}`}>{pct(r.gainPct)}</p>
                 </td>
-                <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.xirr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.xirr)}</td>
-                {!quiet && <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>}
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap ${sz?.num || 'text-xs'} tabular-nums`} title={reasonLong(r.returnsReason)}>
+                  <p className={`font-semibold ${plClass(r.xirr)}`}>{ratePct(r.xirr)}</p>
+                  <p className={`mt-0.5 ${r.cagr == null ? 'text-[var(--text-dim)]' : `${plClass(r.cagr)} opacity-70`}`}>{ratePct(r.cagr)}</p>
+                </td>
                 <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} text-[var(--text-secondary)] tabular-nums`}>{r.weight.toFixed(1)}%</td>
               </tr>
             ))}
