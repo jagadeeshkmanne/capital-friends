@@ -199,3 +199,14 @@ test('a stated initial investment with no opening-balance transaction still coun
   const m = buildFundsModel({ portfolios, holdings, transactions, today })
   assert.equal(m.totals.netInvested, 60000)
 })
+
+test('a typed-in sheet total with no stated initial investment is honoured', () => {
+  const today = new Date(2026, 8, 10)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active', initialInvestment: 0, totalInvestment: 6300000 }]
+  const holdings = [{ portfolioId: 'P1', schemeCode: 'A', fundName: 'Fund A', units: 1000, avgNav: 7915, investment: 7915000, currentNav: 9686, currentValue: 9686000 }]
+  const transactions = [{ portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'BUY', transactionType: 'INITIAL', date: '2023-08-05', units: 1000, price: 7915, totalAmount: 7915000 }]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.netInvested, 6300000)
+  assert.equal(m.totals.totalGain, 3386000)
+  assert.ok(Math.abs(m.totals.xirr - 0.149) < 0.01, `xirr ${m.totals.xirr}`)
+})

@@ -91,8 +91,14 @@ function cashOut(flows) { return flows.reduce((s, cf) => s + (cf.amount > 0 && !
 function applyInitialInvestment(flows, portfolios) {
   const overrides = {}
   ;(portfolios || []).forEach((p) => {
-    const v = Number(p.initialInvestment) || 0
-    if (v > 0) overrides[p.portfolioId] = v
+    const stated = Number(p.initialInvestment) || 0
+    if (stated > 0) { overrides[p.portfolioId] = stated; return }
+    const sheetTotal = Number(p.totalInvestment) || 0
+    if (sheetTotal > 0) {
+      const otherNet = flows.reduce((s, cf) => (cf.portfolioId === p.portfolioId && !cf.opening && !cf.switch ? s - cf.amount : s), 0)
+      const implied = sheetTotal - otherNet
+      if (implied > 0) overrides[p.portfolioId] = implied
+    }
   })
   if (!Object.keys(overrides).length) return flows
   const openingTotals = {}
@@ -236,11 +242,13 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   // initial investment; a stated amount with no opening-balance transaction is added on its own.
   const openingByPortfolio = {}
   allFlows.forEach((cf) => { if (cf.opening && cf.amount < 0) openingByPortfolio[cf.portfolioId] = true })
-  const statedWithoutOpening = (portfolios || []).reduce((s, p) => {
-    const v = Number(p.initialInvestment) || 0
-    return s + (v > 0 && !openingByPortfolio[p.portfolioId] ? v : 0)
+  const netInvested = (portfolios || []).reduce((sum, p) => {
+    const sheetTotal = Number(p.totalInvestment) || 0
+    if (sheetTotal > 0) return sum + sheetTotal   // exactly what the Mutual Funds page shows
+    const pFlows = allFlows.filter((cf) => cf.portfolioId === p.portfolioId)
+    const stated = Number(p.initialInvestment) || 0
+    return sum + cashIn(pFlows) - cashOut(pFlows) + (stated > 0 && !openingByPortfolio[p.portfolioId] ? stated : 0)
   }, 0)
-  const netInvested = cashIn(allFlows) - cashOut(allFlows) + statedWithoutOpening
   const hasCashFlows = netInvested > 0
   const totalGain = hasCashFlows ? totalValue - netInvested : null
   const cagrSince = weightedInflowDate(allFlows)
