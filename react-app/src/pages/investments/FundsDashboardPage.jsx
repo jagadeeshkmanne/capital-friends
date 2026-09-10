@@ -325,7 +325,7 @@ export default function FundsDashboardPage() {
                         <td className={`${sz.row} px-3 text-right`}><ATHBadge fund={f} cls={sz.num} /></td>
                       </tr>
                       {isOpen && (
-                        <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                        <tr className="border-b border-[var(--border-light)] bg-violet-500/[0.06]">
                           <td className="border-l-2 border-violet-500/60"></td>
                           <td colSpan={COLUMNS.length} className="px-4 py-4">
                             <FundDetail fund={f} amt={amt} hideAmounts={hideAmounts} onOpen={() => navigate('/investments/mutual-funds')} />
@@ -373,7 +373,7 @@ export default function FundsDashboardPage() {
                   </div>
                 </button>
                 {isOpen && (
-                  <div className="border-t border-[var(--border-light)] border-l-2 border-l-violet-500/60 bg-[var(--bg-inset)] px-3 py-3">
+                  <div className="border-t border-[var(--border-light)] border-l-2 border-l-violet-500/60 bg-violet-500/[0.06] px-3 py-3">
                     <FundDetail fund={f} amt={amt} hideAmounts={hideAmounts} onOpen={() => navigate('/investments/mutual-funds')} compact />
                   </div>
                 )}
@@ -637,27 +637,43 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2">
+        <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-1">
         <table className="w-full text-xs whitespace-nowrap">
           <thead>
             <tr className="text-[var(--text-dim)] uppercase tracking-wider">
-              <th className="text-left py-1 pr-3 font-semibold">Portfolio</th>
-              <th className="text-left py-1 pr-3 font-semibold">Member</th>
-              <th className="text-right py-1 pr-3 font-semibold">Current</th>
-              <th className="text-right py-1 pr-3 font-semibold">Invested</th>
-              <th className="text-right py-1 pr-3 font-semibold">Gain</th>
-              <th className="text-right py-1 font-semibold">XIRR</th>
+              <th className="text-left py-2 pr-3 font-semibold">Portfolio</th>
+              <th className="text-left py-2 pr-3 font-semibold">Member</th>
+              <th className="text-right py-2 pr-3 font-semibold">
+                <div>Amount</div>
+                <div className="font-medium normal-case tracking-normal">Current / Invested</div>
+              </th>
+              <th className="text-right py-2 pr-3 font-semibold">
+                <div>Gain</div>
+                <div className="font-medium normal-case tracking-normal">Amount / %</div>
+              </th>
+              <th className="text-right py-2 font-semibold">
+                <div>Returns</div>
+                <div className="font-medium normal-case tracking-normal">XIRR / CAGR</div>
+              </th>
             </tr>
           </thead>
           <tbody>
             {fund.positions.map((p) => (
               <tr key={p.portfolioId} className="border-t border-[var(--border-light)]">
-                <td className="py-1.5 pr-3 text-[var(--text-primary)] font-medium">{p.portfolioName}</td>
-                <td className="py-1.5 pr-3 text-[var(--text-muted)]">{p.ownerName}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums font-semibold text-[var(--text-primary)]">{amt(p.currentValue)}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{amt(p.invested)}</td>
-                <td className={`py-1.5 pr-3 text-right tabular-nums font-semibold ${plClass(p.pl)}`}>{hideAmounts ? '' : `${p.pl >= 0 ? '+' : ''}${formatINR(p.pl)} `}{pct(p.plPct)}</td>
-                <td className={`py-1.5 text-right tabular-nums font-semibold ${plClass(p.xirr)}`} title={reasonLong(p.returnsReason)}>{ratePct(p.xirr)}</td>
+                <td className="py-2 pr-3 text-[var(--text-primary)] font-semibold">{p.portfolioName}</td>
+                <td className="py-2 pr-3 text-[var(--text-muted)]">{p.ownerName}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">
+                  <p className="font-semibold text-[var(--text-primary)]">{amt(p.currentValue)}</p>
+                  <p className="text-[var(--text-dim)] mt-0.5">{amt(p.invested)}</p>
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">
+                  {!hideAmounts && <p className={`font-semibold ${plClass(p.pl)}`}>{p.pl >= 0 ? '+' : ''}{formatINR(p.pl)}</p>}
+                  <p className={`${hideAmounts ? 'font-semibold' : 'mt-0.5 opacity-70'} ${plClass(p.pl)}`}>{pct(p.plPct)}</p>
+                </td>
+                <td className="py-2 text-right tabular-nums" title={reasonLong(p.returnsReason)}>
+                  <p className={`font-semibold ${plClass(p.xirr)}`}>{ratePct(p.xirr)}</p>
+                  <p className={`mt-0.5 ${p.cagr == null ? 'text-[var(--text-dim)]' : `${plClass(p.cagr)} opacity-70`}`}>{ratePct(p.cagr)}</p>
+                </td>
               </tr>
             ))}
           </tbody>

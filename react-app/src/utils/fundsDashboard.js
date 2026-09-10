@@ -193,6 +193,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
       units: Number(h.units) || 0, avgNav: Number(h.avgNav) || 0, invested, currentValue, pl,
       plPct: invested > 0 ? (pl / invested) * 100 : null,
       xirr: posReason ? null : computeXIRR([...posFlows, { date: today, amount: currentValue }]),
+      cagr: posReason ? null : computeCAGR(invested, currentValue, weightedInflowDate(posFlows), today),
       returnsReason: posReason,
       openingDate: posFlows.filter((cf) => cf.opening).map((cf) => cf.date).sort((a, b) => b - a)[0] || null,
       since: earliest(posFlows), ongoingSIP: Number(h.ongoingSIP) || 0,
