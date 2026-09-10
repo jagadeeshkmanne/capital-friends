@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Layers, Search, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
-  Eye, EyeOff, Wallet, Check, Info, X, SlidersHorizontal,
+  Eye, EyeOff, Wallet, Check, Info, X, SlidersHorizontal, Presentation, Minimize2,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
@@ -12,6 +12,7 @@ import { CATEGORY_COLORS } from '../../utils/fundCategory'
 import { buildFundsModel, resolvePortfolioOwners } from '../../utils/fundsDashboard'
 
 const HIDE_KEY = 'cf_funds_hide_amounts'
+const PRESENT_KEY = 'cf_funds_present'
 const MEMBER_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ec4899', '#3b82f6', '#f97316', '#14b8a6']
 
 // ── formatting helpers ──
@@ -71,7 +72,7 @@ const COLUMNS = [
   { key: 'invested', label: 'Invested', align: 'right' },
   { key: 'currentValue', label: 'Current', align: 'right' },
   { key: 'pl', label: 'P&L', align: 'right' },
-  { key: 'xirr', label: 'XIRR', sub: 'CAGR · held', align: 'right' },
+  { key: 'xirr', label: 'XIRR', align: 'right' },
   { key: 'weight', label: 'Weight', align: 'right' },
   { key: 'belowATHPct', label: 'ATH', sub: 'Below peak', align: 'right' },
 ]
@@ -94,6 +95,16 @@ export default function FundsDashboardPage() {
   useEffect(() => {
     try { localStorage.setItem(HIDE_KEY, String(hideAmounts)) } catch {}
   }, [hideAmounts])
+  // Present mode: bigger type, fewer elements, filters tucked away. Meant for screen recording.
+  const [present, setPresent] = useState(() => {
+    try { return localStorage.getItem(PRESENT_KEY) === 'true' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(PRESENT_KEY, String(present)) } catch {}
+  }, [present])
+  const sz = present
+    ? { stat: 'text-3xl', statPad: 'px-5 py-4', row: 'py-4', cell: 'text-base', name: 'text-lg', sub: 'text-sm', head: 'text-xs' }
+    : { stat: 'text-2xl', statPad: 'px-4 py-3.5', row: 'py-3.5', cell: 'text-[15px]', name: 'text-[15px]', sub: 'text-xs', head: 'text-xs' }
 
   const amt = (v) => (hideAmounts ? '₹ ••••' : formatINR(v || 0))
   const memberLabels = useMemo(() => buildMemberLabels(familyMembers || []), [familyMembers])
@@ -196,6 +207,8 @@ export default function FundsDashboardPage() {
       showOwner={memberSel.size !== 1}
       hideAmounts={hideAmounts}
       onToggleHide={() => setHideAmounts((v) => !v)}
+      present={present}
+      onTogglePresent={() => setPresent((v) => !v)}
       onClear={clearFilters}
       activeCount={activeFilterCount}
     />
@@ -204,7 +217,7 @@ export default function FundsDashboardPage() {
   return (
     <div className="min-w-0 max-w-full lg:flex lg:items-start lg:gap-5">
       {/* ── Left filter panel (desktop) ── */}
-      <aside className="hidden lg:block w-60 shrink-0 sticky top-4">{filterPanel}</aside>
+      {!present && <aside className="hidden lg:block w-60 shrink-0 sticky top-4">{filterPanel}</aside>}
 
       <div className="flex-1 min-w-0 space-y-4">
         {/* ── Title row ── */}
@@ -212,41 +225,49 @@ export default function FundsDashboardPage() {
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0"><Layers size={18} className="text-violet-400" /></div>
             <div className="min-w-0">
-              <h1 className="text-base font-bold text-[var(--text-primary)] leading-tight">All Funds</h1>
-              <p className="text-xs text-[var(--text-dim)] truncate">
+              <h1 className={`${present ? 'text-xl' : 'text-base'} font-bold text-[var(--text-primary)] leading-tight`}>All Funds</h1>
+              <p className={`${present ? 'text-sm' : 'text-xs'} text-[var(--text-dim)] truncate`}>
                 {memberLabel} · {scopedPortfolios.length} portfolio{scopedPortfolios.length === 1 ? '' : 's'} · {t.fundCount} fund{t.fundCount === 1 ? '' : 's'}
               </p>
             </div>
           </div>
-          <button onClick={() => setFiltersOpen((o) => !o)}
-            className={`lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg transition-colors shrink-0 ${activeFilterCount > 0 || filtersOpen ? 'text-[var(--accent-violet)] bg-violet-500/10 border-violet-500/30' : 'text-[var(--text-muted)] bg-[var(--bg-card)] border-[var(--border)]'}`}>
-            <SlidersHorizontal size={13} /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setFiltersOpen((o) => !o)}
+              className={`${present ? '' : 'lg:hidden'} flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg transition-colors ${activeFilterCount > 0 || filtersOpen ? 'text-[var(--accent-violet)] bg-violet-500/10 border-violet-500/30' : 'text-[var(--text-muted)] bg-[var(--bg-card)] border-[var(--border)]'}`}>
+              <SlidersHorizontal size={13} /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </button>
+            {present && (
+              <button onClick={() => { setPresent(false); setFiltersOpen(false) }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg text-amber-400 bg-amber-500/10 border-amber-500/30">
+                <Minimize2 size={13} /> Exit present
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ── Filter panel (mobile, collapsible) ── */}
-        {filtersOpen && <div className="lg:hidden">{filterPanel}</div>}
+        {/* ── Filter panel (collapsible: mobile always, desktop in present mode) ── */}
+        {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
         {/* ── Stat cards (same style as the Mutual Funds page) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-          <Stat label="Total Invested" value={amt(t.netInvested ?? t.invested)}
+          <Stat sz={sz} quiet={present} label="Total Invested" value={amt(t.netInvested ?? t.invested)}
             sub={t.netInvested != null && Math.abs(t.netInvested - t.invested) > Math.max(1, t.invested * 0.01) ? `cost basis ${amt(t.invested)}` : null} />
-          <Stat label="Current Value" value={amt(t.currentValue)} bold />
-          <Stat label="Total Gain" bold positive={(t.totalGain ?? t.pl) >= 0}
+          <Stat sz={sz} quiet={present} label="Current Value" value={amt(t.currentValue)} bold />
+          <Stat sz={sz} quiet={present} label="Total Gain" bold positive={(t.totalGain ?? t.pl) >= 0}
             value={hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)}`}
             sub={hideAmounts ? null : pct(t.totalGain != null ? t.totalGainPct : t.plPct)}
             note={t.totalGain != null && Math.abs(t.totalGain - t.pl) > Math.max(1, Math.abs(t.pl) * 0.01) ? `unrealised ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : null} />
-          <Stat label="XIRR" bold positive={t.xirr == null ? undefined : t.xirr >= 0} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)}
+          <Stat sz={sz} quiet={present} label="XIRR" bold positive={t.xirr == null ? undefined : t.xirr >= 0} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)}
             note={t.unreliableCount > 0 ? <span className="text-amber-500/90">{t.unreliableCount} fund{t.unreliableCount === 1 ? '' : 's'} need{t.unreliableCount === 1 ? 's' : ''} dates</span> : null} />
-          <Stat label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)}
+          <Stat sz={sz} quiet={present} label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)}
             note={t.cagr != null ? `${holdingSince(t.cagrSince)} avg · since ${monthYear(t.since)}` : null} />
-          <Stat label="Buy Opportunities" bold positive={t.buyOppCount > 0 ? true : undefined} value={String(t.buyOppCount)}
+          <Stat sz={sz} quiet={present} label="Buy Opportunities" bold positive={t.buyOppCount > 0 ? true : undefined} value={String(t.buyOppCount)}
             note={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
         </div>
 
         {/* ── Breakdown by member / portfolio ── */}
         {(model.breakdown.byPortfolio.length > 1 || model.breakdown.byMember.length > 1) && (
-          <BreakdownCard breakdown={model.breakdown} amt={amt} hideAmounts={hideAmounts} />
+          <BreakdownCard breakdown={model.breakdown} amt={amt} hideAmounts={hideAmounts} sz={sz} quiet={present} />
         )}
 
         {/* ── Search ── */}
@@ -262,7 +283,7 @@ export default function FundsDashboardPage() {
         {/* ── Desktop table ── */}
         <div className="hidden lg:block rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className={`w-full ${sz.cell}`}>
               <thead>
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                   <th className="w-8"></th>
@@ -287,34 +308,32 @@ export default function FundsDashboardPage() {
                       <tr onClick={() => toggleExpand(f.key)}
                         className={`border-b border-[var(--border-light)] cursor-pointer transition-colors ${isOpen ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}>
                         <td className="pl-3 text-[var(--text-dim)]">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                        <td className="py-3 px-3 max-w-[320px]">
-                          <p className="text-[var(--text-primary)] font-medium leading-snug truncate" title={f.fundName}>{main}</p>
+                        <td className={`${sz.row} px-3 max-w-[360px]`}>
+                          <p className={`${sz.name} text-[var(--text-primary)] font-medium leading-snug truncate`} title={f.fundName}>{main}</p>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <CategoryTag category={f.category} />
-                            {plan && <span className="text-xs text-[var(--text-dim)] truncate">{plan}</span>}
+                            {plan && !present && <span className="text-xs text-[var(--text-dim)] truncate">{plan}</span>}
                             {f.positions.length > 1 && <span className="text-[10px] font-semibold text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">{f.positions.length} portfolios</span>}
                             {f.isBuyOpp && <BuyTag strong={f.isStrongBuy} />}
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap text-[var(--text-muted)]">{amt(f.invested)}</td>
-                        <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap font-semibold text-[var(--text-primary)]">{amt(f.currentValue)}</td>
-                        <td className={`py-3 px-3 text-right tabular-nums whitespace-nowrap ${plClass(f.pl)}`}>
+                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap text-[var(--text-muted)]`}>{amt(f.invested)}</td>
+                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap font-semibold text-[var(--text-primary)]`}>{amt(f.currentValue)}</td>
+                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap ${plClass(f.pl)}`}>
                           {!hideAmounts && <div className="font-semibold">{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</div>}
-                          <div className={hideAmounts ? 'font-semibold' : 'text-xs opacity-80'}>{pct(f.plPct)}</div>
+                          <div className={hideAmounts ? 'font-semibold' : `${sz.sub} opacity-80`}>{pct(f.plPct)}</div>
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap" title={reasonLong(f.returnsReason)}>
+                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap`} title={reasonLong(f.returnsReason)}>
                           <div className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</div>
-                          <div className="text-xs text-[var(--text-dim)]">
-                            {f.returnsReason ? <span className="text-amber-500/90">{reasonShort(f.returnsReason)}</span> : <><span className={plClass(f.cagr)}>{ratePct(f.cagr)}</span> · {holdingSince(f.cagrSince || f.since)}</>}
-                          </div>
+                          {f.returnsReason && !present && <div className="text-xs text-amber-500/90">{reasonShort(f.returnsReason)}</div>}
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
+                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap`}>
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-14 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className="h-full rounded-full bg-violet-500/70" style={{ width: `${Math.min(100, f.weight)}%` }} /></div>
-                            <span className="text-[var(--text-primary)] w-12">{f.weight.toFixed(1)}%</span>
+                            <span className="text-[var(--text-primary)] w-14">{f.weight.toFixed(1)}%</span>
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <td className={`${sz.row} px-3 text-right whitespace-nowrap`}>
                           <ATHBadge fund={f} />
                         </td>
                       </tr>
@@ -381,17 +400,17 @@ export default function FundsDashboardPage() {
           {rows.length === 0 && <p className="py-10 text-center text-sm text-[var(--text-dim)]">No funds match this selection.</p>}
         </div>
 
-        <p className="flex items-start gap-1.5 text-xs text-[var(--text-dim)] px-1">
+        {!present && <p className="flex items-start gap-1.5 text-xs text-[var(--text-dim)] px-1">
           <Info size={13} className="shrink-0 mt-0.5" />
           <span>Total invested is buys minus sells; switches move money between funds and are never counted as investment. Total gain is current value minus total invested, so it includes gains realised through switches. XIRR is the money-weighted annual return from every recorded purchase and redemption. CAGR uses the amount-weighted average purchase date as its start, so later top-ups shorten the holding period rather than being ignored. Both are N/A for holdings added as an opening balance less than a year ago; edit that transaction and set the real first purchase date. Below ATH compares each fund's NAV to its own all-time high.</span>
-        </p>
+        </p>}
       </div>
     </div>
   )
 }
 
 // ── Left filter panel ──
-function FilterPanel({ members, memberSel, onToggleMember, onAllMembers, portfolios, portfolioSel, onTogglePortfolio, onAllPortfolios, showOwner, hideAmounts, onToggleHide, onClear, activeCount }) {
+function FilterPanel({ members, memberSel, onToggleMember, onAllMembers, portfolios, portfolioSel, onTogglePortfolio, onAllPortfolios, showOwner, hideAmounts, onToggleHide, present, onTogglePresent, onClear, activeCount }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
@@ -416,14 +435,21 @@ function FilterPanel({ members, memberSel, onToggleMember, onAllMembers, portfol
       </Section>
 
       <Section title="View" last>
-        <button onClick={onToggleHide} className="w-full flex items-center justify-between gap-2 px-1 py-1.5 text-sm text-[var(--text-primary)]">
-          <span className="flex items-center gap-2">{hideAmounts ? <EyeOff size={14} className="text-amber-400" /> : <Eye size={14} className="text-[var(--text-dim)]" />} Hide amounts</span>
-          <span className={`w-8 h-[18px] rounded-full relative transition-colors ${hideAmounts ? 'bg-violet-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}>
-            <span className={`absolute top-[2px] w-[12px] h-[12px] rounded-full bg-white transition-all ${hideAmounts ? 'left-[16px]' : 'left-[2px]'}`} />
-          </span>
-        </button>
+        <Toggle on={hideAmounts} onClick={onToggleHide} icon={hideAmounts ? <EyeOff size={14} className="text-amber-400" /> : <Eye size={14} className="text-[var(--text-dim)]" />} label="Hide amounts" />
+        <Toggle on={present} onClick={onTogglePresent} icon={<Presentation size={14} className={present ? 'text-amber-400' : 'text-[var(--text-dim)]'} />} label="Present mode" hint="Bigger type, fewer details" />
       </Section>
     </div>
+  )
+}
+
+function Toggle({ on, onClick, icon, label, hint }) {
+  return (
+    <button onClick={onClick} aria-label={label} aria-pressed={on} className="w-full flex items-center justify-between gap-2 px-1 py-1.5 text-sm text-[var(--text-primary)]">
+      <span className="flex items-center gap-2 min-w-0">{icon}<span className="min-w-0"><span className="block truncate">{label}</span>{hint && <span className="block text-[11px] text-[var(--text-dim)]">{hint}</span>}</span></span>
+      <span className={`w-8 h-[18px] rounded-full relative transition-colors shrink-0 ${on ? 'bg-violet-500' : 'bg-[var(--bg-inset)] border border-[var(--border)]'}`}>
+        <span className={`absolute top-[2px] w-[12px] h-[12px] rounded-full bg-white transition-all ${on ? 'left-[16px]' : 'left-[2px]'}`} />
+      </span>
+    </button>
   )
 }
 
@@ -453,14 +479,14 @@ function CheckRow({ active, onClick, label, sub, hint, dim }) {
 }
 
 // ── small presentational pieces ──
-function Stat({ label, value, sub, note, positive, bold, title }) {
+function Stat({ label, value, sub, note, positive, bold, title, sz, quiet }) {
   const valueCls = positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
   return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 min-w-0" title={title}>
-      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1 truncate">{label}</p>
-      <p className={`text-sm tabular-nums whitespace-nowrap ${bold ? 'font-bold' : 'font-semibold'} ${valueCls}`}>{value}</p>
-      {sub && <p className={`text-xs font-semibold tabular-nums mt-0.5 ${valueCls}`}>{sub}</p>}
-      {note && <p className="text-xs text-[var(--text-dim)] mt-0.5 truncate">{note}</p>}
+    <div className={`bg-[var(--bg-card)] rounded-xl border border-[var(--border)] ${sz?.statPad || 'px-4 py-3'} min-w-0`} title={title}>
+      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1.5 truncate">{label}</p>
+      <p className={`${sz?.stat || 'text-xl'} tabular-nums whitespace-nowrap leading-none ${bold ? 'font-bold' : 'font-semibold'} ${valueCls}`}>{value}</p>
+      {sub && <p className={`text-sm font-semibold tabular-nums mt-1.5 ${valueCls}`}>{sub}</p>}
+      {note && !quiet && <p className="text-xs text-[var(--text-dim)] mt-1 truncate">{note}</p>}
     </div>
   )
 }
@@ -498,7 +524,7 @@ function SortIcon({ active, dir }) {
   return dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
 }
 
-function BreakdownCard({ breakdown, amt, hideAmounts }) {
+function BreakdownCard({ breakdown, amt, hideAmounts, sz, quiet }) {
   const hasMembers = breakdown.byMember.length > 1
   const [mode, setMode] = useState(hasMembers ? 'member' : 'portfolio')
   const rows = mode === 'member' ? breakdown.byMember : breakdown.byPortfolio
@@ -516,7 +542,7 @@ function BreakdownCard({ breakdown, amt, hideAmounts }) {
 
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={`w-full ${sz?.cell || 'text-sm'}`}>
           <thead>
             <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)] text-xs text-[var(--text-muted)] uppercase tracking-wider">
               <th className="text-left py-2 px-4 font-semibold">{mode === 'member' ? 'Member' : 'Portfolio'}</th>
@@ -524,21 +550,21 @@ function BreakdownCard({ breakdown, amt, hideAmounts }) {
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Current</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Gain</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">XIRR</th>
-              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">CAGR</th>
+              {!quiet && <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">CAGR</th>}
               <th className="text-right py-2 px-4 font-semibold whitespace-nowrap">Share</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.id} className="border-b border-[var(--border-light)] last:border-0">
-                <td className="py-2.5 px-4">
+                <td className={`${sz?.row || 'py-2.5'} px-4`}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
                     <div className="min-w-0">
                       <p className="text-[var(--text-primary)] font-medium truncate">{r.name}</p>
-                      <p className="text-xs text-[var(--text-dim)] truncate">
+                      {!quiet && <p className="text-xs text-[var(--text-dim)] truncate">
                         {mode === 'member' ? `${r.portfolioCount} portfolio${r.portfolioCount === 1 ? '' : 's'} · ` : `${r.ownerName} · `}{r.fundCount} fund{r.fundCount === 1 ? '' : 's'}
-                      </p>
+                      </p>}
                     </div>
                   </div>
                 </td>
@@ -549,7 +575,7 @@ function BreakdownCard({ breakdown, amt, hideAmounts }) {
                   <div className={hideAmounts ? 'font-semibold' : 'text-xs opacity-80'}>{pct(r.gainPct)}</div>
                 </td>
                 <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap font-semibold ${plClass(r.xirr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.xirr)}</td>
-                <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>
+                {!quiet && <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>}
                 <td className="py-2.5 px-4 text-right tabular-nums whitespace-nowrap">
                   <div className="flex items-center justify-end gap-2">
                     <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(100, r.weight)}%`, background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} /></div>
@@ -598,6 +624,7 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
           {fund.athNav > 0 && <span>ATH <span className="text-[var(--text-muted)]">₹{fund.athNav.toFixed(2)}</span></span>}
           {fund.ongoingSIP > 0 && <span>SIP <span className="text-[var(--text-muted)]">{amt(fund.ongoingSIP)}/mo</span></span>}
           {fund.since && <span>since <span className="text-[var(--text-muted)]">{monthYear(fund.since)}</span></span>}
+          {fund.cagr != null && <span>CAGR <span className={plClass(fund.cagr)}>{ratePct(fund.cagr)}</span> over {holdingSince(fund.cagrSince || fund.since)}</span>}
         </div>
         <button onClick={(e) => { e.stopPropagation(); onOpen() }} className="text-xs font-medium text-violet-400 hover:text-violet-300">Open in Mutual Funds →</button>
       </div>
