@@ -60,7 +60,8 @@ function buildMemberLabels(members) {
 
 const COLUMNS = [
   { key: 'fundName', label: 'Fund', align: 'left' },
-  { key: 'invested', label: 'Amount', sub: 'Current / Invested', align: 'right' },
+  { key: 'currentValue', label: 'Current', align: 'right' },
+  { key: 'invested', label: 'Invested', align: 'right' },
   { key: 'pl', label: 'P&L', align: 'right' },
   { key: 'xirr', label: 'XIRR', align: 'right' },
   { key: 'weight', label: 'Weight', align: 'right' },
@@ -309,13 +310,11 @@ export default function FundsDashboardPage() {
                             {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Strong Buy' : 'Buy'}</span>}
                           </div>
                         </td>
-                        <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} tabular-nums`}>
-                          <span className="font-semibold text-[var(--text-primary)]">{amt(f.currentValue)}</span>
-                          <span className="text-[var(--text-dim)]"> / {amt(f.invested)}</span>
-                        </td>
+                        <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} font-semibold text-[var(--text-primary)] tabular-nums`}>{amt(f.currentValue)}</td>
+                        <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} text-[var(--text-secondary)] tabular-nums`}>{amt(f.invested)}</td>
                         <td className={`${sz.row} px-3 text-right whitespace-nowrap`}>
                           {!hideAmounts && <span className={`${sz.num} font-semibold tabular-nums ${plClass(f.pl)}`}>{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</span>}
-                          <span className={`${sz.num} tabular-nums ${hideAmounts ? `font-semibold ${plClass(f.pl)}` : `ml-1 ${f.pl >= 0 ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}`}>{hideAmounts ? pct(f.plPct) : `(${pct(f.plPct)})`}</span>
+                          <span className={`${sz.num} tabular-nums inline-block text-right ${hideAmounts ? `font-semibold ${plClass(f.pl)}` : `w-[4.5rem] ${f.pl >= 0 ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}`}>{hideAmounts ? pct(f.plPct) : `(${pct(f.plPct)})`}</span>
                         </td>
                         <td className={`${sz.row} px-3 text-right ${sz.num} font-semibold tabular-nums ${plClass(f.xirr)}`} title={reasonLong(f.returnsReason)}>{ratePct(f.xirr)}</td>
                         <td className={`${sz.row} px-3 text-right ${sz.num} text-[var(--text-secondary)] tabular-nums`}>{f.weight.toFixed(1)}%</td>
@@ -538,10 +537,8 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
           <thead>
             <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)] text-xs text-[var(--text-muted)] uppercase tracking-wider">
               <th className="text-left py-2 px-3 font-semibold">{mode === 'member' ? 'Member' : 'Portfolio'}</th>
-              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">
-                <div>Amount</div>
-                <div className="text-xs font-medium normal-case tracking-normal text-[var(--text-dim)]">Current / Invested</div>
-              </th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Current</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Invested</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Gain</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">XIRR</th>
               {!quiet && <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">CAGR</th>}
@@ -555,13 +552,11 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
                   <span className={`${sz?.name || 'text-sm'} font-semibold text-[var(--text-primary)]`}>{r.name}</span>
                   {!quiet && <p className="text-xs text-[var(--text-dim)]">{mode === 'member' ? `${r.portfolioCount} portfolio${r.portfolioCount === 1 ? '' : 's'}` : r.ownerName} · {r.fundCount} fund{r.fundCount === 1 ? '' : 's'}</p>}
                 </td>
-                <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap ${sz?.num || 'text-xs'} tabular-nums`}>
-                  <span className="font-semibold text-[var(--text-primary)]">{amt(r.current)}</span>
-                  <span className="text-[var(--text-dim)]"> / {amt(r.invested)}</span>
-                </td>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap ${sz?.num || 'text-xs'} font-semibold text-[var(--text-primary)] tabular-nums`}>{amt(r.current)}</td>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap ${sz?.num || 'text-xs'} text-[var(--text-secondary)] tabular-nums`}>{amt(r.invested)}</td>
                 <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap`}>
                   {!hideAmounts && <span className={`${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.gain)}`}>{r.gain >= 0 ? '+' : ''}{formatINR(r.gain)}</span>}
-                  <span className={`${sz?.num || 'text-xs'} tabular-nums ${hideAmounts ? `font-semibold ${plClass(r.gain)}` : `ml-1 ${r.gain >= 0 ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}`}>{hideAmounts ? pct(r.gainPct) : `(${pct(r.gainPct)})`}</span>
+                  <span className={`${sz?.num || 'text-xs'} tabular-nums inline-block text-right ${hideAmounts ? `font-semibold ${plClass(r.gain)}` : `w-[4.5rem] ${r.gain >= 0 ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}`}>{hideAmounts ? pct(r.gainPct) : `(${pct(r.gainPct)})`}</span>
                 </td>
                 <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.xirr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.xirr)}</td>
                 {!quiet && <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>}
@@ -633,7 +628,8 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
             <tr className="text-[var(--text-dim)] uppercase tracking-wider">
               <th className="text-left py-1 pr-3 font-semibold">Portfolio</th>
               <th className="text-left py-1 pr-3 font-semibold">Member</th>
-              <th className="text-right py-1 pr-3 font-semibold">Current / Invested</th>
+              <th className="text-right py-1 pr-3 font-semibold">Current</th>
+              <th className="text-right py-1 pr-3 font-semibold">Invested</th>
               <th className="text-right py-1 pr-3 font-semibold">Gain</th>
               <th className="text-right py-1 font-semibold">XIRR</th>
             </tr>
@@ -643,7 +639,8 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
               <tr key={p.portfolioId} className="border-t border-[var(--border-light)]">
                 <td className="py-1.5 pr-3 text-[var(--text-primary)] font-medium">{p.portfolioName}</td>
                 <td className="py-1.5 pr-3 text-[var(--text-muted)]">{p.ownerName}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums"><span className="font-semibold text-[var(--text-primary)]">{amt(p.currentValue)}</span><span className="text-[var(--text-dim)]"> / {amt(p.invested)}</span></td>
+                <td className="py-1.5 pr-3 text-right tabular-nums font-semibold text-[var(--text-primary)]">{amt(p.currentValue)}</td>
+                <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{amt(p.invested)}</td>
                 <td className={`py-1.5 pr-3 text-right tabular-nums font-semibold ${plClass(p.pl)}`}>{hideAmounts ? '' : `${p.pl >= 0 ? '+' : ''}${formatINR(p.pl)} `}{pct(p.plPct)}</td>
                 <td className={`py-1.5 text-right tabular-nums font-semibold ${plClass(p.xirr)}`} title={reasonLong(p.returnsReason)}>{ratePct(p.xirr)}</td>
               </tr>
