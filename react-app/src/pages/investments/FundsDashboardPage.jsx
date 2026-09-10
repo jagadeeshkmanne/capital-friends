@@ -52,7 +52,6 @@ const REASON_TEXT = {
   'too-new': { short: 'under 3 months', long: 'Held for less than three months. Annualised returns are not meaningful yet.' },
   'funds-unreliable': { short: '', long: 'One or more funds in this selection cannot be annualised, so the combined XIRR and CAGR are hidden.' },
 }
-function reasonShort(r) { return r ? REASON_TEXT[r]?.short || '' : '' }
 function reasonLong(r) { return r ? REASON_TEXT[r]?.long || '' : undefined }
 
 // Family member label: relationship first ("Spouse", "Son"), disambiguated when two members share one
@@ -86,7 +85,7 @@ export default function FundsDashboardPage() {
   const [memberSel, setMemberSel] = useState(() => new Set(selectedMember && selectedMember !== 'all' ? [selectedMember] : []))
   const [portfolioSel, setPortfolioSel] = useState(() => new Set())
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState({ key: 'currentValue', dir: 'desc' })
+  const [sort, setSort] = useState({ key: 'invested', dir: 'desc' })
   const [expanded, setExpanded] = useState(() => new Set())
   const [filtersOpen, setFiltersOpen] = useState(false) // mobile filter panel
   const [tab, setTab] = useState('funds') // 'funds' | 'member' | 'portfolio'
@@ -249,20 +248,19 @@ export default function FundsDashboardPage() {
         {/* ── Filter panel (collapsible: mobile always, desktop in present mode) ── */}
         {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
-        {/* ── Stat cards (same style as the Mutual Funds page) ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-          <Stat sz={sz} quiet={present} label="Total Invested" value={amt(t.netInvested ?? t.invested)}
-            sub={t.netInvested != null && Math.abs(t.netInvested - t.invested) > Math.max(1, t.invested * 0.01) ? `cost basis ${amt(t.invested)}` : null} />
-          <Stat sz={sz} quiet={present} label="Current Value" value={amt(t.currentValue)} bold />
-          <Stat sz={sz} quiet={present} label="Total Gain" bold positive={(t.totalGain ?? t.pl) >= 0}
-            value={hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)}`}
-            sub={hideAmounts ? null : pct(t.totalGain != null ? t.totalGainPct : t.plPct)}
-            note={t.totalGain != null && Math.abs(t.totalGain - t.pl) > Math.max(1, Math.abs(t.pl) * 0.01) ? `unrealised ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : null} />
-          <Stat sz={sz} quiet={present} label="XIRR" bold positive={t.xirr == null ? undefined : t.xirr >= 0} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)}
-            note={t.unreliableCount > 0 ? <span className="text-amber-500/90">{t.unreliableCount} fund{t.unreliableCount === 1 ? '' : 's'} need{t.unreliableCount === 1 ? 's' : ''} dates</span> : null} />
-          <Stat sz={sz} quiet={present} label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)}
-            note={t.cagr != null ? `${holdingSince(t.cagrSince)} avg · since ${monthYear(t.since)}` : null} />
-          <Stat sz={sz} quiet={present} label="Buy Opportunities" bold positive={t.buyOppCount > 0 ? true : undefined} value={String(t.buyOppCount)} />
+        {/* ── Summary panel ── */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 divide-y sm:divide-y-0 divide-[var(--border-light)]">
+            <Stat sz={sz} label="Total invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
+            <Stat sz={sz} label="Current value" value={amt(t.currentValue)} />
+            <Stat sz={sz} label="Total gain" tone={(t.totalGain ?? t.pl) >= 0 ? 'up' : 'down'}
+              value={hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)}`}
+              sub={hideAmounts ? null : pct(t.totalGain != null ? t.totalGainPct : t.plPct)}
+              title={t.totalGain != null ? `Unrealised on current holdings: ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : undefined} />
+            <Stat sz={sz} label="XIRR" tone={t.xirr == null ? 'muted' : t.xirr >= 0 ? 'up' : 'down'} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)} />
+            <Stat sz={sz} label="CAGR" tone={t.cagr == null ? 'muted' : t.cagr >= 0 ? 'up' : 'down'} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason) || (t.cagr != null ? `Over ${holdingSince(t.cagrSince)} average holding, since ${monthYear(t.since)}` : undefined)} />
+            <Stat sz={sz} label="Buy opportunities" value={String(t.buyOppCount)} tone={t.buyOppCount > 0 ? 'up' : undefined} />
+          </div>
         </div>
 
         {/* ── Tabs: Funds | By member | By portfolio ── */}
@@ -331,7 +329,6 @@ export default function FundsDashboardPage() {
                         </td>
                         <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap`} title={reasonLong(f.returnsReason)}>
                           <div className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</div>
-                          {f.returnsReason && !present && <div className="text-xs text-amber-500/90">{reasonShort(f.returnsReason)}</div>}
                         </td>
                         <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap`}>
                           <div className="flex items-center justify-end gap-2">
@@ -381,7 +378,7 @@ export default function FundsDashboardPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-4 gap-2 mt-2.5 text-center">
-                    <Mini label="XIRR" value={ratePct(f.xirr)} cls={plClass(f.xirr)} sub={f.returnsReason ? reasonShort(f.returnsReason) : null} />
+                    <Mini label="XIRR" value={ratePct(f.xirr)} cls={plClass(f.xirr)} />
                     <Mini label="CAGR" value={ratePct(f.cagr)} cls={plClass(f.cagr)} sub={f.returnsReason ? null : holdingSince(f.cagrSince || f.since)} />
                     <Mini label="Weight" value={`${f.weight.toFixed(1)}%`} />
                     <Mini label="Below ATH" value={f.athNav > 0 ? (f.belowATHPct <= 0 ? 'At ATH' : `−${f.belowATHPct.toFixed(1)}%`) : '—'} cls={f.athNav > 0 ? athBadgeClass(f.belowATHPct).split(' ').pop() : ''} />
@@ -492,14 +489,14 @@ function CheckRow({ active, onClick, label, sub, hint, dim }) {
 }
 
 // ── small presentational pieces ──
-function Stat({ label, value, sub, note, positive, bold, title, sz, quiet }) {
-  const valueCls = positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
+function Stat({ label, value, sub, tone, title, sz }) {
+  const cls = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-[var(--accent-rose)]' : tone === 'muted' ? 'text-[var(--text-dim)]' : 'text-[var(--text-primary)]'
   return (
-    <div className={`bg-[var(--bg-card)] rounded-xl border border-[var(--border)] ${sz?.statPad || 'px-4 py-3'} min-w-0`} title={title}>
-      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1.5 truncate">{label}</p>
-      <p className={`${sz?.stat || 'text-xl'} tabular-nums whitespace-nowrap leading-none ${bold ? 'font-bold' : 'font-semibold'} ${valueCls}`}>{value}</p>
-      {sub && <p className={`text-sm font-semibold tabular-nums mt-1.5 ${valueCls}`}>{sub}</p>}
-      {note && !quiet && <p className="text-xs text-[var(--text-dim)] mt-1 truncate">{note}</p>}
+    <div className={`${sz?.statPad || 'px-5 py-4'} min-w-0 sm:border-r sm:last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 xl:[&:nth-child(3n)]:border-r xl:last:border-r-0 border-[var(--border-light)]`} title={title}>
+      <p className="text-xs text-[var(--text-dim)] mb-1.5 truncate">{label}</p>
+      <p className={`${sz?.stat || 'text-2xl'} font-semibold tabular-nums whitespace-nowrap leading-none ${cls}`}>
+        {value}{sub && <span className="text-sm font-medium ml-1.5">{sub}</span>}
+      </p>
     </div>
   )
 }
@@ -629,7 +626,6 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
         </div>
         <button onClick={(e) => { e.stopPropagation(); onOpen() }} className="text-xs font-medium text-violet-400 hover:text-violet-300">Open in Mutual Funds →</button>
       </div>
-      {fund.returnsReason && <p className="text-xs text-amber-500/90">{reasonLong(fund.returnsReason)}</p>}
 
       {compact ? (
         <div className="space-y-2">
