@@ -227,32 +227,34 @@ export default function FundsDashboardPage() {
         {/* ── Filter panel (mobile, collapsible) ── */}
         {filtersOpen && <div className="lg:hidden">{filterPanel}</div>}
 
-        {/* ── Summary ── */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 sm:p-5">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-x-6 gap-y-4">
-            <Stat label="Total invested" value={amt(t.netInvested ?? t.invested)} muted
-              sub={t.netInvested != null && Math.abs(t.netInvested - t.invested) > Math.max(1, t.invested * 0.01) ? `cost basis ${amt(t.invested)}` : 'buys minus sells, switches excluded'} />
-            <Stat label="Current" value={amt(t.currentValue)} bold />
-            <Stat label="Total gain" bold cls={plClass(t.totalGain ?? t.pl)}
-              value={<>{hideAmounts ? '' : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)} `}<span className={`text-sm font-semibold ${hideAmounts ? '' : 'opacity-80'}`}>{pct(t.totalGain != null ? t.totalGainPct : t.plPct)}</span></>}
-              sub={t.totalGain != null && Math.abs(t.totalGain - t.pl) > Math.max(1, Math.abs(t.pl) * 0.01) ? `unrealised ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : null} />
-            <Stat label="XIRR" bold cls={plClass(t.xirr)} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)}
-              sub={t.unreliableCount > 0 ? <span className="text-amber-500/90">{t.unreliableCount} fund{t.unreliableCount === 1 ? '' : 's'} need{t.unreliableCount === 1 ? 's' : ''} dates</span> : null} />
-            <Stat label="CAGR" cls={plClass(t.cagr)} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)}
-              sub={t.cagr != null ? `${holdingSince(t.cagrSince)} avg holding · since ${monthYear(t.since)}` : null} />
-            <Stat label="Buy opportunities" bold cls={t.buyOppCount > 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]'} value={String(t.buyOppCount)}
-              sub={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
-          </div>
+        {/* ── Stat cards (same style as the Mutual Funds page) ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          <Stat label="Total Invested" value={amt(t.netInvested ?? t.invested)}
+            sub={t.netInvested != null && Math.abs(t.netInvested - t.invested) > Math.max(1, t.invested * 0.01) ? `cost basis ${amt(t.invested)}` : null} />
+          <Stat label="Current Value" value={amt(t.currentValue)} bold />
+          <Stat label="Total Gain" bold positive={(t.totalGain ?? t.pl) >= 0}
+            value={hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)}`}
+            sub={hideAmounts ? null : pct(t.totalGain != null ? t.totalGainPct : t.plPct)}
+            note={t.totalGain != null && Math.abs(t.totalGain - t.pl) > Math.max(1, Math.abs(t.pl) * 0.01) ? `unrealised ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : null} />
+          <Stat label="XIRR" bold positive={t.xirr == null ? undefined : t.xirr >= 0} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)}
+            note={t.unreliableCount > 0 ? <span className="text-amber-500/90">{t.unreliableCount} fund{t.unreliableCount === 1 ? '' : 's'} need{t.unreliableCount === 1 ? 's' : ''} dates</span> : null} />
+          <Stat label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)}
+            note={t.cagr != null ? `${holdingSince(t.cagrSince)} avg · since ${monthYear(t.since)}` : null} />
+          <Stat label="Buy Opportunities" bold positive={t.buyOppCount > 0 ? true : undefined} value={String(t.buyOppCount)}
+            note={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
+        </div>
 
-          {(model.categories.length > 0 || model.members.length > 1) && (
-            <div className={`grid grid-cols-1 ${model.members.length > 1 ? 'xl:grid-cols-2' : ''} gap-5 mt-5 pt-4 border-t border-[var(--border-light)]`}>
+        {/* ── Allocation ── */}
+        {(model.categories.length > 0 || model.members.length > 1) && (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-4">
+            <div className={`grid grid-cols-1 ${model.members.length > 1 ? 'xl:grid-cols-2' : ''} gap-5`}>
               <AllocationBar title="By category" items={model.categories} colorFor={(name) => CATEGORY_COLORS[name] || CATEGORY_COLORS.Other} amt={amt} />
               {model.members.length > 1 && (
                 <AllocationBar title="By member" items={model.members} colorFor={(_, i) => MEMBER_COLORS[i % MEMBER_COLORS.length]} amt={amt} />
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* ── Search ── */}
         <div className="relative max-w-xs">
@@ -458,12 +460,14 @@ function CheckRow({ active, onClick, label, sub, hint, dim }) {
 }
 
 // ── small presentational pieces ──
-function Stat({ label, value, sub, cls = 'text-[var(--text-primary)]', bold, muted, title }) {
+function Stat({ label, value, sub, note, positive, bold, title }) {
+  const valueCls = positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
   return (
-    <div title={title}>
-      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-base tabular-nums whitespace-nowrap ${bold ? 'font-bold' : 'font-semibold'} ${muted ? 'text-[var(--text-muted)]' : cls}`}>{value}</p>
-      {sub && <p className="text-xs text-[var(--text-dim)]">{sub}</p>}
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 min-w-0" title={title}>
+      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1 truncate">{label}</p>
+      <p className={`text-sm tabular-nums whitespace-nowrap ${bold ? 'font-bold' : 'font-semibold'} ${valueCls}`}>{value}</p>
+      {sub && <p className={`text-xs font-semibold tabular-nums mt-0.5 ${valueCls}`}>{sub}</p>}
+      {note && <p className="text-xs text-[var(--text-dim)] mt-0.5 truncate">{note}</p>}
     </div>
   )
 }
