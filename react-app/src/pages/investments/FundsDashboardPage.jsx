@@ -89,6 +89,7 @@ export default function FundsDashboardPage() {
   const [sort, setSort] = useState({ key: 'currentValue', dir: 'desc' })
   const [expanded, setExpanded] = useState(() => new Set())
   const [filtersOpen, setFiltersOpen] = useState(false) // mobile filter panel
+  const [tab, setTab] = useState('funds') // 'funds' | 'member' | 'portfolio'
   const [hideAmounts, setHideAmounts] = useState(() => {
     try { return localStorage.getItem(HIDE_KEY) === 'true' } catch { return false }
   })
@@ -265,21 +266,30 @@ export default function FundsDashboardPage() {
             note={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
         </div>
 
-        {/* ── Breakdown by member / portfolio ── */}
-        {(model.breakdown.byPortfolio.length > 1 || model.breakdown.byMember.length > 1) && (
-          <BreakdownCard breakdown={model.breakdown} amt={amt} hideAmounts={hideAmounts} sz={sz} quiet={present} />
-        )}
-
-        {/* ── Search ── */}
-        <div className="relative max-w-xs">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search fund"
-            className="w-full pl-8 pr-7 py-1.5 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-violet-500/50" />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={13} /></button>
+        {/* ── Tabs: Funds | By member | By portfolio ── */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1 rounded-lg bg-[var(--bg-inset)] p-0.5">
+            <TabButton active={tab === 'funds'} onClick={() => setTab('funds')} label={`Funds (${model.funds.length})`} big={present} />
+            {model.breakdown.byMember.length > 1 && <TabButton active={tab === 'member'} onClick={() => setTab('member')} label="By member" big={present} />}
+            {model.breakdown.byPortfolio.length > 1 && <TabButton active={tab === 'portfolio'} onClick={() => setTab('portfolio')} label="By portfolio" big={present} />}
+          </div>
+          {tab === 'funds' && (
+            <div className="relative w-full sm:w-64">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search fund"
+                className="w-full pl-8 pr-7 py-1.5 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-violet-500/50" />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={13} /></button>
+              )}
+            </div>
           )}
         </div>
 
+        {tab !== 'funds' && (
+          <BreakdownCard mode={tab} rows={tab === 'member' ? model.breakdown.byMember : model.breakdown.byPortfolio} amt={amt} hideAmounts={hideAmounts} sz={sz} quiet={present} />
+        )}
+
+        {tab === 'funds' && (<>
         {/* ── Desktop table ── */}
         <div className="hidden lg:block rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
           <div className="overflow-x-auto">
@@ -400,6 +410,8 @@ export default function FundsDashboardPage() {
           {rows.length === 0 && <p className="py-10 text-center text-sm text-[var(--text-dim)]">No funds match this selection.</p>}
         </div>
 
+        </>)}
+
         {!present && <p className="flex items-start gap-1.5 text-xs text-[var(--text-dim)] px-1">
           <Info size={13} className="shrink-0 mt-0.5" />
           <span>Total invested is buys minus sells; switches move money between funds and are never counted as investment. Total gain is current value minus total invested, so it includes gains realised through switches. XIRR is the money-weighted annual return from every recorded purchase and redemption. CAGR uses the amount-weighted average purchase date as its start, so later top-ups shorten the holding period rather than being ignored. Both are N/A for holdings added as an opening balance less than a year ago; edit that transaction and set the real first purchase date. Below ATH compares each fund's NAV to its own all-time high.</span>
@@ -439,6 +451,15 @@ function FilterPanel({ members, memberSel, onToggleMember, onAllMembers, portfol
         <Toggle on={present} onClick={onTogglePresent} icon={<Presentation size={14} className={present ? 'text-amber-400' : 'text-[var(--text-dim)]'} />} label="Present mode" hint="Bigger type, fewer details" />
       </Section>
     </div>
+  )
+}
+
+function TabButton({ active, onClick, label, big }) {
+  return (
+    <button onClick={onClick}
+      className={`${big ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} font-medium rounded-md transition-colors ${active ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+      {label}
+    </button>
   )
 }
 
@@ -524,22 +545,9 @@ function SortIcon({ active, dir }) {
   return dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
 }
 
-function BreakdownCard({ breakdown, amt, hideAmounts, sz, quiet }) {
-  const hasMembers = breakdown.byMember.length > 1
-  const [mode, setMode] = useState(hasMembers ? 'member' : 'portfolio')
-  const rows = mode === 'member' ? breakdown.byMember : breakdown.byPortfolio
+function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-light)]">
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Breakdown</p>
-        <div className="flex items-center gap-1 rounded-lg bg-[var(--bg-inset)] p-0.5">
-          {hasMembers && (
-            <button onClick={() => setMode('member')} className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'member' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>By member</button>
-          )}
-          <button onClick={() => setMode('portfolio')} className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'portfolio' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>By portfolio</button>
-        </div>
-      </div>
-
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
         <table className={`w-full ${sz?.cell || 'text-sm'}`}>
