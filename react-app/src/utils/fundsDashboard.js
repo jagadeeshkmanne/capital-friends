@@ -79,9 +79,21 @@ function historyCovers(flows, invested, heldUnits) {
   return buys >= invested * HISTORY_COVERAGE_MIN
 }
 
-// External cash only: switch legs are internal transfers and cancel out within a selection.
-function cashIn(flows) { return flows.reduce((s, cf) => s + (cf.amount < 0 ? -cf.amount : 0), 0) }
-function cashOut(flows) { return flows.reduce((s, cf) => s + (cf.amount > 0 ? cf.amount : 0), 0) }
+// External cash only. A switch moves money between funds, it is never new investment or a withdrawal.
+function cashIn(flows) { return flows.reduce((s, cf) => s + (cf.amount < 0 && !cf.switch ? -cf.amount : 0), 0) }
+function cashOut(flows) { return flows.reduce((s, cf) => s + (cf.amount > 0 && !cf.switch ? cf.amount : 0), 0) }
+
+// Amount-weighted average date of the money put in. This is the start date a single CAGR figure
+// can honestly use when purchases happened on several dates. Falls back to switch-in buys for a
+// fund that only ever received money via a switch.
+export function weightedInflowDate(flows) {
+  let inflows = flows.filter((cf) => cf.amount < 0 && !cf.switch)
+  if (!inflows.length) inflows = flows.filter((cf) => cf.amount < 0)
+  const total = inflows.reduce((s, cf) => s - cf.amount, 0)
+  if (!(total > 0)) return null
+  const ms = inflows.reduce((s, cf) => s + (-cf.amount / total) * cf.date.getTime(), 0)
+  return new Date(ms)
+}
 
 function earliest(flows) {
   return flows.length ? flows.reduce((m, cf) => (cf.date < m ? cf.date : m), flows[0].date) : null
@@ -173,7 +185,8 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
       pl,
       plPct: f.invested > 0 ? (pl / f.invested) * 100 : null,
       xirr: reason ? null : computeXIRR([...flows, { date: today, amount: f.currentValue }]),
-      cagr: reason ? null : computeCAGR(f.invested, f.currentValue, since, today),
+      cagr: reason ? null : computeCAGR(f.invested, f.currentValue, weightedInflowDate(flows), today),
+      cagrSince: weightedInflowDate(flows),
       returnsReason: reason,
       openingDate: flows.filter((cf) => cf.opening).map((cf) => cf.date).sort((a, b) => b - a)[0] || null,
       since,
@@ -197,11 +210,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   const netInvested = cashIn(allFlows) - cashOut(allFlows)
   const hasCashFlows = allFlows.length > 0 && netInvested > 0
   const totalGain = hasCashFlows ? totalValue - netInvested : null
-  // A portfolio CAGR only means something when the money went in at (roughly) one time
-  const inflowDates = allFlows.filter((cf) => cf.amount < 0 && !cf.switch).map((cf) => cf.date)
-  const inflowSpanDays = inflowDates.length ? (Math.max(...inflowDates) - Math.min(...inflowDates)) / DAY : 0
-  const singleLumpsum = inflowDates.length > 0 && inflowSpanDays <= MIN_HISTORY_DAYS
-  const cagrReason = totalsReason || (singleLumpsum ? null : 'varied-dates')
+  const cagrSince = weightedInflowDate(allFlows)
   const totals = {
     invested: totalInvested,           // cost basis of what is held now
     netInvested: hasCashFlows ? netInvested : null,
@@ -211,8 +220,8 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
     pl: totalPL,                       // unrealised, on current holdings
     plPct: totalInvested > 0 ? (totalPL / totalInvested) * 100 : null,
     xirr: totalsReason ? null : computeXIRR([...allFlows, { date: today, amount: totalValue }]),
-    cagr: cagrReason ? null : computeCAGR(netInvested, totalValue, firstDate, today),
-    cagrReason,
+    cagr: totalsReason || !hasCashFlows ? null : computeCAGR(netInvested, totalValue, cagrSince, today),
+    cagrSince,
     returnsReason: totalsReason,
     unreliableCount: unreliable.length,
     unreliableByReason: unreliable.reduce((acc, f) => { acc[f.returnsReason] = (acc[f.returnsReason] || 0) + 1; return acc }, {}),

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildFundsModel, resolvePortfolioOwners, returnsReason } from './fundsDashboard.js'
+import { buildFundsModel, resolvePortfolioOwners, returnsReason, weightedInflowDate } from './fundsDashboard.js'
 import { mfPortfolios, mfHoldings, mfTransactions, investmentAccounts, familyMembers } from '../data/familyData.js'
 
 const today = new Date(2026, 8, 10)
@@ -120,4 +120,35 @@ test('opening balances dated recently do not get annualised', () => {
     { date: new Date(2026, 7, 5), amount: -20000, opening: true },
   ]
   assert.equal(returnsReason(mixed, 100000, today), null)
+})
+
+test('switches are excluded from total invested even when only one leg is in scope', () => {
+  const today = new Date(2026, 8, 10)
+  const portfolios = [{ portfolioId: 'P2', portfolioName: 'P2', ownerId: 'M1', ownerName: 'Self', status: 'Active' }]
+  const holdings = [{ portfolioId: 'P2', schemeCode: 'B', fundName: 'Fund B', units: 1000, avgNav: 90, investment: 90000, currentNav: 97, currentValue: 97000 }]
+  const transactions = [
+    { portfolioId: 'P2', fundCode: 'B', fundName: 'Fund B', type: 'BUY', transactionType: 'SWITCH', date: '2026-06-10', units: 1000, price: 90, totalAmount: 90000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.netInvested, null) // no fresh money recorded in this portfolio
+})
+
+test('later buys add to total invested and CAGR uses the amount-weighted start date', () => {
+  const today = new Date(2026, 8, 10)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active' }]
+  const holdings = [{ portfolioId: 'P1', schemeCode: 'A', fundName: 'Fund A', units: 660, avgNav: 100, investment: 66000, currentNav: 150, currentValue: 99000 }]
+  const transactions = [
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'BUY', transactionType: 'INITIAL', date: '2023-09-10', units: 630, price: 100, totalAmount: 63000 },
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'BUY', transactionType: 'LUMPSUM', date: '2026-03-10', units: 30, price: 100, totalAmount: 3000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.netInvested, 66000)
+  assert.equal(m.totals.totalGain, 33000)
+  const w = weightedInflowDate([
+    { date: new Date(2023, 8, 10), amount: -63000 }, { date: new Date(2026, 2, 10), amount: -3000 },
+  ])
+  // weighted start is a little after the first buy, so CAGR is a little above the 3-year figure
+  assert.ok(w > new Date(2023, 8, 10) && w < new Date(2023, 11, 1))
+  assert.ok(m.totals.cagr > 0.14 && m.totals.cagr < 0.17, `cagr ${m.totals.cagr}`)
+  assert.ok(m.totals.xirr > 0.14 && m.totals.xirr < 0.17, `xirr ${m.totals.xirr}`)
 })
