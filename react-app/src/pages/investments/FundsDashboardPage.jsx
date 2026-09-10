@@ -13,7 +13,6 @@ import { buildFundsModel, resolvePortfolioOwners } from '../../utils/fundsDashbo
 
 const HIDE_KEY = 'cf_funds_hide_amounts'
 const PRESENT_KEY = 'cf_funds_present'
-const MEMBER_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ec4899', '#3b82f6', '#f97316', '#14b8a6']
 
 // ── formatting helpers ──
 function pct(v, digits = 1) {
@@ -37,13 +36,6 @@ function holdingSince(d) {
   const y = yearsBetween(d)
   if (y < 1) return `${Math.max(1, Math.round(y * 12))}m`
   return `${y.toFixed(1)}y`
-}
-function athBadgeClass(p) {
-  if (p >= 20) return 'bg-rose-500/15 text-[var(--accent-rose)]'
-  if (p >= 10) return 'bg-orange-500/15 text-[var(--accent-orange)]'
-  if (p >= 5) return 'bg-amber-500/15 text-[var(--accent-amber)]'
-  if (p >= 1) return 'bg-yellow-500/10 text-yellow-500'
-  return 'bg-emerald-500/10 text-emerald-400'
 }
 // Why XIRR / CAGR is hidden for a row
 const REASON_TEXT = {
@@ -103,8 +95,8 @@ export default function FundsDashboardPage() {
     try { localStorage.setItem(PRESENT_KEY, String(present)) } catch {}
   }, [present])
   const sz = present
-    ? { stat: 'text-lg', row: 'py-3', cell: 'text-base', name: 'text-base' }
-    : { stat: 'text-sm', row: 'py-2.5', cell: 'text-sm', name: 'text-sm' }
+    ? { stat: 'text-lg', row: 'py-3', cell: 'text-sm', num: 'text-sm', name: 'text-base' }
+    : { stat: 'text-sm', row: 'py-2.5', cell: 'text-sm', num: 'text-xs', name: 'text-sm' }
 
   const amt = (v) => (hideAmounts ? '₹ ••••' : formatINR(v || 0))
   const memberLabels = useMemo(() => buildMemberLabels(familyMembers || []), [familyMembers])
@@ -313,29 +305,20 @@ export default function FundsDashboardPage() {
                         className={`border-b border-[var(--border-light)] cursor-pointer transition-colors ${isOpen ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}>
                         <td className="pl-3 text-[var(--text-dim)]">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                         <td className={`${sz.row} px-3 max-w-[380px]`}>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <p className={`${sz.name} text-[var(--text-primary)] font-medium leading-snug truncate`} title={f.fundName}>{main}</p>
-                            {f.isBuyOpp && <BuyTag strong={f.isStrongBuy} />}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`${sz.name} font-semibold text-[var(--text-primary)] truncate`} title={f.fundName}>{main}</span>
+                            {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Strong Buy' : 'Buy'}</span>}
                           </div>
                         </td>
-                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap text-[var(--text-muted)]`}>{amt(f.invested)}</td>
-                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap font-semibold text-[var(--text-primary)]`}>{amt(f.currentValue)}</td>
-                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap ${plClass(f.pl)}`}>
-                          {!hideAmounts && <div className="font-semibold">{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</div>}
-                          <div className={hideAmounts ? 'font-semibold' : `${sz.sub} opacity-80`}>{pct(f.plPct)}</div>
-                        </td>
-                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap`} title={reasonLong(f.returnsReason)}>
-                          <div className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</div>
-                        </td>
-                        <td className={`${sz.row} px-3 text-right tabular-nums whitespace-nowrap`}>
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-14 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className="h-full rounded-full bg-violet-500/70" style={{ width: `${Math.min(100, f.weight)}%` }} /></div>
-                            <span className="text-[var(--text-primary)] w-14">{f.weight.toFixed(1)}%</span>
-                          </div>
-                        </td>
+                        <td className={`${sz.row} px-3 text-right ${sz.num} text-[var(--text-secondary)] tabular-nums`}>{amt(f.invested)}</td>
+                        <td className={`${sz.row} px-3 text-right ${sz.num} font-semibold text-[var(--text-primary)] tabular-nums`}>{amt(f.currentValue)}</td>
                         <td className={`${sz.row} px-3 text-right whitespace-nowrap`}>
-                          <ATHBadge fund={f} />
+                          {!hideAmounts && <span className={`${sz.num} font-semibold tabular-nums ${plClass(f.pl)}`}>{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</span>}
+                          <span className={`${sz.num} tabular-nums ${hideAmounts ? `font-semibold ${plClass(f.pl)}` : `ml-1 ${f.pl >= 0 ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}`}>{hideAmounts ? pct(f.plPct) : `(${pct(f.plPct)})`}</span>
                         </td>
+                        <td className={`${sz.row} px-3 text-right ${sz.num} font-semibold tabular-nums ${plClass(f.xirr)}`} title={reasonLong(f.returnsReason)}>{ratePct(f.xirr)}</td>
+                        <td className={`${sz.row} px-3 text-right ${sz.num} text-[var(--text-secondary)] tabular-nums`}>{f.weight.toFixed(1)}%</td>
+                        <td className={`${sz.row} px-3 text-right`}><ATHBadge fund={f} cls={sz.num} /></td>
                       </tr>
                       {isOpen && (
                         <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]/60">
@@ -378,7 +361,7 @@ export default function FundsDashboardPage() {
                     <Mini label="XIRR" value={ratePct(f.xirr)} cls={plClass(f.xirr)} />
                     <Mini label="CAGR" value={ratePct(f.cagr)} cls={plClass(f.cagr)} sub={f.returnsReason ? null : holdingSince(f.cagrSince || f.since)} />
                     <Mini label="Weight" value={`${f.weight.toFixed(1)}%`} />
-                    <Mini label="Below ATH" value={f.athNav > 0 ? (f.belowATHPct <= 0 ? 'At ATH' : `−${f.belowATHPct.toFixed(1)}%`) : '—'} cls={f.athNav > 0 ? athBadgeClass(f.belowATHPct).split(' ').pop() : ''} />
+                    <Mini label="Below ATH" value={f.athNav > 0 ? (f.belowATHPct <= 0 ? 'At ATH' : `−${f.belowATHPct.toFixed(1)}%`) : '—'} cls={f.athNav > 0 ? athTextClass(f.belowATHPct) : ''} />
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-xs text-[var(--text-dim)] tabular-nums">
                     <span>Inv {amt(f.invested)}</span>
@@ -514,11 +497,18 @@ function BuyTag({ strong }) {
   return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${strong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>{strong ? 'Strong Buy' : 'Buy'}</span>
 }
 
-function ATHBadge({ fund }) {
-  if (!(fund.athNav > 0)) return <span className="text-xs text-[var(--text-dim)]">—</span>
+function athTextClass(p) {
+  if (p >= 20) return 'text-[var(--accent-rose)] font-bold'
+  if (p >= 10) return 'text-[var(--accent-orange)] font-bold'
+  if (p >= 5) return 'text-[var(--accent-amber)] font-semibold'
+  if (p >= 1) return 'text-yellow-500 font-semibold'
+  return 'text-[var(--text-dim)]'
+}
+function ATHBadge({ fund, cls = 'text-xs' }) {
+  if (!(fund.athNav > 0)) return <span className={`${cls} text-[var(--text-dim)]`}>—</span>
   return (
-    <span className={`inline-block text-xs font-semibold px-1.5 py-0.5 rounded-full tabular-nums ${athBadgeClass(fund.belowATHPct)}`}>
-      {fund.belowATHPct <= 0 ? 'At ATH' : `−${fund.belowATHPct.toFixed(1)}%`}
+    <span className={`${cls} tabular-nums ${athTextClass(fund.belowATHPct)}`}>
+      {fund.belowATHPct <= 0 ? 'At ATH' : `↓${fund.belowATHPct.toFixed(1)}%`}
     </span>
   )
 }
@@ -546,43 +536,31 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
         <table className={`w-full ${sz?.cell || 'text-sm'}`}>
           <thead>
             <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)] text-xs text-[var(--text-muted)] uppercase tracking-wider">
-              <th className="text-left py-2 px-4 font-semibold">{mode === 'member' ? 'Member' : 'Portfolio'}</th>
+              <th className="text-left py-2 px-3 font-semibold">{mode === 'member' ? 'Member' : 'Portfolio'}</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Invested</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Current</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Gain</th>
               <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">XIRR</th>
               {!quiet && <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">CAGR</th>}
-              <th className="text-right py-2 px-4 font-semibold whitespace-nowrap">Share</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Share</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.id} className="border-b border-[var(--border-light)] last:border-0">
-                <td className={`${sz?.row || 'py-2.5'} px-4`}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
-                    <div className="min-w-0">
-                      <p className="text-[var(--text-primary)] font-medium truncate">{r.name}</p>
-                      {!quiet && <p className="text-xs text-[var(--text-dim)] truncate">
-                        {mode === 'member' ? `${r.portfolioCount} portfolio${r.portfolioCount === 1 ? '' : 's'} · ` : `${r.ownerName} · `}{r.fundCount} fund{r.fundCount === 1 ? '' : 's'}
-                      </p>}
-                    </div>
-                  </div>
+                <td className={`${sz?.row || 'py-2.5'} px-3`}>
+                  <span className={`${sz?.name || 'text-sm'} font-semibold text-[var(--text-primary)]`}>{r.name}</span>
+                  {!quiet && <p className="text-xs text-[var(--text-dim)]">{mode === 'member' ? `${r.portfolioCount} portfolio${r.portfolioCount === 1 ? '' : 's'}` : r.ownerName} · {r.fundCount} fund{r.fundCount === 1 ? '' : 's'}</p>}
                 </td>
-                <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap text-[var(--text-muted)]">{amt(r.invested)}</td>
-                <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap font-semibold text-[var(--text-primary)]">{amt(r.current)}</td>
-                <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap ${plClass(r.gain)}`}>
-                  {!hideAmounts && <div className="font-semibold">{r.gain >= 0 ? '+' : ''}{formatINR(r.gain)}</div>}
-                  <div className={hideAmounts ? 'font-semibold' : 'text-xs opacity-80'}>{pct(r.gainPct)}</div>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} text-[var(--text-secondary)] tabular-nums`}>{amt(r.invested)}</td>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold text-[var(--text-primary)] tabular-nums`}>{amt(r.current)}</td>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap`}>
+                  {!hideAmounts && <span className={`${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.gain)}`}>{r.gain >= 0 ? '+' : ''}{formatINR(r.gain)}</span>}
+                  <span className={`${sz?.num || 'text-xs'} tabular-nums ${hideAmounts ? `font-semibold ${plClass(r.gain)}` : `ml-1 ${r.gain >= 0 ? 'text-emerald-400/60' : 'text-[var(--accent-rose)]/60'}`}`}>{hideAmounts ? pct(r.gainPct) : `(${pct(r.gainPct)})`}</span>
                 </td>
-                <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap font-semibold ${plClass(r.xirr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.xirr)}</td>
-                {!quiet && <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>}
-                <td className="py-2.5 px-4 text-right tabular-nums whitespace-nowrap">
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(100, r.weight)}%`, background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} /></div>
-                    <span className="text-[var(--text-primary)] w-12">{r.weight.toFixed(1)}%</span>
-                  </div>
-                </td>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.xirr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.xirr)}</td>
+                {!quiet && <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>}
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right ${sz?.num || 'text-xs'} text-[var(--text-secondary)] tabular-nums`}>{r.weight.toFixed(1)}%</td>
               </tr>
             ))}
           </tbody>
@@ -591,13 +569,10 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
 
       {/* Mobile rows */}
       <div className="sm:hidden divide-y divide-[var(--border-light)]">
-        {rows.map((r, i) => (
+        {rows.map((r) => (
           <div key={r.id} className="px-4 py-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
-                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{r.name}</p>
-              </div>
+              <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{r.name}</p>
               <p className="text-sm font-bold tabular-nums text-[var(--text-primary)] shrink-0">{amt(r.current)}</p>
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs tabular-nums">
