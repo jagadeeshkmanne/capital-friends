@@ -249,7 +249,7 @@ export default function FundsDashboardPage() {
         {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
         {/* ── Stat cards (Mutual Funds page style) ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <Stat sz={sz} label="Invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
           <Stat sz={sz} label="Current Value" value={amt(t.currentValue)} bold />
           <Stat sz={sz} label="Total Gain" positive={(t.totalGain ?? t.pl) >= 0}
@@ -258,7 +258,6 @@ export default function FundsDashboardPage() {
             title={t.totalGain != null ? `Unrealised on current holdings: ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : undefined} />
           <Stat sz={sz} label="XIRR" positive={t.xirr == null ? undefined : t.xirr >= 0} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)} />
           <Stat sz={sz} label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason) || (t.cagr != null ? `Over ${holdingSince(t.cagrSince)} average holding, since ${monthYear(t.since)}` : undefined)} />
-          <Stat sz={sz} label="Buy Opportunities" value={String(t.buyOppCount)} positive={t.buyOppCount > 0 ? true : undefined} bold />
         </div>
 
         {/* ── Tabs (Mutual Funds page style) ── */}
