@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Layers, Search, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
-  Eye, EyeOff, Wallet, Check, Info, X, SlidersHorizontal, Presentation, Minimize2,
+  Eye, EyeOff, Wallet, Check, Info, X, SlidersHorizontal, Presentation, Minimize2, Users,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
@@ -103,8 +103,8 @@ export default function FundsDashboardPage() {
     try { localStorage.setItem(PRESENT_KEY, String(present)) } catch {}
   }, [present])
   const sz = present
-    ? { stat: 'text-2xl', statPad: 'px-5 py-4', row: 'py-4', cell: 'text-base', name: 'text-lg', sub: 'text-sm', head: 'text-xs' }
-    : { stat: 'text-xl', statPad: 'px-4 py-3.5', row: 'py-3.5', cell: 'text-[15px]', name: 'text-[15px]', sub: 'text-xs', head: 'text-xs' }
+    ? { stat: 'text-lg', row: 'py-3', cell: 'text-base', name: 'text-base' }
+    : { stat: 'text-sm', row: 'py-2.5', cell: 'text-sm', name: 'text-sm' }
 
   const amt = (v) => (hideAmounts ? '₹ ••••' : formatINR(v || 0))
   const memberLabels = useMemo(() => buildMemberLabels(familyMembers || []), [familyMembers])
@@ -248,35 +248,33 @@ export default function FundsDashboardPage() {
         {/* ── Filter panel (collapsible: mobile always, desktop in present mode) ── */}
         {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
-        {/* ── Summary ── */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3">
-          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3">
-            <Stat sz={sz} label="Total invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
-            <Stat sz={sz} label="Current value" value={amt(t.currentValue)} />
-            <Stat sz={sz} label="Total gain" tone={(t.totalGain ?? t.pl) >= 0 ? 'up' : 'down'}
-              value={hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)}`}
-              sub={hideAmounts ? null : pct(t.totalGain != null ? t.totalGainPct : t.plPct)}
-              title={t.totalGain != null ? `Unrealised on current holdings: ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : undefined} />
-            <Stat sz={sz} label="XIRR" tone={t.xirr == null ? 'muted' : t.xirr >= 0 ? 'up' : 'down'} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)} />
-            <Stat sz={sz} label="CAGR" tone={t.cagr == null ? 'muted' : t.cagr >= 0 ? 'up' : 'down'} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason) || (t.cagr != null ? `Over ${holdingSince(t.cagrSince)} average holding, since ${monthYear(t.since)}` : undefined)} />
-            <Stat sz={sz} label="Buy opportunities" value={String(t.buyOppCount)} tone={t.buyOppCount > 0 ? 'up' : undefined} />
-          </div>
+        {/* ── Stat cards (Mutual Funds page style) ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Stat sz={sz} label="Invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
+          <Stat sz={sz} label="Current Value" value={amt(t.currentValue)} bold />
+          <Stat sz={sz} label="Total Gain" positive={(t.totalGain ?? t.pl) >= 0}
+            value={hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)}`}
+            sub={hideAmounts ? null : pct(t.totalGain != null ? t.totalGainPct : t.plPct)}
+            title={t.totalGain != null ? `Unrealised on current holdings: ${hideAmounts ? '' : formatINR(t.pl) + ' '}${pct(t.plPct)}` : undefined} />
+          <Stat sz={sz} label="XIRR" positive={t.xirr == null ? undefined : t.xirr >= 0} value={ratePct(t.xirr)} title={reasonLong(t.returnsReason)} />
+          <Stat sz={sz} label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason) || (t.cagr != null ? `Over ${holdingSince(t.cagrSince)} average holding, since ${monthYear(t.since)}` : undefined)} />
+          <Stat sz={sz} label="Buy Opportunities" value={String(t.buyOppCount)} positive={t.buyOppCount > 0 ? true : undefined} bold />
         </div>
 
-        {/* ── Tabs: Funds | By member | By portfolio ── */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-1 rounded-lg bg-[var(--bg-inset)] p-0.5">
-            <TabButton active={tab === 'funds'} onClick={() => setTab('funds')} label={`Funds (${model.funds.length})`} big={present} />
-            {model.breakdown.byMember.length > 1 && <TabButton active={tab === 'member'} onClick={() => setTab('member')} label="By member" big={present} />}
-            {model.breakdown.byPortfolio.length > 1 && <TabButton active={tab === 'portfolio'} onClick={() => setTab('portfolio')} label="By portfolio" big={present} />}
+        {/* ── Tabs (Mutual Funds page style) ── */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 shrink-0">
+            <TabButton active={tab === 'funds'} onClick={() => setTab('funds')} icon={<Layers size={12} />} label={`Funds (${model.funds.length})`} />
+            {model.breakdown.byMember.length > 1 && <TabButton active={tab === 'member'} onClick={() => setTab('member')} icon={<Users size={12} />} label={`By Member (${model.breakdown.byMember.length})`} />}
+            {model.breakdown.byPortfolio.length > 1 && <TabButton active={tab === 'portfolio'} onClick={() => setTab('portfolio')} icon={<Wallet size={12} />} label={`By Portfolio (${model.breakdown.byPortfolio.length})`} />}
           </div>
           {tab === 'funds' && (
-            <div className="relative w-full sm:w-64">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+            <div className="relative ml-auto shrink-0 w-48 sm:w-60">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search fund"
-                className="w-full pl-8 pr-7 py-1.5 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-violet-500/50" />
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-[var(--bg-card)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-violet-500/50" />
               {search && (
-                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={13} /></button>
+                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={12} /></button>
               )}
             </div>
           )}
@@ -296,7 +294,7 @@ export default function FundsDashboardPage() {
                   <th className="w-8"></th>
                   {COLUMNS.map((c) => (
                     <th key={c.key} onClick={() => toggleSort(c.key)}
-                      className={`py-2.5 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider select-none cursor-pointer whitespace-nowrap hover:text-[var(--text-primary)] ${c.align === 'left' ? 'text-left' : 'text-right'}`}>
+                      className={`py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider select-none cursor-pointer whitespace-nowrap hover:text-[var(--text-primary)] ${c.align === 'left' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center gap-1 ${c.align === 'left' ? '' : 'justify-end'}`}>
                         <span>{c.label}</span>
                         <SortIcon active={sort.key === c.key} dir={sort.dir} />
@@ -443,11 +441,11 @@ function FilterPanel({ members, memberSel, onToggleMember, onAllMembers, portfol
   )
 }
 
-function TabButton({ active, onClick, label, big }) {
+function TabButton({ active, onClick, label, icon }) {
   return (
     <button onClick={onClick}
-      className={`${big ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} font-medium rounded-md transition-colors ${active ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-      {label}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${active ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+      {icon} {label}
     </button>
   )
 }
@@ -489,13 +487,21 @@ function CheckRow({ active, onClick, label, sub, hint, dim }) {
 }
 
 // ── small presentational pieces ──
-function Stat({ label, value, sub, tone, title, sz }) {
-  const cls = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-[var(--accent-rose)]' : tone === 'muted' ? 'text-[var(--text-dim)]' : 'text-[var(--text-primary)]'
+// Same markup as StatCard on the Mutual Funds page
+function Stat({ label, value, sub, positive, bold, title, sz }) {
   return (
-    <div className="rounded-lg bg-[var(--bg-inset)] px-4 py-3.5 min-w-0" title={title}>
-      <p className="text-xs text-[var(--text-dim)] mb-1.5">{label}</p>
-      <p className={`${sz?.stat || 'text-xl'} font-semibold tabular-nums leading-tight ${cls}`}>{value}</p>
-      {sub && <p className={`text-sm font-medium tabular-nums mt-0.5 ${cls}`}>{sub}</p>}
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3" title={title}>
+      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
+      <p className={`${sz?.stat || 'text-sm'} tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${
+        positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
+      }`}>
+        {value}
+      </p>
+      {sub && (
+        <p className={`text-xs font-semibold tabular-nums mt-0.5 ${positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+          {sub}
+        </p>
+      )}
     </div>
   )
 }
