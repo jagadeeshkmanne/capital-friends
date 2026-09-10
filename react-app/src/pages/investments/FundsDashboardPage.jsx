@@ -46,6 +46,13 @@ const REASON_TEXT = {
 }
 function reasonLong(r) { return r ? REASON_TEXT[r]?.long || '' : undefined }
 
+function fundFacts(f) {
+  const parts = [`${f.units.toFixed(3)} units`, `NAV ₹${f.currentNav.toFixed(2)}`, `Avg ₹${f.avgNav.toFixed(2)}`]
+  if (f.athNav > 0) parts.push(`ATH ₹${f.athNav.toFixed(2)}`)
+  if (f.since) parts.push(`since ${monthYear(f.since)}`)
+  return parts.join(' · ')
+}
+
 // Family member label: relationship first ("Spouse", "Son"), disambiguated when two members share one
 function buildMemberLabels(members) {
   const counts = {}
@@ -297,15 +304,16 @@ export default function FundsDashboardPage() {
               <tbody>
                 {rows.map((f) => {
                   const { main } = splitFundName(f.fundName)
-                  const isOpen = expanded.has(f.key)
+                  const expandable = f.positions.length > 1
+                  const isOpen = expandable && expanded.has(f.key)
                   return (
                     <Fragment key={f.key}>
-                      <tr onClick={() => toggleExpand(f.key)}
-                        className={`border-b border-[var(--border-light)] cursor-pointer transition-colors ${isOpen ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}>
-                        <td className="pl-3 text-[var(--text-dim)]">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
+                      <tr onClick={() => expandable && toggleExpand(f.key)}
+                        className={`border-b border-[var(--border-light)] transition-colors ${expandable ? 'cursor-pointer' : ''} ${isOpen ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}>
+                        <td className="pl-3 text-[var(--text-dim)]">{expandable ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</td>
                         <td className={`${sz.row} px-3 w-full max-w-0`}>
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`${sz.name} font-semibold text-[var(--text-primary)] truncate`} title={f.fundName}>{main}</span>
+                            <span className={`${sz.name} font-semibold text-[var(--text-primary)] truncate`} title={`${f.fundName}\n${fundFacts(f)}`}>{main}</span>
                             {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Strong Buy' : 'Buy'}</span>}
                           </div>
                         </td>
@@ -347,10 +355,11 @@ export default function FundsDashboardPage() {
         <div className="lg:hidden space-y-2 min-w-0">
           {rows.map((f) => {
             const { main } = splitFundName(f.fundName)
-            const isOpen = expanded.has(f.key)
+            const expandable = f.positions.length > 1
+            const isOpen = expandable && expanded.has(f.key)
             return (
               <div key={f.key} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden min-w-0">
-                <button onClick={() => toggleExpand(f.key)} className="w-full text-left px-3 py-3 min-w-0">
+                <button onClick={() => expandable && toggleExpand(f.key)} className="w-full text-left px-3 py-3 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--text-primary)] leading-snug">{main}</p>
