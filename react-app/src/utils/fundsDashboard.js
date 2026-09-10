@@ -230,11 +230,18 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   // Every fund has already validated its own history; at portfolio level only the aggregate verdict matters
   const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : (allFlows.length ? null : 'no-history')
   // Money actually put in (switch legs cancel), and the gain on it including what was realised along the way
-  // Prefer the sheet's own Total Investment (AllPortfolios column E) so this page agrees with the
-  // Mutual Funds page; it is initial investment + SIP + lumpsum - withdrawals, switches excluded.
-  const sheetInvested = (portfolios || []).reduce((s, p) => s + (Number(p.totalInvestment) || 0), 0)
-  const netInvested = sheetInvested > 0 ? sheetInvested : cashIn(allFlows) - cashOut(allFlows)
-  const hasCashFlows = netInvested > 0 && (sheetInvested > 0 || allFlows.length > 0)
+  // Same rule as the sheet's Total Investment formula, computed here so it does not depend on that
+  // cell being intact: (initial investment if stated, else opening balances) + SIP + lumpsum
+  // - withdrawals, switches excluded. allFlows already has opening balances rescaled to the stated
+  // initial investment; a stated amount with no opening-balance transaction is added on its own.
+  const openingByPortfolio = {}
+  allFlows.forEach((cf) => { if (cf.opening && cf.amount < 0) openingByPortfolio[cf.portfolioId] = true })
+  const statedWithoutOpening = (portfolios || []).reduce((s, p) => {
+    const v = Number(p.initialInvestment) || 0
+    return s + (v > 0 && !openingByPortfolio[p.portfolioId] ? v : 0)
+  }, 0)
+  const netInvested = cashIn(allFlows) - cashOut(allFlows) + statedWithoutOpening
+  const hasCashFlows = netInvested > 0
   const totalGain = hasCashFlows ? totalValue - netInvested : null
   const cagrSince = weightedInflowDate(allFlows)
   const totals = {

@@ -170,3 +170,32 @@ test('portfolio initial investment overrides opening-balance amounts, matching t
   // Per-fund figures stay on cost basis
   assert.equal(m.funds[0].invested, 79000)
 })
+
+test('total invested follows the stated initial investment even when the sheet total is missing', () => {
+  const today = new Date(2026, 8, 10)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active', initialInvestment: 6300000, totalInvestment: '' }]
+  const holdings = [
+    { portfolioId: 'P1', schemeCode: 'A', fundName: 'Fund A', units: 1000, avgNav: 2301, investment: 2301000, currentNav: 3718, currentValue: 3718000 },
+    { portfolioId: 'P1', schemeCode: 'B', fundName: 'Fund B', units: 1000, avgNav: 5614, investment: 5614000, currentNav: 5968, currentValue: 5968000 },
+  ]
+  const transactions = [
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'BUY', transactionType: 'INITIAL', date: '2026-08-05', units: 1000, price: 2301, totalAmount: 2301000 },
+    { portfolioId: 'P1', fundCode: 'B', fundName: 'Fund B', type: 'BUY', transactionType: 'INITIAL', date: '2026-08-05', units: 1000, price: 5614, totalAmount: 5614000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.invested, 7915000)
+  assert.equal(m.totals.netInvested, 6300000)
+  assert.equal(m.totals.totalGain, 9686000 - 6300000)
+  // Opening balances dated last month: annualised figures stay hidden
+  assert.equal(m.totals.xirr, null)
+  assert.equal(m.totals.returnsReason, 'funds-unreliable')
+})
+
+test('a stated initial investment with no opening-balance transaction still counts', () => {
+  const today = new Date(2026, 8, 10)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active', initialInvestment: 50000 }]
+  const holdings = [{ portfolioId: 'P1', schemeCode: 'A', fundName: 'Fund A', units: 100, avgNav: 100, investment: 10000, currentNav: 120, currentValue: 12000 }]
+  const transactions = [{ portfolioId: 'P1', fundCode: 'A', fundName: 'Fund A', type: 'BUY', transactionType: 'SIP', date: '2025-01-05', units: 100, price: 100, totalAmount: 10000 }]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.netInvested, 60000)
+})
