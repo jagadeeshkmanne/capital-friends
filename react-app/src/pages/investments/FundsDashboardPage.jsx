@@ -262,8 +262,7 @@ export default function FundsDashboardPage() {
             note={t.unreliableCount > 0 ? <span className="text-amber-500/90">{t.unreliableCount} fund{t.unreliableCount === 1 ? '' : 's'} need{t.unreliableCount === 1 ? 's' : ''} dates</span> : null} />
           <Stat sz={sz} quiet={present} label="CAGR" positive={t.cagr == null ? undefined : t.cagr >= 0} value={ratePct(t.cagr)} title={reasonLong(t.returnsReason)}
             note={t.cagr != null ? `${holdingSince(t.cagrSince)} avg · since ${monthYear(t.since)}` : null} />
-          <Stat sz={sz} quiet={present} label="Buy Opportunities" bold positive={t.buyOppCount > 0 ? true : undefined} value={String(t.buyOppCount)}
-            note={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
+          <Stat sz={sz} quiet={present} label="Buy Opportunities" bold positive={t.buyOppCount > 0 ? true : undefined} value={String(t.buyOppCount)} />
         </div>
 
         {/* ── Tabs: Funds | By member | By portfolio ── */}
