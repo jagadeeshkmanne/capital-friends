@@ -23,9 +23,39 @@ export function resolvePortfolioOwners(mfPortfolios, investmentAccounts, members
 
 function toFlows(txns) {
   return txns
-    .map((t) => ({ date: parseDate(t.date), amount: Number(t.totalAmount) || 0, type: String(t.type || '').toUpperCase() }))
+    .map((t) => ({
+      date: parseDate(t.date), amount: Number(t.totalAmount) || 0,
+      type: String(t.type || '').toUpperCase(), subType: String(t.transactionType || '').toUpperCase(),
+    }))
     .filter((t) => t.date && t.amount > 0)
-    .map((t) => ({ date: t.date, amount: t.type === 'SELL' ? t.amount : -t.amount }))
+    .map((t) => ({ date: t.date, amount: t.type === 'SELL' ? t.amount : -t.amount, opening: t.subType === 'INITIAL' }))
+}
+
+const DAY = 86400000
+export const MIN_HISTORY_DAYS = 90            // XIRR/CAGR need at least this much history
+export const OPENING_BALANCE_MIN_DAYS = 365   // an opening balance ("Add Existing Holdings") needs a real, old date
+export const OPENING_BALANCE_SHARE = 0.5      // ...when it makes up this share of recorded buys
+
+/**
+ * Decide whether XIRR / CAGR can be trusted for a set of flows.
+ * Returns null when fine, otherwise a reason code:
+ *   'no-history'      recorded buys do not cover the cost basis (migrated without transactions)
+ *   'opening-balance' most of the money is an opening balance dated less than a year ago,
+ *                     so its date is almost certainly the setup date, not the purchase date
+ *   'too-new'         less than MIN_HISTORY_DAYS of history
+ */
+export function returnsReason(flows, invested, today) {
+  if (!historyCovers(flows, invested)) return 'no-history'
+  const buys = flows.filter((cf) => cf.amount < 0)
+  const totalBuy = buys.reduce((s, cf) => s - cf.amount, 0)
+  const openingBuy = buys.filter((cf) => cf.opening).reduce((s, cf) => s - cf.amount, 0)
+  if (totalBuy > 0 && openingBuy / totalBuy >= OPENING_BALANCE_SHARE) {
+    const newestOpening = buys.filter((cf) => cf.opening).reduce((m, cf) => (cf.date > m ? cf.date : m), buys.find((cf) => cf.opening).date)
+    if ((today - newestOpening) / DAY < OPENING_BALANCE_MIN_DAYS) return 'opening-balance'
+  }
+  const first = earliest(flows)
+  if (!first || (today - first) / DAY < MIN_HISTORY_DAYS) return 'too-new'
+  return null
 }
 
 // Buys recorded in the transaction log should cover the cost basis of what is held.
@@ -94,7 +124,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
 
     const posFlows = toFlows((txnsByFund[key] || []).filter((t) => t.portfolioId === h.portfolioId))
     const pl = currentValue - invested
-    const posComplete = historyCovers(posFlows, invested)
+    const posReason = returnsReason(posFlows, invested, today)
     const pTotal = portfolioTotals[h.portfolioId] || 0
     const currentAllocPct = pTotal > 0 ? (currentValue / pTotal) * 100 : 0
     const targetAllocPct = Number(h.targetAllocationPct) || 0
@@ -106,8 +136,9 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
       portfolioId: h.portfolioId, portfolioName: p?.portfolioName || '', ownerName: p?.ownerName || '', ownerId: p?.ownerId || '',
       units: Number(h.units) || 0, avgNav: Number(h.avgNav) || 0, invested, currentValue, pl,
       plPct: invested > 0 ? (pl / invested) * 100 : null,
-      xirr: posComplete ? computeXIRR([...posFlows, { date: today, amount: currentValue }]) : null,
-      historyComplete: posComplete,
+      xirr: posReason ? null : computeXIRR([...posFlows, { date: today, amount: currentValue }]),
+      returnsReason: posReason,
+      openingDate: posFlows.filter((cf) => cf.opening).map((cf) => cf.date).sort((a, b) => b - a)[0] || null,
       since: earliest(posFlows), ongoingSIP: Number(h.ongoingSIP) || 0,
     })
   })
@@ -118,16 +149,17 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
     const since = earliest(flows)
     const pl = f.currentValue - f.invested
     const holding = { fundName: f.fundName, athNav: f.athNav, belowATHPct: f.belowATHPct }
-    const complete = historyCovers(flows, f.invested)
+    const reason = returnsReason(flows, f.invested, today)
     return {
       ...f,
       members: [...f.members],
       avgNav: f.units > 0 ? f.invested / f.units : 0,
       pl,
       plPct: f.invested > 0 ? (pl / f.invested) * 100 : null,
-      xirr: complete ? computeXIRR([...flows, { date: today, amount: f.currentValue }]) : null,
-      cagr: complete ? computeCAGR(f.invested, f.currentValue, since, today) : null,
-      historyComplete: complete,
+      xirr: reason ? null : computeXIRR([...flows, { date: today, amount: f.currentValue }]),
+      cagr: reason ? null : computeCAGR(f.invested, f.currentValue, since, today),
+      returnsReason: reason,
+      openingDate: flows.filter((cf) => cf.opening).map((cf) => cf.date).sort((a, b) => b - a)[0] || null,
       since,
       weight: totalValue > 0 ? (f.currentValue / totalValue) * 100 : 0,
       isBuyOpp: isBuyOpportunity(holding),
@@ -143,16 +175,18 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   const totalPL = totalValue - totalInvested
   const allFlows = toFlows(txns)
   const firstDate = earliest(allFlows)
-  const totalsComplete = historyCovers(allFlows, totalInvested)
+  const unreliable = funds.filter((f) => f.returnsReason)
+  const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : returnsReason(allFlows, totalInvested, today)
   const totals = {
     invested: totalInvested,
     currentValue: totalValue,
     pl: totalPL,
     plPct: totalInvested > 0 ? (totalPL / totalInvested) * 100 : null,
-    xirr: totalsComplete ? computeXIRR([...allFlows, { date: today, amount: totalValue }]) : null,
-    cagr: totalsComplete ? computeCAGR(totalInvested, totalValue, firstDate, today) : null,
-    historyComplete: totalsComplete,
-    incompleteCount: funds.filter((f) => !f.historyComplete).length,
+    xirr: totalsReason ? null : computeXIRR([...allFlows, { date: today, amount: totalValue }]),
+    cagr: totalsReason ? null : computeCAGR(totalInvested, totalValue, firstDate, today),
+    returnsReason: totalsReason,
+    unreliableCount: unreliable.length,
+    unreliableByReason: unreliable.reduce((acc, f) => { acc[f.returnsReason] = (acc[f.returnsReason] || 0) + 1; return acc }, {}),
     since: firstDate,
     fundCount: funds.length,
     buyOppCount: funds.filter((f) => f.isBuyOpp).length,

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildFundsModel, resolvePortfolioOwners } from './fundsDashboard.js'
+import { buildFundsModel, resolvePortfolioOwners, returnsReason } from './fundsDashboard.js'
 import { mfPortfolios, mfHoldings, mfTransactions, investmentAccounts, familyMembers } from '../data/familyData.js'
 
 const today = new Date(2026, 8, 10)
@@ -26,7 +26,7 @@ test('per-fund XIRR uses buys as outflows and sells as inflows', () => {
   const m = buildFundsModel({ portfolios, holdings: mfHoldings, transactions: mfTransactions, today })
   const axis = m.funds.find((f) => f.schemeCode === '120465')
   assert.ok(axis, 'focused fund present')
-  assert.equal(axis.historyComplete, true)
+  assert.equal(axis.returnsReason, null)
   assert.ok(Number.isFinite(axis.xirr), 'xirr computed')
   assert.ok(Number.isFinite(axis.cagr), 'cagr computed')
   assert.ok(axis.since instanceof Date)
@@ -38,10 +38,11 @@ test('funds whose recorded buys do not cover the cost basis get no XIRR or CAGR'
   const m = buildFundsModel({ portfolios, holdings: mfHoldings, transactions: mfTransactions, today })
   const nifty = m.funds.find((f) => f.schemeCode === '120716') // one SIP recorded against a 3L holding
   assert.ok(nifty)
-  assert.equal(nifty.historyComplete, false)
+  assert.equal(nifty.returnsReason, 'no-history')
   assert.equal(nifty.xirr, null)
   assert.equal(nifty.cagr, null)
-  assert.ok(m.totals.incompleteCount >= 1)
+  assert.ok(m.totals.unreliableCount >= 1)
+  assert.equal(m.totals.xirr, null)
 })
 
 test('member filter narrows portfolios and funds', () => {
@@ -74,4 +75,20 @@ test('allocation is per portfolio and only surfaced at fund level when unambiguo
   const byPortfolio = {}
   m.funds.forEach((f) => f.positions.forEach((pos) => { byPortfolio[pos.portfolioId] = (byPortfolio[pos.portfolioId] || 0) + pos.currentAllocPct }))
   Object.values(byPortfolio).forEach((sum) => assert.ok(Math.abs(sum - 100) < 1e-6))
+})
+
+test('opening balances dated recently do not get annualised', () => {
+  const today = new Date(2026, 8, 10)
+  const recent = [{ date: new Date(2026, 7, 5), amount: -100000, opening: true }]
+  assert.equal(returnsReason(recent, 100000, today), 'opening-balance')
+  const old = [{ date: new Date(2023, 7, 5), amount: -100000, opening: true }]
+  assert.equal(returnsReason(old, 100000, today), null)
+  const newLumpsum = [{ date: new Date(2026, 7, 5), amount: -100000, opening: false }]
+  assert.equal(returnsReason(newLumpsum, 100000, today), 'too-new')
+  // A recent opening balance that is a minority of buys is tolerated
+  const mixed = [
+    { date: new Date(2023, 0, 1), amount: -80000, opening: false },
+    { date: new Date(2026, 7, 5), amount: -20000, opening: true },
+  ]
+  assert.equal(returnsReason(mixed, 100000, today), null)
 })
