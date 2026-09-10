@@ -311,19 +311,16 @@ export default function FundsDashboardPage() {
               </thead>
               <tbody>
                 {rows.map((f) => {
-                  const { main, plan } = splitFundName(f.fundName)
+                  const { main } = splitFundName(f.fundName)
                   const isOpen = expanded.has(f.key)
                   return (
                     <Fragment key={f.key}>
                       <tr onClick={() => toggleExpand(f.key)}
                         className={`border-b border-[var(--border-light)] cursor-pointer transition-colors ${isOpen ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}>
                         <td className="pl-3 text-[var(--text-dim)]">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                        <td className={`${sz.row} px-3 max-w-[360px]`}>
-                          <p className={`${sz.name} text-[var(--text-primary)] font-medium leading-snug truncate`} title={f.fundName}>{main}</p>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <CategoryTag category={f.category} />
-                            {plan && !present && <span className="text-xs text-[var(--text-dim)] truncate">{plan}</span>}
-                            {f.positions.length > 1 && <span className="text-[10px] font-semibold text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded">{f.positions.length} portfolios</span>}
+                        <td className={`${sz.row} px-3 max-w-[380px]`}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className={`${sz.name} text-[var(--text-primary)] font-medium leading-snug truncate`} title={f.fundName}>{main}</p>
                             {f.isBuyOpp && <BuyTag strong={f.isStrongBuy} />}
                           </div>
                         </td>
@@ -369,7 +366,7 @@ export default function FundsDashboardPage() {
         {/* ── Mobile cards ── */}
         <div className="lg:hidden space-y-2 min-w-0">
           {rows.map((f) => {
-            const { main, plan } = splitFundName(f.fundName)
+            const { main } = splitFundName(f.fundName)
             const isOpen = expanded.has(f.key)
             return (
               <div key={f.key} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden min-w-0">
@@ -377,11 +374,7 @@ export default function FundsDashboardPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--text-primary)] leading-snug">{main}</p>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <CategoryTag category={f.category} />
-                        {plan && <span className="text-xs text-[var(--text-dim)] truncate">{plan}</span>}
-                        {f.isBuyOpp && <BuyTag strong={f.isStrongBuy} />}
-                      </div>
+                      {f.isBuyOpp && <div className="mt-1"><BuyTag strong={f.isStrongBuy} /></div>}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{amt(f.currentValue)}</p>
@@ -620,40 +613,37 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
   )
 }
 
-// ── Expanded row: fund-level facts + per-portfolio split ──
+// ── Expanded row: a few facts + per-portfolio split ──
 function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
+  const { plan } = splitFundName(fund.fundName)
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-dim)] tabular-nums">
-          <span><span className="text-[var(--text-muted)]">{fund.units.toFixed(3)}</span> units</span>
-          <span>NAV <span className="text-[var(--text-muted)]">₹{fund.currentNav.toFixed(2)}</span></span>
-          <span>Avg <span className="text-[var(--text-muted)]">₹{fund.avgNav.toFixed(2)}</span></span>
-          {fund.athNav > 0 && <span>ATH <span className="text-[var(--text-muted)]">₹{fund.athNav.toFixed(2)}</span></span>}
-          {fund.ongoingSIP > 0 && <span>SIP <span className="text-[var(--text-muted)]">{amt(fund.ongoingSIP)}/mo</span></span>}
-          {fund.since && <span>since <span className="text-[var(--text-muted)]">{monthYear(fund.since)}</span></span>}
+          <CategoryTag category={fund.category} />
+          {plan && <span>{plan}</span>}
+          <span>{fund.units.toFixed(3)} units</span>
+          <span>NAV ₹{fund.currentNav.toFixed(2)} · avg ₹{fund.avgNav.toFixed(2)}</span>
+          {fund.athNav > 0 && <span>ATH ₹{fund.athNav.toFixed(2)}</span>}
+          {fund.ongoingSIP > 0 && <span>SIP {amt(fund.ongoingSIP)}/mo</span>}
           {fund.cagr != null && <span>CAGR <span className={plClass(fund.cagr)}>{ratePct(fund.cagr)}</span> over {holdingSince(fund.cagrSince || fund.since)}</span>}
         </div>
         <button onClick={(e) => { e.stopPropagation(); onOpen() }} className="text-xs font-medium text-violet-400 hover:text-violet-300">Open in Mutual Funds →</button>
       </div>
       {fund.returnsReason && <p className="text-xs text-amber-500/90">{reasonLong(fund.returnsReason)}</p>}
 
-      <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Held in {fund.positions.length} portfolio{fund.positions.length === 1 ? '' : 's'}</p>
       {compact ? (
         <div className="space-y-2">
           {fund.positions.map((p) => (
-            <div key={p.portfolioId} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{p.portfolioName}</p>
-                  <p className="text-[10px] text-[var(--text-dim)]">{p.ownerName} · since {monthYear(p.since)}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{amt(p.currentValue)}</p>
-                  <p className={`text-[11px] font-semibold tabular-nums ${plClass(p.pl)}`}>{pct(p.plPct)} · XIRR {ratePct(p.xirr)}</p>
-                </div>
+            <div key={p.portfolioId} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{p.portfolioName}</p>
+                <p className="text-[10px] text-[var(--text-dim)]">{p.ownerName} · inv {amt(p.invested)}</p>
               </div>
-              <p className="text-[10px] text-[var(--text-dim)] mt-1 tabular-nums">{p.units.toFixed(3)} units · avg ₹{p.avgNav.toFixed(2)} · inv {amt(p.invested)}{p.ongoingSIP > 0 ? ` · SIP ${amt(p.ongoingSIP)}/mo` : ''}</p>
+              <div className="text-right shrink-0">
+                <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{amt(p.currentValue)}</p>
+                <p className={`text-[11px] font-semibold tabular-nums ${plClass(p.pl)}`}>{pct(p.plPct)} · XIRR {ratePct(p.xirr)}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -663,14 +653,10 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
             <tr className="text-[var(--text-dim)] uppercase tracking-wider">
               <th className="text-left py-1 pr-3 font-semibold">Portfolio</th>
               <th className="text-left py-1 pr-3 font-semibold">Member</th>
-              <th className="text-right py-1 pr-3 font-semibold">Units</th>
-              <th className="text-right py-1 pr-3 font-semibold">Avg NAV</th>
               <th className="text-right py-1 pr-3 font-semibold">Invested</th>
               <th className="text-right py-1 pr-3 font-semibold">Current</th>
-              <th className="text-right py-1 pr-3 font-semibold">P&L</th>
-              <th className="text-right py-1 pr-3 font-semibold">XIRR</th>
-              <th className="text-right py-1 pr-3 font-semibold">Since</th>
-              <th className="text-right py-1 font-semibold">SIP</th>
+              <th className="text-right py-1 pr-3 font-semibold">Gain</th>
+              <th className="text-right py-1 font-semibold">XIRR</th>
             </tr>
           </thead>
           <tbody>
@@ -678,14 +664,10 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
               <tr key={p.portfolioId} className="border-t border-[var(--border-light)]">
                 <td className="py-1.5 pr-3 text-[var(--text-primary)] font-medium">{p.portfolioName}</td>
                 <td className="py-1.5 pr-3 text-[var(--text-muted)]">{p.ownerName}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{p.units.toFixed(3)}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">₹{p.avgNav.toFixed(2)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{amt(p.invested)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums font-semibold text-[var(--text-primary)]">{amt(p.currentValue)}</td>
                 <td className={`py-1.5 pr-3 text-right tabular-nums font-semibold ${plClass(p.pl)}`}>{hideAmounts ? '' : `${p.pl >= 0 ? '+' : ''}${formatINR(p.pl)} `}{pct(p.plPct)}</td>
-                <td className={`py-1.5 pr-3 text-right tabular-nums font-semibold ${plClass(p.xirr)}`} title={reasonLong(p.returnsReason)}>{ratePct(p.xirr)}{p.returnsReason && <div className="text-[10px] font-normal text-amber-500/90">{reasonShort(p.returnsReason)}</div>}</td>
-                <td className="py-1.5 pr-3 text-right text-[var(--text-dim)]">{monthYear(p.since)}</td>
-                <td className="py-1.5 text-right tabular-nums text-[var(--text-dim)]">{p.ongoingSIP > 0 ? `${amt(p.ongoingSIP)}/mo` : '—'}</td>
+                <td className={`py-1.5 text-right tabular-nums font-semibold ${plClass(p.xirr)}`} title={reasonLong(p.returnsReason)}>{ratePct(p.xirr)}</td>
               </tr>
             ))}
           </tbody>
