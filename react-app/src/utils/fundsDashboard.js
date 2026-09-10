@@ -227,7 +227,8 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   const allFlows = applyInitialInvestment(toFlows(txns), portfolios)
   const firstDate = earliest(allFlows)
   const unreliable = funds.filter((f) => f.returnsReason)
-  const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : returnsReason(allFlows, totalInvested, today)
+  // Every fund has already validated its own history; at portfolio level only the aggregate verdict matters
+  const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : (allFlows.length ? null : 'no-history')
   // Money actually put in (switch legs cancel), and the gain on it including what was realised along the way
   // Prefer the sheet's own Total Investment (AllPortfolios column E) so this page agrees with the
   // Mutual Funds page; it is initial investment + SIP + lumpsum - withdrawals, switches excluded.
