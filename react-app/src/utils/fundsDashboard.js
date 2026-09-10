@@ -135,7 +135,7 @@ function fundKey(code, name) {
  * Build one row per fund (consolidated across the given portfolios) plus totals and allocation lists.
  * @param {{ portfolios: object[], holdings: object[], transactions: object[], today?: Date }} input
  */
-export function buildFundsModel({ portfolios, holdings, transactions, today = new Date() }) {
+export function buildFundsModel({ portfolios, holdings, transactions, today = new Date(), withBreakdown = true }) {
   const portfolioById = {}
   ;(portfolios || []).forEach((p) => { portfolioById[p.portfolioId] = p })
   const inScope = (id) => Boolean(portfolioById[id])
@@ -284,5 +284,34 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
     .map(([name, value]) => ({ name, value, pct: totalValue > 0 ? (value / totalValue) * 100 : 0 }))
     .sort((a, b) => b.value - a.value)
 
-  return { funds, totals, categories: toList(byCategory), members: toList(byMember) }
+  // Breakdown by portfolio and by member, each computed with exactly the same rules as the totals
+  let breakdown = { byPortfolio: [], byMember: [] }
+  if (withBreakdown) {
+    const summarise = (subset) => {
+      const sub = buildFundsModel({ portfolios: subset, holdings, transactions, today, withBreakdown: false }).totals
+      return {
+        invested: sub.netInvested ?? sub.invested, current: sub.currentValue,
+        gain: sub.totalGain ?? sub.pl, gainPct: sub.totalGain != null ? sub.totalGainPct : sub.plPct,
+        xirr: sub.xirr, cagr: sub.cagr, returnsReason: sub.returnsReason, fundCount: sub.fundCount,
+        weight: totalValue > 0 ? (sub.currentValue / totalValue) * 100 : 0,
+      }
+    }
+    const byPortfolio = (portfolios || [])
+      .map((p) => ({ id: p.portfolioId, name: p.portfolioName, ownerId: p.ownerId, ownerName: p.ownerName, ...summarise([p]) }))
+      .filter((r) => r.current > 0 || r.invested > 0)
+      .sort((a, b) => b.current - a.current)
+    const owners = {}
+    ;(portfolios || []).forEach((p) => {
+      const key = p.ownerId || p.ownerName || 'unassigned'
+      if (!owners[key]) owners[key] = { id: key, name: p.ownerName || 'Unassigned', portfolios: [] }
+      owners[key].portfolios.push(p)
+    })
+    const byMemberRows = Object.values(owners)
+      .map((o) => ({ id: o.id, name: o.name, portfolioCount: o.portfolios.length, ...summarise(o.portfolios) }))
+      .filter((r) => r.current > 0 || r.invested > 0)
+      .sort((a, b) => b.current - a.current)
+    breakdown = { byPortfolio, byMember: byMemberRows }
+  }
+
+  return { funds, totals, categories: toList(byCategory), members: toList(byMember), breakdown }
 }

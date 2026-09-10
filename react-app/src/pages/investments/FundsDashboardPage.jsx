@@ -244,16 +244,9 @@ export default function FundsDashboardPage() {
             note={`${t.buyOppCount > 0 ? '5%+ below peak · ' : ''}avg ${t.weightedBelowATH.toFixed(1)}% below ATH`} />
         </div>
 
-        {/* ── Allocation ── */}
-        {(model.categories.length > 0 || model.members.length > 1) && (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-4">
-            <div className={`grid grid-cols-1 ${model.members.length > 1 ? 'xl:grid-cols-2' : ''} gap-5`}>
-              <AllocationBar title="By category" items={model.categories} colorFor={(name) => CATEGORY_COLORS[name] || CATEGORY_COLORS.Other} amt={amt} />
-              {model.members.length > 1 && (
-                <AllocationBar title="By member" items={model.members} colorFor={(_, i) => MEMBER_COLORS[i % MEMBER_COLORS.length]} amt={amt} />
-              )}
-            </div>
-          </div>
+        {/* ── Breakdown by member / portfolio ── */}
+        {(model.breakdown.byPortfolio.length > 1 || model.breakdown.byMember.length > 1) && (
+          <BreakdownCard breakdown={model.breakdown} amt={amt} hideAmounts={hideAmounts} />
         )}
 
         {/* ── Search ── */}
@@ -505,23 +498,87 @@ function SortIcon({ active, dir }) {
   return dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
 }
 
-function AllocationBar({ title, items, colorFor, amt }) {
-  if (!items.length) return null
+function BreakdownCard({ breakdown, amt, hideAmounts }) {
+  const hasMembers = breakdown.byMember.length > 1
+  const [mode, setMode] = useState(hasMembers ? 'member' : 'portfolio')
+  const rows = mode === 'member' ? breakdown.byMember : breakdown.byPortfolio
   return (
-    <div>
-      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-2">{title}</p>
-      <div className="flex h-2 rounded-full overflow-hidden bg-[var(--bg-inset)]">
-        {items.map((it, i) => (
-          <div key={it.name} style={{ width: `${it.pct}%`, background: colorFor(it.name, i) }} title={`${it.name} ${it.pct.toFixed(1)}%`} />
-        ))}
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-light)]">
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Breakdown</p>
+        <div className="flex items-center gap-1 rounded-lg bg-[var(--bg-inset)] p-0.5">
+          {hasMembers && (
+            <button onClick={() => setMode('member')} className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'member' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>By member</button>
+          )}
+          <button onClick={() => setMode('portfolio')} className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'portfolio' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>By portfolio</button>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-        {items.map((it, i) => (
-          <div key={it.name} className="flex items-center gap-1.5 text-xs">
-            <span className="w-2 h-2 rounded-sm" style={{ background: colorFor(it.name, i) }} />
-            <span className="text-[var(--text-muted)]">{it.name}</span>
-            <span className="text-[var(--text-primary)] font-semibold tabular-nums">{it.pct.toFixed(1)}%</span>
-            <span className="text-[var(--text-dim)] tabular-nums">{amt(it.value)}</span>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)] text-xs text-[var(--text-muted)] uppercase tracking-wider">
+              <th className="text-left py-2 px-4 font-semibold">{mode === 'member' ? 'Member' : 'Portfolio'}</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Invested</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Current</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">Gain</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">XIRR</th>
+              <th className="text-right py-2 px-3 font-semibold whitespace-nowrap">CAGR</th>
+              <th className="text-right py-2 px-4 font-semibold whitespace-nowrap">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id} className="border-b border-[var(--border-light)] last:border-0">
+                <td className="py-2.5 px-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
+                    <div className="min-w-0">
+                      <p className="text-[var(--text-primary)] font-medium truncate">{r.name}</p>
+                      <p className="text-xs text-[var(--text-dim)] truncate">
+                        {mode === 'member' ? `${r.portfolioCount} portfolio${r.portfolioCount === 1 ? '' : 's'} · ` : `${r.ownerName} · `}{r.fundCount} fund{r.fundCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap text-[var(--text-muted)]">{amt(r.invested)}</td>
+                <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap font-semibold text-[var(--text-primary)]">{amt(r.current)}</td>
+                <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap ${plClass(r.gain)}`}>
+                  {!hideAmounts && <div className="font-semibold">{r.gain >= 0 ? '+' : ''}{formatINR(r.gain)}</div>}
+                  <div className={hideAmounts ? 'font-semibold' : 'text-xs opacity-80'}>{pct(r.gainPct)}</div>
+                </td>
+                <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap font-semibold ${plClass(r.xirr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.xirr)}</td>
+                <td className={`py-2.5 px-3 text-right tabular-nums whitespace-nowrap ${plClass(r.cagr)}`} title={reasonLong(r.returnsReason)}>{ratePct(r.cagr)}</td>
+                <td className="py-2.5 px-4 text-right tabular-nums whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(100, r.weight)}%`, background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} /></div>
+                    <span className="text-[var(--text-primary)] w-12">{r.weight.toFixed(1)}%</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile rows */}
+      <div className="sm:hidden divide-y divide-[var(--border-light)]">
+        {rows.map((r, i) => (
+          <div key={r.id} className="px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
+                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{r.name}</p>
+              </div>
+              <p className="text-sm font-bold tabular-nums text-[var(--text-primary)] shrink-0">{amt(r.current)}</p>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs tabular-nums">
+              <span className="text-[var(--text-dim)]">Inv {amt(r.invested)}</span>
+              <span className={plClass(r.gain)}>{hideAmounts ? '' : `${r.gain >= 0 ? '+' : ''}${formatINR(r.gain)} `}{pct(r.gainPct)}</span>
+              <span className={plClass(r.xirr)}>XIRR {ratePct(r.xirr)}</span>
+              <span className="text-[var(--text-dim)]">{r.weight.toFixed(1)}%</span>
+            </div>
           </div>
         ))}
       </div>
