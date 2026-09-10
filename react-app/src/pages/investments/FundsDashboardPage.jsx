@@ -309,9 +309,9 @@ export default function FundsDashboardPage() {
                             {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Strong Buy' : 'Buy'}</span>}
                           </div>
                         </td>
-                        <td className={`${sz.row} px-3 text-right`}>
-                          <p className={`${sz.num} font-semibold text-[var(--text-primary)] tabular-nums`}>{amt(f.currentValue)}</p>
-                          <p className={`${sz.num} text-[var(--text-dim)] tabular-nums mt-0.5`}>{amt(f.invested)}</p>
+                        <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} tabular-nums`}>
+                          <span className="font-semibold text-[var(--text-primary)]">{amt(f.currentValue)}</span>
+                          <span className="text-[var(--text-dim)]"> / {amt(f.invested)}</span>
                         </td>
                         <td className={`${sz.row} px-3 text-right whitespace-nowrap`}>
                           {!hideAmounts && <span className={`${sz.num} font-semibold tabular-nums ${plClass(f.pl)}`}>{f.pl >= 0 ? '+' : ''}{formatINR(f.pl)}</span>}
@@ -322,9 +322,9 @@ export default function FundsDashboardPage() {
                         <td className={`${sz.row} px-3 text-right`}><ATHBadge fund={f} cls={sz.num} /></td>
                       </tr>
                       {isOpen && (
-                        <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]/60">
-                          <td></td>
-                          <td colSpan={COLUMNS.length} className="px-3 py-3">
+                        <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                          <td className="border-l-2 border-violet-500/60"></td>
+                          <td colSpan={COLUMNS.length} className="px-4 py-4">
                             <FundDetail fund={f} amt={amt} hideAmounts={hideAmounts} onOpen={() => navigate('/investments/mutual-funds')} />
                           </td>
                         </tr>
@@ -370,7 +370,7 @@ export default function FundsDashboardPage() {
                   </div>
                 </button>
                 {isOpen && (
-                  <div className="border-t border-[var(--border-light)] bg-[var(--bg-inset)]/60 px-3 py-3">
+                  <div className="border-t border-[var(--border-light)] border-l-2 border-l-violet-500/60 bg-[var(--bg-inset)] px-3 py-3">
                     <FundDetail fund={f} amt={amt} hideAmounts={hideAmounts} onOpen={() => navigate('/investments/mutual-funds')} compact />
                   </div>
                 )}
@@ -555,9 +555,9 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
                   <span className={`${sz?.name || 'text-sm'} font-semibold text-[var(--text-primary)]`}>{r.name}</span>
                   {!quiet && <p className="text-xs text-[var(--text-dim)]">{mode === 'member' ? `${r.portfolioCount} portfolio${r.portfolioCount === 1 ? '' : 's'}` : r.ownerName} · {r.fundCount} fund{r.fundCount === 1 ? '' : 's'}</p>}
                 </td>
-                <td className={`${sz?.row || 'py-2.5'} px-3 text-right`}>
-                  <p className={`${sz?.num || 'text-xs'} font-semibold text-[var(--text-primary)] tabular-nums`}>{amt(r.current)}</p>
-                  <p className={`${sz?.num || 'text-xs'} text-[var(--text-dim)] tabular-nums mt-0.5`}>{amt(r.invested)}</p>
+                <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap ${sz?.num || 'text-xs'} tabular-nums`}>
+                  <span className="font-semibold text-[var(--text-primary)]">{amt(r.current)}</span>
+                  <span className="text-[var(--text-dim)]"> / {amt(r.invested)}</span>
                 </td>
                 <td className={`${sz?.row || 'py-2.5'} px-3 text-right whitespace-nowrap`}>
                   {!hideAmounts && <span className={`${sz?.num || 'text-xs'} font-semibold tabular-nums ${plClass(r.gain)}`}>{r.gain >= 0 ? '+' : ''}{formatINR(r.gain)}</span>}
@@ -627,6 +627,7 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
           ))}
         </div>
       ) : (
+        <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2">
         <table className="w-full text-xs whitespace-nowrap">
           <thead>
             <tr className="text-[var(--text-dim)] uppercase tracking-wider">
@@ -649,6 +650,7 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )
