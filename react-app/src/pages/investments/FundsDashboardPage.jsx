@@ -103,8 +103,8 @@ export default function FundsDashboardPage() {
     try { localStorage.setItem(PRESENT_KEY, String(present)) } catch {}
   }, [present])
   const sz = present
-    ? { stat: 'text-3xl', statPad: 'px-5 py-4', row: 'py-4', cell: 'text-base', name: 'text-lg', sub: 'text-sm', head: 'text-xs' }
-    : { stat: 'text-2xl', statPad: 'px-4 py-3.5', row: 'py-3.5', cell: 'text-[15px]', name: 'text-[15px]', sub: 'text-xs', head: 'text-xs' }
+    ? { stat: 'text-2xl', statPad: 'px-5 py-4', row: 'py-4', cell: 'text-base', name: 'text-lg', sub: 'text-sm', head: 'text-xs' }
+    : { stat: 'text-xl', statPad: 'px-4 py-3.5', row: 'py-3.5', cell: 'text-[15px]', name: 'text-[15px]', sub: 'text-xs', head: 'text-xs' }
 
   const amt = (v) => (hideAmounts ? '₹ ••••' : formatINR(v || 0))
   const memberLabels = useMemo(() => buildMemberLabels(familyMembers || []), [familyMembers])
@@ -248,9 +248,9 @@ export default function FundsDashboardPage() {
         {/* ── Filter panel (collapsible: mobile always, desktop in present mode) ── */}
         {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
-        {/* ── Summary panel ── */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 divide-y sm:divide-y-0 divide-[var(--border-light)]">
+        {/* ── Summary ── */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3">
             <Stat sz={sz} label="Total invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
             <Stat sz={sz} label="Current value" value={amt(t.currentValue)} />
             <Stat sz={sz} label="Total gain" tone={(t.totalGain ?? t.pl) >= 0 ? 'up' : 'down'}
@@ -492,11 +492,10 @@ function CheckRow({ active, onClick, label, sub, hint, dim }) {
 function Stat({ label, value, sub, tone, title, sz }) {
   const cls = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-[var(--accent-rose)]' : tone === 'muted' ? 'text-[var(--text-dim)]' : 'text-[var(--text-primary)]'
   return (
-    <div className={`${sz?.statPad || 'px-5 py-4'} min-w-0 sm:border-r sm:last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 xl:[&:nth-child(3n)]:border-r xl:last:border-r-0 border-[var(--border-light)]`} title={title}>
-      <p className="text-xs text-[var(--text-dim)] mb-1.5 truncate">{label}</p>
-      <p className={`${sz?.stat || 'text-2xl'} font-semibold tabular-nums whitespace-nowrap leading-none ${cls}`}>
-        {value}{sub && <span className="text-sm font-medium ml-1.5">{sub}</span>}
-      </p>
+    <div className="rounded-lg bg-[var(--bg-inset)] px-4 py-3.5 min-w-0" title={title}>
+      <p className="text-xs text-[var(--text-dim)] mb-1.5">{label}</p>
+      <p className={`${sz?.stat || 'text-xl'} font-semibold tabular-nums leading-tight ${cls}`}>{value}</p>
+      {sub && <p className={`text-sm font-medium tabular-nums mt-0.5 ${cls}`}>{sub}</p>}
     </div>
   )
 }
