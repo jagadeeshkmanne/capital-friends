@@ -26,10 +26,12 @@ function toFlows(txns) {
     .map((t) => ({
       date: parseDate(t.date), amount: Number(t.totalAmount) || 0, units: Number(t.units) || 0,
       type: String(t.type || '').toUpperCase(), subType: String(t.transactionType || '').toUpperCase(),
+      portfolioId: t.portfolioId,
     }))
     .filter((t) => t.date && t.amount > 0)
     .map((t) => ({
       date: t.date,
+      portfolioId: t.portfolioId,
       amount: t.type === 'SELL' ? t.amount : -t.amount,
       units: (Number(t.units) || 0) * (t.type === 'SELL' ? -1 : 1),
       opening: t.subType === 'INITIAL',
@@ -82,6 +84,26 @@ function historyCovers(flows, invested, heldUnits) {
 // External cash only. A switch moves money between funds, it is never new investment or a withdrawal.
 function cashIn(flows) { return flows.reduce((s, cf) => s + (cf.amount < 0 && !cf.switch ? -cf.amount : 0), 0) }
 function cashOut(flows) { return flows.reduce((s, cf) => s + (cf.amount > 0 && !cf.switch ? cf.amount : 0), 0) }
+
+// AllPortfolios column D lets a user state what they originally invested in a portfolio. When set,
+// the sheet's Total Investment formula uses it instead of the opening-balance transactions. Mirror
+// that here by rescaling the portfolio's opening-balance flows to that amount, keeping their dates.
+function applyInitialInvestment(flows, portfolios) {
+  const overrides = {}
+  ;(portfolios || []).forEach((p) => {
+    const v = Number(p.initialInvestment) || 0
+    if (v > 0) overrides[p.portfolioId] = v
+  })
+  if (!Object.keys(overrides).length) return flows
+  const openingTotals = {}
+  flows.forEach((cf) => {
+    if (cf.opening && cf.amount < 0 && overrides[cf.portfolioId]) openingTotals[cf.portfolioId] = (openingTotals[cf.portfolioId] || 0) - cf.amount
+  })
+  return flows.map((cf) => {
+    if (!(cf.opening && cf.amount < 0 && overrides[cf.portfolioId] && openingTotals[cf.portfolioId] > 0)) return cf
+    return { ...cf, amount: cf.amount * (overrides[cf.portfolioId] / openingTotals[cf.portfolioId]) }
+  })
+}
 
 // Amount-weighted average date of the money put in. This is the start date a single CAGR figure
 // can honestly use when purchases happened on several dates. Falls back to switch-in buys for a
@@ -202,13 +224,16 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
 
   const totalInvested = funds.reduce((s, f) => s + f.invested, 0)
   const totalPL = totalValue - totalInvested
-  const allFlows = toFlows(txns)
+  const allFlows = applyInitialInvestment(toFlows(txns), portfolios)
   const firstDate = earliest(allFlows)
   const unreliable = funds.filter((f) => f.returnsReason)
   const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : returnsReason(allFlows, totalInvested, today)
   // Money actually put in (switch legs cancel), and the gain on it including what was realised along the way
-  const netInvested = cashIn(allFlows) - cashOut(allFlows)
-  const hasCashFlows = allFlows.length > 0 && netInvested > 0
+  // Prefer the sheet's own Total Investment (AllPortfolios column E) so this page agrees with the
+  // Mutual Funds page; it is initial investment + SIP + lumpsum - withdrawals, switches excluded.
+  const sheetInvested = (portfolios || []).reduce((s, p) => s + (Number(p.totalInvestment) || 0), 0)
+  const netInvested = sheetInvested > 0 ? sheetInvested : cashIn(allFlows) - cashOut(allFlows)
+  const hasCashFlows = netInvested > 0 && (sheetInvested > 0 || allFlows.length > 0)
   const totalGain = hasCashFlows ? totalValue - netInvested : null
   const cagrSince = weightedInflowDate(allFlows)
   const totals = {

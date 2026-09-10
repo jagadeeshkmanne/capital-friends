@@ -152,3 +152,21 @@ test('later buys add to total invested and CAGR uses the amount-weighted start d
   assert.ok(m.totals.cagr > 0.14 && m.totals.cagr < 0.17, `cagr ${m.totals.cagr}`)
   assert.ok(m.totals.xirr > 0.14 && m.totals.xirr < 0.17, `xirr ${m.totals.xirr}`)
 })
+
+test('portfolio initial investment overrides opening-balance amounts, matching the sheet', () => {
+  const today = new Date(2026, 8, 10)
+  // User stated 63,000 originally invested; opening balance recorded post-switch at 79,000 cost
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active', initialInvestment: 63000, totalInvestment: 63000 }]
+  const holdings = [{ portfolioId: 'P1', schemeCode: 'B', fundName: 'Fund B', units: 1000, avgNav: 79, investment: 79000, currentNav: 97, currentValue: 97000 }]
+  const transactions = [
+    { portfolioId: 'P1', fundCode: 'B', fundName: 'Fund B', type: 'BUY', transactionType: 'INITIAL', date: '2023-09-10', units: 1000, price: 79, totalAmount: 79000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.netInvested, 63000)
+  assert.equal(m.totals.totalGain, 34000)
+  assert.equal(m.totals.invested, 79000)
+  assert.ok(Math.abs(m.totals.xirr - 0.155) < 0.01, `xirr ${m.totals.xirr}`)
+  assert.ok(Math.abs(m.totals.cagr - 0.155) < 0.01, `cagr ${m.totals.cagr}`)
+  // Per-fund figures stay on cost basis
+  assert.equal(m.funds[0].invested, 79000)
+})
