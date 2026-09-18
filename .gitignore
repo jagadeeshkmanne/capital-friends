@@ -35,3 +35,8 @@ youtube-studio/
 # Logs
 *.log
 npm-debug.log*
+
+# Claude / local tool caches
+.claude/
+.cache/
+.remotion/
