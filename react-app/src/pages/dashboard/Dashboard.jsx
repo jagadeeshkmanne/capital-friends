@@ -441,7 +441,7 @@ export default function Dashboard() {
       const actualEq = totalVal > 0 ? Math.round((eqVal / totalVal) * 100) : null
       const mismatch = maps.length > 0 && actualEq !== null ? Math.round(actualEq - rec.equity) : null
       // Live SIP/lumpsum
-      const cagr = g.expectedCAGR || 0.12, mr = cagr / 12
+      const cagr = g.expectedCAGR || 0.12, mr = Math.pow(1 + cagr, 1 / 12) - 1
       const months = Math.max(0, Math.round(yearsLeft * 12))
       const fvCur = (g.currentValue || 0) * (months > 0 ? Math.pow(1 + mr, months) : 1)
       const gap = Math.max(0, (g.targetAmount || 0) - fvCur)

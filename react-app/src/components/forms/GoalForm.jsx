@@ -275,7 +275,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
   const calc = useMemo(() => {
     const inflationRate = (Number(form.inflation) || 0) / 100
     const cagrRate = (Number(form.cagr) || 0) / 100
-    const monthlyRate = cagrRate / 12
+    const monthlyRate = Math.pow(1 + cagrRate, 1 / 12) - 1
     const lumpsum = Number(form.lumpsum) || 0
     const monthlyExp = Number(form.monthlyExpenses) || 0
     const emoMonths = Number(form.emergencyMonths) || 6

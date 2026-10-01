@@ -1200,7 +1200,7 @@ function buildDashboardReportData() {
       var gTarget = parseFloat(g.targetAmount) || 0;
       var gCurrent = parseFloat(g.currentValue) || 0;
       var cagr = parseFloat(g.expectedCAGR) || 0.12;
-      var monthlyRate = cagr / 12;
+      var monthlyRate = Math.pow(1 + cagr, 1 / 12) - 1;
       var months = Math.max(0, Math.round(yearsLeft * 12));
       var fvCurrent = gCurrent * (months > 0 ? Math.pow(1 + monthlyRate, months) : 1);
       var gapAtMat = Math.max(0, gTarget - fvCurrent);

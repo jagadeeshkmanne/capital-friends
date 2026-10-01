@@ -931,10 +931,10 @@ function setGoalFormulas(sheet, row) {
   const progressFormula = `=IF(OR(A${row}="",E${row}=0),"",MIN(1,I${row}/E${row}))`;
 
   // G: Monthly SIP Needed — PMT formula using live current allocated
-  // Uses monthly compounding: months = time to target, mr = CAGR/12
+  // Uses monthly compounding: months = time to target, mr = (1+CAGR)^(1/12)-1 (equivalent monthly rate)
   // FV of current = I × (1+mr)^months, gap = Target - FV, SIP = PMT(mr, months, 0, gap)
   const sipFormula =
-    `=IF(OR(A${row}="",E${row}=0),0,LET(mo,MAX(1,ROUND((F${row}-TODAY())/365.25*12)),mr,R${row}/12,fvI,MAX(I${row},U${row})*POWER(1+mr,mo),gap,MAX(0,E${row}-fvI),IF(gap<=0,0,-PMT(mr,mo,0,gap))))`;
+    `=IF(OR(A${row}="",E${row}=0),0,LET(mo,MAX(1,ROUND((F${row}-TODAY())/365.25*12)),mr,POWER(1+R${row},1/12)-1,fvI,MAX(I${row},U${row})*POWER(1+mr,mo),gap,MAX(0,E${row}-fvI),IF(gap<=0,0,-PMT(mr,mo,0,gap))))`;
 
   // H: Lumpsum Needed = PV of target minus current allocated
   const lumpsumFormula =
@@ -967,7 +967,7 @@ function calculateMonthlySIP(futureValue, yearsToGo, expectedCAGR, currentAmount
   if (yearsToGo <= 0) return 0;
 
   const months = yearsToGo * 12;
-  const monthlyRate = expectedCAGR / 12;
+  const monthlyRate = Math.pow(1 + expectedCAGR, 1 / 12) - 1;
 
   // Future value of current amount
   const fvCurrent = currentAmount * Math.pow(1 + monthlyRate, months);

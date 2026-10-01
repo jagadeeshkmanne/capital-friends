@@ -7,7 +7,8 @@ export function calculateGoalFundingProjection({
 }) {
   const target = Math.max(0, Number(targetAmount) || 0)
   const durationMonths = Math.max(0, Number(months) || 0)
-  const monthlyRate = Math.max(0, Number(annualReturn) || 0) / 12
+  // Convert annual CAGR to the equivalent monthly rate (12% a year -> ~0.949% a month, not 1%)
+  const monthlyRate = Math.pow(1 + Math.max(0, Number(annualReturn) || 0), 1 / 12) - 1
   const lumpsum = Math.max(0, Number(plannedLumpsum) || 0)
   const linkedValue = Math.max(0, Number(linkedCurrentValue) || 0)
 

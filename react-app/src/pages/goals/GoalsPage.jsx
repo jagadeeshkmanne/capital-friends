@@ -738,7 +738,7 @@ export default function GoalsPage() {
               const actual = g.currentValue || 0
               const elapsed = new Date() - (g.createdDate ? new Date(g.createdDate) : new Date())
               const cagr = g.expectedCAGR || 0.12
-              const monthlyRate = cagr / 12
+              const monthlyRate = Math.pow(1 + cagr, 1 / 12) - 1
               const elapsedMonths = Math.max(0, Math.round(elapsed / (30.44 * 24 * 60 * 60 * 1000)))
               const sipPlanned = g.monthlyInvestment || 0
               const lsPlanned = g.lumpsumInvested || 0
