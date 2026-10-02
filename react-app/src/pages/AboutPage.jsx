@@ -1,4 +1,4 @@
-import { Heart, ChevronRight, MessageSquarePlus, Bug, Github, Globe, Shield, Smartphone, BarChart3, Users, Target, Mail } from 'lucide-react'
+import { Heart, ChevronRight, MessageSquarePlus, Bug, Github, Youtube, Globe, Shield, Smartphone, BarChart3, Users, Target, Mail } from 'lucide-react'
 
 const FEATURES = [
   { icon: BarChart3, color: 'text-violet-400 bg-violet-500/15', text: 'Track Mutual Funds, Stocks & Other Investments' },
@@ -67,6 +67,17 @@ export default function AboutPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--text-primary)]">GitHub Repository</p>
               <p className="text-xs text-[var(--text-dim)]">View source code and contribute</p>
+            </div>
+            <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
+          </a>
+          <a href="https://www.youtube.com/@capitalfriendsin" target="_blank" rel="noopener noreferrer"
+             className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-red-500/15 text-red-400">
+              <Youtube size={17} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)]">YouTube Channel</p>
+              <p className="text-xs text-[var(--text-dim)]">How I plan my family's money, with real numbers</p>
             </div>
             <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
           </a>

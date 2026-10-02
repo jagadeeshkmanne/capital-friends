@@ -820,6 +820,10 @@ export default function LandingPage() {
           <div style={{ marginTop: 10, fontSize: 11.5, color: '#475569' }}>
             No bank credentials · Data stays in your Google Drive · Always free · Open source
           </div>
+          <a href="https://www.youtube.com/@capitalfriendsin" target="_blank" rel="noopener noreferrer"
+             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: '#94a3b8', textDecoration: 'none' }}>
+            <span style={{ color: '#ef4444', fontSize: 14 }}>▶</span> Watch how I plan my family's money on YouTube
+          </a>
         </div>
 
         {/* Footer */}
@@ -839,6 +843,8 @@ export default function LandingPage() {
               <span style={{ color: '#334155' }}>Free &amp; open source</span>
             </div>
             <div>
+              <a href="https://www.youtube.com/@capitalfriendsin" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>YouTube</a>
+              <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>
               <a href="https://capitalfriends.in/privacy" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Privacy Policy</a>
               <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>
               <a href="https://capitalfriends.in/terms" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Terms &amp; Conditions</a>
