@@ -39,6 +39,29 @@ const yrs = months => {
   return `${y.toFixed(1)} ${y >= 0.95 && y < 1.05 ? 'yr' : 'yrs'}`
 }
 const EMPTY_SET = new Set()
+// Same tolerance as the Goals card's equity check.
+const EQUITY_TOLERANCE = 15
+const EQUITY_CATEGORIES = new Set(['Equity', 'ELSS', 'Index'])
+
+// Equity share of the goal, estimated exactly like the Goals card does, so the
+// two screens always show the same number.
+function estimateGoalEquity(plan, assetAllocations, goal) {
+  const detailed = {}
+  for (const a of assetAllocations || []) if (a.assetAllocation) detailed[String(a.fundCode)] = a.assetAllocation
+  let total = 0, eq = 0
+  for (const f of plan.allFunds || []) {
+    const v = Number(f.goalValue) || 0
+    total += v
+    const d = detailed[String(f.schemeCode || f.fundCode)]
+    if (d) eq += v * ((Number(d.Equity) || 0) / 100)
+    else if (EQUITY_CATEGORIES.has(f.category)) eq += v
+    else if (f.category === 'Hybrid') eq += v * 0.65
+    else if (f.category === 'Multi-Asset') eq += v * 0.5
+  }
+  if (!(total > 0)) return null
+  const yearsLeft = goal.targetDate ? Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 864e5)) : 0
+  return { now: Math.round((eq / total) * 100), target: getRecommendedAllocation('Retirement', yearsLeft).equity }
+}
 const BUILD_STATUSES = new Set(['building', 'building-wait', 'step-done', 'built'])
 
 // Date of the latest bucket switch recorded for this goal (from transaction notes).
@@ -154,8 +177,14 @@ export default function RetirementBucketsPage() {
 
   const canRecord = plan.schedule.retired || BUILD_STATUSES.has(plan.status)
   // Years before retirement: the existing glide-path preview (same as the old Bucket Preview).
-  const previewOps = plan.status === 'not-started'
-    ? buildTargetAwareBucketPreview(plan).map(op => ({ ...op, reason: 'glide-path' }))
+  // More than 5 years away: compare equity with the glide path the same way the
+  // Goals card does, and suggest a preview move only when the card would flag it.
+  const early = plan.status === 'not-started'
+  const equity = early ? estimateGoalEquity(plan, assetAllocations, goal) : null
+  const previewOps = early
+    ? (equity && equity.now - equity.target > EQUITY_TOLERANCE
+      ? buildTargetAwareBucketPreview(plan).map(op => ({ ...op, reason: 'glide-path' }))
+      : [])
     : null
   const liveOps = previewOps || plan.operations
   const active = session && session.goalId === goal.goalId ? session : null
@@ -167,9 +196,9 @@ export default function RetirementBucketsPage() {
   return (
     <div className="space-y-4 pb-6">
       {header}
-      <StatusHero plan={plan} goal={goal} previewCount={previewOps?.length || 0} forceShow={forceShow} onForce={() => setForceShow(true)} />
-      <BucketCards plan={plan} showAfter={showSteps && !previewOps} />
-      <MarketCheck plan={plan} />
+      <StatusHero plan={plan} goal={goal} equity={equity} previewCount={previewOps?.length || 0} forceShow={forceShow} onForce={() => setForceShow(true)} />
+      {early ? <EarlyBuckets plan={plan} /> : <BucketCards plan={plan} showAfter={showSteps} />}
+      {!early && <MarketCheck plan={plan} />}
       <Warnings plan={plan} />
       {showSteps && (
         <RefillSteps key={goal.goalId} plan={plan} operations={stepOps} canRecord={canRecord} recorded={recorded}
@@ -255,7 +284,7 @@ export default function RetirementBucketsPage() {
 }
 
 /* ── Top card: one clear answer ── */
-function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
+function StatusHero({ plan, goal, equity, previewCount, forceShow, onForce }) {
   const moves = plan.operations
   const totalMove = moves.reduce((sum, op) => sum + op.fundedAmount, 0)
   let tone = 'emerald', Icon = CheckCircle2, title, detail, action = null
@@ -263,9 +292,23 @@ function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
   if (plan.status === 'not-started') {
     tone = 'blue'; Icon = CalendarClock
     title = plan.schedule.retirementDate ? `Retirement starts ${fmtDate(plan.schedule.retirementDate)}` : 'Set a retirement date'
-    detail = previewCount
-      ? 'Bucket building starts 5 years before retirement. For now, your equity is above the glide path. See the suggested moves below (preview only).'
-      : 'Bucket building starts 5 years before retirement. Until then, your goal just follows its glide path, and it is on track.'
+    const rd = plan.schedule.retirementDate
+    const start = rd ? new Date(rd.getFullYear() - 5, rd.getMonth(), rd.getDate()) : null
+    const safe = plan.refillTargets.b1 + plan.refillTargets.b2
+    detail = rd
+      ? `In ${rd.getFullYear()} you will need about ${formatINR(plan.expense.monthlyExpense)} a month. By then, Income and Stability should hold about ${formatINR(safe)} (7 years of expenses). Building starts in ${start.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}, a little each quarter.`
+      : 'Add a retirement date to the goal to see the plan.'
+    if (equity) {
+      action = (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="px-2.5 py-1 rounded-full bg-[var(--bg-card)]/70 text-[var(--text-secondary)] font-semibold tabular-nums">Equity now about {equity.now}%</span>
+          <span className="px-2.5 py-1 rounded-full bg-[var(--bg-card)]/70 text-[var(--text-secondary)] font-semibold tabular-nums">Suggested for now: {equity.target}%</span>
+          {previewCount
+            ? <span className="text-amber-400 font-semibold">A bit high. See the suggested move below (preview only).</span>
+            : <span className="text-emerald-400 font-semibold flex items-center gap-1"><CheckCircle2 size={13} /> On track</span>}
+        </div>
+      )
+    }
   } else if (plan.status === 'ok') {
     title = 'All set. No refill needed'
     detail = `Your Income bucket has ${yrs(plan.months.b1)} of expenses. Next yearly check: ${fmtDate(plan.schedule.nextDate)}.`
@@ -342,6 +385,44 @@ function SafeMoneyBar({ build }) {
         const q = build.doneThisQuarter ? Math.max(1, build.quartersLeft - 1) : build.quartersLeft
         return <p className="text-[11px] text-[var(--text-dim)] mt-1">{q} {q === 1 ? 'quarter' : 'quarters'} left · about {formatINR(build.gap / q)} per quarter</p>
       })()}
+    </div>
+  )
+}
+
+/* ── More than 5 years away: the split today, in plain shares ── */
+function EarlyBuckets({ plan }) {
+  const total = plan.totals.b1 + plan.totals.b2 + plan.totals.b3
+  const rd = plan.schedule.retirementDate
+  const start = rd ? rd.getFullYear() - 5 : null
+  const notes = {
+    b1: rd ? `Built in the last 2 years (from ${rd.getFullYear() - 2})` : 'Built in the last 2 years',
+    b2: start ? `Built step by step from ${start}` : 'Built in the last 5 years',
+    b3: 'Your main engine until then',
+  }
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 pt-5 pb-4 sm:px-6">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] text-center mb-4">Your retirement money today</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-6">
+        {['b1', 'b2', 'b3'].map(key => {
+          const b = BUCKET[key]
+          const Icon = b.icon
+          const pct = total > 0 ? (plan.totals[key] / total) * 100 : 0
+          return (
+            <div key={key} className="flex flex-col items-center text-center min-w-0">
+              <div className={`relative w-16 sm:w-24 h-32 sm:h-40 rounded-b-3xl rounded-t-lg border-2 ${b.border} bg-[var(--bg-inset)] overflow-hidden`}>
+                <div className={`absolute bottom-0 inset-x-0 ${b.bar} transition-[height] duration-700`} style={{ height: `${pct}%` }} />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="w-8 h-8 rounded-full bg-[var(--bg-card)]/85 flex items-center justify-center"><Icon size={15} className={b.text} /></span>
+                </span>
+              </div>
+              <p className={`mt-2 text-xs sm:text-sm font-bold ${b.text}`}>{b.name}</p>
+              <p className="text-lg sm:text-2xl font-bold text-[var(--text-primary)] tabular-nums leading-tight">{Math.round(pct)}%</p>
+              <p className="text-[10px] sm:text-xs text-[var(--text-dim)] tabular-nums">{formatINR(plan.totals[key])}</p>
+              <p className="text-[10px] sm:text-[11px] text-[var(--text-muted)] mt-1 leading-snug">{notes[key]}</p>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
