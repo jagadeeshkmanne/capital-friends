@@ -109,6 +109,7 @@ test('before retirement the plan is a preview', () => {
   assert.equal(plan.status, 'not-started')
   const soon = buildBucketRefillPlan({ ...base, goal: { ...goal, targetDate: '2029-01-15T00:00:00.000Z' }, holdings: holdings({ b1: 600000, b2: 3000000, b3: 11800000 }), planDate: ON_REFILL_DATE })
   assert.equal(soon.status, 'building')
+  assert.equal(plan.operations.length, 0)
 })
 
 test('market check is weighted by value and schedule uses the retirement anniversary', () => {
@@ -136,16 +137,37 @@ test('goal marked Achieved before its target date counts as retired', () => {
   assert.equal(plan.status, 'due')
 })
 
-test('before retirement, growth only gives the part above its own target', () => {
-  const soon = { ...goal, targetDate: '2028-01-15T00:00:00.000Z', targetAmount: 5000000 }
+test('last 5 years: buckets are built in quarterly steps, never in one go', () => {
+  // 2 years to retirement, nothing built yet: target ₹42L (12 + 30), 8 quarters left → ₹5.25L this quarter.
+  const soon = { ...goal, targetDate: '2029-01-15T00:00:00.000Z' }
   const plan = buildBucketRefillPlan({ ...base, goal: soon, holdings: holdings({ b1: 0, b2: 0, b3: 5000000 }), planDate: ON_REFILL_DATE })
   assert.equal(plan.status, 'building')
-  const sold = plan.operations.filter(op => op.from === 'b3').reduce((s, op) => s + op.fundedAmount, 0)
-  assert.ok(sold <= 4200000 + 1) // ₹50L - (₹50L target - ₹12L - ₹30L) = ₹42L max
-  const capped = buildBucketRefillPlan({ ...base, goal: { ...soon, targetAmount: 8000000 }, holdings: holdings({ b1: 0, b2: 0, b3: 5000000 }), planDate: ON_REFILL_DATE })
-  const soldCapped = capped.operations.filter(op => op.from === 'b3').reduce((s, op) => s + op.fundedAmount, 0)
-  assert.equal(Math.round(soldCapped), 1200000) // ₹50L - (₹80L - ₹42L) = ₹12L
-  assert.ok(capped.warnings.some(w => w.code === 'building-capped'))
+  assert.equal(plan.build.quartersLeft, 8)
+  const moved = plan.operations.reduce((s, op) => s + op.fundedAmount, 0)
+  assert.equal(Math.round(moved), 525000)
+  assert.ok(moved < 0.15 * 5000000)
+  // Within 2 years of retirement, the step is shared between Income and Stability.
+  assert.deepEqual(plan.operations.map(op => op.to).sort(), ['b1', 'b2'])
+})
+
+test('3-5 years out: the quarterly step goes to Stability first', () => {
+  const later = { ...goal, targetDate: '2031-01-15T00:00:00.000Z' }
+  const plan = buildBucketRefillPlan({ ...base, goal: later, holdings: holdings({ b1: 0, b2: 0, b3: 9000000 }), planDate: ON_REFILL_DATE })
+  assert.equal(plan.status, 'building')
+  assert.deepEqual(plan.operations.map(op => op.to), ['b2'])
+  assert.equal(Math.round(plan.build.stepAmount), Math.round(4200000 / 16))
+})
+
+test('building: a bad market skips the quarter, and one step per quarter', () => {
+  const soon = { ...goal, targetDate: '2029-01-15T00:00:00.000Z' }
+  const down = buildBucketRefillPlan({ ...base, goal: soon, holdings: holdings({ b1: 0, b2: 0, b3: 5000000, nav: 75 }), planDate: ON_REFILL_DATE })
+  assert.equal(down.status, 'building-wait')
+  assert.equal(down.operations.length, 0)
+  const done = buildBucketRefillPlan({ ...base, goal: soon, holdings: holdings({ b1: 0, b2: 600000, b3: 4400000 }), planDate: ON_REFILL_DATE, lastBucketMoveDate: '2027-01-05' })
+  assert.equal(done.status, 'step-done')
+  assert.equal(done.operations.length, 0)
+  const built = buildBucketRefillPlan({ ...base, goal: soon, holdings: holdings({ b1: 1200000, b2: 3000000, b3: 5000000 }), planDate: ON_REFILL_DATE })
+  assert.equal(built.status, 'built')
 })
 
 test('negative or zero expenses are treated as not set', () => {

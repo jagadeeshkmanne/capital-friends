@@ -9,7 +9,7 @@ import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR, splitFundName } from '../../data/familyData'
-import { getRecommendedAllocation } from '../../data/glidePath'
+import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-red-400' }
@@ -450,7 +450,7 @@ export default function Dashboard() {
       dashGoalHealth[g.goalId] = {
         yearsLeft, label: rec.label, recommendedEquity: rec.equity, recommendedDebt: rec.debt,
         actualEquity: actualEq, isMapped: maps.length > 0,
-        mismatch, needsAttention: mismatch !== null && Math.abs(mismatch) > 15,
+        mismatch, needsAttention: mismatch !== null && Math.abs(mismatch) > 15 && !followsBucketPlan(g.goalType, yearsLeft),
         liveSIP, liveLumpsum: liveLS,
       }
     })
@@ -601,7 +601,10 @@ export default function Dashboard() {
       if (g.status === 'Achieved') return
       const yearsLeft = (new Date(g.targetDate) - nowD) / (365.25 * 24 * 60 * 60 * 1000)
       if (yearsLeft <= 0) return
+      // Retirement follows its own glide path, and the bucket plan in the last 5 years.
+      if (followsBucketPlan(g.goalType, yearsLeft)) return
       const rec = g.goalType === 'Emergency Fund' ? 0
+        : g.goalType === 'Retirement' ? getRecommendedAllocation('Retirement', yearsLeft).equity
         : yearsLeft <= 1 ? 10 : yearsLeft <= 3 ? 30 : yearsLeft <= 5 ? 50
         : yearsLeft <= 7 ? 65 : yearsLeft <= 10 ? 75 : 85
       const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)

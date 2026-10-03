@@ -15,6 +15,9 @@
 //   - Down market: stability → B1, but stability never goes below 2 years.
 //     Growth is not sold. If B1 still can't be filled, the plan warns.
 //   - An underfunded corpus never blocks a refill; it only shows a warning.
+//   - Last 5 years before retirement: build Income + Stability in quarterly steps
+//     of (what is missing) / (quarters left), good market only, one step per
+//     quarter. Stability first; Income in the last 2 years.
 
 import {
   allocateFromFundsByTarget,
@@ -29,6 +32,8 @@ export const REFILL_RULES = {
   goodMarketMaxBelowAthPct: 10,
   refillWindowDays: 45,
   highWithdrawalRate: 0.05,
+  buildYears: 5,
+  incomeBuildYears: 2,
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -135,6 +140,7 @@ export function buildBucketRefillPlan({
   assetAllocations,
   targetEquityPct,
   planDate = new Date(),
+  lastBucketMoveDate = null,
   rules: customRules,
 }) {
   const rules = { ...REFILL_RULES, ...(customRules || {}) }
@@ -178,20 +184,94 @@ export function buildBucketRefillPlan({
   const committedUnits = {}
   const operations = []
   const warnings = []
-  // Before retirement, growth only gives the part above its own target (the
-  // existing builder's safety rule), so the buckets fill gradually instead of
-  // selling most of the equity in one go.
-  let growthBudget = schedule.retired ? Infinity : Math.max(0, totals.b3 - base.targets.b3)
-  let growthCapped = false
-  const sellGrowthCapped = amount => {
-    const allowed = Math.min(amount, growthBudget)
-    if (allowed < amount - 1) growthCapped = true
-    const result = allowed > 1
-      ? sellGrowth(b3Sources, allowed, committedUnits, rules.goodMarketMaxBelowAthPct)
-      : { allocations: [], fundedAmount: 0, shortfall: 0 }
-    growthBudget -= result.fundedAmount
-    return result
+  const annualExpense = monthly * 12
+  const withdrawalRate = base.totalClassified > 0 ? annualExpense / base.totalClassified : 0
+  const common = {
+    ...base,
+    rules,
+    months,
+    refillTargets: targets,
+    market,
+    schedule,
+    withdrawalRate,
+    corpusYears: annualExpense > 0 ? base.totalClassified / annualExpense : null,
   }
+  if (base.totals.unclassified > 1) warnings.push({ code: 'unclassified', count: base.byBucket.unclassified.length })
+
+  // ── Before retirement (last 5 years): build the buckets in small quarterly steps ──
+  // Target at retirement: Income 2 years + Stability 5 years of retirement-year
+  // expenses. Each quarter moves (what is still missing) / (quarters left), only
+  // in a good market, so even a late starter never moves a big share in one go.
+  const yearsLeft = schedule.yearsToRetirement
+  if (!schedule.retired && yearsLeft !== null && yearsLeft <= rules.buildYears) {
+    const safeTarget = targets.b1 + targets.b2
+    const safeNow = totals.b1 + totals.b2
+    const gap = Math.max(0, safeTarget - safeNow)
+    const quartersLeft = Math.max(1, Math.ceil(yearsLeft * 4 - 1e-9))
+    const stepAmount = gap / quartersLeft
+    const quarterStart = new Date(planDate.getFullYear(), Math.floor(planDate.getMonth() / 3) * 3, 1)
+    const nextQuarter = new Date(quarterStart.getFullYear(), quarterStart.getMonth() + 3, 1)
+    const lastMove = validDate(lastBucketMoveDate)
+    const doneThisQuarter = !!lastMove && lastMove >= quarterStart && lastMove <= planDate
+
+    let status
+    if (gap <= monthly * 0.5) status = 'built'
+    else if (doneThisQuarter) status = 'step-done'
+    else if (market.status !== 'good') status = 'building-wait'
+    else status = 'building'
+
+    let b1Add = 0, b2Add = 0
+    if (status === 'building') {
+      const b1Gap = Math.max(0, targets.b1 - totals.b1)
+      const b2Gap = Math.max(0, targets.b2 - totals.b2)
+      if (yearsLeft > rules.incomeBuildYears) {
+        // Stability first (it earns more than liquid funds); Income is built in the last 2 years.
+        b2Add = Math.min(stepAmount, b2Gap)
+        b1Add = Math.min(stepAmount - b2Add, b1Gap)
+      } else {
+        const total = b1Gap + b2Gap
+        b1Add = total > 0 ? stepAmount * b1Gap / total : 0
+        b2Add = stepAmount - b1Add
+      }
+      for (const [to, amount] of [['b2', b2Add], ['b1', b1Add]]) {
+        if (amount <= 1) continue
+        const result = sellGrowth(b3Sources, amount, committedUnits, rules.goodMarketMaxBelowAthPct)
+        if (result.fundedAmount > 1) operations.push(operation(`build-b3-to-${to}`, 'b3', to, result, 'build-step'))
+        if (result.shortfall > 1) warnings.push({ code: 'growth-short-build', amount: result.shortfall })
+      }
+    }
+    if (status !== 'built' && market.status === 'unknown' && base.byBucket.b3.length) warnings.push({ code: 'market-unknown' })
+    // No withdrawal-rate warning yet: the corpus is still growing until retirement.
+
+    const moved = { b1: 0, b2: 0, b3: 0 }
+    for (const op of operations) { moved[op.from] -= op.fundedAmount; moved[op.to] += op.fundedAmount }
+    return {
+      ...common,
+      status,
+      hasWork: operations.length > 0,
+      nextCheckDate: nextQuarter,
+      operations,
+      warnings,
+      after: { b1: totals.b1 + moved.b1, b2: totals.b2 + moved.b2, b3: totals.b3 + moved.b3 },
+      b1Shortfall: 0,
+      build: { safeTarget, safeNow, gap, quartersLeft, stepAmount, nextQuarter, doneThisQuarter, lastMove },
+    }
+  }
+
+  // More than 5 years away: no bucket moves yet (the page shows the glide-path preview).
+  if (!schedule.retired) {
+    return {
+      ...common,
+      status: 'not-started',
+      hasWork: false,
+      nextCheckDate: null,
+      operations: [],
+      warnings,
+      after: { ...totals },
+      b1Shortfall: 0,
+    }
+  }
+
   const b1Gap = Math.max(0, targets.b1 - totals.b1)
   let b1Need = b1Gap
   let b2Now = totals.b2
@@ -209,7 +289,7 @@ export function buildBucketRefillPlan({
     }
     // 2. Growth refills income directly.
     if (b1Need > 1) {
-      const result = sellGrowthCapped(b1Need)
+      const result = sellGrowth(b3Sources, b1Need, committedUnits, rules.goodMarketMaxBelowAthPct)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b1', 'b3', 'b1', result, 'good-market'))
         b1Need -= result.fundedAmount
@@ -218,7 +298,7 @@ export function buildBucketRefillPlan({
     // 3. Growth tops stability back up to 5 years.
     const b2Gap = Math.max(0, targets.b2 - b2Now)
     if (b2Gap > 1) {
-      const result = sellGrowthCapped(b2Gap)
+      const result = sellGrowth(b3Sources, b2Gap, committedUnits, rules.goodMarketMaxBelowAthPct)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b2', 'b3', 'b2', result, 'good-market'))
         b2Now += result.fundedAmount
@@ -241,13 +321,8 @@ export function buildBucketRefillPlan({
     }
     if (b1Need > 1) warnings.push({ code: market.status === 'good' ? 'growth-short' : 'stability-floor', amount: b1Need })
   }
-  if (growthCapped) warnings.push({ code: 'building-capped' })
 
   if (market.status === 'unknown' && base.byBucket.b3.length) warnings.push({ code: 'market-unknown' })
-  if (base.totals.unclassified > 1) warnings.push({ code: 'unclassified', count: base.byBucket.unclassified.length })
-
-  const annualExpense = monthly * 12
-  const withdrawalRate = base.totalClassified > 0 ? annualExpense / base.totalClassified : 0
   if (withdrawalRate > rules.highWithdrawalRate) warnings.push({ code: 'high-withdrawal', rate: withdrawalRate })
 
   // When is the refill due?
@@ -256,9 +331,7 @@ export function buildBucketRefillPlan({
   const b1Low = months.b1 <= rules.earlyRefillMonths
   const inWindow = daysSinceRefillDate !== null && daysSinceRefillDate <= rules.refillWindowDays
   const hasWork = operations.length > 0
-  if (!schedule.retired) {
-    status = schedule.yearsToRetirement !== null && schedule.yearsToRetirement <= 3 ? 'building' : 'not-started'
-  } else if (!hasWork && b1Gap <= monthly * 0.5) {
+  if (!hasWork && b1Gap <= monthly * 0.5) {
     status = 'ok'
   } else if (b1Low || inWindow) {
     status = 'due'
@@ -273,12 +346,7 @@ export function buildBucketRefillPlan({
   const nextCheckDate = schedule.nextDate && schedule.nextDate < lowDate ? schedule.nextDate : lowDate
 
   return {
-    ...base,
-    rules,
-    months,
-    refillTargets: targets,
-    market,
-    schedule,
+    ...common,
     status,
     hasWork,
     nextCheckDate,
@@ -290,8 +358,6 @@ export function buildBucketRefillPlan({
       b3: totals.b3 - operations.filter(op => op.from === 'b3').reduce((sum, op) => sum + op.fundedAmount, 0),
     },
     b1Shortfall: Math.max(0, b1Need),
-    withdrawalRate,
-    corpusYears: annualExpense > 0 ? base.totalClassified / annualExpense : null,
   }
 }
 

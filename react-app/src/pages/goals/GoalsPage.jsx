@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, Trash2, AlertTriangle, Wallet, TrendingUp } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
-import { getRecommendedAllocation } from '../../data/glidePath'
+import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
@@ -225,7 +225,7 @@ export default function GoalsPage() {
       const actualEquity = totalValue > 0 ? Math.round((equityValue / totalValue) * 100) : null
       const isMapped = mappings.length > 0
       const mismatch = isMapped && actualEquity !== null ? Math.round(actualEquity - recommended.equity) : null
-      const needsAttention = mismatch !== null && Math.abs(mismatch) > 15
+      const needsAttention = mismatch !== null && Math.abs(mismatch) > 15 && !followsBucketPlan(g.goalType, yearsLeft)
 
       // Live gap computation based on actual currentValue (or planned lumpsum if higher)
       const cagr = g.expectedCAGR || 0.12
@@ -876,7 +876,7 @@ export default function GoalsPage() {
                           <div className="h-full" style={{ width: `${100 - h.actualEquity}%`, background: '#60a5fa' }} />
                         </div>
                         <span className={`text-xs font-semibold tabular-nums shrink-0 ${h.needsAttention ? 'text-amber-400' : 'text-[var(--text-muted)]'}`}>
-                          {h.actualEquity}% <span className="text-[var(--text-dim)] font-normal">/ rec {h.recommendedEquity}%</span>
+                          {h.actualEquity}% <span className="text-[var(--text-dim)] font-normal">{followsBucketPlan(g.goalType, h.yearsLeft) ? '· bucket plan' : `/ rec ${h.recommendedEquity}%`}</span>
                         </span>
                       </div>
                       {h.needsAttention && h.mismatch > 0 && (
@@ -888,6 +888,9 @@ export default function GoalsPage() {
                       )}
                       {h.needsAttention && h.mismatch < 0 && (
                         <p className="text-xs text-blue-400">ℹ {Math.abs(h.mismatch)}% under equity — room for growth</p>
+                      )}
+                      {followsBucketPlan(g.goalType, h.yearsLeft) && (
+                        <p className="text-xs text-violet-400">Less than 5 years to retirement: build the buckets step by step. Open Buckets for this quarter’s step.</p>
                       )}
                     </div>
                   )}

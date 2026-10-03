@@ -30,6 +30,7 @@ const REASON = {
   'down-market': 'Growth funds are down, so Stability pays and growth is left alone.',
   'growth-short': 'Growth did not have enough, so Stability covers the rest.',
   'glide-path': 'Your equity is above the glide path for your years to retirement, so some growth moves to safer funds.',
+  'build-step': 'This quarter’s small step towards your retirement buckets. Growth funds are near their high.',
 }
 
 const fmtDate = d => (d ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
@@ -38,6 +39,25 @@ const yrs = months => {
   return `${y.toFixed(1)} ${y >= 0.95 && y < 1.05 ? 'yr' : 'yrs'}`
 }
 const EMPTY_SET = new Set()
+const BUILD_STATUSES = new Set(['building', 'building-wait', 'step-done', 'built'])
+
+// Date of the latest bucket switch recorded for this goal (from transaction notes).
+function parseTxnDate(value) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value || '').trim())
+  const d = m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+function lastBucketMove(transactions, goal) {
+  let latest = null
+  for (const t of transactions || []) {
+    if (t.transactionType !== 'SWITCH' || t.type !== 'SELL') continue
+    const notes = String(t.notes || '')
+    if (!notes.includes('Retirement bucket') || !notes.includes(`(${goal.goalName})`)) continue
+    const d = parseTxnDate(t.date)
+    if (d && (!latest || d > latest)) latest = d
+  }
+  return latest
+}
 // Round units down so a prefilled sale never exceeds the units held.
 const unitsDown = u => (Math.floor(Math.max(0, u) * 1000) / 1000).toFixed(3)
 const num = (value, fallback) => {
@@ -50,7 +70,7 @@ export default function RetirementBucketsPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { selectedMember } = useFamily()
-  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, switchMF, redeemMF } = useData()
+  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, switchMF, redeemMF } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const [switchDraft, setSwitchDraft] = useState(null)
   const [redeemDraft, setRedeemDraft] = useState(null)
@@ -77,8 +97,9 @@ export default function RetirementBucketsPage() {
       portfolios: mfPortfolios,
       assetAllocations,
       targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity,
+      lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
     })
-  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations])
+  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations])
 
   if (goalList === null) return <PageLoading title="Loading retirement buckets" cards={4} />
 
@@ -131,7 +152,7 @@ export default function RetirementBucketsPage() {
     )
   }
 
-  const canRecord = plan.schedule.retired || plan.status === 'building'
+  const canRecord = plan.schedule.retired || BUILD_STATUSES.has(plan.status)
   // Years before retirement: the existing glide-path preview (same as the old Bucket Preview).
   const previewOps = plan.status === 'not-started'
     ? buildTargetAwareBucketPreview(plan).map(op => ({ ...op, reason: 'glide-path' }))
@@ -166,7 +187,7 @@ export default function RetirementBucketsPage() {
               units: unitsDown(allocation.units),
               fromPrice: allocation.currentNav ? String(allocation.currentNav) : '',
               toPrice: dest.currentNav ? String(dest.currentNav) : '',
-              notes: `Retirement bucket refill: ${BUCKET[op.from].name} to ${BUCKET[op.to].name} (${goal.goalName})`,
+              notes: `${op.reason === 'build-step' ? 'Retirement bucket build' : 'Retirement bucket refill'}: ${BUCKET[op.from].name} to ${BUCKET[op.to].name} (${goal.goalName})`,
             },
           })} />
       )}
@@ -243,8 +264,8 @@ function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
     tone = 'blue'; Icon = CalendarClock
     title = plan.schedule.retirementDate ? `Retirement starts ${fmtDate(plan.schedule.retirementDate)}` : 'Set a retirement date'
     detail = previewCount
-      ? 'Refills start 3 years before retirement. For now, your equity is above the glide path. See the suggested moves below (preview only).'
-      : 'Refills start 3 years before retirement. Until then, your goal just follows its glide path, and it is on track.'
+      ? 'Bucket building starts 5 years before retirement. For now, your equity is above the glide path. See the suggested moves below (preview only).'
+      : 'Bucket building starts 5 years before retirement. Until then, your goal just follows its glide path, and it is on track.'
   } else if (plan.status === 'ok') {
     title = 'All set. No refill needed'
     detail = `Your Income bucket has ${yrs(plan.months.b1)} of expenses. Next yearly check: ${fmtDate(plan.schedule.nextDate)}.`
@@ -253,6 +274,17 @@ function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
     title = 'No refill needed yet'
     detail = `Income has ${yrs(plan.months.b1)} left. The next refill is on ${fmtDate(plan.nextCheckDate)}, or earlier if Income drops to 1 year.`
     if (plan.hasWork && !forceShow) action = <button onClick={onForce} className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1">Show the refill plan anyway <ChevronDown size={13} /></button>
+  } else if (plan.status === 'built') {
+    title = 'Buckets are ready for retirement'
+    detail = `Income and Stability already hold 7 years of expenses. Retirement starts ${fmtDate(plan.schedule.retirementDate)}.`
+  } else if (plan.status === 'step-done') {
+    tone = 'blue'; Icon = CalendarClock
+    title = 'This quarter’s step is done'
+    detail = `Next small step from ${fmtDate(plan.build.nextQuarter)}. ${plan.build.quartersLeft - 1} more ${plan.build.quartersLeft - 1 === 1 ? 'quarter' : 'quarters'} until retirement.`
+  } else if (plan.status === 'building-wait') {
+    tone = 'blue'; Icon = TrendingDown
+    title = 'Market is down: skip this quarter'
+    detail = 'Growth funds are more than 10% below their high, so nothing moves now. The amount is spread over the quarters that are left.'
   } else if (!plan.hasWork && plan.status === 'building') {
     title = 'Buckets are on track for retirement'
     detail = `Retirement starts ${fmtDate(plan.schedule.retirementDate)}. Nothing needs to move right now.`
@@ -262,8 +294,13 @@ function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
     detail = 'See the note below for what to do.'
   } else {
     tone = 'violet'; Icon = Sparkles
-    title = plan.status === 'building' ? 'Build your buckets before retirement' : 'Refill due now'
-    detail = `${moves.length} ${moves.length === 1 ? 'step' : 'steps'}, about ${formatINR(totalMove)} in total. Follow the steps below.`
+    if (plan.status === 'building') {
+      title = `This quarter: move about ${formatINR(totalMove)}`
+      detail = `Retirement in ${(plan.schedule.yearsToRetirement || 0).toFixed(1)} years. The buckets are built in small steps, one each quarter, so nothing moves in one go.`
+    } else {
+      title = 'Refill due now'
+      detail = `${moves.length} ${moves.length === 1 ? 'step' : 'steps'}, about ${formatINR(totalMove)} in total. Follow the steps below.`
+    }
   }
 
   const T = {
@@ -282,8 +319,29 @@ function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
           <p className="text-lg font-bold text-[var(--text-primary)] leading-snug mt-0.5">{title}</p>
           <p className="text-sm text-[var(--text-muted)] mt-1">{detail}</p>
           {action && <div className="mt-2">{action}</div>}
+          {plan.build && <SafeMoneyBar build={plan.build} />}
         </div>
       </div>
+    </div>
+  )
+}
+
+function SafeMoneyBar({ build }) {
+  const pct = build.safeTarget > 0 ? Math.min(100, (build.safeNow / build.safeTarget) * 100) : 100
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
+        <span>Safe money built (Income + Stability)</span>
+        <span className="tabular-nums font-semibold text-[var(--text-secondary)]">{formatINR(build.safeNow)} of {formatINR(build.safeTarget)}</span>
+      </div>
+      <div className="h-2 rounded-full bg-[var(--bg-inset)] overflow-hidden">
+        <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-700" style={{ width: `${pct}%` }} />
+      </div>
+      {build.gap > 1 && (() => {
+        // After this quarter's step, count only the quarters still to come.
+        const q = build.doneThisQuarter ? Math.max(1, build.quartersLeft - 1) : build.quartersLeft
+        return <p className="text-[11px] text-[var(--text-dim)] mt-1">{q} {q === 1 ? 'quarter' : 'quarters'} left · about {formatINR(build.gap / q)} per quarter</p>
+      })()}
     </div>
   )
 }
@@ -414,7 +472,7 @@ function Warnings({ plan }) {
     switch (w.code) {
       case 'stability-floor': return { tone: 'amber', title: 'Stability has reached its 2-year minimum', text: `Income is short by ${formatINR(w.amount)} this time. Growth is still down, so it is not sold. If you can, spend a little less until the market recovers.` }
       case 'growth-short-stability': return { tone: 'amber', title: 'Stability could not be fully topped up', text: `About ${formatINR(w.amount)} is still missing from Stability. It is topped up again in the next good year.` }
-      case 'building-capped': return { tone: 'blue', title: 'Buckets fill gradually before retirement', text: 'Until you retire, growth only gives the part above its own target, so equity is not sold all at once. The rest is moved in the coming years.' }
+      case 'growth-short-build': return { tone: 'amber', title: 'Growth could not cover this quarter’s step', text: `About ${formatINR(w.amount)} could not be moved. Review the funds linked to this goal.` }
       case 'growth-short': return { tone: 'amber', title: 'Growth did not have enough', text: `About ${formatINR(w.amount)} could not be moved. Review your expenses or the funds linked to this goal.` }
       case 'market-unknown': return { tone: 'amber', title: 'Market check not available', text: 'All-time high NAV is missing for your growth funds, so the plan protects growth and uses Stability instead. It usually appears after the next daily data refresh.' }
       case 'unclassified': return { tone: 'rose', title: `${w.count} fund(s) are not in any bucket`, text: 'Their category is unclear, so they are left out of the plan. Check them on the Mutual Funds page.' }
@@ -479,7 +537,7 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
         <p className="text-xs text-[var(--text-dim)] mt-0.5">
           {canRecord
             ? 'Place each switch with your broker or fund house, then tap Record switch. The form opens filled in, so you only check the NAV and date.'
-            : 'Preview only. Recording starts 3 years before retirement.'}
+            : 'Preview only. Bucket building starts 5 years before retirement.'}
         </p>
       </div>
 

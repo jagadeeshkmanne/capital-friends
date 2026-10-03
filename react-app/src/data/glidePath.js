@@ -10,16 +10,25 @@ export const GLIDE_PATH = [
 ]
 
 // Retirement is an income-start date, not a one-time spending deadline. The
-// corpus still needs long-term growth after retirement, so its glide path ends
-// at the bucket-aware allocation instead of the generic 10% equity endpoint.
-export const RETIREMENT_GLIDE_PATH = [
-  { maxYears: 10,       equity: 75, label: 'Retirement buckets' },
-  { maxYears: Infinity, equity: 85, label: 'Long-term' },
-]
-
+// corpus still needs long-term growth after retirement. Equity eases gently
+// from 85% (10 years out) to 75% (5 years out) instead of one 10% jump; in the
+// last 5 years the Retirement Buckets page builds the safe money (2 years
+// Income + 5 years Stability) in quarterly steps, so the goal card follows that
+// plan instead of a fixed equity percentage.
 export function getRecommendedAllocation(goalType, yearsLeft) {
   if (goalType === 'Emergency Fund') return { equity: 0, debt: 100, label: 'Safety' }
-  const path = goalType === 'Retirement' ? RETIREMENT_GLIDE_PATH : GLIDE_PATH
-  const step = path.find(s => yearsLeft <= s.maxYears)
+  if (goalType === 'Retirement') {
+    const y = Math.max(0, Number(yearsLeft) || 0)
+    const equity = y <= 5 ? 75 : y >= 10 ? 85 : Math.round(75 + 2 * (y - 5))
+    return { equity, debt: 100 - equity, label: y <= 5 ? 'Retirement buckets' : 'Long-term' }
+  }
+  const step = GLIDE_PATH.find(s => yearsLeft <= s.maxYears)
   return { equity: step.equity, debt: 100 - step.equity, label: step.label }
+}
+
+// In the last 5 years before retirement, a retirement goal follows the bucket
+// plan (Retirement Buckets page) instead of a fixed equity percentage.
+export const BUCKET_BUILD_YEARS = 5
+export function followsBucketPlan(goalType, yearsLeft) {
+  return goalType === 'Retirement' && Number(yearsLeft) <= BUCKET_BUILD_YEARS
 }
