@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowDownToLine, ArrowRight, ArrowUpFromLine, CalendarClock, CheckCircle2, ChevronDown, CircleHelp, Info,
-  Landmark, Pencil, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet,
+  AlertTriangle, ArrowDownToLine, ArrowRight, ArrowRightLeft, ArrowUpFromLine, CalendarClock, CheckCircle2, ChevronDown, CircleHelp, Info,
+  Landmark, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet,
 } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { useToast } from '../../context/ToastContext'
-import { useConfirm } from '../../context/ConfirmContext'
 import Modal from '../../components/Modal'
 import PageLoading from '../../components/PageLoading'
 import FundSearchInput from '../../components/forms/FundSearchInput'
+import MFSwitchForm from '../../components/forms/MFSwitchForm'
+import MFRedeemForm from '../../components/forms/MFRedeemForm'
 import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 import { allocateBucketWithdrawal } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
@@ -30,7 +31,6 @@ const REASON = {
   'growth-short': 'Growth did not have enough, so Stability covers the rest.',
 }
 
-const todayISO = () => new Date().toISOString().split('T')[0]
 const fmtDate = d => (d ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
 const yrs = months => {
   const y = Math.max(0, months) / 12
@@ -46,9 +46,14 @@ export default function RetirementBucketsPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { selectedMember } = useFamily()
-  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, executeMFPlan } = useData()
+  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, switchMF, redeemMF } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
-  const confirm = useConfirm()
+  const [switchDraft, setSwitchDraft] = useState(null)
+  const [redeemDraft, setRedeemDraft] = useState(null)
+  const [recorded, setRecorded] = useState(() => new Set())
+  // Once the user starts recording, keep the steps they are following fixed until
+  // every line is recorded; the jars above still update from live data.
+  const [frozenOps, setFrozenOps] = useState(null)
 
   const [showHelp, setShowHelp] = useState(false)
   const [forceShow, setForceShow] = useState(false)
@@ -84,7 +89,7 @@ export default function RetirementBucketsPage() {
       </div>
       <div className="flex items-center gap-2">
         {goals.length > 1 && (
-          <select value={goal?.goalId || ''} onChange={e => { setParams({ goal: e.target.value }); setForceShow(false) }}
+          <select value={goal?.goalId || ''} onChange={e => { setParams({ goal: e.target.value }); setForceShow(false); setFrozenOps(null); setRecorded(new Set()) }}
             className="text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-2 text-[var(--text-primary)] max-w-[160px]">
             {goals.map(g => <option key={g.goalId} value={g.goalId}>{g.goalName}</option>)}
           </select>
@@ -123,7 +128,9 @@ export default function RetirementBucketsPage() {
   }
 
   const canRecord = plan.schedule.retired || plan.status === 'building'
-  const showSteps = plan.hasWork && plan.status !== 'not-started' && (plan.status !== 'not-due' || forceShow)
+  const showSteps = !!frozenOps || (plan.hasWork && plan.status !== 'not-started' && (plan.status !== 'not-due' || forceShow))
+  const stepOps = frozenOps || plan.operations
+  const totalLines = stepOps.reduce((n, op) => n + op.allocations.length, 0)
 
   return (
     <div className="space-y-4 pb-6">
@@ -133,17 +140,81 @@ export default function RetirementBucketsPage() {
       <MarketCheck plan={plan} />
       <Warnings plan={plan} />
       {showSteps && (
-        <RefillSteps key={goal.goalId} plan={plan} goal={goal} canRecord={canRecord}
-          executeMFPlan={executeMFPlan} showToast={showToast} showBlockUI={showBlockUI} hideBlockUI={hideBlockUI} confirm={confirm} />
+        <RefillSteps key={goal.goalId} plan={plan} operations={stepOps} canRecord={canRecord} recorded={recorded}
+          onRecordSwitch={({ lineKey, op, allocation, dest }) => { if (!frozenOps) setFrozenOps(plan.operations); setSwitchDraft({
+            lineKey,
+            portfolioId: allocation.portfolioId,
+            initial: {
+              fromPortfolioId: allocation.portfolioId,
+              toPortfolioId: allocation.portfolioId,
+              fromFundCode: allocation.schemeCode,
+              fromFundName: allocation.fundName,
+              toFundCode: dest.schemeCode,
+              toFundName: dest.fundName,
+              units: allocation.units.toFixed(3),
+              fromPrice: allocation.currentNav ? String(allocation.currentNav) : '',
+              toPrice: dest.currentNav ? String(dest.currentNav) : '',
+              notes: `Retirement bucket refill: ${BUCKET[op.from].name} to ${BUCKET[op.to].name} (${goal.goalName})`,
+            },
+          }) }} />
       )}
       {plan.schedule.retired && plan.totals.b1 > 1 && (
-        <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan} goal={goal}
-          executeMFPlan={executeMFPlan} showToast={showToast} showBlockUI={showBlockUI} hideBlockUI={hideBlockUI} confirm={confirm} />
+        <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan}
+          onRecordRedeem={a => setRedeemDraft({
+            portfolioId: a.portfolioId,
+            fundCode: a.schemeCode,
+            initial: { units: a.units.toFixed(3), notes: `Retirement monthly income (${goal.goalName})` },
+          })} />
       )}
       <p className="text-[11px] text-[var(--text-dim)] leading-relaxed px-1">
         Suggestions use the latest NAVs in the app and the rules in “How it works”. Capital Friends does not place orders. Place them with your broker or fund house, then record them here. This is not investment advice.
       </p>
       {helpModal}
+
+      <Modal open={!!switchDraft} onClose={() => setSwitchDraft(null)} title="Record switch" wide>
+        {switchDraft && (
+          <MFSwitchForm key={switchDraft.lineKey} portfolioId={switchDraft.portfolioId} initial={switchDraft.initial}
+            onCancel={() => setSwitchDraft(null)}
+            onSave={async data => {
+              showBlockUI('Recording switch...')
+              try {
+                await switchMF(data)
+                const next = new Set(recorded).add(switchDraft.lineKey)
+                setSwitchDraft(null)
+                if (next.size >= totalLines) {
+                  setRecorded(new Set()); setFrozenOps(null); setForceShow(false)
+                  showToast('All switches recorded. Refill done.')
+                } else {
+                  setRecorded(next)
+                  showToast(`Switch recorded (${next.size} of ${totalLines})`)
+                }
+              } catch (err) {
+                showToast(err.message || 'Failed to record switch', 'error')
+              } finally {
+                hideBlockUI()
+              }
+            }} />
+        )}
+      </Modal>
+
+      <Modal open={!!redeemDraft} onClose={() => setRedeemDraft(null)} title="Record redemption" wide>
+        {redeemDraft && (
+          <MFRedeemForm key={`${redeemDraft.portfolioId}-${redeemDraft.fundCode}`} portfolioId={redeemDraft.portfolioId} fundCode={redeemDraft.fundCode} initial={redeemDraft.initial}
+            onCancel={() => setRedeemDraft(null)}
+            onSave={async data => {
+              showBlockUI('Recording redemption...')
+              try {
+                await redeemMF(data)
+                setRedeemDraft(null)
+                showToast('Redemption recorded')
+              } catch (err) {
+                showToast(err.message || 'Failed to record redemption', 'error')
+              } finally {
+                hideBlockUI()
+              }
+            }} />
+        )}
+      </Modal>
     </div>
   )
 }
@@ -356,74 +427,32 @@ function groupByPortfolio(allocations) {
   }, {})
 }
 
-function RefillSteps({ plan, goal, canRecord, executeMFPlan, showToast, showBlockUI, hideBlockUI, confirm }) {
-  const [date, setDate] = useState(todayISO())
+function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) {
   const [destinations, setDestinations] = useState({})
-  const [edits, setEdits] = useState({})
-  const [buyNavs, setBuyNavs] = useState({})
-  const [editing, setEditing] = useState({})
-
   const multiPortfolio = new Set(plan.allFunds.map(f => f.portfolioId)).size > 1
-  const destinationFor = (op, portfolioId) => {
-    const key = `${op.id}::${portfolioId}`
-    return destinations[key] || destinationCandidates(plan, op.to, portfolioId)[0] || null
-  }
-
-  const switches = []
-  let missing = false
-  for (const op of plan.operations) {
-    for (const [portfolioId, allocations] of Object.entries(groupByPortfolio(op.allocations))) {
-      const dest = destinationFor(op, portfolioId)
-      const destKey = `${op.id}::${portfolioId}`
-      const toPrice = dest ? num(buyNavs[destKey], dest.currentNav) : 0
-      if (!dest || toPrice <= 0) { missing = true; continue }
-      for (const a of allocations) {
-        const k = `${op.id}::${a.key}`
-        const units = Math.min(num(edits[k]?.units, a.units), a.goalUnits || a.units)
-        const price = num(edits[k]?.nav, a.currentNav)
-        if (units <= 0 || price <= 0) continue
-        switches.push({
-          fromPortfolioId: a.portfolioId,
-          toPortfolioId: a.portfolioId,
-          fromFundCode: a.schemeCode,
-          fromFundName: a.fundName,
-          toFundCode: dest.schemeCode,
-          toFundName: dest.fundName,
-          units: parseFloat(units.toFixed(4)),
-          fromFundPrice: price,
-          toFundPrice: toPrice,
-          switchDate: date,
-          notes: `Retirement bucket refill ${op.label} - ${goal.goalName}`,
-        })
-      }
-    }
-  }
-
-  async function record() {
-    const ok = await confirm(`Record ${switches.length} switch${switches.length === 1 ? '' : 'es'} dated ${date}? Do this only after you have placed the orders.`, { title: 'Record refill', confirmLabel: 'Record' })
-    if (!ok) return
-    showBlockUI('Recording refill...')
-    try {
-      const result = await executeMFPlan(switches, [])
-      if (!result?.success) throw new Error((result?.message || 'Could not record the refill') + (result?.partial ? ' Some entries may be saved; refresh before retrying.' : ''))
-      showToast('Refill recorded. Your buckets are updated.')
-      setEdits({}); setBuyNavs({}); setEditing({})
-    } catch (err) {
-      showToast(err.message || 'Could not record the refill', 'error')
-    } finally {
-      hideBlockUI()
-    }
-  }
+  const destinationFor = (op, portfolioId) =>
+    destinations[`${op.id}::${portfolioId}`] || destinationCandidates(plan, op.to, portfolioId)[0] || null
 
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
       <div className="px-4 py-3.5 border-b border-[var(--border-light)]">
-        <p className="text-sm font-bold text-[var(--text-primary)]">What to do</p>
-        <p className="text-xs text-[var(--text-dim)] mt-0.5">Switch these units with your broker or fund house. The units are already worked out.</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-bold text-[var(--text-primary)]">What to do</p>
+          {recorded.size > 0 && (
+            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 rounded-full px-2.5 py-0.5">
+              {recorded.size} of {operations.reduce((n, op) => n + op.allocations.length, 0)} recorded
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-dim)] mt-0.5">
+          {canRecord
+            ? 'Place each switch with your broker or fund house, then tap Record switch. The form opens filled in, so you only check the NAV and date.'
+            : 'Preview only. Recording starts 3 years before retirement.'}
+        </p>
       </div>
 
       <div className="divide-y divide-[var(--border-light)]">
-        {plan.operations.map((op, i) => {
+        {operations.map((op, i) => {
           const from = BUCKET[op.from], to = BUCKET[op.to]
           return (
             <div key={op.id} className="px-4 py-4 space-y-3">
@@ -444,61 +473,52 @@ function RefillSteps({ plan, goal, canRecord, executeMFPlan, showToast, showBloc
                 const destKey = `${op.id}::${portfolioId}`
                 const dest = destinationFor(op, portfolioId)
                 const candidates = destinationCandidates(plan, op.to, portfolioId)
-                const isEditing = editing[destKey]
                 return (
-                  <div key={portfolioId} className="sm:ml-10 rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] overflow-hidden">
-                    {multiPortfolio && <p className="px-3 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Portfolio · {allocations[0].portfolioName}</p>}
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 p-3 items-start">
-                      <div className="space-y-2">
-                        <p className={`text-[11px] font-semibold ${from.text}`}>Sell</p>
-                        {allocations.map(a => {
-                          const k = `${op.id}::${a.key}`
-                          const units = Math.min(num(edits[k]?.units, a.units), a.goalUnits || a.units)
-                          const nav = num(edits[k]?.nav, a.currentNav)
-                          return (
-                            <div key={k} className="bg-[var(--bg-card)] rounded-lg px-3 py-2.5">
-                              <p className="text-sm font-semibold text-[var(--text-secondary)] leading-snug">{splitFundName(a.fundName || '').main}</p>
-                              <p className="text-xs text-[var(--text-muted)] mt-0.5"><b className="text-[var(--text-primary)] tabular-nums">{units.toFixed(3)} units</b> · about {formatINR(units * nav)}</p>
-                              {isEditing && (
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                  <SmallInput label="Units sold" value={edits[k]?.units} placeholder={a.units.toFixed(3)} onChange={v => setEdits(p => ({ ...p, [k]: { ...p[k], units: v } }))} />
-                                  <SmallInput label="Sell NAV ₹" value={edits[k]?.nav} placeholder={a.currentNav.toFixed(4)} onChange={v => setEdits(p => ({ ...p, [k]: { ...p[k], nav: v } }))} />
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <div className="hidden md:flex items-center self-center"><ArrowRight size={18} className="text-[var(--text-dim)]" /></div>
-                      <div className="space-y-2">
-                        <p className={`text-[11px] font-semibold ${to.text}`}>Buy</p>
+                  <div key={portfolioId} className="sm:ml-10 rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] p-3 space-y-2.5">
+                    {multiPortfolio && <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Portfolio · {allocations[0].portfolioName}</p>}
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <p className={`text-[11px] font-semibold ${to.text} shrink-0 sm:w-16`}>Buy into</p>
+                      <div className="flex-1 min-w-0">
                         {candidates.length > 1 ? (
                           <select value={dest?.key || ''} onChange={e => setDestinations(p => ({ ...p, [destKey]: candidates.find(c => c.key === e.target.value) }))}
-                            className="w-full text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]">
+                            className="w-full text-sm font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]">
                             {candidates.map(c => <option key={c.key} value={c.key}>{splitFundName(c.fundName || '').main}</option>)}
                           </select>
                         ) : candidates.length === 1 ? (
-                          <div className="bg-[var(--bg-card)] rounded-lg px-3 py-2.5 text-sm font-semibold text-[var(--text-secondary)]">{splitFundName(candidates[0].fundName || '').main}</div>
+                          <div className="bg-[var(--bg-card)] rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text-secondary)]">{splitFundName(candidates[0].fundName || '').main}</div>
                         ) : (
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             <p className="text-xs text-amber-400">No {to.name.toLowerCase()} fund in this portfolio yet. Pick one:</p>
                             <FundSearchInput value={dest ? { schemeCode: dest.schemeCode, fundName: dest.fundName } : null}
                               onSelect={({ schemeCode, fundName, nav }) => setDestinations(p => ({ ...p, [destKey]: { key: `new::${schemeCode}`, schemeCode: String(schemeCode), fundName, currentNav: nav || 0, portfolioId } }))}
                               placeholder={op.to === 'b1' ? 'Search a liquid fund…' : 'Search a hybrid or debt fund…'} />
                           </div>
                         )}
-                        <p className="text-[11px] text-[var(--text-dim)]">{to.holds}</p>
-                        {isEditing && dest && (
-                          <SmallInput label="Buy NAV ₹" value={buyNavs[destKey]} placeholder={Number(dest.currentNav || 0).toFixed(4)} onChange={v => setBuyNavs(p => ({ ...p, [destKey]: v }))} />
-                        )}
                       </div>
                     </div>
-                    {canRecord && (
-                      <button type="button" onClick={() => setEditing(p => ({ ...p, [destKey]: !p[destKey] }))}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] border-t border-[var(--border-light)]">
-                        <Pencil size={11} /> {isEditing ? 'Hide actual units and NAV' : 'Enter actual units and NAV (optional)'}
-                      </button>
-                    )}
+
+                    <p className={`text-[11px] font-semibold ${from.text}`}>Sell {allocations.length > 1 ? `from ${allocations.length} funds` : ''}</p>
+                    {allocations.map(a => {
+                      const lineKey = `${op.id}::${a.key}::${dest?.schemeCode || ''}`
+                      const done = recorded.has(lineKey)
+                      return (
+                        <div key={a.key} className="bg-[var(--bg-card)] rounded-lg px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2.5">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-[var(--text-secondary)] leading-snug">{splitFundName(a.fundName || '').main}</p>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5"><b className="text-[var(--text-primary)] tabular-nums">{a.units.toFixed(3)} units</b> · about {formatINR(a.amount)} at ₹{a.currentNav.toFixed(2)}</p>
+                          </div>
+                          {canRecord && (done ? (
+                            <span className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg shrink-0"><CheckCircle2 size={14} /> Recorded</span>
+                          ) : (
+                            <button type="button" disabled={!dest} onClick={() => onRecordSwitch({ lineKey, op, allocation: a, dest })}
+                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
+                              <ArrowRightLeft size={14} /> Record switch
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               })}
@@ -506,60 +526,14 @@ function RefillSteps({ plan, goal, canRecord, executeMFPlan, showToast, showBloc
           )
         })}
       </div>
-
-      <div className="px-4 py-3.5 border-t border-[var(--border-light)] flex flex-col sm:flex-row sm:items-center gap-3">
-        {canRecord ? (
-          <>
-            <label className="text-xs text-[var(--text-dim)] flex items-center gap-2">Done on
-              <input type="date" value={date} max={todayISO()} onChange={e => setDate(e.target.value)}
-                className="text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--text-primary)]" />
-            </label>
-            {missing && <p className="text-xs text-amber-400">Pick a fund to buy in every step first.</p>}
-            <button type="button" onClick={record} disabled={missing || !switches.length}
-              className="sm:ml-auto flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              <CheckCircle2 size={15} /> I’ve done this, record it
-            </button>
-          </>
-        ) : (
-          <p className="text-xs text-blue-400">Preview only. Recording starts 3 years before retirement.</p>
-        )}
-      </div>
     </div>
   )
 }
 
 /* ── This month's income ── */
-function MonthlyWithdrawal({ plan, goal, executeMFPlan, showToast, showBlockUI, hideBlockUI, confirm }) {
+function MonthlyWithdrawal({ plan, onRecordRedeem }) {
   const [amount, setAmount] = useState(String(Math.round(plan.expense.monthlyExpense)))
-  const [date, setDate] = useState(todayISO())
-  const value = num(amount, 0)
-  const result = allocateBucketWithdrawal(plan.byBucket.b1, value)
-  const redemptions = result.allocations.map(a => ({
-    portfolioId: a.portfolioId,
-    fundCode: a.schemeCode,
-    fundName: a.fundName,
-    units: parseFloat(a.units.toFixed(4)),
-    salePrice: a.currentNav,
-    saleDate: date,
-    totalAmount: a.units * a.currentNav,
-    notes: `Retirement monthly income - ${goal.goalName}`,
-  })).filter(r => r.units > 0 && r.salePrice > 0)
-
-  async function record() {
-    const ok = await confirm(`Record a withdrawal of ${formatINR(value)} from the Income bucket, dated ${date}?`, { title: 'Record monthly income', confirmLabel: 'Record' })
-    if (!ok) return
-    showBlockUI('Recording withdrawal...')
-    try {
-      const res = await executeMFPlan([], redemptions)
-      if (!res?.success) throw new Error(res?.message || 'Could not record the withdrawal')
-      showToast('Withdrawal recorded.')
-    } catch (err) {
-      showToast(err.message || 'Could not record the withdrawal', 'error')
-    } finally {
-      hideBlockUI()
-    }
-  }
-
+  const result = allocateBucketWithdrawal(plan.byBucket.b1, num(amount, 0))
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
       <div className="px-4 py-3.5 flex items-center gap-3 border-b border-[var(--border-light)]">
@@ -570,39 +544,24 @@ function MonthlyWithdrawal({ plan, goal, executeMFPlan, showToast, showBlockUI, 
         </div>
       </div>
       <div className="p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-xs text-[var(--text-dim)] flex items-center gap-2">Amount ₹
-            <input type="number" min="0" step="1000" value={amount} onChange={e => setAmount(e.target.value)}
-              className="w-32 text-sm font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--text-primary)]" />
-          </label>
-          <label className="text-xs text-[var(--text-dim)] flex items-center gap-2">On
-            <input type="date" value={date} max={todayISO()} onChange={e => setDate(e.target.value)}
-              className="text-xs font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--text-primary)]" />
-          </label>
-        </div>
+        <label htmlFor="monthly-amount" className="text-xs text-[var(--text-dim)] flex items-center gap-2">Amount ₹
+          <input id="monthly-amount" type="number" min="0" step="1000" value={amount} onChange={e => setAmount(e.target.value)}
+            className="w-32 text-sm font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--text-primary)]" />
+        </label>
         {result.allocations.map(a => (
-          <div key={a.key} className="flex items-center justify-between gap-3 bg-[var(--bg-inset)] rounded-lg px-3 py-2.5">
-            <p className="text-sm font-semibold text-[var(--text-secondary)] truncate">{splitFundName(a.fundName || '').main}</p>
-            <p className="text-xs text-[var(--text-muted)] shrink-0">Sell <b className="text-[var(--text-primary)] tabular-nums">{a.units.toFixed(3)} units</b></p>
+          <div key={a.key} className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-[var(--bg-inset)] rounded-lg px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-[var(--text-secondary)] truncate">{splitFundName(a.fundName || '').main}</p>
+              <p className="text-xs text-[var(--text-muted)]">Sell <b className="text-[var(--text-primary)] tabular-nums">{a.units.toFixed(3)} units</b> · about {formatINR(a.amount)}</p>
+            </div>
+            <button type="button" onClick={() => onRecordRedeem(a)}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors shrink-0">
+              <CheckCircle2 size={14} /> Record redemption
+            </button>
           </div>
         ))}
         {result.shortfall > 1 && <p className="text-xs text-rose-400">The Income bucket is short by {formatINR(result.shortfall)}. Refill it first.</p>}
-        <div className="flex justify-end">
-          <button type="button" onClick={record} disabled={!redemptions.length || result.shortfall > 1}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            <CheckCircle2 size={14} /> Record withdrawal
-          </button>
-        </div>
       </div>
     </div>
-  )
-}
-
-function SmallInput({ label, value, placeholder, onChange }) {
-  return (
-    <label className="text-[11px] text-[var(--text-dim)] block">{label}
-      <input type="number" min="0" step="0.0001" value={value ?? ''} placeholder={placeholder} onChange={e => onChange(e.target.value)}
-        className="mt-1 w-full text-xs bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-[var(--text-primary)]" />
-    </label>
   )
 }

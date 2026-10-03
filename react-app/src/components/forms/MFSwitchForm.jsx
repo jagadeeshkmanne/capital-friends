@@ -5,7 +5,7 @@ import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
 
-export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
+export default function MFSwitchForm({ portfolioId, initial, onSave, onCancel }) {
   const { mfPortfolios, mfHoldings } = useData()
   const { selectedMember } = useFamily()
 
@@ -27,6 +27,8 @@ export default function MFSwitchForm({ portfolioId, onSave, onCancel }) {
     toPrice: '',
     targetAllocation: '',
     notes: '',
+    // Optional prefill (e.g. from the Retirement Buckets page). Existing callers pass nothing.
+    ...(initial || {}),
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)

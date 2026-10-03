@@ -4,7 +4,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
-export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, onSave, onCancel }) {
+export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, initial, onSave, onCancel }) {
   const { mfPortfolios, mfHoldings } = useData()
   const { selectedMember } = useFamily()
 
@@ -27,6 +27,8 @@ export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, o
     units: '',
     price: initialHolding?.currentNav > 0 ? String(initialHolding.currentNav) : '',
     notes: '',
+    // Optional prefill (e.g. from the Retirement Buckets page). Existing callers pass nothing.
+    ...(initial || {}),
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
