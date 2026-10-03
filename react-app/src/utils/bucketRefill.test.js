@@ -181,3 +181,27 @@ test('growth funds without all-time-high data are sold only after funds near the
   const sold = plan.operations.find(op => op.id === 'b3-to-b1').allocations
   assert.deepEqual(sold.map(a => a.schemeCode), ['E1'])
 })
+
+test('funds are placed in a bucket from the automatic category and the name, without manual input', async () => {
+  const { classifyRetirementHolding } = await import('./retirementBuckets.js')
+  const cases = [
+    ['Liquid', 'Parag Parikh Liquid Fund - Direct Plan - Growth', 'b1'],
+    ['Debt', 'HDFC Ultra Short Term Fund - Direct Growth', 'b1'],
+    ['Debt', 'ICICI Prudential Corporate Bond Fund - Direct Plan - Growth', 'b2'],
+    ['Gilt', 'SBI Magnum Gilt Fund - Direct Growth', 'b2'],
+    ['Hybrid', 'ICICI Prudential Balanced Advantage Fund - Direct Growth', 'b2'],
+    ['Hybrid', 'Canara Robeco Equity Hybrid Fund - Direct Growth', 'b3'],
+    ['Hybrid', 'Quant Aggressive Hybrid Fund - Direct Growth', 'b3'],
+    ['Multi-Asset', 'Nippon India Multi Asset Omni FoF - Direct Growth', 'b2'],
+    ['Other', 'Motilal Oswal Asset Allocation Passive FoF - Conservative - Direct Growth', 'b2'],
+    ['Equity', 'Parag Parikh Flexi Cap Fund - Direct Plan - Growth', 'b3'],
+    ['Other', 'Motilal Oswal Multi Factor Passive FoF - Direct Growth', 'b3'],
+    ['Index', 'Motilal Oswal Nasdaq 100 Fund of Fund - Direct Growth', 'b3'],
+    ['Commodity', 'Nippon India Gold Savings Fund - Direct Growth', 'b3'],
+    ['Other', 'Edelweiss Bharat Bond ETF - April 2030', 'b2'],
+    ['', 'Mirae Asset Nifty Midcap 150 ETF', 'b3'],
+  ]
+  for (const [category, fundName, bucket] of cases) {
+    assert.equal(classifyRetirementHolding({ category, fundName }, null).bucket, bucket, fundName)
+  }
+})

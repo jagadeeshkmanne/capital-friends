@@ -2,6 +2,10 @@ const EQUITY_CATEGORY_WORDS = [
   'equity', 'elss', 'index', 'large cap', 'mid cap', 'small cap', 'flexi cap',
   'multi cap', 'focused', 'value', 'contra', 'dividend yield', 'sectoral',
   'thematic', 'international',
+  // Name-only signals (the app's category is often just "Other" for these).
+  'flexicap', 'multicap', 'midcap', 'smallcap', 'largecap', 'large & mid',
+  'factor', 'momentum', 'quality', 'low volatility', 'alpha', 'nasdaq', 's&p',
+  'nifty', 'sensex', 'etf', 'global', 'us equity', 'tax saver',
 ]
 
 const B1_CATEGORY_WORDS = [
@@ -14,7 +18,15 @@ const B2_CATEGORY_WORDS = [
   'dynamic asset allocation', 'equity savings', 'arbitrage', 'debt', 'gilt',
   'medium duration', 'long duration',
   'corporate bond', 'banking & psu', 'credit risk', 'floater',
+  // Name-only signals
+  'bond', 'g-sec', 'gsec', 'government securities', 'sdl', 'asset allocation',
+  'conservative', 'income fund', 'accrual', 'dynamic bond',
 ]
+
+// Hybrid funds that are mostly equity (65-80%) belong with growth.
+const GROWTH_HYBRID_WORDS = ['aggressive hybrid', 'equity hybrid', 'equity & debt', 'equity and debt', 'aggressive']
+
+const COMMODITY_WORDS = ['gold', 'silver', 'commodit', 'precious metal']
 
 function includesAny(value, words) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -47,12 +59,17 @@ export function getRetirementExpenseBasis(goal, planDate = new Date()) {
   }
 }
 
+// Which bucket a fund belongs to. Works without any manual input: the app's
+// automatic category (from the scheme name) and the fund name are enough. A
+// fund's asset breakdown, if the user entered one, refines the answer.
 export function classifyRetirementHolding(holding, assetAllocation) {
   const category = holding?.category || ''
-  // B1 is intentionally limited to cash-like and short-duration categories.
+  const name = holding?.fundName || ''
+  const text = `${category} ${name}`
+  // B1 is intentionally limited to cash-like and short-duration funds.
   // A generic debt label is not enough because duration and credit risk matter.
-  if (includesAny(category, B1_CATEGORY_WORDS)) {
-    return { bucket: 'b1', reason: category || 'Liquid/short debt', equity: 0, confidence: 'category' }
+  if (includesAny(text, B1_CATEGORY_WORDS)) {
+    return { bucket: 'b1', reason: category && category !== 'Other' ? category : 'Liquid/short debt', equity: 0, confidence: 'category' }
   }
 
   const allocation = assetAllocation || null
@@ -64,14 +81,31 @@ export function classifyRetirementHolding(holding, assetAllocation) {
 
     if (equity >= 70) return { bucket: 'b3', reason: `${equity.toFixed(0)}% equity`, equity, confidence: 'allocation' }
     if (equity >= 30) return { bucket: 'b2', reason: `${equity.toFixed(0)}% equity`, equity, confidence: 'allocation' }
-    if (debt + cash >= 70 && includesAny(category, B2_CATEGORY_WORDS)) {
+    if (debt + cash >= 70 && includesAny(text, B2_CATEGORY_WORDS)) {
       return { bucket: 'b2', reason: `${(debt + cash).toFixed(0)}% debt/cash`, equity, confidence: 'allocation' }
     }
     if (knownTotal >= 70) return { bucket: null, reason: 'Asset mix needs review', equity, confidence: 'review' }
   }
 
-  if (includesAny(category, EQUITY_CATEGORY_WORDS)) return { bucket: 'b3', reason: category, equity: 100, confidence: 'category' }
-  if (includesAny(category, B2_CATEGORY_WORDS)) return { bucket: 'b2', reason: category, equity: 40, confidence: 'category' }
+  const cat = category.trim().toLowerCase()
+  // The app's own categories first (set automatically from the scheme name).
+  if (cat === 'equity' || cat === 'elss' || cat === 'index') return { bucket: 'b3', reason: category, equity: 100, confidence: 'category' }
+  if (cat === 'debt' || cat === 'gilt' || cat === 'multi-asset') return { bucket: 'b2', reason: category, equity: cat === 'multi-asset' ? 50 : 0, confidence: 'category' }
+  if (cat === 'hybrid') {
+    return includesAny(name, GROWTH_HYBRID_WORDS)
+      ? { bucket: 'b3', reason: 'Aggressive hybrid', equity: 75, confidence: 'category' }
+      : { bucket: 'b2', reason: category, equity: 40, confidence: 'category' }
+  }
+  if (cat === 'commodity' || includesAny(text, COMMODITY_WORDS)) {
+    // Gold and silver swing a lot, so they are not used for near-term income.
+    return { bucket: 'b3', reason: 'Gold/silver', equity: 0, confidence: 'category' }
+  }
+
+  // Otherwise read the category label and fund name. Hybrid/debt words are
+  // checked before equity words (e.g. "Bharat Bond ETF" is debt, not equity).
+  if (includesAny(text, GROWTH_HYBRID_WORDS)) return { bucket: 'b3', reason: 'Aggressive hybrid', equity: 75, confidence: 'name' }
+  if (includesAny(text, B2_CATEGORY_WORDS)) return { bucket: 'b2', reason: category && category !== 'Other' ? category : 'Hybrid/debt (from name)', equity: 40, confidence: 'name' }
+  if (includesAny(text, EQUITY_CATEGORY_WORDS)) return { bucket: 'b3', reason: category && category !== 'Other' ? category : 'Equity (from name)', equity: 100, confidence: 'name' }
   return { bucket: null, reason: category || 'Category unavailable', equity: null, confidence: 'review' }
 }
 
