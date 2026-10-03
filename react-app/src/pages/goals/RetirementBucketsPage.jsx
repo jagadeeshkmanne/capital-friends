@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowDownToLine, ArrowRight, ArrowRightLeft, ArrowUpFromLine, CalendarClock, CheckCircle2, ChevronDown, CircleHelp, Info,
-  Landmark, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet,
+  FlaskConical, Landmark, ShieldCheck, X, Sparkles, TrendingDown, TrendingUp, Wallet,
 } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
@@ -17,6 +17,7 @@ import MFRedeemForm from '../../components/forms/MFRedeemForm'
 import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 import { allocateBucketWithdrawal, buildTargetAwareBucketPreview } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
+import { DEMO_SCENARIOS, buildDemoData, applyDemoSwitch, applyDemoRedeem } from '../../data/bucketDemo'
 
 const BUCKET = {
   b1: { name: 'Income', long: 'Income bucket', icon: Wallet, text: 'text-emerald-400', soft: 'bg-emerald-500/10', bar: 'bg-emerald-500', border: 'border-emerald-500/25', holds: 'Liquid and short-term debt funds' },
@@ -93,8 +94,21 @@ export default function RetirementBucketsPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { selectedMember } = useFamily()
-  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, switchMF, redeemMF } = useData()
+  const liveData = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
+
+  // Demo mode (?demo=<situation>): the page runs on sample data kept in this
+  // page only. Recording a switch changes the sample, never the user's data.
+  const demoKey = DEMO_SCENARIOS[params.get('demo')] ? params.get('demo') : null
+  const [demoState, setDemoState] = useState(null)
+  if (demoKey && demoState?.key !== demoKey) setDemoState({ key: demoKey, data: buildDemoData(demoKey) })
+  if (!demoKey && demoState) setDemoState(null)
+  const demo = demoKey && demoState?.key === demoKey ? demoState.data : null
+  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations } = demo || liveData
+  const switchMF = demo ? async sw => setDemoState(st => ({ ...st, data: applyDemoSwitch(st.data, sw) })) : liveData.switchMF
+  const redeemMF = demo ? async r => setDemoState(st => ({ ...st, data: applyDemoRedeem(st.data, r) })) : liveData.redeemMF
+  const startDemo = key => { setParams({ demo: key }); setSession(null); setForceShow(false) }
+  const exitDemo = () => { setParams({}); setSession(null); setForceShow(false) }
   const [switchDraft, setSwitchDraft] = useState(null)
   const [redeemDraft, setRedeemDraft] = useState(null)
   // Recording session for one goal: { goalId, ops, done: Set }.
@@ -107,7 +121,7 @@ export default function RetirementBucketsPage() {
 
   const goals = useMemo(() => (goalList || [])
     .filter(g => g.isActive !== false && g.goalType === 'Retirement')
-    .filter(g => selectedMember === 'all' || g.familyMemberId === selectedMember), [goalList, selectedMember])
+    .filter(g => demo || selectedMember === 'all' || g.familyMemberId === selectedMember), [goalList, selectedMember, demo])
   const goal = goals.find(g => g.goalId === params.get('goal')) || goals[0]
 
   const plan = useMemo(() => {
@@ -124,7 +138,7 @@ export default function RetirementBucketsPage() {
     })
   }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations])
 
-  if (goalList === null) return <PageLoading title="Loading retirement buckets" cards={4} />
+  if (goalList === null || (demoKey && !demo)) return <PageLoading title="Loading retirement buckets" cards={4} />
 
   const header = (
     <div className="flex items-center justify-between gap-3">
@@ -132,11 +146,17 @@ export default function RetirementBucketsPage() {
         <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0"><Wallet size={18} className="text-violet-400" /></div>
         <div className="min-w-0">
           <h1 className="text-base font-bold text-[var(--text-primary)] leading-tight">Retirement Buckets</h1>
-          <p className="text-xs text-[var(--text-dim)] truncate">Your yearly refill plan, worked out for you</p>
+          <p className="text-xs text-[var(--text-dim)] truncate">{demo ? 'Sample data, nothing is saved' : 'Your yearly refill plan, worked out for you'}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {goals.length > 1 && (
+        {!demo && (
+          <button type="button" onClick={() => startDemo('good')}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border)] hover:text-[var(--text-primary)] transition-colors">
+            <FlaskConical size={14} /> <span className="hidden sm:inline">Try sample data</span>
+          </button>
+        )}
+        {!demo && goals.length > 1 && (
           <select value={goal?.goalId || ''} onChange={e => { setParams({ goal: e.target.value }); setForceShow(false) }}
             className="text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-2 text-[var(--text-primary)] max-w-[160px]">
             {goals.map(g => <option key={g.goalId} value={g.goalId}>{g.goalName}</option>)}
@@ -147,6 +167,26 @@ export default function RetirementBucketsPage() {
           <CircleHelp size={14} /> <span className="hidden sm:inline">How it works</span>
         </button>
       </div>
+    </div>
+  )
+
+  const demoBar = demo && (
+    <div className="rounded-xl border border-dashed border-violet-500/40 bg-violet-500/5 px-3 py-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-xs font-semibold text-violet-400 flex items-center gap-1.5"><FlaskConical size={14} /> Sample data. Try any situation; nothing is saved to your account.</p>
+        <button type="button" onClick={exitDemo} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] shrink-0">
+          <X size={13} /> Exit
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {Object.entries(DEMO_SCENARIOS).map(([key, sc]) => (
+          <button key={key} type="button" onClick={() => startDemo(key)}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${demoKey === key ? 'bg-violet-500/15 text-violet-400 border-violet-500/30' : 'text-[var(--text-muted)] border-[var(--border-input)] hover:text-[var(--text-primary)]'}`}>
+            {sc.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-[var(--text-dim)] mt-2">{DEMO_SCENARIOS[demoKey].note}</p>
     </div>
   )
 
@@ -168,7 +208,10 @@ export default function RetirementBucketsPage() {
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl py-12 px-6 text-center space-y-3">
           <Wallet size={30} className="mx-auto text-[var(--text-dim)]" />
           <p className="text-sm text-[var(--text-muted)] max-w-sm mx-auto">{detail}</p>
-          <button onClick={() => navigate('/goals')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">Go to Goals</button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button onClick={() => navigate('/goals')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">Go to Goals</button>
+            <button onClick={() => startDemo('good')} className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"><FlaskConical size={13} /> See it with sample data</button>
+          </div>
         </div>
         {helpModal}
       </div>
@@ -196,6 +239,7 @@ export default function RetirementBucketsPage() {
   return (
     <div className="space-y-4 pb-6">
       {header}
+      {demoBar}
       <StatusHero plan={plan} goal={goal} equity={equity} previewCount={previewOps?.length || 0} forceShow={forceShow} onForce={() => setForceShow(true)} />
       {early ? <EarlyBuckets plan={plan} /> : <BucketCards plan={plan} showAfter={showSteps} />}
       {!early && <MarketCheck plan={plan} />}
@@ -235,7 +279,7 @@ export default function RetirementBucketsPage() {
 
       <Modal open={!!switchDraft} onClose={() => setSwitchDraft(null)} title="Record switch" wide>
         {switchDraft && (
-          <MFSwitchForm key={switchDraft.lineKey} portfolioId={switchDraft.portfolioId} initial={switchDraft.initial}
+          <MFSwitchForm key={switchDraft.lineKey} portfolioId={switchDraft.portfolioId} initial={switchDraft.initial} dataOverride={demo || undefined}
             onCancel={() => setSwitchDraft(null)}
             onSave={async data => {
               showBlockUI('Recording switch...')
@@ -247,10 +291,10 @@ export default function RetirementBucketsPage() {
                 setSwitchDraft(null)
                 if (next.size >= lines) {
                   setSession(null); setForceShow(false)
-                  showToast('All switches recorded. Refill done.')
+                  showToast(demo ? 'All switches recorded in the sample. Nothing was saved.' : 'All switches recorded. Refill done.')
                 } else {
                   setSession({ goalId: goal.goalId, ops, done: next })
-                  showToast(`Switch recorded (${next.size} of ${lines})`)
+                  showToast(demo ? `Sample switch recorded (${next.size} of ${lines}). Nothing was saved.` : `Switch recorded (${next.size} of ${lines})`)
                 }
               } catch (err) {
                 showToast(err.message || 'Failed to record switch', 'error')
@@ -263,14 +307,14 @@ export default function RetirementBucketsPage() {
 
       <Modal open={!!redeemDraft} onClose={() => setRedeemDraft(null)} title="Record redemption" wide>
         {redeemDraft && (
-          <MFRedeemForm key={`${redeemDraft.portfolioId}-${redeemDraft.fundCode}`} portfolioId={redeemDraft.portfolioId} fundCode={redeemDraft.fundCode} initial={redeemDraft.initial}
+          <MFRedeemForm key={`${redeemDraft.portfolioId}-${redeemDraft.fundCode}`} portfolioId={redeemDraft.portfolioId} fundCode={redeemDraft.fundCode} initial={redeemDraft.initial} dataOverride={demo || undefined}
             onCancel={() => setRedeemDraft(null)}
             onSave={async data => {
               showBlockUI('Recording redemption...')
               try {
                 await redeemMF(data)
                 setRedeemDraft(null)
-                showToast('Redemption recorded')
+                showToast(demo ? 'Sample redemption recorded. Nothing was saved.' : 'Redemption recorded')
               } catch (err) {
                 showToast(err.message || 'Failed to record redemption', 'error')
               } finally {

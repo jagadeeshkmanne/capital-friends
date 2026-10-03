@@ -5,14 +5,16 @@ import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 import FundSearchInput from './FundSearchInput'
 
-export default function MFSwitchForm({ portfolioId, initial, onSave, onCancel }) {
-  const { mfPortfolios, mfHoldings } = useData()
+export default function MFSwitchForm({ portfolioId, initial, dataOverride, onSave, onCancel }) {
+  // dataOverride: optional sample data (Retirement Buckets demo). Existing callers pass nothing.
+  const liveData = useData()
+  const { mfPortfolios, mfHoldings } = dataOverride || liveData
   const { selectedMember } = useFamily()
 
   const activePortfolios = useMemo(() => {
     const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
-    return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
-  }, [mfPortfolios, selectedMember])
+    return selectedMember === 'all' || dataOverride ? active : active.filter((p) => p.ownerId === selectedMember)
+  }, [mfPortfolios, selectedMember, dataOverride])
 
   const [form, setForm] = useState({
     fromPortfolioId: portfolioId || '',

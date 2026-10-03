@@ -4,14 +4,16 @@ import { useFamily } from '../../context/FamilyContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
 
-export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, initial, onSave, onCancel }) {
-  const { mfPortfolios, mfHoldings } = useData()
+export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, initial, dataOverride, onSave, onCancel }) {
+  // dataOverride: optional sample data (Retirement Buckets demo). Existing callers pass nothing.
+  const liveData = useData()
+  const { mfPortfolios, mfHoldings } = dataOverride || liveData
   const { selectedMember } = useFamily()
 
   const activePortfolios = useMemo(() => {
     const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
-    return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
-  }, [mfPortfolios, selectedMember])
+    return selectedMember === 'all' || dataOverride ? active : active.filter((p) => p.ownerId === selectedMember)
+  }, [mfPortfolios, selectedMember, dataOverride])
 
   // Resolve initial fund details from holdings
   const initialHolding = useMemo(() => {
