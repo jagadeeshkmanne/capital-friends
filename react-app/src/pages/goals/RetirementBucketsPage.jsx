@@ -529,8 +529,22 @@ function BucketCards({ plan, showAfter }) {
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[var(--text-muted)] opacity-30" /> Moves in this refill</span>
         </div>
       )}
+      <YearsExplainer plan={plan} />
       <style>{`.bucket-out{background-image:repeating-linear-gradient(45deg,transparent 0 4px,rgba(255,255,255,.18) 4px 8px)}`}</style>
     </div>
+  )
+}
+
+// One plain line: how "years" are counted, including inflation.
+function YearsExplainer({ plan }) {
+  const e = plan.expense
+  const when = plan.schedule.retired ? 'this year' : 'at retirement'
+  const withInflation = e.inflation > 0 && e.monthlyExpense - e.todayExpense > 500
+  return (
+    <p className="mt-4 text-center text-[11px] sm:text-xs text-[var(--text-dim)] leading-relaxed max-w-xl mx-auto">
+      Years = money in the bucket ÷ <b className="text-[var(--text-muted)]">{formatINR(e.monthlyExpense)} a month</b>, your spending {when}.
+      {withInflation && <> That is the {formatINR(e.todayExpense)} in your goal plus {Math.round(e.inflation * 100)}% yearly inflation.</>}
+    </p>
   )
 }
 

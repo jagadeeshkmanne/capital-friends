@@ -159,6 +159,8 @@ export function buildBucketRefillPlan({
 
   const monthly = base.expense.monthlyExpense
   if (!(monthly > 0)) return { noExpenses: true, expense: base.expense }
+  // Ignore tiny moves (rounding, a few days of spending): never suggest less than half a month.
+  const minMove = Math.max(1000, monthly * 0.5)
   const totals = base.totals
   const months = {
     b1: totals.b1 / monthly,
@@ -234,7 +236,7 @@ export function buildBucketRefillPlan({
         b2Add = stepAmount - b1Add
       }
       for (const [to, amount] of [['b2', b2Add], ['b1', b1Add]]) {
-        if (amount <= 1) continue
+        if (amount < 1000) continue
         const result = sellGrowth(b3Sources, amount, committedUnits, rules.goodMarketMaxBelowAthPct)
         if (result.fundedAmount > 1) operations.push(operation(`build-b3-to-${to}`, 'b3', to, result, 'build-step'))
         if (result.shortfall > 1) warnings.push({ code: 'growth-short-build', amount: result.shortfall })
@@ -279,7 +281,7 @@ export function buildBucketRefillPlan({
   if (market.status === 'good') {
     // 1. Stability already above 5 years: its extra goes to income first.
     const b2Surplus = Math.max(0, b2Now - targets.b2)
-    if (b1Need > 1 && b2Surplus > 1) {
+    if (b1Need > minMove && b2Surplus > minMove) {
       const result = allocateFromFundsByTarget(b2Sources, Math.min(b1Need, b2Surplus), committedUnits)
       if (result.fundedAmount > 1) {
         operations.push(operation('b2-to-b1', 'b2', 'b1', result, 'stability-surplus'))
@@ -288,7 +290,7 @@ export function buildBucketRefillPlan({
       }
     }
     // 2. Growth refills income directly.
-    if (b1Need > 1) {
+    if (b1Need > minMove) {
       const result = sellGrowth(b3Sources, b1Need, committedUnits, rules.goodMarketMaxBelowAthPct)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b1', 'b3', 'b1', result, 'good-market'))
@@ -297,21 +299,21 @@ export function buildBucketRefillPlan({
     }
     // 3. Growth tops stability back up to 5 years.
     const b2Gap = Math.max(0, targets.b2 - b2Now)
-    if (b2Gap > 1) {
+    if (b2Gap > minMove) {
       const result = sellGrowth(b3Sources, b2Gap, committedUnits, rules.goodMarketMaxBelowAthPct)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b2', 'b3', 'b2', result, 'good-market'))
         b2Now += result.fundedAmount
       }
-      if (result.shortfall > 1) warnings.push({ code: 'growth-short-stability', amount: result.shortfall })
+      if (result.shortfall > minMove) warnings.push({ code: 'growth-short-stability', amount: result.shortfall })
     }
   }
 
   // Down market (or growth not enough / no ATH data): stability pays income,
   // but never below its floor. Growth is not sold.
-  if (b1Need > 1) {
+  if (b1Need > minMove) {
     const available = Math.max(0, b2Now - targets.b2Floor)
-    if (available > 1) {
+    if (available > minMove) {
       const result = allocateFromFundsByTarget(b2Sources, Math.min(b1Need, available), committedUnits)
       if (result.fundedAmount > 1) {
         operations.push(operation('b2-to-b1-down', 'b2', 'b1', result, market.status === 'good' ? 'growth-short' : 'down-market'))
@@ -319,7 +321,7 @@ export function buildBucketRefillPlan({
         b2Now -= result.fundedAmount
       }
     }
-    if (b1Need > 1) warnings.push({ code: market.status === 'good' ? 'growth-short' : 'stability-floor', amount: b1Need })
+    if (b1Need > minMove) warnings.push({ code: market.status === 'good' ? 'growth-short' : 'stability-floor', amount: b1Need })
   }
 
   if (market.status === 'unknown' && base.byBucket.b3.length) warnings.push({ code: 'market-unknown' })

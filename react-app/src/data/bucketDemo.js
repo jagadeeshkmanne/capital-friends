@@ -38,6 +38,11 @@ export function buildDemoData(key) {
     targetDate,
     targetAmount: 20000000,
   }
+  // Sample bucket sizes are given at today's ₹50,000; scale them by one year of
+  // inflation so the jars show round numbers (e.g. 1.0 yr) at this year's spending.
+  const f = S.retireInMonths ? 1 : 1.06
+  const b1 = S.b1 * f
+  const b2 = S.b2 * f
   const debtPf = S.split ? 'DEMO-P2' : 'DEMO-P1'
   const g = S.growthScale || 1
   const fund = (portfolioId, code, name, category, value, nav, ath) => ({
@@ -51,9 +56,9 @@ export function buildDemoData(key) {
       ? [{ goalId: DEMO_GOAL_ID, portfolioId: 'DEMO-P1', allocationPct: 100 }, { goalId: DEMO_GOAL_ID, portfolioId: 'DEMO-P2', allocationPct: 100 }]
       : [{ goalId: DEMO_GOAL_ID, portfolioId: 'DEMO-P1', allocationPct: 100 }],
     mfHoldings: [
-      fund(debtPf, 'DEMO-L1', 'Sample Liquid Fund', 'Liquid', S.b1, 1450.2, 1450.2),
-      fund(debtPf, 'DEMO-H1', 'Sample Balanced Advantage Fund', 'Hybrid', S.b2 * 0.6, 72.4, 74),
-      fund(debtPf, 'DEMO-H2', 'Sample Corporate Bond Fund', 'Debt', S.b2 * 0.4, 31.8, 31.8),
+      fund(debtPf, 'DEMO-L1', 'Sample Liquid Fund', 'Liquid', b1, 1450.2, 1450.2),
+      fund(debtPf, 'DEMO-H1', 'Sample Balanced Advantage Fund', 'Hybrid', b2 * 0.6, 72.4, 74),
+      fund(debtPf, 'DEMO-H2', 'Sample Corporate Bond Fund', 'Debt', b2 * 0.4, 31.8, 31.8),
       fund('DEMO-P1', 'DEMO-E1', 'Sample Flexi Cap Fund', 'Equity', g * 7000000 * S.nav / 100, S.nav * 0.9, 90),
       fund('DEMO-P1', 'DEMO-E2', 'Sample Nifty 500 Index Fund', 'Index', g * 4000000 * S.nav / 100, S.nav * 0.25, 25),
       fund('DEMO-P1', 'DEMO-E3', 'Sample Small Cap Fund', 'Equity', g * 800000 * S.small / 40, S.small * 4.2, 168),

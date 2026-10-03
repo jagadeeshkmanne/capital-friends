@@ -205,3 +205,8 @@ test('funds are placed in a bucket from the automatic category and the name, wit
     assert.equal(classifyRetirementHolding({ category, fundName }, null).bucket, bucket, fundName)
   }
 })
+
+test('tiny gaps (rounding, a few days of spending) are not suggested as steps', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 600000, b2: 2999700, b3: 11800000 }), planDate: ON_REFILL_DATE })
+  assert.deepEqual(ids(plan), ['b3-to-b1'])
+})
