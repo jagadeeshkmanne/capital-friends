@@ -15,7 +15,7 @@ import FundSearchInput from '../../components/forms/FundSearchInput'
 import MFSwitchForm from '../../components/forms/MFSwitchForm'
 import MFRedeemForm from '../../components/forms/MFRedeemForm'
 import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
-import { allocateBucketWithdrawal } from '../../utils/retirementBuckets'
+import { allocateBucketWithdrawal, buildTargetAwareBucketPreview } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
 
 const BUCKET = {
@@ -29,6 +29,7 @@ const REASON = {
   'stability-surplus': 'Stability has more than 5 years, so its extra is used first.',
   'down-market': 'Growth funds are down, so Stability pays and growth is left alone.',
   'growth-short': 'Growth did not have enough, so Stability covers the rest.',
+  'glide-path': 'Your equity is above the glide path for your years to retirement, so some growth moves to safer funds.',
 }
 
 const fmtDate = d => (d ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
@@ -36,6 +37,9 @@ const yrs = months => {
   const y = Math.max(0, months) / 12
   return `${y.toFixed(1)} ${y >= 0.95 && y < 1.05 ? 'yr' : 'yrs'}`
 }
+const EMPTY_SET = new Set()
+// Round units down so a prefilled sale never exceeds the units held.
+const unitsDown = u => (Math.floor(Math.max(0, u) * 1000) / 1000).toFixed(3)
 const num = (value, fallback) => {
   if (value === undefined || value === '') return fallback
   const n = parseFloat(value)
@@ -50,10 +54,10 @@ export default function RetirementBucketsPage() {
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const [switchDraft, setSwitchDraft] = useState(null)
   const [redeemDraft, setRedeemDraft] = useState(null)
-  const [recorded, setRecorded] = useState(() => new Set())
+  // Recording session for one goal: { goalId, ops, done: Set }.
   // Once the user starts recording, keep the steps they are following fixed until
   // every line is recorded; the jars above still update from live data.
-  const [frozenOps, setFrozenOps] = useState(null)
+  const [session, setSession] = useState(null)
 
   const [showHelp, setShowHelp] = useState(false)
   const [forceShow, setForceShow] = useState(false)
@@ -89,7 +93,7 @@ export default function RetirementBucketsPage() {
       </div>
       <div className="flex items-center gap-2">
         {goals.length > 1 && (
-          <select value={goal?.goalId || ''} onChange={e => { setParams({ goal: e.target.value }); setForceShow(false); setFrozenOps(null); setRecorded(new Set()) }}
+          <select value={goal?.goalId || ''} onChange={e => { setParams({ goal: e.target.value }); setForceShow(false) }}
             className="text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-2.5 py-2 text-[var(--text-primary)] max-w-[160px]">
             {goals.map(g => <option key={g.goalId} value={g.goalId}>{g.goalName}</option>)}
           </select>
@@ -128,42 +132,50 @@ export default function RetirementBucketsPage() {
   }
 
   const canRecord = plan.schedule.retired || plan.status === 'building'
-  const showSteps = !!frozenOps || (plan.hasWork && plan.status !== 'not-started' && (plan.status !== 'not-due' || forceShow))
-  const stepOps = frozenOps || plan.operations
-  const totalLines = stepOps.reduce((n, op) => n + op.allocations.length, 0)
+  // Years before retirement: the existing glide-path preview (same as the old Bucket Preview).
+  const previewOps = plan.status === 'not-started'
+    ? buildTargetAwareBucketPreview(plan).map(op => ({ ...op, reason: 'glide-path' }))
+    : null
+  const liveOps = previewOps || plan.operations
+  const active = session && session.goalId === goal.goalId ? session : null
+  const frozenOps = active?.ops || null
+  const recorded = active?.done || EMPTY_SET
+  const showSteps = !!frozenOps || (liveOps.length > 0 && (plan.status !== 'not-due' || forceShow))
+  const stepOps = frozenOps || liveOps
 
   return (
     <div className="space-y-4 pb-6">
       {header}
-      <StatusHero plan={plan} goal={goal} forceShow={forceShow} onForce={() => setForceShow(true)} />
-      <BucketCards plan={plan} showAfter={showSteps} />
+      <StatusHero plan={plan} goal={goal} previewCount={previewOps?.length || 0} forceShow={forceShow} onForce={() => setForceShow(true)} />
+      <BucketCards plan={plan} showAfter={showSteps && !previewOps} />
       <MarketCheck plan={plan} />
       <Warnings plan={plan} />
       {showSteps && (
         <RefillSteps key={goal.goalId} plan={plan} operations={stepOps} canRecord={canRecord} recorded={recorded}
-          onRecordSwitch={({ lineKey, op, allocation, dest }) => { if (!frozenOps) setFrozenOps(plan.operations); setSwitchDraft({
+          onRecordSwitch={({ lineKey, op, allocation, dest }) => setSwitchDraft({
             lineKey,
+            opsSnapshot: frozenOps || liveOps,
             portfolioId: allocation.portfolioId,
             initial: {
               fromPortfolioId: allocation.portfolioId,
-              toPortfolioId: allocation.portfolioId,
+              toPortfolioId: dest.portfolioId || allocation.portfolioId,
               fromFundCode: allocation.schemeCode,
               fromFundName: allocation.fundName,
               toFundCode: dest.schemeCode,
               toFundName: dest.fundName,
-              units: allocation.units.toFixed(3),
+              units: unitsDown(allocation.units),
               fromPrice: allocation.currentNav ? String(allocation.currentNav) : '',
               toPrice: dest.currentNav ? String(dest.currentNav) : '',
               notes: `Retirement bucket refill: ${BUCKET[op.from].name} to ${BUCKET[op.to].name} (${goal.goalName})`,
             },
-          }) }} />
+          })} />
       )}
       {plan.schedule.retired && plan.totals.b1 > 1 && (
         <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan}
           onRecordRedeem={a => setRedeemDraft({
             portfolioId: a.portfolioId,
             fundCode: a.schemeCode,
-            initial: { units: a.units.toFixed(3), notes: `Retirement monthly income (${goal.goalName})` },
+            initial: { units: unitsDown(a.units), notes: `Retirement monthly income (${goal.goalName})` },
           })} />
       )}
       <p className="text-[11px] text-[var(--text-dim)] leading-relaxed px-1">
@@ -179,14 +191,16 @@ export default function RetirementBucketsPage() {
               showBlockUI('Recording switch...')
               try {
                 await switchMF(data)
+                const ops = switchDraft.opsSnapshot
+                const lines = ops.reduce((n, op) => n + op.allocations.length, 0)
                 const next = new Set(recorded).add(switchDraft.lineKey)
                 setSwitchDraft(null)
-                if (next.size >= totalLines) {
-                  setRecorded(new Set()); setFrozenOps(null); setForceShow(false)
+                if (next.size >= lines) {
+                  setSession(null); setForceShow(false)
                   showToast('All switches recorded. Refill done.')
                 } else {
-                  setRecorded(next)
-                  showToast(`Switch recorded (${next.size} of ${totalLines})`)
+                  setSession({ goalId: goal.goalId, ops, done: next })
+                  showToast(`Switch recorded (${next.size} of ${lines})`)
                 }
               } catch (err) {
                 showToast(err.message || 'Failed to record switch', 'error')
@@ -220,15 +234,17 @@ export default function RetirementBucketsPage() {
 }
 
 /* ── Top card: one clear answer ── */
-function StatusHero({ plan, goal, forceShow, onForce }) {
+function StatusHero({ plan, goal, previewCount, forceShow, onForce }) {
   const moves = plan.operations
   const totalMove = moves.reduce((sum, op) => sum + op.fundedAmount, 0)
   let tone = 'emerald', Icon = CheckCircle2, title, detail, action = null
 
   if (plan.status === 'not-started') {
     tone = 'blue'; Icon = CalendarClock
-    title = `Retirement starts ${fmtDate(plan.schedule.retirementDate)}`
-    detail = 'Refill suggestions start 3 years before retirement. Until then, keep following your goal’s glide path on the Goals page.'
+    title = plan.schedule.retirementDate ? `Retirement starts ${fmtDate(plan.schedule.retirementDate)}` : 'Set a retirement date'
+    detail = previewCount
+      ? 'Refills start 3 years before retirement. For now, your equity is above the glide path. See the suggested moves below (preview only).'
+      : 'Refills start 3 years before retirement. Until then, your goal just follows its glide path, and it is on track.'
   } else if (plan.status === 'ok') {
     title = 'All set. No refill needed'
     detail = `Your Income bucket has ${yrs(plan.months.b1)} of expenses. Next yearly check: ${fmtDate(plan.schedule.nextDate)}.`
@@ -237,6 +253,9 @@ function StatusHero({ plan, goal, forceShow, onForce }) {
     title = 'No refill needed yet'
     detail = `Income has ${yrs(plan.months.b1)} left. The next refill is on ${fmtDate(plan.nextCheckDate)}, or earlier if Income drops to 1 year.`
     if (plan.hasWork && !forceShow) action = <button onClick={onForce} className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1">Show the refill plan anyway <ChevronDown size={13} /></button>
+  } else if (!plan.hasWork && plan.status === 'building') {
+    title = 'Buckets are on track for retirement'
+    detail = `Retirement starts ${fmtDate(plan.schedule.retirementDate)}. Nothing needs to move right now.`
   } else if (!plan.hasWork) {
     tone = 'amber'; Icon = AlertTriangle
     title = 'Refill due, but nothing can be moved'
@@ -259,7 +278,7 @@ function StatusHero({ plan, goal, forceShow, onForce }) {
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-[var(--bg-card)]/60 flex items-center justify-center shrink-0"><Icon size={20} /></div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{goal.goalName} · {formatINR(plan.expense.monthlyExpense)}/month{plan.expense.inflation > 0 ? ' this year' : ''}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{goal.goalName} · {formatINR(plan.expense.monthlyExpense)}/month{plan.expense.inflation > 0 ? (plan.schedule.retired ? ' this year' : ' at retirement') : ''}</p>
           <p className="text-lg font-bold text-[var(--text-primary)] leading-snug mt-0.5">{title}</p>
           <p className="text-sm text-[var(--text-muted)] mt-1">{detail}</p>
           {action && <div className="mt-2">{action}</div>}
@@ -382,11 +401,20 @@ function MarketCheck({ plan }) {
 }
 
 /* ── Plain-language warnings ── */
+const WARN_TONE = {
+  amber: { box: 'border-amber-500/25 bg-amber-500/10', text: 'text-amber-400' },
+  rose: { box: 'border-rose-500/25 bg-rose-500/10', text: 'text-rose-400' },
+  blue: { box: 'border-blue-500/25 bg-blue-500/10', text: 'text-blue-400' },
+}
 function Warnings({ plan }) {
   const seen = new Set()
-  const items = plan.warnings.filter(w => (seen.has(w.code) ? false : seen.add(w.code))).map(w => {
+  // Years before retirement only fund classification matters; refill warnings would confuse.
+  const relevant = plan.status === 'not-started' ? plan.warnings.filter(w => w.code === 'unclassified') : plan.warnings
+  const items = relevant.filter(w => (seen.has(w.code) ? false : seen.add(w.code))).map(w => {
     switch (w.code) {
       case 'stability-floor': return { tone: 'amber', title: 'Stability has reached its 2-year minimum', text: `Income is short by ${formatINR(w.amount)} this time. Growth is still down, so it is not sold. If you can, spend a little less until the market recovers.` }
+      case 'growth-short-stability': return { tone: 'amber', title: 'Stability could not be fully topped up', text: `About ${formatINR(w.amount)} is still missing from Stability. It is topped up again in the next good year.` }
+      case 'building-capped': return { tone: 'blue', title: 'Buckets fill gradually before retirement', text: 'Until you retire, growth only gives the part above its own target, so equity is not sold all at once. The rest is moved in the coming years.' }
       case 'growth-short': return { tone: 'amber', title: 'Growth did not have enough', text: `About ${formatINR(w.amount)} could not be moved. Review your expenses or the funds linked to this goal.` }
       case 'market-unknown': return { tone: 'amber', title: 'Market check not available', text: 'All-time high NAV is missing for your growth funds, so the plan protects growth and uses Stability instead. It usually appears after the next daily data refresh.' }
       case 'unclassified': return { tone: 'rose', title: `${w.count} fund(s) are not in any bucket`, text: 'Their category is unclear, so they are left out of the plan. Check them on the Mutual Funds page.' }
@@ -397,27 +425,31 @@ function Warnings({ plan }) {
   if (!items.length) return null
   return (
     <div className="space-y-2">
-      {items.map(item => (
-        <div key={item.title} className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${item.tone === 'rose' ? 'border-rose-500/25 bg-rose-500/10' : 'border-amber-500/25 bg-amber-500/10'}`}>
-          <AlertTriangle size={16} className={`shrink-0 mt-0.5 ${item.tone === 'rose' ? 'text-rose-400' : 'text-amber-400'}`} />
-          <div>
-            <p className={`text-sm font-semibold ${item.tone === 'rose' ? 'text-rose-400' : 'text-amber-400'}`}>{item.title}</p>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{item.text}</p>
+      {items.map(item => {
+        const t = WARN_TONE[item.tone] || WARN_TONE.amber
+        const Icon = item.tone === 'blue' ? Info : AlertTriangle
+        return (
+          <div key={item.title} className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${t.box}`}>
+            <Icon size={16} className={`shrink-0 mt-0.5 ${t.text}`} />
+            <div>
+              <p className={`text-sm font-semibold ${t.text}`}>{item.title}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{item.text}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
 /* ── Step-by-step sell and buy list ── */
+// Funds that can receive the money: the same portfolio first, then any other
+// portfolio linked to this goal (for example a separate debt portfolio). Within
+// each, the fund furthest below its target comes first.
 function destinationCandidates(plan, bucket, portfolioId) {
-  return plan.byBucket[bucket]
-    .filter(f => f.portfolioId === portfolioId)
-    .sort((a, b) => {
-      const gap = f => (Number(f.portfolioGoalValue) || 0) * (Number(f.effectiveTargetAllocationPct ?? f.targetAllocationPct) || 0) / 100 - (Number(f.goalValue) || 0)
-      return gap(b) - gap(a)
-    })
+  const gap = f => (Number(f.portfolioGoalValue) || 0) * (Number(f.effectiveTargetAllocationPct ?? f.targetAllocationPct) || 0) / 100 - (Number(f.goalValue) || 0)
+  return [...plan.byBucket[bucket]].sort((a, b) =>
+    Number(b.portfolioId === portfolioId) - Number(a.portfolioId === portfolioId) || gap(b) - gap(a))
 }
 
 function groupByPortfolio(allocations) {
@@ -483,13 +515,13 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                         {candidates.length > 1 ? (
                           <select value={dest?.key || ''} onChange={e => setDestinations(p => ({ ...p, [destKey]: candidates.find(c => c.key === e.target.value) }))}
                             className="w-full text-sm font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]">
-                            {candidates.map(c => <option key={c.key} value={c.key}>{splitFundName(c.fundName || '').main}</option>)}
+                            {candidates.map(c => <option key={c.key} value={c.key}>{splitFundName(c.fundName || '').main}{multiPortfolio ? ` · ${c.portfolioName}` : ''}</option>)}
                           </select>
                         ) : candidates.length === 1 ? (
-                          <div className="bg-[var(--bg-card)] rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text-secondary)]">{splitFundName(candidates[0].fundName || '').main}</div>
+                          <div className="bg-[var(--bg-card)] rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text-secondary)]">{splitFundName(candidates[0].fundName || '').main}{multiPortfolio && <span className="font-normal text-[var(--text-dim)]"> · {candidates[0].portfolioName}</span>}</div>
                         ) : (
                           <div className="space-y-1.5">
-                            <p className="text-xs text-amber-400">No {to.name.toLowerCase()} fund in this portfolio yet. Pick one:</p>
+                            <p className="text-xs text-amber-400">No {to.name.toLowerCase()} fund linked to this goal yet. Pick one to add to this portfolio:</p>
                             <FundSearchInput value={dest ? { schemeCode: dest.schemeCode, fundName: dest.fundName } : null}
                               onSelect={({ schemeCode, fundName, nav }) => setDestinations(p => ({ ...p, [destKey]: { key: `new::${schemeCode}`, schemeCode: String(schemeCode), fundName, currentNav: nav || 0, portfolioId } }))}
                               placeholder={op.to === 'b1' ? 'Search a liquid fund…' : 'Search a hybrid or debt fund…'} />
@@ -498,9 +530,12 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                       </div>
                     </div>
 
+                    {dest?.portfolioId && dest.portfolioId !== portfolioId && (
+                      <p className="text-[11px] text-violet-400">Cross-portfolio switch: money moves from {allocations[0].portfolioName} to {dest.portfolioName}.</p>
+                    )}
                     <p className={`text-[11px] font-semibold ${from.text}`}>Sell {allocations.length > 1 ? `from ${allocations.length} funds` : ''}</p>
                     {allocations.map(a => {
-                      const lineKey = `${op.id}::${a.key}::${dest?.schemeCode || ''}`
+                      const lineKey = `${op.id}::${a.key}`
                       const done = recorded.has(lineKey)
                       return (
                         <div key={a.key} className="bg-[var(--bg-card)] rounded-lg px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2.5">

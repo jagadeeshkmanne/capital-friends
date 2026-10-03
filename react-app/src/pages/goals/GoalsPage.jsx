@@ -11,7 +11,6 @@ import Modal from '../../components/Modal'
 import GoalForm from '../../components/forms/GoalForm'
 import GoalWithdrawalPlan from '../../components/forms/GoalWithdrawalPlan'
 import GlidepathRebalancePlan from '../../components/forms/GlidepathRebalancePlan'
-import RetirementBucketPlan from '../../components/forms/RetirementBucketPlan'
 import PageLoading from '../../components/PageLoading'
 import { calculateGoalFundingProjection } from '../../utils/goalProjection'
 
@@ -118,7 +117,6 @@ export default function GoalsPage() {
   const [modal, setModal] = useState(null)
   const [withdrawalGoal, setWithdrawalGoal] = useState(null)
   const [rebalanceGoal, setRebalanceGoal] = useState(null)
-  const [bucketGoal, setBucketGoal] = useState(null)
   const [showCelebration, setShowCelebration] = useState(null)
   const prevAchievedRef = useRef(new Set())
 
@@ -520,24 +518,6 @@ export default function GoalsPage() {
     }
   }
 
-  async function handleConfirmBucketPlan(switches, redemptions) {
-    showBlockUI('Recording bucket plan...')
-    try {
-      const result = await executeMFPlan(switches, redemptions || [])
-      if (!result?.success) {
-        const detail = result?.partial ? ' Some earlier transactions may have been recorded; refresh and review before retrying.' : ''
-        throw new Error((result?.message || 'Bucket plan failed') + detail)
-      }
-      setBucketGoal(null)
-      const total = switches.length + (redemptions?.length || 0)
-      showToast(`${total} transaction${total !== 1 ? 's' : ''} recorded`)
-    } catch (err) {
-      showToast(err.message || 'Failed to record bucket plan', 'error')
-    } finally {
-      hideBlockUI()
-    }
-  }
-
   function getProgress(g) {
     if (!g.targetAmount || g.targetAmount === 0) return 0
     return Math.min(((g.currentValue || 0) / g.targetAmount) * 100, 100)
@@ -930,7 +910,7 @@ export default function GoalsPage() {
                       </button>
                     )}
                     {g.goalType === 'Retirement' && (
-                      <button onClick={() => setBucketGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
+                      <button onClick={() => navigate(`/retirement-buckets?goal=${encodeURIComponent(g.goalId)}`)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
                         <Wallet size={11} /> {isPastDue || g.status === 'Achieved' || parseFloat(yearsLeft) <= 3 ? 'Buckets' : 'Bucket Preview'}
                       </button>
                     )}
@@ -1179,22 +1159,6 @@ export default function GoalsPage() {
             assetAllocations={assetAllocations}
             onClose={() => setRebalanceGoal(null)}
             onConfirmRebalance={handleConfirmRebalance}
-          />
-        )}
-      </Modal>
-
-      <Modal open={!!bucketGoal} onClose={() => setBucketGoal(null)} title={`Retirement Bucket Plan — ${bucketGoal?.goalName || ''}`} maxWidth="max-w-4xl" maxHeight="max-h-[86vh]">
-        {bucketGoal && (
-          <RetirementBucketPlan
-            goal={bucketGoal}
-            health={allocationHealth[bucketGoal.goalId]}
-            goalPortfolioMappings={goalPortfolioMappings}
-            mfHoldings={mfHoldings}
-            mfPortfolios={mfPortfolios}
-            assetAllocations={assetAllocations}
-            executionEnabled={bucketGoal.status === 'Achieved' || getYearsLeft(bucketGoal) === '0' || parseFloat(getYearsLeft(bucketGoal)) <= 3}
-            onClose={() => setBucketGoal(null)}
-            onConfirmPlan={handleConfirmBucketPlan}
           />
         )}
       </Modal>

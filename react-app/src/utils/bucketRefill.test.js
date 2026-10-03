@@ -122,3 +122,40 @@ test('market check is weighted by value and schedule uses the retirement anniver
   assert.equal(schedule.lastDate.toISOString().slice(0, 10), '2027-01-15')
   assert.equal(schedule.nextDate.toISOString().slice(0, 10), '2028-01-15')
 })
+
+test('income full but stability short in a good year: shown as not due, not "all set"', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 1200000, b2: 1500000, b3: 11800000 }), planDate: MID_YEAR })
+  assert.deepEqual(ids(plan), ['b3-to-b2'])
+  assert.equal(plan.status, 'not-due')
+})
+
+test('goal marked Achieved before its target date counts as retired', () => {
+  const early = { ...goal, status: 'Achieved', targetDate: '2035-01-15T00:00:00.000Z' }
+  const plan = buildBucketRefillPlan({ ...base, goal: early, holdings: holdings({ b1: 600000, b2: 3000000, b3: 11800000 }), planDate: MID_YEAR })
+  assert.equal(plan.schedule.retired, true)
+  assert.equal(plan.status, 'due')
+})
+
+test('before retirement, growth only gives the part above its own target', () => {
+  const soon = { ...goal, targetDate: '2028-01-15T00:00:00.000Z', targetAmount: 5000000 }
+  const plan = buildBucketRefillPlan({ ...base, goal: soon, holdings: holdings({ b1: 0, b2: 0, b3: 5000000 }), planDate: ON_REFILL_DATE })
+  assert.equal(plan.status, 'building')
+  const sold = plan.operations.filter(op => op.from === 'b3').reduce((s, op) => s + op.fundedAmount, 0)
+  assert.ok(sold <= 4200000 + 1) // ₹50L - (₹50L target - ₹12L - ₹30L) = ₹42L max
+  const capped = buildBucketRefillPlan({ ...base, goal: { ...soon, targetAmount: 8000000 }, holdings: holdings({ b1: 0, b2: 0, b3: 5000000 }), planDate: ON_REFILL_DATE })
+  const soldCapped = capped.operations.filter(op => op.from === 'b3').reduce((s, op) => s + op.fundedAmount, 0)
+  assert.equal(Math.round(soldCapped), 1200000) // ₹50L - (₹80L - ₹42L) = ₹12L
+  assert.ok(capped.warnings.some(w => w.code === 'building-capped'))
+})
+
+test('negative or zero expenses are treated as not set', () => {
+  const plan = buildBucketRefillPlan({ ...base, goal: { ...goal, monthlyExpenses: -5000 }, holdings: holdings({ b1: 600000, b2: 3000000, b3: 11800000 }), planDate: ON_REFILL_DATE })
+  assert.equal(plan.noExpenses, true)
+})
+
+test('growth funds without all-time-high data are sold only after funds near their high', () => {
+  const noAth = { portfolioId: 'P1', schemeCode: 'E9', fundName: 'New Fund', category: 'Flexi Cap', units: 10000, currentNav: 100, currentValue: 1000000, athNav: 0 }
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 600000, b2: 3000000, b3: 11000000, nav: 99, extraGrowth: noAth }), planDate: ON_REFILL_DATE })
+  const sold = plan.operations.find(op => op.id === 'b3-to-b1').allocations
+  assert.deepEqual(sold.map(a => a.schemeCode), ['E1'])
+})

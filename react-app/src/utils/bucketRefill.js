@@ -1,7 +1,7 @@
 // Retirement bucket refill check, used by the Retirement Buckets page.
 //
 // This file adds the yearly refill rules on top of the existing bucket plan.
-// It does not change buildRetirementBucketPlan (used by the Goals page popup);
+// It does not change buildRetirementBucketPlan (the existing bucket plan builder);
 // it only reads the funds, bucket totals and expense basis from it.
 //
 // Rules (kept in one place so the page and its help text agree):
@@ -80,7 +80,13 @@ export function assessGrowthMarket(growthFunds, maxBelowAthPct = REFILL_RULES.go
 // The refill date is the retirement date's anniversary each year.
 export function refillSchedule(goal, planDate = new Date()) {
   const start = validDate(goal?.targetDate)
-  if (!start) return { retired: goal?.status === 'Achieved', retirementDate: null, lastDate: null, nextDate: null, yearsToRetirement: null }
+  const achieved = goal?.status === 'Achieved'
+  if (!start) return { retired: achieved, retirementDate: null, lastDate: null, nextDate: null, yearsToRetirement: null }
+  // Retired early: the goal is marked Achieved before its target date. There is
+  // no anniversary yet, so refills are triggered by the income level only.
+  if (start > planDate && achieved) {
+    return { retired: true, retirementDate: start, lastDate: null, nextDate: null, yearsToRetirement: 0 }
+  }
   if (start > planDate) {
     return {
       retired: false,
@@ -90,6 +96,7 @@ export function refillSchedule(goal, planDate = new Date()) {
       yearsToRetirement: (start.getTime() - planDate.getTime()) / (365.25 * DAY_MS),
     }
   }
+  // A 29 Feb retirement date rolls to 1 Mar in non-leap years (JS Date behaviour).
   const last = new Date(start)
   last.setFullYear(planDate.getFullYear())
   if (last > planDate) last.setFullYear(last.getFullYear() - 1)
@@ -102,12 +109,12 @@ function operation(id, from, to, result, reason) {
   return { id, from, to, label: `${from.toUpperCase()} to ${to.toUpperCase()}`, reason, ...result }
 }
 
-// Sell from growth funds that are near their high first; dip into the others
-// only if those are not enough.
+// Sell from growth funds that are near their high first; funds that fell more,
+// or have no all-time-high data, are used only if those are not enough.
 function sellGrowth(growthFunds, amount, committedUnits, maxBelowAthPct) {
   const nearHigh = growthFunds.filter(fund => {
     const below = belowAthPct(fund)
-    return below === null || below <= maxBelowAthPct
+    return below !== null && below <= maxBelowAthPct
   })
   const others = growthFunds.filter(fund => !nearHigh.includes(fund))
   const first = allocateFromFundsByTarget(nearHigh, amount, committedUnits)
@@ -145,6 +152,7 @@ export function buildBucketRefillPlan({
   if (!base || base.noExpenses) return base
 
   const monthly = base.expense.monthlyExpense
+  if (!(monthly > 0)) return { noExpenses: true, expense: base.expense }
   const totals = base.totals
   const months = {
     b1: totals.b1 / monthly,
@@ -170,6 +178,20 @@ export function buildBucketRefillPlan({
   const committedUnits = {}
   const operations = []
   const warnings = []
+  // Before retirement, growth only gives the part above its own target (the
+  // existing builder's safety rule), so the buckets fill gradually instead of
+  // selling most of the equity in one go.
+  let growthBudget = schedule.retired ? Infinity : Math.max(0, totals.b3 - base.targets.b3)
+  let growthCapped = false
+  const sellGrowthCapped = amount => {
+    const allowed = Math.min(amount, growthBudget)
+    if (allowed < amount - 1) growthCapped = true
+    const result = allowed > 1
+      ? sellGrowth(b3Sources, allowed, committedUnits, rules.goodMarketMaxBelowAthPct)
+      : { allocations: [], fundedAmount: 0, shortfall: 0 }
+    growthBudget -= result.fundedAmount
+    return result
+  }
   const b1Gap = Math.max(0, targets.b1 - totals.b1)
   let b1Need = b1Gap
   let b2Now = totals.b2
@@ -187,7 +209,7 @@ export function buildBucketRefillPlan({
     }
     // 2. Growth refills income directly.
     if (b1Need > 1) {
-      const result = sellGrowth(b3Sources, b1Need, committedUnits, rules.goodMarketMaxBelowAthPct)
+      const result = sellGrowthCapped(b1Need)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b1', 'b3', 'b1', result, 'good-market'))
         b1Need -= result.fundedAmount
@@ -196,12 +218,12 @@ export function buildBucketRefillPlan({
     // 3. Growth tops stability back up to 5 years.
     const b2Gap = Math.max(0, targets.b2 - b2Now)
     if (b2Gap > 1) {
-      const result = sellGrowth(b3Sources, b2Gap, committedUnits, rules.goodMarketMaxBelowAthPct)
+      const result = sellGrowthCapped(b2Gap)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b2', 'b3', 'b2', result, 'good-market'))
         b2Now += result.fundedAmount
       }
-      if (result.shortfall > 1) warnings.push({ code: 'growth-short', amount: result.shortfall })
+      if (result.shortfall > 1) warnings.push({ code: 'growth-short-stability', amount: result.shortfall })
     }
   }
 
@@ -219,6 +241,7 @@ export function buildBucketRefillPlan({
     }
     if (b1Need > 1) warnings.push({ code: market.status === 'good' ? 'growth-short' : 'stability-floor', amount: b1Need })
   }
+  if (growthCapped) warnings.push({ code: 'building-capped' })
 
   if (market.status === 'unknown' && base.byBucket.b3.length) warnings.push({ code: 'market-unknown' })
   if (base.totals.unclassified > 1) warnings.push({ code: 'unclassified', count: base.byBucket.unclassified.length })
@@ -235,11 +258,12 @@ export function buildBucketRefillPlan({
   const hasWork = operations.length > 0
   if (!schedule.retired) {
     status = schedule.yearsToRetirement !== null && schedule.yearsToRetirement <= 3 ? 'building' : 'not-started'
-  } else if (b1Gap <= monthly * 0.5) {
+  } else if (!hasWork && b1Gap <= monthly * 0.5) {
     status = 'ok'
   } else if (b1Low || inWindow) {
     status = 'due'
   } else {
+    // Includes a stability-only top-up while income is full: shown on request.
     status = 'not-due'
   }
 
