@@ -792,9 +792,11 @@ export default function GoalsPage() {
                           )}
                         </div>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${needsSip ? 'bg-amber-500/15 text-amber-400' : (statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]')}`}>
-                        {needsSip ? 'Needs SIP' : g.status}
-                      </span>
+                      {(() => {
+                        const notStarted = !isPastDue && actual === 0 && _cardGap > 0
+                        const cls = needsSip ? 'bg-amber-500/15 text-amber-400' : notStarted ? 'bg-slate-500/15 text-[var(--text-muted)]' : (statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]')
+                        return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${cls}`}>{needsSip ? 'Needs SIP' : notStarted ? 'Not started' : g.status}</span>
+                      })()}
                     </div>
                   </div>
 
