@@ -14,6 +14,10 @@
 //     then growth → stability back to 5 years.
 //   - Down market: stability → B1, but stability never goes below 2 years.
 //     Growth is not sold. If B1 still can't be filled, the plan warns.
+//   - Late starter (retired with little or no safe money, market down): if Income
+//     would still hold less than 1 year after Stability has paid, sell just enough
+//     growth for 1 year of expenses, because there is nothing else to live on.
+//     The rest is built in the next good year.
 //   - An underfunded corpus never blocks a refill; it only shows a warning.
 //   - Last 5 years before retirement: build Income + Stability in quarterly steps
 //     of (what is missing) / (quarters left), good market only, one step per
@@ -29,6 +33,7 @@ export const REFILL_RULES = {
   stabilityMonths: 60,
   stabilityFloorMonths: 24,
   earlyRefillMonths: 12,
+  lateStartIncomeMonths: 12,
   goodMarketMaxBelowAthPct: 10,
   refillWindowDays: 45,
   highWithdrawalRate: 0.05,
@@ -323,7 +328,19 @@ export function buildBucketRefillPlan({
         b2Now -= result.fundedAmount
       }
     }
-    if (b1Need > minMove) warnings.push({ code: market.status === 'good' ? 'growth-short' : 'stability-floor', amount: b1Need })
+    // Late starter: Income still under 1 year and no more safe money to use.
+    // Sell just enough growth for 1 year of expenses, even in a down market.
+    const b1Now = targets.b1 - b1Need
+    const lateNeed = Math.min(b1Need, Math.max(0, monthly * rules.lateStartIncomeMonths - b1Now))
+    if (market.status !== 'good' && lateNeed > minMove && b3Sources.length) {
+      const result = sellGrowth(b3Sources, lateNeed, committedUnits, rules.goodMarketMaxBelowAthPct)
+      if (result.fundedAmount > 1) {
+        operations.push(operation('b3-to-b1-late', 'b3', 'b1', result, 'late-start'))
+        b1Need -= result.fundedAmount
+        warnings.push({ code: 'late-start', amount: result.fundedAmount, remaining: Math.max(0, b1Need) + Math.max(0, targets.b2 - b2Now) })
+      }
+    }
+    if (b1Need > minMove && !warnings.some(w => w.code === 'late-start')) warnings.push({ code: market.status === 'good' ? 'growth-short' : 'stability-floor', amount: b1Need })
   }
 
   if (market.status === 'unknown' && base.byBucket.b3.length) warnings.push({ code: 'market-unknown' })

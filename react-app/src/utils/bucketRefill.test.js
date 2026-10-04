@@ -210,3 +210,26 @@ test('tiny gaps (rounding, a few days of spending) are not suggested as steps', 
   const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 600000, b2: 2999700, b3: 11800000 }), planDate: ON_REFILL_DATE })
   assert.deepEqual(ids(plan), ['b3-to-b1'])
 })
+
+test('late starter, market down, no safe money: 1 year of income from growth, nothing more', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 0, b2: 0, b3: 8000000, nav: 70 }), planDate: ON_REFILL_DATE })
+  assert.equal(plan.market.status, 'down')
+  assert.deepEqual(ids(plan), ['b3-to-b1-late'])
+  assert.equal(amountOf(plan, 'b3-to-b1-late'), 600000)
+  assert.ok(plan.warnings.some(w => w.code === 'late-start'))
+  assert.equal(plan.warnings.some(w => w.code === 'stability-floor'), false)
+})
+
+test('late starter, market down, a little safe money: stability pays first, growth only tops up to 1 year', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 0, b2: 1400000, b3: 8000000, nav: 70 }), planDate: ON_REFILL_DATE })
+  assert.deepEqual(ids(plan), ['b2-to-b1-down', 'b3-to-b1-late'])
+  assert.equal(amountOf(plan, 'b2-to-b1-down'), 200000)
+  assert.equal(amountOf(plan, 'b3-to-b1-late'), 400000)
+})
+
+test('late starter, good market: both safe buckets are filled from growth now', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 0, b2: 0, b3: 11800000, nav: 98 }), planDate: ON_REFILL_DATE })
+  assert.deepEqual(ids(plan), ['b3-to-b1', 'b3-to-b2'])
+  assert.equal(amountOf(plan, 'b3-to-b1'), 1200000)
+  assert.equal(amountOf(plan, 'b3-to-b2'), 3000000)
+})

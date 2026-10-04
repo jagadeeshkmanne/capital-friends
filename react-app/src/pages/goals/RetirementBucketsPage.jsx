@@ -32,6 +32,7 @@ const REASON = {
   'growth-short': 'Growth did not have enough, so Stability covers the rest.',
   'glide-path': 'Your equity is above the glide path for your years to retirement, so some growth moves to safer funds.',
   'build-step': 'This quarter’s small step towards your retirement buckets. Growth funds are near their high.',
+  'late-start': 'There is not enough safe money for even 1 year, so 1 year of expenses comes from growth, even though it is down.',
 }
 
 const fmtDate = d => (d ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
@@ -613,6 +614,7 @@ function Warnings({ plan }) {
       case 'stability-floor': return { tone: 'amber', title: 'Stability has reached its 2-year minimum', text: `Income is short by ${formatINR(w.amount)} this time. Growth is still down, so it is not sold. If you can, spend a little less until the market recovers.` }
       case 'growth-short-stability': return { tone: 'amber', title: 'Stability could not be fully topped up', text: `About ${formatINR(w.amount)} is still missing from Stability. It is topped up again in the next good year.` }
       case 'growth-short-build': return { tone: 'amber', title: 'Growth could not cover this quarter’s step', text: `About ${formatINR(w.amount)} could not be moved. Review the funds linked to this goal.` }
+      case 'late-start': return { tone: 'amber', title: 'Not enough safe money: 1 year of income from growth', text: `There was not enough safe money, so about ${formatINR(w.amount)} of growth is sold even though the market is down. That covers 1 year. The rest of Income and Stability (about ${formatINR(w.remaining)}) is built in the next good year.` }
       case 'growth-short': return { tone: 'amber', title: 'Growth did not have enough', text: `About ${formatINR(w.amount)} could not be moved. Review your expenses or the funds linked to this goal.` }
       case 'market-unknown': return { tone: 'amber', title: 'Market check not available', text: 'All-time high NAV is missing for your growth funds, so the plan protects growth and uses Stability instead. It usually appears after the next daily data refresh.' }
       case 'unclassified': return { tone: 'rose', title: `${w.count} fund(s) are not in any bucket`, text: 'Their category is unclear, so they are left out of the plan. Check them on the Mutual Funds page.' }

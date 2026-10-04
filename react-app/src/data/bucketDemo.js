@@ -12,6 +12,9 @@ export const DEMO_SCENARIOS = {
   notdue: { label: 'Not due yet', note: 'Mid-year: Income still has about 1.5 years, so nothing to do until the yearly date.', b1: 900000, b2: 3000000, nav: 99, small: 38, retiredMonthsAgo: 16 },
   build: { label: '2.5 years to retire', note: 'Almost nothing in Income or Stability yet. Instead of moving everything at once, one small step this quarter.', b1: 20000, b2: 50000, nav: 98, small: 37, retireInMonths: 30 },
   buildwait: { label: '2.5 years, market down', note: 'Same goal, but the market is 28% down: this quarter is skipped.', b1: 20000, b2: 50000, nav: 72, small: 26, retireInMonths: 30 },
+  late2: { label: 'Retiring in 2 years, no buckets', note: 'Never planned buckets: everything is still in equity and retirement is 2 years away. Bigger quarterly steps, still only in a good market.', b1: 0, b2: 0, nav: 98, small: 37, retireInMonths: 24 },
+  lateeq: { label: 'Just retired, all equity', note: 'Retired last month, never planned buckets, everything in equity. Market is near its high, so both safe buckets are filled now.', b1: 0, b2: 0, nav: 98, small: 37, retiredMonthsAgo: 1 },
+  lateeqdown: { label: 'Just retired, market down', note: 'Retired last month, everything in equity, and the market is 28% down. Only 1 year of income is taken from growth; the rest waits for a good year.', b1: 0, b2: 0, nav: 72, small: 26, retiredMonthsAgo: 1 },
   pre: { label: '9 years to retire', note: 'Retirement is far away: the page shows today’s split, the equity check and when building starts.', b1: 0, b2: 1063000, nav: 99, small: 38, retireInMonths: 111, growthScale: 0.37 },
 }
 
