@@ -702,11 +702,12 @@ function StepFlow({ plan, op, before }) {
   const after = { ...before, [op.from]: before[op.from] - op.fundedAmount, [op.to]: before[op.to] + op.fundedAmount }
   const cx = k => (w / 6) * (order.indexOf(k) * 2 + 1)
   const x1 = cx(op.from), x2 = cx(op.to)
-  const far = Math.abs(order.indexOf(op.from) - order.indexOf(op.to)) > 1
-  const AREA = far ? 126 : 102            // space above the jars for the arc and label
-  const base = AREA - 4                  // arc starts and ends just above the jar rims
-  const ry = far ? 66 : 44
   const rx = Math.abs(x2 - x1) / 2
+  // A real half-ellipse: height is a good share of the width, so the arc
+  // clearly rises over the middle bucket instead of looking like a flat line.
+  const ry = Math.round(Math.min(160, Math.max(46, rx * 0.62)))
+  const AREA = ry + 62                    // room for the arc plus the amount label above it
+  const base = AREA - 4                   // arc starts and ends just above the jar rims
   const sweep = x2 > x1 ? 1 : 0          // always over the top
   const d = `M ${x1} ${base} A ${rx} ${ry} 0 0 ${sweep} ${x2} ${base}`
   const peakY = base - ry
