@@ -28,7 +28,7 @@ export function buildDemoData(key) {
   const targetDate = S.retireInMonths ? monthsFromToday(S.retireInMonths) : monthsFromToday(-S.retiredMonthsAgo)
   const goal = {
     goalId: DEMO_GOAL_ID,
-    goalName: 'Sample retirement',
+    goalName: 'Retirement',
     goalType: 'Retirement',
     isActive: true,
     familyMemberId: 'DEMO',
@@ -56,17 +56,17 @@ export function buildDemoData(key) {
       ? [{ goalId: DEMO_GOAL_ID, portfolioId: 'DEMO-P1', allocationPct: 100 }, { goalId: DEMO_GOAL_ID, portfolioId: 'DEMO-P2', allocationPct: 100 }]
       : [{ goalId: DEMO_GOAL_ID, portfolioId: 'DEMO-P1', allocationPct: 100 }],
     mfHoldings: [
-      fund(debtPf, 'DEMO-L1', 'Sample Liquid Fund', 'Liquid', b1, 1450.2, 1450.2),
-      fund(debtPf, 'DEMO-H1', 'Sample Balanced Advantage Fund', 'Hybrid', b2 * 0.6, 72.4, 74),
-      fund(debtPf, 'DEMO-H2', 'Sample Corporate Bond Fund', 'Debt', b2 * 0.4, 31.8, 31.8),
-      fund('DEMO-P1', 'DEMO-E1', 'Sample Flexi Cap Fund', 'Equity', g * 7000000 * S.nav / 100, S.nav * 0.9, 90),
-      fund('DEMO-P1', 'DEMO-E2', 'Sample Nifty 500 Index Fund', 'Index', g * 4000000 * S.nav / 100, S.nav * 0.25, 25),
-      fund('DEMO-P1', 'DEMO-E3', 'Sample Small Cap Fund', 'Equity', g * 800000 * S.small / 40, S.small * 4.2, 168),
+      fund(debtPf, 'DEMO-L1', 'Liquid Fund', 'Liquid', b1, 1450.2, 1450.2),
+      fund(debtPf, 'DEMO-H1', 'Balanced Advantage Fund', 'Hybrid', b2 * 0.6, 72.4, 74),
+      fund(debtPf, 'DEMO-H2', 'Corporate Bond Fund', 'Debt', b2 * 0.4, 31.8, 31.8),
+      fund('DEMO-P1', 'DEMO-E1', 'Flexi Cap Fund', 'Equity', g * 7000000 * S.nav / 100, S.nav * 0.9, 90),
+      fund('DEMO-P1', 'DEMO-E2', 'Nifty 500 Index Fund', 'Index', g * 4000000 * S.nav / 100, S.nav * 0.25, 25),
+      fund('DEMO-P1', 'DEMO-E3', 'Small Cap Fund', 'Equity', g * 800000 * S.small / 40, S.small * 4.2, 168),
     ],
     mfPortfolios: S.split
-      ? [{ portfolioId: 'DEMO-P1', portfolioName: 'PFL-Sample Equity', status: 'Active', ownerId: 'DEMO', ownerName: 'Sample' },
-        { portfolioId: 'DEMO-P2', portfolioName: 'PFL-Sample Debt', status: 'Active', ownerId: 'DEMO', ownerName: 'Sample' }]
-      : [{ portfolioId: 'DEMO-P1', portfolioName: 'PFL-Sample Retirement', status: 'Active', ownerId: 'DEMO', ownerName: 'Sample' }],
+      ? [{ portfolioId: 'DEMO-P1', portfolioName: 'Equity portfolio', status: 'Active', ownerId: 'DEMO', ownerName: 'Sample' },
+        { portfolioId: 'DEMO-P2', portfolioName: 'Debt portfolio', status: 'Active', ownerId: 'DEMO', ownerName: 'Sample' }]
+      : [{ portfolioId: 'DEMO-P1', portfolioName: 'Retirement portfolio', status: 'Active', ownerId: 'DEMO', ownerName: 'Sample' }],
     mfTransactions: [],
     assetAllocations: [],
   }

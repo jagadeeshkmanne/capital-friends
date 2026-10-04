@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowDownToLine, ArrowRight, ArrowRightLeft, ArrowUpFromLine, CalendarClock, CheckCircle2, ChevronDown, CircleHelp, Info,
+  AlertTriangle, ArrowDown, ArrowDownToLine, ArrowRight, ArrowRightLeft, ArrowUpFromLine, CalendarClock, CheckCircle2, ChevronDown, CircleHelp, Info,
   FlaskConical, Landmark, ShieldCheck, X, Sparkles, TrendingDown, TrendingUp, Wallet,
 } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
@@ -657,6 +657,31 @@ function groupByPortfolio(allocations) {
   }, {})
 }
 
+const fmtUnits = u => Number(u || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+
+function TxnSide({ label, tone, fund, detail }) {
+  return (
+    <div className={`min-w-0 rounded-md border-l-2 ${tone.border} ${tone.soft} px-3 py-2`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wide ${tone.text}`}>{label}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug truncate">{fund}</p>
+      <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{detail}</p>
+    </div>
+  )
+}
+
+function FlowArrow() {
+  return (
+    <div className="flex items-center justify-center text-[var(--text-dim)]">
+      <ArrowDown size={16} className="md:hidden" />
+      <ArrowRight size={16} className="hidden md:block" />
+    </div>
+  )
+}
+
+function RecordedPill() {
+  return <span className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg whitespace-nowrap"><CheckCircle2 size={14} /> Recorded</span>
+}
+
 function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) {
   const [destinations, setDestinations] = useState({})
   const multiPortfolio = new Set(plan.allFunds.map(f => f.portfolioId)).size > 1
@@ -676,7 +701,7 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-0.5">
           {canRecord
-            ? 'Place each switch with your broker or fund house, then tap Record switch. The form opens filled in, so you only check the NAV and date.'
+            ? 'For each line: sell the units in your broker or fund-house app, buy the fund shown, then tap Record switch here. The form opens filled in, so you only check the NAV and date.'
             : 'Preview only. Bucket building starts 5 years before retirement.'}
         </p>
       </div>
@@ -704,10 +729,10 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                 const dest = destinationFor(op, portfolioId)
                 const candidates = destinationCandidates(plan, op.to, portfolioId)
                 return (
-                  <div key={portfolioId} className="sm:ml-10 rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] p-3 space-y-2.5">
+                  <div key={portfolioId} className={`sm:ml-10 space-y-2.5 ${multiPortfolio ? 'rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] p-3' : ''}`}>
                     {multiPortfolio && <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Portfolio · {allocations[0].portfolioName}</p>}
 
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    {candidates.length !== 1 && (<div className="flex flex-col sm:flex-row sm:items-center gap-2">
                       <p className={`text-[11px] font-semibold ${to.text} shrink-0 sm:w-16`}>Buy into</p>
                       <div className="flex-1 min-w-0">
                         {candidates.length > 1 ? (
@@ -726,29 +751,29 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                           </div>
                         )}
                       </div>
-                    </div>
+                    </div>)}
 
                     {dest?.portfolioId && dest.portfolioId !== portfolioId && (
                       <p className="text-[11px] text-violet-400">Cross-portfolio switch: money moves from {allocations[0].portfolioName} to {dest.portfolioName}.</p>
                     )}
-                    <p className={`text-[11px] font-semibold ${from.text}`}>Sell {allocations.length > 1 ? `from ${allocations.length} funds` : ''}</p>
                     {allocations.map(a => {
                       const lineKey = `${op.id}::${a.key}`
                       const done = recorded.has(lineKey)
                       return (
-                        <div key={a.key} className="bg-[var(--bg-card)] rounded-lg px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2.5">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-[var(--text-secondary)] leading-snug">{splitFundName(a.fundName || '').main}</p>
-                            <p className="text-xs text-[var(--text-muted)] mt-0.5"><b className="text-[var(--text-primary)] tabular-nums">{a.units.toFixed(3)} units</b> · about {formatINR(a.amount)} at ₹{a.currentNav.toFixed(2)}</p>
+                        <div key={a.key} className={`rounded-lg border ${done ? 'border-emerald-500/30' : 'border-[var(--border-light)]'} bg-[var(--bg-card)] p-3`}>
+                          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center md:gap-3">
+                            <TxnSide label={`Sell · ${from.name}`} tone={from} fund={splitFundName(a.fundName || '').main}
+                              detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
+                            <FlowArrow />
+                            <TxnSide label={`Buy · ${to.name}`} tone={to} fund={dest ? splitFundName(dest.fundName || '').main : 'Choose a fund above'}
+                              detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b>{dest?.portfolioName && multiPortfolio ? ` · ${dest.portfolioName}` : ''}</>} />
+                            {canRecord && (done ? <RecordedPill /> : (
+                              <button type="button" disabled={!dest} onClick={() => onRecordSwitch({ lineKey, op, allocation: a, dest })}
+                                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 md:py-2 text-xs font-semibold text-violet-400 border border-violet-500/40 hover:bg-violet-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                                <ArrowRightLeft size={14} /> Record switch
+                              </button>
+                            ))}
                           </div>
-                          {canRecord && (done ? (
-                            <span className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg shrink-0"><CheckCircle2 size={14} /> Recorded</span>
-                          ) : (
-                            <button type="button" disabled={!dest} onClick={() => onRecordSwitch({ lineKey, op, allocation: a, dest })}
-                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
-                              <ArrowRightLeft size={14} /> Record switch
-                            </button>
-                          ))}
                         </div>
                       )
                     })}
@@ -765,7 +790,7 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
 
 /* ── This month's income ── */
 function MonthlyWithdrawal({ plan, onRecordRedeem }) {
-  const [amount, setAmount] = useState(String(Math.round(plan.expense.monthlyExpense)))
+  const [amount, setAmount] = useState(String(Math.round(plan.expense.monthlyExpense / 1000) * 1000))
   const result = allocateBucketWithdrawal(plan.byBucket.b1, num(amount, 0))
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
@@ -777,20 +802,23 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
         </div>
       </div>
       <div className="p-4 space-y-3">
-        <label htmlFor="monthly-amount" className="text-xs text-[var(--text-dim)] flex items-center gap-2">Amount ₹
+        <label htmlFor="monthly-amount" className="text-xs text-[var(--text-dim)] flex items-center gap-2">Amount you need this month ₹
           <input id="monthly-amount" type="number" min="0" step="1000" value={amount} onChange={e => setAmount(e.target.value)}
             className="w-32 text-sm font-semibold bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[var(--text-primary)]" />
         </label>
         {result.allocations.map(a => (
-          <div key={a.key} className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-[var(--bg-inset)] rounded-lg px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[var(--text-secondary)] truncate">{splitFundName(a.fundName || '').main}</p>
-              <p className="text-xs text-[var(--text-muted)]">Sell <b className="text-[var(--text-primary)] tabular-nums">{a.units.toFixed(3)} units</b> · about {formatINR(a.amount)}</p>
+          <div key={a.key} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center md:gap-3">
+              <TxnSide label="Sell · Income" tone={BUCKET.b1} fund={splitFundName(a.fundName || '').main}
+                detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
+              <FlowArrow />
+              <TxnSide label="To your bank" tone={{ border: 'border-[var(--border)]', soft: 'bg-[var(--bg-inset)]', text: 'text-[var(--text-dim)]' }} fund="Your savings account"
+                detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · for this month</>} />
+              <button type="button" onClick={() => onRecordRedeem(a)}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 md:py-2 text-xs font-semibold text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/10 rounded-lg transition-colors whitespace-nowrap">
+                <CheckCircle2 size={14} /> Record redemption
+              </button>
             </div>
-            <button type="button" onClick={() => onRecordRedeem(a)}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors shrink-0">
-              <CheckCircle2 size={14} /> Record redemption
-            </button>
           </div>
         ))}
         {result.shortfall > 1 && <p className="text-xs text-rose-400">The Income bucket is short by {formatINR(result.shortfall)}. Refill it first.</p>}
