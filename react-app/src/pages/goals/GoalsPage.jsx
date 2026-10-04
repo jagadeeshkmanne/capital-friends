@@ -199,7 +199,7 @@ export default function GoalsPage() {
   }, [assetAllocations])
 
   const allocationHealth = useMemo(() => {
-    if (!allActiveGoals.length || !mfHoldings?.length) return {}
+    if (!allActiveGoals.length) return {}
     const now = new Date()
     const health = {}
     for (const g of allActiveGoals) {
@@ -210,7 +210,7 @@ export default function GoalsPage() {
       const mappings = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
       let totalValue = 0, equityValue = 0
       for (const m of mappings) {
-        const holdings = mfHoldings.filter(h => h.portfolioId === m.portfolioId && h.units > 0)
+        const holdings = (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)
         for (const h of holdings) {
           const val = h.currentValue * (m.allocationPct / 100)
           totalValue += val
@@ -220,6 +220,20 @@ export default function GoalsPage() {
           } else if (EQUITY_CATS.has(h.category)) equityValue += val
           else if (h.category === 'Hybrid') equityValue += val * 0.65
           else if (h.category === 'Multi-Asset') equityValue += val * 0.50
+        }
+        // Stock portfolios linked to the goal: all equity
+        for (const sh of (stockHoldings || []).filter(x => x.portfolioId === m.portfolioId)) {
+          const val = (Number(sh.currentValue) || 0) * (m.allocationPct / 100)
+          totalValue += val
+          equityValue += val
+        }
+        // Other investments linked to the goal (EPF, PPF, FD, gold, ...): count them in the total;
+        // only those whose category is Equity add to equity. EPF/PPF/FD are debt, so they lower the equity %.
+        const inv = (otherInvList || []).find(i => i.investmentId === m.portfolioId)
+        if (inv) {
+          const val = (Number(inv.currentValue) || 0) * (m.allocationPct / 100)
+          totalValue += val
+          if (inv.investmentCategory === 'Equity') equityValue += val
         }
       }
       const actualEquity = totalValue > 0 ? Math.round((equityValue / totalValue) * 100) : null
@@ -243,7 +257,7 @@ export default function GoalsPage() {
       health[g.goalId] = { yearsLeft, label: recommended.label, recommendedEquity: recommended.equity, recommendedDebt: recommended.debt, actualEquity, isMapped, mismatch, needsAttention, liveLumpsum, liveSIP }
     }
     return health
-  }, [allActiveGoals, goalPortfolioMappings, mfHoldings, goalAllocMap])
+  }, [allActiveGoals, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, goalAllocMap])
 
   // Live totals from allocationHealth — always from all goals
   const liveTotalSIP = allActiveGoals.reduce((s, g) => s + (allocationHealth[g.goalId]?.liveSIP || 0), 0)
@@ -726,7 +740,10 @@ export default function GoalsPage() {
               const fvSIP = sipPlanned > 0 && monthlyRate > 0 && elapsedMonths > 0
                 ? sipPlanned * ((Math.pow(1 + monthlyRate, elapsedMonths) - 1) / monthlyRate) : sipPlanned * elapsedMonths
               const expectedNow = Math.round(fvLs + fvSIP)
-              const trackStatus = !isPastDue && (_cardGap === 0 || actual >= expectedNow || g.status === 'Achieved')
+              // Same rule as the status badge (server: value today vs value needed today at the goal's return).
+              // The old check compared against the planned SIP since the goal was created, so a new goal always read "On track".
+              const serverOnTrack = g.status === 'On Track' || g.status === 'Achieved'
+              const trackStatus = !isPastDue && (_cardGap === 0 || (g.status ? serverOnTrack : actual >= expectedNow))
               const color = _cardGap === 0 ? '#10b981' : isPastDue ? '#ef4444' : trackStatus ? '#10b981' : progress >= 15 ? '#f59e0b' : '#ef4444'
               const statusText = _cardGap === 0 ? 'Funded' : isPastDue ? 'Overdue' : (actual === 0 && _cardGap > 0) ? 'Not started' : trackStatus ? 'On track' : 'Behind'
 
