@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowDown, ArrowDownToLine, ArrowRight, ArrowRightLeft, ArrowUpFromLine, CalendarClock, CheckCircle2, ChevronDown, CircleHelp, Info,
@@ -659,9 +659,9 @@ function groupByPortfolio(allocations) {
 
 const fmtUnits = u => Number(u || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 
-function TxnSide({ label, tone, fund, detail }) {
+function TxnSide({ label, tone, fund, detail, step }) {
   return (
-    <div className={`min-w-0 rounded-md border-l-2 ${tone.border} ${tone.soft} px-3 py-2`}>
+    <div className={`min-w-0 rounded-md border-l-2 ${tone.border} ${tone.soft} px-3 py-2 ${step ? `txn-${step}` : ''}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wide ${tone.text}`}>{label}</p>
       <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug truncate">{fund}</p>
       <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{detail}</p>
@@ -672,8 +672,8 @@ function TxnSide({ label, tone, fund, detail }) {
 function FlowArrow() {
   return (
     <div className="flex items-center justify-center text-[var(--text-dim)]">
-      <ArrowDown size={16} className="md:hidden" />
-      <ArrowRight size={16} className="hidden md:block" />
+      <ArrowDown size={16} className="md:hidden txn-arrow-y" />
+      <ArrowRight size={16} className="hidden md:block txn-arrow-x" />
     </div>
   )
 }
@@ -681,6 +681,109 @@ function FlowArrow() {
 function RecordedPill() {
   return <span className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg whitespace-nowrap"><CheckCircle2 size={14} /> Recorded</span>
 }
+
+// Animated picture of one refill step. All three buckets are always shown, in
+// the same order as the jars above. Money travels in a half-ellipse over the
+// tops (never across a bucket) while the source drains and the target fills.
+// Loop: hold "now", move, hold "after".
+function StepFlow({ plan, op, before }) {
+  const ref = useRef(null)
+  const [w, setW] = useState(600)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const m = plan.expense.monthlyExpense || 1
+  const target = { b1: plan.rules.incomeMonths, b2: plan.rules.stabilityMonths }
+  const order = ['b1', 'b2', 'b3']
+  const after = { ...before, [op.from]: before[op.from] - op.fundedAmount, [op.to]: before[op.to] + op.fundedAmount }
+  const cx = k => (w / 6) * (order.indexOf(k) * 2 + 1)
+  const x1 = cx(op.from), x2 = cx(op.to)
+  const far = Math.abs(order.indexOf(op.from) - order.indexOf(op.to)) > 1
+  const AREA = far ? 126 : 102            // space above the jars for the arc and label
+  const base = AREA - 4                  // arc starts and ends just above the jar rims
+  const ry = far ? 66 : 44
+  const rx = Math.abs(x2 - x1) / 2
+  const sweep = x2 > x1 ? 1 : 0          // always over the top
+  const d = `M ${x1} ${base} A ${rx} ${ry} 0 0 ${sweep} ${x2} ${base}`
+  const peakY = base - ry
+
+  return (
+    <div className="sm:ml-10 rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] px-2 sm:px-6 pt-2 sm:pt-3 pb-3 sm:pb-4">
+      <div className="relative h-4 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide">
+        <span className="flow-t1 absolute left-0 text-[var(--text-dim)]">Now</span>
+        <span className="flow-t2 absolute left-0 text-amber-400">Moving money</span>
+        <span className="flow-t3 absolute left-0 text-emerald-400">After this step</span>
+      </div>
+      <div ref={ref} className="relative mx-auto max-w-[640px]">
+        <div className="relative" style={{ height: AREA }}>
+          <svg width={w} height={AREA} className="absolute inset-0 overflow-visible" aria-hidden="true">
+            <defs>
+              <marker id={`flow-head-${op.id}`} viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)" />
+              </marker>
+            </defs>
+            <path d={d} fill="none" stroke="var(--text-dim)" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 7" className="flow-dash" markerEnd={`url(#flow-head-${op.id})`} />
+          </svg>
+          <span className={`absolute -translate-x-1/2 px-2 py-0.5 rounded-md bg-[var(--bg-inset)] text-sm sm:text-base font-bold tabular-nums whitespace-nowrap ${BUCKET[op.to].text}`}
+            style={{ left: (x1 + x2) / 2, top: Math.max(0, peakY - 44) }}>{formatINR(op.fundedAmount)}</span>
+          {[0, 1, 2, 3, 4].map(n => (
+            <span key={n} className="flow-coin absolute top-0 left-0 w-3.5 h-3.5 rounded-full bg-amber-400 ring-2 ring-amber-300/40 text-[8px] font-bold text-amber-950 flex items-center justify-center shadow"
+              style={{ offsetPath: `path('${d}')`, offsetRotate: '0deg', offsetAnchor: 'center', animationDelay: `${n * 0.16}s` }}>₹</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-3">
+          {order.map(k => {
+            const b = BUCKET[k], Icon = b.icon
+            const moving = k === op.from || k === op.to
+            const scale = target[k] ? target[k] * m : Math.max(before[k], after[k], 1)
+            const a = Math.min(100, (before[k] / scale) * 100), z = Math.min(100, (after[k] / scale) * 100)
+            const full = target[k] && after[k] >= target[k] * m - m * 0.5
+            return (
+              <div key={k} className={`flex flex-col items-center text-center min-w-0 ${moving ? '' : 'opacity-45'}`}>
+                <div className={`relative w-14 h-[72px] sm:w-20 sm:h-28 rounded-b-2xl sm:rounded-b-3xl rounded-t-md border-2 ${b.border} bg-[var(--bg-card)] overflow-hidden`}>
+                  <div className={`absolute bottom-0 inset-x-0 ${b.bar} ${moving ? 'flow-level' : ''}`} style={{ '--a': `${a}%`, '--z': `${z}%`, height: `${z}%` }} />
+                  <span className="absolute inset-0 flex items-center justify-center"><span className="w-7 h-7 rounded-full bg-[var(--bg-card)]/85 flex items-center justify-center"><Icon size={14} className={b.text} /></span></span>
+                </div>
+                <p className={`mt-1.5 text-xs sm:text-sm font-bold ${b.text}`}>{b.name}</p>
+                <p className="text-[11px] sm:text-xs text-[var(--text-muted)] tabular-nums sm:whitespace-nowrap leading-snug">
+                  {moving ? <>{yrs(before[k] / m)} <ArrowRight size={10} className="inline -mt-px" /> <b className="text-[var(--text-primary)]">{yrs(after[k] / m)}</b></> : <>{yrs(before[k] / m)}<span className="hidden sm:inline"> · no change</span></>}
+                </p>
+                <p className="text-[10px] sm:text-[11px] text-[var(--text-dim)] tabular-nums sm:whitespace-nowrap leading-snug">
+                  {k === op.from ? `gives ${formatINR(op.fundedAmount)}` : k === op.to ? (full ? 'gets it · full' : `gets it · target ${yrs(target[k])}`) : (target[k] ? `target ${yrs(target[k])}` : 'the rest')}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const FLOW_CSS = `
+@keyframes flow-coin{0%,18%{offset-distance:0%;opacity:0}22%{opacity:1}62%{opacity:1}68%,100%{offset-distance:100%;opacity:0}}
+.flow-coin{offset-distance:0%;opacity:0;animation:flow-coin 4s ease-in-out infinite}
+@keyframes flow-dash{to{stroke-dashoffset:-16}}
+.flow-dash{animation:flow-dash .8s linear infinite}
+@keyframes flow-level{0%,20%{height:var(--a)}68%,100%{height:var(--z)}}
+.flow-level{animation:flow-level 4s ease-in-out infinite}
+@keyframes flow-t1{0%,19%{opacity:1}20%,100%{opacity:0}}
+@keyframes flow-t2{0%,19%{opacity:0}20%,67%{opacity:1}68%,100%{opacity:0}}
+@keyframes flow-t3{0%,67%{opacity:0}68%,100%{opacity:1}}
+.flow-t1{opacity:0;animation:flow-t1 4s step-end infinite}.flow-t2{opacity:0;animation:flow-t2 4s step-end infinite}.flow-t3{animation:flow-t3 4s step-end infinite}
+@keyframes txn-hi{0%,100%{transform:none;filter:none;box-shadow:none}50%{transform:scale(1.015);filter:brightness(1.3);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 6px 18px rgba(0,0,0,.25)}}
+.txn-sell,.txn-buy{transition:transform .3s}
+.txn-sell{animation:txn-sell 4s ease-in-out infinite}.txn-buy{animation:txn-buy 4s ease-in-out infinite}
+@keyframes txn-sell{0%,16%,46%,100%{transform:none;filter:none;box-shadow:none}24%,38%{transform:scale(1.015);filter:brightness(1.3);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 6px 18px rgba(0,0,0,.25)}}
+@keyframes txn-buy{0%,44%,76%,100%{transform:none;filter:none;box-shadow:none}52%,68%{transform:scale(1.015);filter:brightness(1.3);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 6px 18px rgba(0,0,0,.25)}}
+@keyframes txn-ax{0%,38%,54%,100%{transform:none;opacity:.6}46%{transform:translateX(5px);opacity:1}}
+@keyframes txn-ay{0%,38%,54%,100%{transform:none;opacity:.6}46%{transform:translateY(5px);opacity:1}}
+.txn-arrow-x{animation:txn-ax 4s ease-in-out infinite}.txn-arrow-y{animation:txn-ay 4s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.flow-dash{animation:none}.txn-sell,.txn-buy,.txn-arrow-x,.txn-arrow-y{animation:none}.flow-coin{animation:none;opacity:0}.flow-level{animation:none}.flow-t1,.flow-t2{animation:none;opacity:0}.flow-t3{animation:none;opacity:1}}`
 
 function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) {
   const [destinations, setDestinations] = useState({})
@@ -706,9 +809,12 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
         </p>
       </div>
 
+      <style>{FLOW_CSS}</style>
       <div className="divide-y divide-[var(--border-light)]">
         {operations.map((op, i) => {
           const from = BUCKET[op.from], to = BUCKET[op.to]
+          const before = { ...plan.totals }
+          for (const prev of operations.slice(0, i)) { before[prev.from] -= prev.fundedAmount; before[prev.to] += prev.fundedAmount }
           return (
             <div key={op.id} className="px-4 py-4 space-y-3">
               <div className="flex items-start gap-3">
@@ -723,6 +829,8 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                   <p className="text-xs text-[var(--text-dim)] mt-0.5">{REASON[op.reason]}</p>
                 </div>
               </div>
+
+              <StepFlow plan={plan} op={op} before={before} />
 
               {Object.entries(groupByPortfolio(op.allocations)).map(([portfolioId, allocations]) => {
                 const destKey = `${op.id}::${portfolioId}`
@@ -762,10 +870,10 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                       return (
                         <div key={a.key} className={`rounded-lg border ${done ? 'border-emerald-500/30' : 'border-[var(--border-light)]'} bg-[var(--bg-card)] p-3`}>
                           <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center md:gap-3">
-                            <TxnSide label={`Sell · ${from.name}`} tone={from} fund={splitFundName(a.fundName || '').main}
+                            <TxnSide step="sell" label={`Sell · ${from.name}`} tone={from} fund={splitFundName(a.fundName || '').main}
                               detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
                             <FlowArrow />
-                            <TxnSide label={`Buy · ${to.name}`} tone={to} fund={dest ? splitFundName(dest.fundName || '').main : 'Choose a fund above'}
+                            <TxnSide step="buy" label={`Buy · ${to.name}`} tone={to} fund={dest ? splitFundName(dest.fundName || '').main : 'Choose a fund above'}
                               detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b>{dest?.portfolioName && multiPortfolio ? ` · ${dest.portfolioName}` : ''}</>} />
                             {canRecord && (done ? <RecordedPill /> : (
                               <button type="button" disabled={!dest} onClick={() => onRecordSwitch({ lineKey, op, allocation: a, dest })}
@@ -794,6 +902,7 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
   const result = allocateBucketWithdrawal(plan.byBucket.b1, num(amount, 0))
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
+      <style>{FLOW_CSS}</style>
       <div className="px-4 py-3.5 flex items-center gap-3 border-b border-[var(--border-light)]">
         <span className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0"><Landmark size={17} className="text-emerald-400" /></span>
         <div>
@@ -809,10 +918,10 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
         {result.allocations.map(a => (
           <div key={a.key} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center md:gap-3">
-              <TxnSide label="Sell · Income" tone={BUCKET.b1} fund={splitFundName(a.fundName || '').main}
+              <TxnSide step="sell" label="Sell · Income" tone={BUCKET.b1} fund={splitFundName(a.fundName || '').main}
                 detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
               <FlowArrow />
-              <TxnSide label="To your bank" tone={{ border: 'border-[var(--border)]', soft: 'bg-[var(--bg-inset)]', text: 'text-[var(--text-dim)]' }} fund="Your savings account"
+              <TxnSide step="buy" label="To your bank" tone={{ border: 'border-[var(--border)]', soft: 'bg-[var(--bg-inset)]', text: 'text-[var(--text-dim)]' }} fund="Your savings account"
                 detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · for this month</>} />
               <button type="button" onClick={() => onRecordRedeem(a)}
                 className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 md:py-2 text-xs font-semibold text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/10 rounded-lg transition-colors whitespace-nowrap">
