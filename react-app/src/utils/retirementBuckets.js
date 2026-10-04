@@ -109,6 +109,21 @@ export function classifyRetirementHolding(holding, assetAllocation) {
   return { bucket: null, reason: category || 'Category unavailable', equity: null, confidence: 'review' }
 }
 
+// Other investments linked to a retirement goal (EPF, PPF, FD, gold, ...). They count in the
+// buckets but are never sold or bought by the refill plan (the app can't switch them).
+export function classifyOtherInvestment(investment) {
+  const type = String(investment?.investmentType || '').trim()
+  const category = String(investment?.investmentCategory || '').trim().toLowerCase()
+  const t = type.toLowerCase()
+  if (t === 'fixed deposit' || t === 'fd') return { bucket: 'b1', reason: 'Fixed deposit', equity: 0, confidence: 'type' }
+  if (['epf', 'ppf', 'bonds', 'nps'].includes(t)) return { bucket: 'b2', reason: type, equity: 0, confidence: 'type' }
+  if (category === 'gold' || category === 'silver' || includesAny(t, COMMODITY_WORDS)) return { bucket: 'b3', reason: 'Gold/silver', equity: 0, confidence: 'type' }
+  if (category === 'equity') return { bucket: 'b3', reason: type || 'Equity', equity: 100, confidence: 'type' }
+  if (category === 'debt') return { bucket: 'b2', reason: type || 'Debt', equity: 0, confidence: 'type' }
+  if (category === 'property') return { bucket: null, reason: 'Property (not used for income)', equity: 0, confidence: 'review' }
+  return { bucket: null, reason: type || 'Other', equity: null, confidence: 'review' }
+}
+
 export function buildGoalAdjustedTargets(funds, targetEquityPct) {
   const targetEquity = Math.max(0, Math.min(100, Number(targetEquityPct)))
   if (!Number.isFinite(targetEquity)) return funds || []
@@ -337,7 +352,7 @@ export function buildTargetAwareBucketPreview(plan) {
 
 export function allocateBucketWithdrawal(bucketFunds, requestedAmount) {
   return allocateFromFunds(
-    [...(bucketFunds || [])].sort((a, b) => b.goalValue - a.goalValue),
+    (bucketFunds || []).filter(fund => !fund.isOther).sort((a, b) => b.goalValue - a.goalValue),
     Math.max(0, Number(requestedAmount) || 0),
   )
 }
@@ -352,6 +367,7 @@ export function buildRetirementBucketPlan({
   b1TargetMonths = 24,
   b2TargetMonths = 60,
   planDate = new Date(),
+  otherInvestments = [],
 }) {
   const goalMappings = (mappings || []).filter(mapping => mapping.goalId === goal?.goalId)
   if (!goalMappings.length) return null
@@ -367,7 +383,35 @@ export function buildRetirementBucketPlan({
   const allFunds = []
   for (const mapping of goalMappings) {
     const portfolio = (portfolios || []).find(item => item.portfolioId === mapping.portfolioId)
-    if (!portfolio) continue
+    if (!portfolio) {
+      const investment = (otherInvestments || []).find(item => item.investmentId === mapping.portfolioId && item.status !== 'Inactive')
+      if (!investment) continue
+      const share = Math.max(0, Number(mapping.allocationPct) || 0) / 100
+      const value = (Number(investment.currentValue) || 0) * share
+      if (!(value > 0)) continue
+      const classification = classifyOtherInvestment(investment)
+      allFunds.push({
+        key: `${mapping.portfolioId}::other`,
+        schemeCode: '',
+        fundName: investment.investmentName || investment.investmentType || 'Other investment',
+        category: investment.investmentType || '',
+        portfolioId: mapping.portfolioId,
+        portfolioName: investment.investmentType || 'Other',
+        allocationPct: Number(mapping.allocationPct) || 0,
+        currentNav: 0,
+        goalUnits: 0,
+        goalValue: value,
+        portfolioGoalValue: 0,
+        targetAllocationPct: 0,
+        athNav: 0,
+        isOther: true,
+        bucket: classification.bucket,
+        bucketReason: classification.reason,
+        equityPercent: classification.equity,
+        classificationConfidence: classification.confidence,
+      })
+      continue
+    }
     const goalShare = Math.max(0, Number(mapping.allocationPct) || 0) / 100
     const portfolioName = portfolio.portfolioName?.replace(/^PFL-/, '') || portfolio.portfolioName
 
@@ -414,10 +458,10 @@ export function buildRetirementBucketPlan({
     unclassified: adjustedFunds.filter(fund => !fund.bucket).sort((a, b) => b.goalValue - a.goalValue),
   }
 
-  const b2RefillSources = [...byBucket.b2].sort((a, b) =>
+  const b2RefillSources = byBucket.b2.filter(fund => !fund.isOther).sort((a, b) =>
     (a.equityPercent ?? 100) - (b.equityPercent ?? 100) || b.goalValue - a.goalValue,
   )
-  const b3RefillSources = [...byBucket.b3].sort((a, b) =>
+  const b3RefillSources = byBucket.b3.filter(fund => !fund.isOther).sort((a, b) =>
     (b.equityPercent ?? 0) - (a.equityPercent ?? 0) || b.goalValue - a.goalValue,
   )
 

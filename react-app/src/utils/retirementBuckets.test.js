@@ -6,6 +6,7 @@ import {
   buildGoalAdjustedTargets,
   buildRetirementBucketPlan,
   buildTargetAwareBucketPreview,
+  classifyOtherInvestment,
   classifyRetirementHolding,
   getRetirementExpenseBasis,
 } from './retirementBuckets.js'
@@ -217,4 +218,24 @@ test('target-aware preview never transfers between linked portfolios', () => {
   assert.equal(operations[0].portfolioId, 'P1')
   assert.equal(operations[0].fundedAmount, 200)
   assert.ok(operations[0].allocations.every(item => item.portfolioId === 'P1'))
+})
+
+test('linked EPF counts in the Stability bucket but is never sold', () => {
+  assert.equal(classifyOtherInvestment({ investmentType: 'EPF', investmentCategory: 'Debt' }).bucket, 'b2')
+  assert.equal(classifyOtherInvestment({ investmentType: 'Fixed Deposit', investmentCategory: 'Debt' }).bucket, 'b1')
+  assert.equal(classifyOtherInvestment({ investmentType: 'Real Estate', investmentCategory: 'Property' }).bucket, null)
+  const plan = buildRetirementBucketPlan({
+    goal: { ...goal, targetAmount: 30000000 },
+    mappings: [
+      { goalId: 'RET-1', portfolioId: 'PF-1', allocationPct: 100 },
+      { goalId: 'RET-1', portfolioId: 'INV-EPF', allocationPct: 100 },
+    ],
+    holdings: [{ portfolioId: 'PF-1', schemeCode: '1', fundName: 'Nifty 50 Index Fund', category: 'Index', units: 1000, currentNav: 1000, currentValue: 1000000 }],
+    portfolios: [{ portfolioId: 'PF-1', portfolioName: 'Core' }],
+    otherInvestments: [{ investmentId: 'INV-EPF', investmentName: 'EPF', investmentType: 'EPF', investmentCategory: 'Debt', currentValue: 2800000, status: 'Active' }],
+    planDate: new Date('2026-01-01T00:00:00.000Z'),
+  })
+  assert.equal(plan.totals.b2, 2800000)
+  assert.equal(plan.totals.b3, 1000000)
+  for (const op of plan.operations) for (const a of op.allocations) assert.notEqual(a.portfolioId, 'INV-EPF')
 })

@@ -142,6 +142,7 @@ export function buildBucketRefillPlan({
   planDate = new Date(),
   lastBucketMoveDate = null,
   rules: customRules,
+  otherInvestments = [],
 }) {
   const rules = { ...REFILL_RULES, ...(customRules || {}) }
   const base = buildRetirementBucketPlan({
@@ -154,6 +155,7 @@ export function buildBucketRefillPlan({
     b1TargetMonths: rules.incomeMonths,
     b2TargetMonths: rules.stabilityMonths,
     planDate,
+    otherInvestments,
   })
   if (!base || base.noExpenses) return base
 
@@ -173,13 +175,13 @@ export function buildBucketRefillPlan({
     b2Floor: monthly * rules.stabilityFloorMonths,
   }
 
-  const market = assessGrowthMarket(base.byBucket.b3, rules.goodMarketMaxBelowAthPct)
+  const market = assessGrowthMarket(base.byBucket.b3.filter(fund => !fund.isOther), rules.goodMarketMaxBelowAthPct)
   const schedule = refillSchedule(goal, planDate)
 
-  const b2Sources = [...base.byBucket.b2].sort((a, b) =>
+  const b2Sources = base.byBucket.b2.filter(fund => !fund.isOther).sort((a, b) =>
     (a.equityPercent ?? 100) - (b.equityPercent ?? 100) || b.goalValue - a.goalValue,
   )
-  const b3Sources = [...base.byBucket.b3].sort((a, b) =>
+  const b3Sources = base.byBucket.b3.filter(fund => !fund.isOther).sort((a, b) =>
     (b.equityPercent ?? 0) - (a.equityPercent ?? 0) || b.goalValue - a.goalValue,
   )
 

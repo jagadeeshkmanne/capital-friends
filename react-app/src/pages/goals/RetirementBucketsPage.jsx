@@ -104,7 +104,7 @@ export default function RetirementBucketsPage() {
   if (demoKey && demoState?.key !== demoKey) setDemoState({ key: demoKey, data: buildDemoData(demoKey) })
   if (!demoKey && demoState) setDemoState(null)
   const demo = demoKey && demoState?.key === demoKey ? demoState.data : null
-  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations } = demo || liveData
+  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList } = demo || liveData
   const switchMF = demo ? async sw => setDemoState(st => ({ ...st, data: applyDemoSwitch(st.data, sw) })) : liveData.switchMF
   const redeemMF = demo ? async r => setDemoState(st => ({ ...st, data: applyDemoRedeem(st.data, r) })) : liveData.redeemMF
   const startDemo = key => { setParams({ demo: key }); setSession(null); setForceShow(false) }
@@ -135,8 +135,9 @@ export default function RetirementBucketsPage() {
       assetAllocations,
       targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity,
       lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
+      otherInvestments: otherInvList || [],
     })
-  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations])
+  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList])
 
   if (goalList === null || (demoKey && !demo)) return <PageLoading title="Loading retirement buckets" cards={4} />
 
@@ -645,7 +646,7 @@ function Warnings({ plan }) {
 // each, the fund furthest below its target comes first.
 function destinationCandidates(plan, bucket, portfolioId) {
   const gap = f => (Number(f.portfolioGoalValue) || 0) * (Number(f.effectiveTargetAllocationPct ?? f.targetAllocationPct) || 0) / 100 - (Number(f.goalValue) || 0)
-  return [...plan.byBucket[bucket]].sort((a, b) =>
+  return plan.byBucket[bucket].filter(f => !f.isOther).sort((a, b) =>
     Number(b.portfolioId === portfolioId) - Number(a.portfolioId === portfolioId) || gap(b) - gap(a))
 }
 
