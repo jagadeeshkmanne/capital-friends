@@ -745,7 +745,11 @@ export default function GoalsPage() {
               const serverOnTrack = g.status === 'On Track' || g.status === 'Achieved'
               const trackStatus = !isPastDue && (_cardGap === 0 || (g.status ? serverOnTrack : actual >= expectedNow))
               const color = _cardGap === 0 ? '#10b981' : isPastDue ? '#ef4444' : trackStatus ? '#10b981' : progress >= 15 ? '#f59e0b' : '#ef4444'
-              const statusText = _cardGap === 0 ? 'Funded' : isPastDue ? 'Overdue' : (actual === 0 && _cardGap > 0) ? 'Not started' : trackStatus ? 'On track' : 'Behind'
+              // Money already saved won't reach the target alone, but a monthly SIP can: say so plainly
+              // instead of a bare "Behind" (the app doesn't yet know the SIP the user is already doing).
+              const needsSip = !isPastDue && _cardGap > 0 && actual > 0 && !trackStatus && (h?.liveSIP || 0) > 0
+              const statusText = _cardGap === 0 ? 'Funded' : isPastDue ? 'Overdue' : (actual === 0 && _cardGap > 0) ? 'Not started' : trackStatus ? 'On track'
+                : needsSip ? `On track if you invest ${formatINR(h.liveSIP)}/mo` : 'Behind'
 
               // SIP/Lumpsum: live (portfolio-based) > stored plan
               const sipVal = h?.liveSIP > 0 ? h.liveSIP : g.monthlyInvestment || 0
@@ -788,8 +792,8 @@ export default function GoalsPage() {
                           )}
                         </div>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]'}`}>
-                        {g.status}
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${needsSip ? 'bg-amber-500/15 text-amber-400' : (statusBadge[g.status] || 'bg-slate-500/15 text-[var(--text-muted)]')}`}>
+                        {needsSip ? 'Needs SIP' : g.status}
                       </span>
                     </div>
                   </div>
