@@ -705,8 +705,8 @@ function StepFlow({ plan, op, before }) {
   const rx = Math.abs(x2 - x1) / 2
   // A real half-ellipse: height is a good share of the width, so the arc
   // clearly rises over the middle bucket instead of looking like a flat line.
-  const ry = Math.round(Math.min(160, Math.max(46, rx * 0.62)))
-  const AREA = ry + 62                    // room for the arc plus the amount label above it
+  const ry = Math.round(Math.min(100, Math.max(44, rx * 0.55)))
+  const AREA = ry + 16                    // room for the arc (the amount sits inside it)
   const base = AREA - 4                   // arc starts and ends just above the jar rims
   const sweep = x2 > x1 ? 1 : 0          // always over the top
   const d = `M ${x1} ${base} A ${rx} ${ry} 0 0 ${sweep} ${x2} ${base}`
@@ -719,7 +719,7 @@ function StepFlow({ plan, op, before }) {
         <span className="flow-t2 absolute left-0 text-amber-400">Moving money</span>
         <span className="flow-t3 absolute left-0 text-emerald-400">After this step</span>
       </div>
-      <div ref={ref} className="relative mx-auto max-w-[640px]">
+      <div ref={ref} className="relative mx-auto max-w-[560px]">
         <div className="relative" style={{ height: AREA }}>
           <svg width={w} height={AREA} className="absolute inset-0 overflow-visible" aria-hidden="true">
             <defs>
@@ -730,7 +730,7 @@ function StepFlow({ plan, op, before }) {
             <path d={d} fill="none" stroke="var(--text-dim)" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 7" className="flow-dash" markerEnd={`url(#flow-head-${op.id})`} />
           </svg>
           <span className={`absolute -translate-x-1/2 px-2 py-0.5 rounded-md bg-[var(--bg-inset)] text-sm sm:text-base font-bold tabular-nums whitespace-nowrap ${BUCKET[op.to].text}`}
-            style={{ left: (x1 + x2) / 2, top: Math.max(0, peakY - 44) }}>{formatINR(op.fundedAmount)}</span>
+            style={{ left: (x1 + x2) / 2, top: peakY + 16 }}>{formatINR(op.fundedAmount)}</span>
           {[0, 1, 2, 3, 4].map(n => (
             <span key={n} className="flow-coin absolute top-0 left-0 w-3.5 h-3.5 rounded-full bg-amber-400 ring-2 ring-amber-300/40 text-[8px] font-bold text-amber-950 flex items-center justify-center shadow"
               style={{ offsetPath: `path('${d}')`, offsetRotate: '0deg', offsetAnchor: 'center', animationDelay: `${n * 0.16}s` }}>₹</span>
@@ -745,7 +745,7 @@ function StepFlow({ plan, op, before }) {
             const full = target[k] && after[k] >= target[k] * m - m * 0.5
             return (
               <div key={k} className={`flex flex-col items-center text-center min-w-0 ${moving ? '' : 'opacity-45'}`}>
-                <div className={`relative w-14 h-[72px] sm:w-20 sm:h-28 rounded-b-2xl sm:rounded-b-3xl rounded-t-md border-2 ${b.border} bg-[var(--bg-card)] overflow-hidden`}>
+                <div className={`relative w-14 h-[72px] sm:w-[72px] sm:h-24 rounded-b-2xl sm:rounded-b-3xl rounded-t-md border-2 ${b.border} bg-[var(--bg-card)] overflow-hidden`}>
                   <div className={`absolute bottom-0 inset-x-0 ${b.bar} ${moving ? 'flow-level' : ''}`} style={{ '--a': `${a}%`, '--z': `${z}%`, height: `${z}%` }} />
                   <span className="absolute inset-0 flex items-center justify-center"><span className="w-7 h-7 rounded-full bg-[var(--bg-card)]/85 flex items-center justify-center"><Icon size={14} className={b.text} /></span></span>
                 </div>
