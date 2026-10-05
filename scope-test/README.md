@@ -19,3 +19,17 @@ What we learn
 - Does SpreadsheetApp.openById work with only drive.file on a sheet the app created?
 - Does sharing work (Drive API permissions.create vs addEditor)?
 - Spouse: no access before Picker, access after Picker, and it stays.
+
+## Results
+
+### Owner test, 5 Oct 2026 (jagadeesh.k.manne@gmail.com, only drive.file)
+- FAIL SpreadsheetApp.create -> "Required permissions: .../auth/spreadsheets"
+- OK   Sheets API Spreadsheets.create (app-created sheet)
+- FAIL SpreadsheetApp.openById on the app's own sheet -> needs .../auth/spreadsheets
+- OK   Sheets API values.update + values.get on that sheet
+- OK   Drive API files.get on that sheet
+
+Conclusion: with drive.file, SpreadsheetApp cannot be used at all (not even on the
+app's own sheets). Everything must go through the Sheets API (Advanced Sheets
+service) + Drive API. Plan: an adapter that mimics the SpreadsheetApp calls the app
+uses, backed by the Sheets API, so most of gas-webapp stays unchanged.

@@ -76,3 +76,7 @@ function checkAccess_(id, who) {
     try_('Drive API files.get (metadata)', function () { return Drive.Files.get(id, { fields: 'name' }).name; })
   ];
 }
+
+// Run these from the editor (Run button) - results go to the Execution log
+function RUN_step1() { step1_createAndOpen().forEach(function (r) { Logger.log((r.ok ? 'OK   ' : 'FAIL ') + r.step + ' -> ' + r.detail); }); }
+function RUN_step3() { step3_tryOpen().forEach(function (r) { Logger.log((r.ok ? 'OK   ' : 'FAIL ') + r.step + ' -> ' + r.detail); }); }
