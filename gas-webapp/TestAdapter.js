@@ -83,7 +83,7 @@ function TEST_3_loadAllBoth() {
 }
 
 function TEST_4_realCopy() {
-  var realId = testProps_().getProperty('TEST_REAL_SHEET_ID');
+  var realId = testProps_().getProperty('TEST_REAL_SHEET_ID') || '1FhHhQdFP4Mq2lYnepEIhWx-JIfDL_vBvr3HUSEbosow'; // owner's sheet, read-only (a copy is tested)
   if (!realId) { Logger.log('Set Script Property TEST_REAL_SHEET_ID first'); return; }
   var copyId = testProps_().getProperty('TEST_COPY_ID');
   if (!copyId) {
@@ -115,6 +115,8 @@ function diff_(a, b, path, out, showValues) {
   }
   if (a !== b) {
     if (typeof a === 'number' && Math.abs(a - b) < 1e-9) return;
+    var iso = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d/;
+    if (!showValues && typeof a === 'string' && iso.test(a) && iso.test(b)) { out.push(path + ': dates differ by ' + ((Date.parse(b) - Date.parse(a)) / 1000) + ' s'); return; }
     out.push(path + ': ' + describe_(a, showValues) + ' vs ' + describe_(b, showValues));
   }
 }
