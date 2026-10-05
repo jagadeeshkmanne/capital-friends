@@ -255,7 +255,7 @@ function noScopeStep_(name, fn) {
 /** TEST_7: create a portfolio (17 conditional-format rules) on the old sheet (old path) and the adapter sheet, compare. */
 function TEST_7_portfolio() {
   var oldId = testProps_().getProperty('TEST_OLD_ID'), newId = testProps_().getProperty('TEST_NEW_ID');
-  var make = function () { return processAddPortfolio({ portfolioName: 'Test Portfolio', investmentAccount: '', initialInvestment: 0, sipTarget: 1000, lumpsumTarget: 0, rebalanceThreshold: 5 }); };
+  var make = function () { var mem = getAllFamilyMembers()[0] || {}; var banks = getAllBankAccounts(); var ia = addInvestmentAccount({ accountName: 'Test Demat', accountType: 'Demat + Trading', platformBroker: 'Test Broker', memberId: mem.memberId, bankAccountId: banks[0] && banks[0].accountId, registeredEmail: 'owner@example.com', registeredPhone: '9000000001' }); var iaId = ia && (ia.accountId || ia.investmentAccountId || (ia.data && ia.data.accountId)); return { ia: ia, pf: processAddPortfolio({ portfolioName: 'Test Portfolio', investmentAccount: iaId || 'Test Demat', initialInvestment: 0, sipTarget: 1000, lumpsumTarget: 0, rebalanceThreshold: 5 }) }; };
   var a = runPath_(false, oldId, function () { return safeTry_(make); });
   var b = runPath_(true, newId, function () { return safeTry_(make); });
   Logger.log('old: ' + JSON.stringify(a.out).slice(0, 300));
