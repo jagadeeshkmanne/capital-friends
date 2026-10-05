@@ -12,6 +12,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 // drive.file: GAS creates user spreadsheet (SpreadsheetApp.create)
 // gmail.send: GAS sends email reports via GmailApp from user's Gmail
 // script.scriptapp: GAS creates daily sync triggers for auto-refresh
+// (script.external_request is added in stage 3, together with Google verification - it is a sensitive scope)
 // openid/email/profile: user identity
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -78,6 +79,7 @@ export function AuthProvider({ children }) {
 
       // Register token refresh function with api module
       api.setTokenRefreshFn(silentRefresh)
+      api.setReauthHandler(askForConsent)
 
       const explicitLogout = localStorage.getItem('cf_idb_stale') === '1'
 
@@ -205,6 +207,40 @@ export function AuthProvider({ children }) {
     })
   }
 
+  // Ask the user (with a button = real click) to approve the app's Google permissions
+  // again, e.g. after a new permission was added. Shared by all waiting API calls.
+  const [consentAsk, setConsentAsk] = useState(null)
+  const consentPending = useRef(null)
+  function askForConsent() {
+    if (consentPending.current) return consentPending.current.promise
+    let resolve, reject
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej })
+    consentPending.current = { promise, resolve, reject }
+    setConsentAsk({ error: '' })
+    return promise
+  }
+  function finishConsent(ok, err) {
+    const p = consentPending.current
+    consentPending.current = null
+    setConsentAsk(null)
+    if (p) { if (ok) p.resolve(); else p.reject(err || new Error('cancelled')) }
+  }
+  function approveConsent() {
+    const client = tokenClientRef.current
+    if (!client) return finishConsent(false)
+    const originalCallback = client.callback
+    client.callback = (response) => {
+      client.callback = originalCallback
+      if (response.error) {
+        setConsentAsk({ error: response.error_description || response.error })
+      } else {
+        api.storeToken(response.access_token, response.expires_in)
+        finishConsent(true)
+      }
+    }
+    client.requestAccessToken({ prompt: 'consent' })
+  }
+
   // Manual sign-in trigger.
   // After explicit logout → show account picker so user can switch accounts.
   // Otherwise → try silent first (no screen), fall back to account picker only if needed.
@@ -253,7 +289,32 @@ export function AuthProvider({ children }) {
     signOut,
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {consentAsk && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+          <div className="fixed inset-0 bg-black/60" />
+          <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl p-6">
+            <h2 className="text-base font-bold text-[var(--text-primary)]">One more Google permission</h2>
+            <p className="text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
+              Capital Friends was updated and needs your OK once more in Google, so it can load
+              the latest fund prices. Your data stays in your own Google Sheet.
+            </p>
+            {consentAsk.error && <p className="text-xs text-rose-500 mt-3">{consentAsk.error}</p>}
+            <div className="flex gap-2 mt-5">
+              <button onClick={approveConsent} className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold">
+                Continue with Google
+              </button>
+              <button onClick={() => finishConsent(false)} className="px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">
+                Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

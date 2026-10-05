@@ -12,120 +12,68 @@
  * Stores compressed fund data for fast retrieval
  */
 function cacheFundsForUser() {
+  // Fund list is public and the same for everyone, so it lives in the shared
+  // script cache (CacheService, 100KB per entry, max 6 hours) - not in User
+  // Properties: ~15,000 funds (~1 MB) never fit the 500 KB User Properties quota,
+  // so the old cache always failed and every search read the whole sheet.
   try {
-    var userProps = PropertiesService.getUserProperties();
     var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    var cache = CacheService.getScriptCache();
+    if (cache.get(FUND_CACHE_PREFIX_ + today + ':n')) return;
 
-    var lastCacheDate = userProps.getProperty('fundCacheDate');
+    var rows;
+    try { rows = masterRows_(CONFIG.masterMFDataSheet, 2); }       // public download, no Sheets API quota
+    catch (e) { log('Fund list download failed, reading sheet: ' + e.message); rows = null; }
+    var funds = rows ? rows.map(function (row) {
+      return { fundCode: String(row[0] || '').trim(), fundName: String(row[1] || '').trim() };
+    }).filter(function (f) { return f.fundCode && f.fundName; }) : loadFundsDirectlyFromSheet();
+    if (!funds.length) return;
 
-    // Already cached today?
-    if (lastCacheDate === today) {
-      log('✅ Fund cache already fresh for today (' + today + ')');
-      return;
-    }
-
-    log('📥 Caching funds for ' + today + '...');
-
-    var ss = getSpreadsheet();
-    var masterSheet = ss.getSheetByName(CONFIG.mutualFundDataSheet);
-
-    if (!masterSheet) {
-      log('⚠️ MutualFundData sheet not found');
-      return;
-    }
-
-    var totalRows = masterSheet.getLastRow();
-    if (totalRows < 2) {
-      log('⚠️ MutualFundData is empty');
-      return;
-    }
-
-    var data = masterSheet.getRange(2, 1, totalRows - 1, 2).getValues(); // Get Code, Name only (no category needed)
-
-    // Convert to fund objects - only store what we need for search
-    var funds = data.map(function(row) {
-      return {
-        fundCode: String(row[0] || '').trim(),
-        fundName: String(row[1] || '').trim()
-      };
-    });
-
-    // Convert to JSON string
-    var jsonString = JSON.stringify(funds);
-
-    // Split into 8KB chunks (User Properties limit: 9KB per property)
-    var chunkSize = 8000;
-    var chunks = [];
-
-    for (var i = 0; i < jsonString.length; i += chunkSize) {
-      chunks.push(jsonString.substring(i, i + chunkSize));
-    }
-
-    // Clear old cache chunks (in case fund count decreased)
-    var oldChunkCount = parseInt(userProps.getProperty('fundCacheChunks') || '0');
-    for (var k = chunks.length; k < oldChunkCount; k++) {
-      userProps.deleteProperty('fundCache_' + k);
-    }
-
-    // Store metadata
-    userProps.setProperty('fundCacheDate', today);
-    userProps.setProperty('fundCacheChunks', String(chunks.length));
-    userProps.setProperty('fundCacheCount', String(data.length));
-
-    // Store chunks
-    for (var j = 0; j < chunks.length; j++) {
-      userProps.setProperty('fundCache_' + j, chunks[j]);
-    }
-
-    log('✅ Cached ' + data.length + ' funds in ' + chunks.length + ' chunks for ' + today);
-
+    var json = JSON.stringify(funds), size = 90000, put = {}, n = 0;
+    for (var i = 0; i < json.length; i += size) put[FUND_CACHE_PREFIX_ + today + ':' + (n++)] = json.substring(i, i + size);
+    put[FUND_CACHE_PREFIX_ + today + ':n'] = String(n);
+    cache.putAll(put, 21600);
+    log('Cached ' + funds.length + ' funds in ' + n + ' chunks for ' + today);
+    cleanupOldUserFundCache_();
   } catch (error) {
     log('Error caching funds: ' + error.toString());
-    // Don't throw - this is background caching, shouldn't break sheet open
   }
 }
 
+var FUND_CACHE_PREFIX_ = 'funds_v2:';
+
+/** Remove the old (always incomplete) fund cache from User Properties, once. */
+function cleanupOldUserFundCache_() {
+  try {
+    var up = PropertiesService.getUserProperties();
+    if (!up.getProperty('fundCacheChunks') && !up.getProperty('fundCache_0')) return;
+    Object.keys(up.getProperties()).forEach(function (k) {
+      if (k.indexOf('fundCache') === 0) up.deleteProperty(k);
+    });
+    log('Removed old fund cache from User Properties');
+  } catch (e) { log('cleanupOldUserFundCache_: ' + e); }
+}
+
 /**
- * Get all funds from User Properties cache
- * Falls back to loading from sheet if cache doesn't exist
- * Returns array of {fundCode, fundName, category} objects
+ * Get all funds (cached for the day). Returns [{fundCode, fundName}].
  */
 function getAllFundsFromCache() {
   try {
-    var userProps = PropertiesService.getUserProperties();
-
-    var chunkCount = parseInt(userProps.getProperty('fundCacheChunks') || '0');
-
-    // No cache - build it now
-    if (chunkCount === 0) {
-      log('⚠️ No cache found, building now...');
-      cacheFundsForUser();
-      chunkCount = parseInt(userProps.getProperty('fundCacheChunks') || '0');
-
-      if (chunkCount === 0) {
-        log('ERROR: Failed to build cache, loading directly from sheet');
-        return loadFundsDirectlyFromSheet();
-      }
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    var cache = CacheService.getScriptCache();
+    var n = +cache.get(FUND_CACHE_PREFIX_ + today + ':n');
+    if (!n) { cacheFundsForUser(); n = +cache.get(FUND_CACHE_PREFIX_ + today + ':n'); }
+    if (!n) return loadFundsDirectlyFromSheet();
+    var keys = [];
+    for (var i = 0; i < n; i++) keys.push(FUND_CACHE_PREFIX_ + today + ':' + i);
+    var got = cache.getAll(keys), json = '';
+    for (var j = 0; j < keys.length; j++) {
+      if (got[keys[j]] === undefined) { log('Fund cache chunk missing, reading sheet'); return loadFundsDirectlyFromSheet(); }
+      json += got[keys[j]];
     }
-
-    // Reconstruct JSON string from chunks
-    var jsonString = '';
-    for (var i = 0; i < chunkCount; i++) {
-      jsonString += userProps.getProperty('fundCache_' + i);
-    }
-
-    // Parse JSON to get fund objects
-    var funds = JSON.parse(jsonString);
-
-    var cacheDate = userProps.getProperty('fundCacheDate');
-
-    log('📤 Returning ' + funds.length + ' funds from cache (date: ' + cacheDate + ')');
-
-    return funds;
-
+    return JSON.parse(json);
   } catch (error) {
     log('Error loading funds from cache: ' + error.toString());
-    log('Falling back to direct sheet read');
     return loadFundsDirectlyFromSheet();
   }
 }
@@ -173,11 +121,8 @@ function loadFundsDirectlyFromSheet() {
  */
 function refreshFundCache() {
   try {
-    var userProps = PropertiesService.getUserProperties();
-
-    // Clear cache date to force reload
-    userProps.deleteProperty('fundCacheDate');
-
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    CacheService.getScriptCache().remove(FUND_CACHE_PREFIX_ + today + ':n');
     cacheFundsForUser();
 
     SpreadsheetApp.getUi().alert('✅ Fund cache refreshed successfully!\n\nThe latest fund data is now available for search.');

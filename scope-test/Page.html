@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html><head><base target="_top"><meta charset="utf-8">
+<style>
+ body{font-family:system-ui,Arial;margin:24px;max-width:820px;color:#16384a}
+ button{font-size:15px;padding:9px 14px;margin:4px 6px 4px 0;border-radius:8px;border:1px solid #16384a;background:#fff;cursor:pointer}
+ input{font-size:15px;padding:8px;width:280px}
+ .ok{color:#0f8f7e}.no{color:#c0563f} li{margin:6px 0} small{color:#667}
+</style></head><body>
+<h2>Capital Friends · drive.file test</h2>
+<p>Signed in as: <b id="me">…</b> &nbsp; <small>Test sheet: <span id="sid">none</span></small></p>
+<h3>Owner (your account)</h3>
+<button onclick="run('step1_createAndOpen')">1. Create test sheet</button><br>
+<input id="spouse" placeholder="spouse test Gmail address"> <button onclick="run('step2_share', document.getElementById('spouse').value)">2. Share with spouse</button>
+<h3>Spouse (second account)</h3>
+<button onclick="run('step3_tryOpen')">3. Try opening (before Picker)</button>
+<button onclick="pick()">4. Pick the file (Picker)</button>
+<button onclick="run('step3_tryOpen')">5. Try again (after Picker)</button>
+<h3>Results</h3><ul id="out"><li><small>Click a step…</small></li></ul>
+<script>
+ var KEY = '<?= pickerKey ?>', APPID = '<?= appId ?>';
+ google.script.run.withSuccessHandler(function(e){document.getElementById('me').textContent=e||'(unknown)';}).whoAmI();
+ function refreshId(){ google.script.run.withSuccessHandler(function(i){document.getElementById('sid').textContent=i||'none';}).getSheetId(); }
+ refreshId();
+ function show(title, rows){
+   var ul=document.getElementById('out'); var h='<li><b>'+title+'</b><ul>';
+   rows.forEach(function(r){ h+='<li class="'+(r.ok?'ok':'no')+'">'+(r.ok?'✅ ':'❌ ')+r.step+' — <small>'+r.detail+'</small></li>'; });
+   ul.innerHTML = h+'</ul></li>' + (ul.innerHTML.indexOf('Click a step')>-1?'':ul.innerHTML);
+ }
+ function run(fn, arg){
+   show(fn+' … running', []);
+   var r = google.script.run.withSuccessHandler(function(rows){ show(fn, rows); refreshId(); })
+     .withFailureHandler(function(e){ show(fn, [{step:'Script error', ok:false, detail:e.message}]); });
+   arg===undefined ? r[fn]() : r[fn](arg);
+ }
+ function pick(){
+   if(!KEY||!APPID){ show('Picker', [{step:'Picker not configured', ok:false, detail:'Fill PICKER_API_KEY and CLOUD_PROJECT_NUMBER in Code.gs (test Cloud project) and redeploy'}]); return; }
+   google.script.run.withSuccessHandler(function(id){
+     google.script.run.withSuccessHandler(function(token){
+       gapi.load('picker', function(){
+         var view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setFileIds(id);
+         new google.picker.PickerBuilder().setOAuthToken(token).setDeveloperKey(KEY).setAppId(APPID)
+           .addView(view).setOrigin(google.script.host.origin)
+           .setCallback(function(d){ if(d.action===google.picker.Action.PICKED){ show('Picker',[{step:'Picked '+d.docs[0].name, ok:true, detail:'now click step 5'}]); } })
+           .build().setVisible(true);
+       });
+     }).getToken();
+   }).getSheetId();
+ }
+</script>
+<script src="https://apis.google.com/js/api.js"></script>
+</body></html>

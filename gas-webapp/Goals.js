@@ -348,7 +348,7 @@ function addGoal(goalData) {
     setGoalFormulas(sheet, newRow);
     
     // Force spreadsheet to evaluate formulas before returning so that immediate fetch gets correct values
-    SpreadsheetApp.flush();
+    flushSheets_();
 
     // Format the new row
     applyDataRowFormatting(sheet, newRow, newRow, 24);
@@ -439,7 +439,7 @@ function editGoal(goalId, goalData) {
     setGoalFormulas(sheet, rowIndex);
     
     // Force spreadsheet to evaluate formulas before returning so that immediate fetch gets correct values
-    SpreadsheetApp.flush();
+    flushSheets_();
 
     log(`Goal edited: ${goalId} - ${goalData.goalName}`);
 
@@ -786,7 +786,7 @@ function mapPortfoliosToGoal(goalId, portfolioMappings) {
 
     // No need to recalculate — Goals column I has a live SUMPRODUCT formula
     // that auto-updates when GoalPortfolioMapping changes
-    SpreadsheetApp.flush(); // Force formulas to evaluate so that immediate refresh gets new current value
+    flushSheets_(); // Force formulas to evaluate so that immediate refresh gets new current value
 
     log(`Investments mapped to goal: ${goalId}`);
 

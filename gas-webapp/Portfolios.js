@@ -428,56 +428,56 @@ function createPortfolioSheet(portfolioName, portfolioId) {
 
   // Background colors for sections (only apply when column A is not empty)
   const fundInfoBgRange = portfolioSheet.getRange("B4:F1000");
-  const fundInfoBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const fundInfoBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#f9fafb")  // Light gray
     .setRanges([fundInfoBgRange])
     .build();
 
   const currentBgRange = portfolioSheet.getRange("G4:H1000");
-  const currentBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const currentBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#eff6ff")  // Light blue
     .setRanges([currentBgRange])
     .build();
 
   const targetBgRange = portfolioSheet.getRange("I4:J1000");
-  const targetBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const targetBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#f0fdf4")  // Light green
     .setRanges([targetBgRange])
     .build();
 
   const sipBgRange = portfolioSheet.getRange("K4:L1000");
-  const sipBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const sipBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#ecfdf5")  // Light emerald
     .setRanges([sipBgRange])
     .build();
 
   const lumpsumBgRange = portfolioSheet.getRange("M4:N1000");
-  const lumpsumBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const lumpsumBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#f3e8ff")  // Light purple
     .setRanges([lumpsumBgRange])
     .build();
 
   const rebalanceBgRange = portfolioSheet.getRange("O4:O1000");
-  const rebalanceBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const rebalanceBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#fffbeb")  // Light amber
     .setRanges([rebalanceBgRange])
     .build();
 
   const athBgRange = portfolioSheet.getRange("R4:S1000");
-  const athBgRule = SpreadsheetApp.newConditionalFormatRule()
+  const athBgRule = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#fff3e0")  // Light orange
     .setRanges([athBgRange])
     .build();
 
   const plBgRange = portfolioSheet.getRange("P4:P1000");
-  const plBgRuleBackground = SpreadsheetApp.newConditionalFormatRule()
+  const plBgRuleBackground = newConditionalFormatRule_()
     .whenFormulaSatisfied('=$A4<>""')
     .setBackground("#fef2f2")  // Light red
     .setRanges([plBgRange])
@@ -485,14 +485,14 @@ function createPortfolioSheet(portfolioName, portfolioId) {
 
   // P&L Column (P): Bold green for profit, Bold red for loss
   const plRange = portfolioSheet.getRange("P4:P1000");
-  const plRuleProfit = SpreadsheetApp.newConditionalFormatRule()
+  const plRuleProfit = newConditionalFormatRule_()
     .whenNumberGreaterThan(0)
     .setFontColor('#059669')   // Bold green (emerald-600)
     .setBold(true)
     .setRanges([plRange])
     .build();
 
-  const plRuleLoss = SpreadsheetApp.newConditionalFormatRule()
+  const plRuleLoss = newConditionalFormatRule_()
     .whenNumberLessThan(0)
     .setFontColor('#dc2626')   // Bold red (red-600)
     .setBold(true)
@@ -501,14 +501,14 @@ function createPortfolioSheet(portfolioName, portfolioId) {
 
   // Buy/Sell Column (O): Bold green for buy, Bold red for sell
   const buySellRange = portfolioSheet.getRange("O4:O1000");
-  const buySellRuleBuy = SpreadsheetApp.newConditionalFormatRule()
+  const buySellRuleBuy = newConditionalFormatRule_()
     .whenNumberGreaterThan(0)  // Buy needed
     .setFontColor('#059669')   // Bold green
     .setBold(true)
     .setRanges([buySellRange])
     .build();
 
-  const buySellRuleSell = SpreadsheetApp.newConditionalFormatRule()
+  const buySellRuleSell = newConditionalFormatRule_()
     .whenNumberLessThan(0)  // Sell needed
     .setFontColor('#dc2626')   // Bold red
     .setBold(true)
@@ -874,14 +874,14 @@ function applyPLConditionalFormatting(sheet, row) {
   try {
     // Column N: Total P&L (₹) - Green if positive, Red if negative
     const amountRange = sheet.getRange(row, 14);  // Column N
-    const amountRule1 = SpreadsheetApp.newConditionalFormatRule()
+    const amountRule1 = newConditionalFormatRule_()
       .whenNumberGreaterThan(0)
       .setBackground("#d1fae5")  // Light green for positive
       .setFontColor("#059669")   // Dark green text
       .setRanges([amountRange])
       .build();
 
-    const amountRule2 = SpreadsheetApp.newConditionalFormatRule()
+    const amountRule2 = newConditionalFormatRule_()
       .whenNumberLessThan(0)
       .setBackground("#fee2e2")  // Light red for negative
       .setFontColor("#dc2626")   // Dark red text
@@ -890,14 +890,14 @@ function applyPLConditionalFormatting(sheet, row) {
 
     // Column O: Total P&L (%) - Green if positive, Red if negative
     const percentRange = sheet.getRange(row, 15);  // Column O
-    const percentRule1 = SpreadsheetApp.newConditionalFormatRule()
+    const percentRule1 = newConditionalFormatRule_()
       .whenNumberGreaterThan(0)
       .setBackground("#d1fae5")  // Light green for positive
       .setFontColor("#059669")   // Dark green text
       .setRanges([percentRange])
       .build();
 
-    const percentRule2 = SpreadsheetApp.newConditionalFormatRule()
+    const percentRule2 = newConditionalFormatRule_()
       .whenNumberLessThan(0)
       .setBackground("#fee2e2")  // Light red for negative
       .setFontColor("#dc2626")   // Dark red text

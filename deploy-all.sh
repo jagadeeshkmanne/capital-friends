@@ -33,6 +33,14 @@
 
 set -e
 
+# --- safety: only deploy from the main branch (feature branches must never reach production) ---
+CURRENT_BRANCH="$(git -C "$(cd "$(dirname "$0")" && pwd)" rev-parse --abbrev-ref HEAD)"
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo "❌ Refusing to deploy: you are on branch '$CURRENT_BRANCH'. Switch to main first (git checkout main)."
+  exit 1
+fi
+
+
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${1:-all}"
 

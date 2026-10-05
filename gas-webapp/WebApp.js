@@ -36,6 +36,7 @@ var WEBAPP_CONFIG = {
  * @returns {Object} - { success: boolean, data: any, error: string }
  */
 function apiRouter(request) {
+  _inApiRequest = true; // Sheets API adapter batches all writes of this request
   try {
     // With Execution API, Session.getActiveUser() returns the calling user
     var email = Session.getActiveUser().getEmail();
@@ -57,16 +58,31 @@ function apiRouter(request) {
       return { success: false, error: 'Account suspended or unavailable.', code: 403 };
     }
 
+    // Family member who hasn't picked the owner's sheet in the Google Picker yet
+    // (drive.file permission). React shows the Picker, then retries the same call.
+    if (userRecord.needsFilePicker) {
+      var owner = userRecord.invitedBy ? findUserByEmail(userRecord.invitedBy) : null;
+      return {
+        success: false, code: 428, error: 'NEEDS_FILE_PICKER',
+        needsFilePicker: true,
+        spreadsheetId: userRecord.spreadsheetId,
+        sheetTitle: owner && owner.displayName ? 'Capital Friends - ' + owner.displayName : 'Capital Friends',
+        ownerEmail: userRecord.invitedBy || ''
+      };
+    }
+
     // Set spreadsheet context for all business logic functions
     _currentUserSpreadsheetId = userRecord.spreadsheetId;
 
     // Route to action handler
     var result = routeAction(action, params, userRecord);
+    flushSheets_(); // send all queued sheet writes in one go
 
     // Sanitize: strip non-serializable types (Date, Range, Sheet) for Execution API
     return JSON.parse(JSON.stringify({ success: true, data: result }));
 
   } catch (error) {
+    try { if (_ssAdapter) _ssAdapter.flush(); } catch (e2) { log('flush after error failed: ' + e2); }
     log('apiRouter error: ' + error.toString());
     return { success: false, error: error.message || 'Internal server error', stack: error.stack, code: 500 };
   }

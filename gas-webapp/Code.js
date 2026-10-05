@@ -98,9 +98,78 @@ var _currentUserSpreadsheetId = null;
  */
 function getSpreadsheet() {
   if (_currentUserSpreadsheetId) {
+    if (useSheetsApi_()) {
+      // drive.file-safe path: Sheets API adapter (see SheetsAdapter.js), one instance per execution
+      if (!_ssAdapter || _ssAdapterId !== _currentUserSpreadsheetId) {
+        if (_ssAdapter) _ssAdapter.flush();
+        _ssAdapter = SheetsAdapter.openById(_currentUserSpreadsheetId);
+        _ssAdapterId = _currentUserSpreadsheetId;
+      }
+      _ssAdapter.autoFlush = !_inApiRequest;
+      return _ssAdapter;
+    }
     return SpreadsheetApp.openById(_currentUserSpreadsheetId);
   }
   throw new Error('No spreadsheet context. Call must come through WebApp doPost.');
+}
+
+// ---------------------------------------------------------------------------
+// Sheets API switch (drive.file migration)
+// Script Property USE_SHEETS_API:  '' / missing = off (old SpreadsheetApp path),
+//   'all' = everyone, or a comma list of emails = only those users.
+// ---------------------------------------------------------------------------
+var _ssAdapter = null, _ssAdapterId = null, _useSheetsApi = null, _inApiRequest = false;
+
+function useSheetsApi_() {
+  if (_useSheetsApi !== null) return _useSheetsApi;
+  var flag = (PropertiesService.getScriptProperties().getProperty('USE_SHEETS_API') || '').trim().toLowerCase();
+  if (!flag) { _useSheetsApi = false; return false; }
+  if (flag === 'all') { _useSheetsApi = true; return true; }
+  var email = '';
+  try { email = (Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || '').toLowerCase(); } catch (e) {}
+  _useSheetsApi = flag.split(',').map(function (s) { return s.trim(); }).indexOf(email) >= 0;
+  return _useSheetsApi;
+}
+
+/** Send queued sheet changes now (replaces SpreadsheetApp.flush()). */
+function flushSheets_() {
+  if (_ssAdapter) { _ssAdapter.flush(); return; }
+  if (!useSheetsApi_()) SpreadsheetApp.flush();
+}
+
+/** Create a user spreadsheet (Sheets API when the switch is on). Returns an object with getId(). */
+function createUserSpreadsheet_(title) {
+  return useSheetsApi_() ? SheetsAdapter.create(title) : SpreadsheetApp.create(title);
+}
+
+/** Open any spreadsheet by id on the active path (sharing etc.). */
+function openSpreadsheetById_(id) {
+  return useSheetsApi_() ? SheetsAdapter.openById(id) : SpreadsheetApp.openById(id);
+}
+
+/**
+ * Can the current user open this spreadsheet?
+ * Returns 'ok', 'missing' (deleted / no access) or 'error' (anything else, e.g. a
+ * temporary Google error - callers must NOT treat that as missing).
+ * With drive.file, a family member sees 'missing' until they pick the file once in
+ * the Google Picker.
+ */
+function spreadsheetAccess_(id) {
+  try {
+    if (useSheetsApi_()) Sheets.Spreadsheets.get(id, { fields: 'spreadsheetId' });
+    else SpreadsheetApp.openById(id);
+    return 'ok';
+  } catch (e) {
+    var msg = String(e && e.message || e);
+    if (/not found|404|does not exist|permission|403|Requested entity was not found|PERMISSION_DENIED/i.test(msg)) return 'missing';
+    log('spreadsheetAccess_ error for ' + id + ': ' + msg);
+    return 'error';
+  }
+}
+
+/** Conditional-format rule builder that works on both paths. */
+function newConditionalFormatRule_() {
+  return useSheetsApi_() ? SheetsAdapter.newConditionalFormatRule() : newConditionalFormatRule_();
 }
 
 /**

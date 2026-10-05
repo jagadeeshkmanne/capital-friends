@@ -10,6 +10,7 @@ import { ConfirmProvider } from './context/ConfirmContext'
 import { MaskProvider } from './context/MaskContext'
 import './index.css'
 import App from './App.jsx'
+import FilePickerGate from './components/FilePickerGate'
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
@@ -21,6 +22,7 @@ createRoot(document.getElementById('root')).render(
               <DataProvider>
                 <FamilyProvider>
                   <App />
+                  <FilePickerGate />
                 </FamilyProvider>
               </DataProvider>
             </ConfirmProvider>
