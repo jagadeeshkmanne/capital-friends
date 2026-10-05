@@ -43,6 +43,7 @@ function TEST_1_setupBoth() {
   if (!oldSs) {
     oldSs = SpreadsheetApp.create('CF TEST old-path ' + stamp);
     r1 = runPath_(false, oldSs.getId(), function () { return createAllSheets(); });
+    testProps_().setProperty('TEST_OLD_ID', oldSs.getId());
   }
   var newSs = SheetsAdapter.create('CF TEST adapter ' + stamp);
   var r2 = runPath_(true, newSs.getId(), function () { return createAllSheets(); });
