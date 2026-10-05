@@ -142,8 +142,17 @@ var SheetsAdapter = (function () {
     this._req({ updateSpreadsheetProperties: { properties: { timeZone: tz }, fields: 'timeZone' } });
     if (this._meta) this._meta.timeZone = tz;
   };
+  // The Sheets API rejects some locales SpreadsheetApp accepts (e.g. en_IN).
+  // Send it on its own (never inside the batch, one bad request fails the whole
+  // batch) and keep the current locale if the API refuses it.
   Book.prototype.setSpreadsheetLocale = function (loc) {
-    this._req({ updateSpreadsheetProperties: { properties: { locale: loc }, fields: 'locale' } });
+    var self = this;
+    try {
+      api_(function () { return Sheets.Spreadsheets.batchUpdate({ requests: [{ updateSpreadsheetProperties: { properties: { locale: loc }, fields: 'locale' } }] }, self.id); });
+      if (self._meta) self._meta.locale = loc;
+    } catch (e) {
+      Logger.log('SheetsAdapter: locale ' + loc + ' not supported by Sheets API, keeping ' + (self._meta ? self._meta.locale : 'current') + ' (' + e.message + ')');
+    }
   };
   Book.prototype.getSpreadsheetTimeZone = function () { return this._m().timeZone; };
   Book.prototype.getOwner = function () {
