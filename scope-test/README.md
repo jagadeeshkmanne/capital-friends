@@ -33,3 +33,21 @@ Conclusion: with drive.file, SpreadsheetApp cannot be used at all (not even on t
 app's own sheets). Everything must go through the Sheets API (Advanced Sheets
 service) + Drive API. Plan: an adapter that mimics the SpreadsheetApp calls the app
 uses, backed by the Sheets API, so most of gas-webapp stays unchanged.
+
+### Adapter test (owner)
+- RUN_adapterTest: 101 getRange/setValues/appendRow calls in app-style code -> 5 Sheets API requests, values and formulas correct.
+
+### Sharing (owner -> Visali)
+- OK   Drive API permissions.create on the app-created sheet (drive.file)
+- FAIL SpreadsheetApp addEditor (needs spreadsheets)
+- Visali before Picker: Sheets API "Requested entity was not found", Drive "File not found" (expected)
+
+### Picker grant (owner, on a sheet made in Google Sheets, i.e. NOT by the app = same as spouse case)
+- Test Cloud project cf-scope-test (944346365396), Testing mode, test users: owner + Visali. APIs: Sheets, Drive, Picker.
+- Before Picker: Sheets API / Drive API -> not found.
+- Picker works WITHOUT an API key (setOAuthToken + setAppId(project number)).
+- setFileIds([id]) showed an empty list without an API key; setQuery('<exact sheet title>') shows only that sheet -> works.
+- After picking: OK Sheets API write/read, OK Drive API files.get. drive.file grant confirmed.
+
+Next: same Picker step as Visali (needs her own browser profile / incognito because web-app links
+don't handle several signed-in accounts), then move the adapter into gas-webapp on this branch.
