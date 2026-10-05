@@ -284,6 +284,18 @@ var SheetsAdapter = (function () {
     var t = this._tabs[title];
     // pending writes on a formula tab: flush so computed values are fresh
     if (t && this._queue.length && (t.hasFormulas || t.wroteFormula)) { this.flush(); t = this._tabs[title]; }
+    if (!t && !this._pendingTabs[title] && typeof userMasterTabSource_ === 'function') {
+      // The big reference tabs (fund NAVs, ATH, stocks: ~15,000 rows) are a copy of the
+      // public master DB. Reading them through the Sheets API takes ~20 s, so they are
+      // served from a shared, cached copy of the master data instead (same content).
+      var rows = null;
+      try { rows = userMasterTabSource_(title); } catch (e) { Logger.log('master tab source failed for ' + title + ': ' + e); }
+      if (rows) {
+        var self0 = this, hdr = api_(function () { return Sheets.Spreadsheets.Values.get(self0.id, q_(title) + '!1:1', { valueRenderOption: 'UNFORMATTED_VALUE' }); });
+        var values = [((hdr && hdr.values) || [[]])[0] || []].concat(rows);
+        this._tabs[title] = t = { values: values, formulas: values.map(function () { return []; }), hasFormulas: false };
+      }
+    }
     if (!t) {
       // First read of a tab: load it together with every other small tab not yet
       // loaded (2 calls total instead of 2 per tab). Big tabs (master data) only on demand.
