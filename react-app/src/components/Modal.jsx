@@ -68,10 +68,23 @@ export function FormInput({ value, onChange, placeholder, type = 'text', sensiti
   )
 }
 
+function parseFormDate(value) {
+  if (!value) return null
+  const v = String(value).trim()
+  let d
+  const dmy = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (dmy) d = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]))
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) d = new Date(v + 'T00:00:00')
+  else d = new Date(v)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export function FormDateInput({ value, onChange, ...props }) {
   // Convert date string to Date object for react-datepicker
   // Handles both YYYY-MM-DD and ISO strings (2045-12-31T00:00:00.000Z)
-  const dateValue = value ? new Date(value.length > 10 ? value : value + 'T00:00:00') : null
+  // Also accepts dd/MM/yyyy (what some backend lists send); an unparseable value shows empty
+  // instead of crashing the date picker ("Invalid time value").
+  const dateValue = parseFormDate(value)
 
   function handleChange(date) {
     if (!date) { onChange(''); return }

@@ -313,15 +313,15 @@ function getAllReminders() {
         familyMemberId: reminderMemberId_(row[2], members),
         title: row[3] || '',
         description: row[4] || '',
-        dueDate: row[5] ? formatDate(row[5]) : '',
+        dueDate: row[5] ? formatDate(row[5], 'yyyy-MM-dd') : '', // ISO: the app does new Date(...) on it
         advanceNoticeDays: parseInt(row[6]) || 7,
         frequency: row[7] || 'One-time',
-        recurrenceEndDate: row[8] ? formatDate(row[8]) : '',
+        recurrenceEndDate: row[8] ? formatDate(row[8], 'yyyy-MM-dd') : '', // ISO: the app does new Date(...) on it
         priority: row[9] || 'Medium',
         status: row[10] || 'Pending',
         recipientEmail: row[11] || '',
-        lastSentDate: row[12] ? formatDate(row[12]) : '',
-        nextSendDate: row[13] ? formatDate(row[13]) : '',
+        lastSentDate: row[12] ? formatDate(row[12], 'yyyy-MM-dd') : '', // ISO: the app does new Date(...) on it
+        nextSendDate: row[13] ? formatDate(row[13], 'yyyy-MM-dd') : '', // ISO: the app does new Date(...) on it
         createdDate: row[14] ? row[14].toString() : '',
         isActive: row[15] !== false && row[15] !== 'No' && row[15] !== 'FALSE'
       });
