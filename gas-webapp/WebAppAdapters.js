@@ -261,6 +261,25 @@ function updateGoalPortfolioMappings(goalId, mappings) {
 // REMINDERS CRUD (new — not in original add-on)
 // ============================================================================
 
+// React sends reminderType + familyMemberId; the sheet keeps the type and the member's
+// NAME (the reminder emails show the name). These map between the two.
+function reminderType_(data) { return data.reminderType || data.type || data.category || ''; }
+function reminderMemberName_(data) {
+  if (data.familyMemberId) {
+    try {
+      var m = getAllFamilyMembers().filter(function (x) { return String(x.memberId) === String(data.familyMemberId); })[0];
+      if (m) return m.memberName;
+    } catch (e) { log('reminderMemberName_: ' + e); }
+  }
+  return data.familyMember || data.familyMemberName || '';
+}
+function reminderMemberId_(name, members) {
+  var n = String(name || '').trim().toLowerCase();
+  if (!n) return '';
+  var m = members.filter(function (x) { return String(x.memberName || '').trim().toLowerCase() === n; })[0];
+  return m ? m.memberId : '';
+}
+
 /**
  * Get all reminders
  * Reminders sheet: Row 1=Watermark, Row 2=Headers, Row 3+=Data
@@ -278,6 +297,8 @@ function getAllReminders() {
 
     var data = sheet.getRange(3, 1, lastRow - 2, 16).getValues();
     var reminders = [];
+    var members = [];
+    try { members = getAllFamilyMembers(); } catch (e) { log('getAllReminders members: ' + e); }
 
     for (var i = 0; i < data.length; i++) {
       var row = data[i];
@@ -286,7 +307,10 @@ function getAllReminders() {
       reminders.push({
         reminderId: row[0],
         type: row[1] || '',
+        reminderType: row[1] || '',
         familyMember: row[2] || '',
+        familyMemberName: row[2] || '',
+        familyMemberId: reminderMemberId_(row[2], members),
         title: row[3] || '',
         description: row[4] || '',
         dueDate: row[5] ? formatDate(row[5]) : '',
@@ -330,8 +354,8 @@ function addReminder(data) {
 
     sheet.appendRow([
       reminderId,                       // A: Reminder ID
-      data.type || data.category || '', // B: Type
-      data.familyMember || '',          // C: Family Member
+      reminderType_(data),              // B: Type
+      reminderMemberName_(data),        // C: Family Member (name)
       data.title,                       // D: Title
       data.description || '',           // E: Description
       data.dueDate || '',               // F: Due Date
@@ -395,8 +419,8 @@ function updateReminder(data) {
 
     sheet.getRange(rowIndex, 1, 1, 16).setValues([[
       data.reminderId,
-      data.type || data.category || '',
-      data.familyMember || '',
+      reminderType_(data),
+      reminderMemberName_(data),
       data.title,
       data.description || '',
       data.dueDate || '',
