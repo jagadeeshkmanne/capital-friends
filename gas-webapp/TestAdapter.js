@@ -197,3 +197,57 @@ function TEST_5_masterSource() {
     Logger.log((d.length ? '❌ ' : '✅ ') + x[0] + ': ' + got.length + ' rows downloaded in ' + ms + ' ms' + (d.length ? '\n   ' + d.join('\n   ') : ', identical to SpreadsheetApp'));
   });
 }
+
+/**
+ * TEST_6: the whole flow WITHOUT the spreadsheets permission (remove it from the TEST
+ * project's manifest before running). Uses only the new path - no SpreadsheetApp.
+ *   part 1: new user sheet + sample data + load-all
+ *   part 2 (TEST_6b): master data refresh + owner lookup + email PDF
+ */
+function TEST_6_noScope() {
+  var res = noScopeStep_('create sheet', function () {
+    var ss = createUserSpreadsheet_('CF TEST no-scope ' + new Date().toISOString().slice(0, 16));
+    testProps_().setProperty('TEST_NOSCOPE_ID', ss.getId());
+    _currentUserSpreadsheetId = ss.getId();
+    var r = createAllSheets();
+    var book = getSpreadsheet(), s1 = book.getSheetByName('Sheet1');
+    if (s1 && book.getSheets().length > 1) book.deleteSheet(s1);
+    flushSheets_();
+    return (r && r.created ? r.created.length : '?') + ' tabs';
+  });
+  if (!res) return;
+  noScopeStep_('add 2 members + bank', function () {
+    var m = addFamilyMember({ memberName: 'Test Owner', relationship: 'Self', email: 'owner@example.com', mobile: '9000000001', pan: 'ABCDE1234F', aadhar: '234567890123', dateOfBirth: '1984-05-10', includeInEmailReports: true });
+    addFamilyMember({ memberName: 'Test Spouse', relationship: 'Spouse', email: 'spouse@example.com', mobile: '9000000002', pan: 'FGHIJ5678K', aadhar: '345678901234', dateOfBirth: '1988-02-01' });
+    addBankAccount({ memberId: m.memberId, accountName: 'Test Savings', bankName: 'Test Bank', accountNumber: '000011112222', accountType: 'Savings', ifscCode: 'TEST0000001', branchName: 'Test Branch' });
+    flushSheets_();
+    return getAllFamilyMembers().length + ' members, ' + getAllBankAccounts().length + ' banks';
+  });
+  noScopeStep_('load-all', function () {
+    var d = JSON.parse(JSON.stringify(loadAllData()));
+    return Object.keys(d).map(function (k) { return k + ':' + (Array.isArray(d[k]) ? d[k].length : typeof d[k]); }).join(' ');
+  });
+}
+
+function TEST_6b_noScope() {
+  _currentUserSpreadsheetId = testProps_().getProperty('TEST_NOSCOPE_ID');
+  noScopeStep_('master data refresh (MF + ATH + stocks)', function () { var r = refreshAllMasterData(); return JSON.stringify(r).slice(0, 200); });
+  noScopeStep_('fund search', function () { var r = searchFundsWithCache('nifty'); return (r && r.length !== undefined ? r.length : JSON.stringify(r).slice(0, 100)) + ' results'; });
+  noScopeStep_('sheet owner (reminders)', function () { return getSpreadsheet().getOwner().getEmail() ? 'found' : 'empty'; });
+  noScopeStep_('email PDF', function () { var b = convertHTMLToPDF('<h1>Capital Friends test</h1><p>PDF without Drive</p>', 'cf-test'); return b.getBytes().length + ' bytes'; });
+  noScopeStep_('user check (owner access)', function () { return spreadsheetAccess_(_currentUserSpreadsheetId); });
+}
+
+function noScopeStep_(name, fn) {
+  _useSheetsApi = true; _inApiRequest = true; SHEETS_API_CALLS = 0;
+  var t0 = Date.now();
+  try {
+    var out = fn();
+    flushSheets_();
+    Logger.log('✅ ' + name + ': ' + out + '  (' + (Date.now() - t0) + ' ms, ' + SHEETS_API_CALLS + ' API calls)');
+    return out || true;
+  } catch (e) {
+    Logger.log('❌ ' + name + ': ' + e.message + '\n' + String(e.stack || '').split('\n').slice(0, 6).join('\n'));
+    return null;
+  }
+}
