@@ -188,6 +188,10 @@ function processInvestment(formData, transactionType) {
  */
 function processRedeem(formData) {
   try {
+    // The app's Redeem form sends date/price; older callers send saleDate/salePrice
+    formData = Object.assign({}, formData);
+    if (!formData.saleDate && formData.date) formData.saleDate = formData.date;
+    if (!formData.salePrice && formData.price) formData.salePrice = formData.price;
     log(`processRedeem called`);
     log(`Form data: ${JSON.stringify(formData)}`);
 
@@ -366,6 +370,11 @@ function processRedeemBulk(params) {
  */
 function processSwitchFunds(formData) {
   try {
+    // The app's Switch form sends date/fromPrice/toPrice; older callers send switchDate/fromFundPrice/toFundPrice
+    formData = Object.assign({}, formData);
+    if (!formData.switchDate && formData.date) formData.switchDate = formData.date;
+    if (!formData.fromFundPrice && formData.fromPrice) formData.fromFundPrice = formData.fromPrice;
+    if (!formData.toFundPrice && formData.toPrice) formData.toFundPrice = formData.toPrice;
     log(`processSwitchFunds called`);
     log(`Form data: ${JSON.stringify(formData)}`);
 

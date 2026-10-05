@@ -253,9 +253,16 @@ var SheetsAdapter = (function () {
     var tz = this._m().timeZone;
     var f = api_(function () { return Sheets.Spreadsheets.Values.batchGet(self.id, { ranges: ranges, valueRenderOption: 'FORMULA', dateTimeRenderOption: 'SERIAL_NUMBER' }); });
     var v = api_(function () { return Sheets.Spreadsheets.Values.batchGet(self.id, { ranges: ranges, valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING' }); });
+    // Formula cells that show a date: the views above give the formula and a date string.
+    // A third view (serial numbers) tells dates apart from text - only when needed.
+    var anyFormula = (f.valueRanges || []).some(function (vrng) {
+      return (vrng.values || []).some(function (row) { return row.some(function (x) { return typeof x === 'string' && x.charAt(0) === '='; }); });
+    });
+    var sv = anyFormula ? api_(function () { return Sheets.Spreadsheets.Values.batchGet(self.id, { ranges: ranges, valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }); }) : null;
     need.forEach(function (title, i) {
       var fr = (f.valueRanges[i] && f.valueRanges[i].values) || [];
       var vr = (v.valueRanges[i] && v.valueRanges[i].values) || [];
+      var sr = sv ? ((sv.valueRanges[i] && sv.valueRanges[i].values) || []) : null;
       var rows = Math.max(fr.length, vr.length), values = [], formulas = [], hasF = false;
       for (var r = 0; r < rows; r++) {
         var frow = fr[r] || [], vrow = vr[r] || [], n = Math.max(frow.length, vrow.length), vals = [], fms = [];
@@ -265,6 +272,7 @@ var SheetsAdapter = (function () {
           if (isFormula) { hasF = true; fms.push(raw); } else fms.push('');
           // number in the raw view but text in the computed view = a date/time cell
           if (!isFormula && typeof raw === 'number' && typeof val === 'string') val = serialToDate_(raw, tz);
+          else if (isFormula && sr && typeof val === 'string' && typeof (sr[r] || [])[c] === 'number') val = serialToDate_(sr[r][c], tz);
           vals.push(val === undefined || val === null ? '' : val);
         }
         values.push(vals); formulas.push(fms);
@@ -285,6 +293,25 @@ var SheetsAdapter = (function () {
     }
     return t;
   };
+
+  // How Google stores a value typed in with USER_ENTERED, for the cases we can be sure of.
+  var UNSURE_ = {};
+  function asStored_(v, tz) {
+    if (v === null || v === undefined || v === '') return '';
+    if (typeof v === 'number' || typeof v === 'boolean' || v instanceof Date) return v;
+    var str = String(v);
+    if (/^-?(0|[1-9]\d{0,14})(\.\d+)?$/.test(str)) return Number(str);                 // plain number
+    var m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/);
+    if (m) {                                                                         // our own date format
+      var d = Utilities.parseDate(m[1] + '-' + m[2] + '-' + m[3] + ' ' + (m[4] || '00') + ':' + (m[5] || '00') + ':' + (m[6] || '00'), tz, 'yyyy-MM-dd HH:mm:ss');
+      return m[7] ? new Date(d.getTime() + Number((m[7] + '00').slice(0, 3))) : d;
+    }
+    // anything Google might turn into a number / date / time / percent / currency / boolean
+    if (/^\s*[+\-(]?\s*[₹$€£]?\s*[\d.,]+\s*%?\)?\s*$/.test(str) || /\d\s*[\/\-.:]\s*\d/.test(str) ||
+        /^\s*(true|false)\s*$/i.test(str) || /^\s*[\d.]+e[+\-]?\d+\s*$/i.test(str) || /^\s+|\s+$/.test(str) ||
+        /^\d/.test(str) && /\d\s*(am|pm)\b/i.test(str) || /^'/.test(str)) return UNSURE_;
+    return str;
+  }
   function serialToDate_(serial, tz) {
     var ms = Math.round((serial - 25569) * 86400000);
     var wall = Utilities.formatDate(new Date(ms), 'UTC', 'yyyy-MM-dd HH:mm:ss');
@@ -301,13 +328,18 @@ var SheetsAdapter = (function () {
   Sheet.prototype.getMaxRows = function () { return this.book._sheetMeta(this.title).rowCount; };
   Sheet.prototype.getMaxColumns = function () { return this.book._sheetMeta(this.title).columnCount; };
   Sheet.prototype.getLastRow = function () {
-    var v = this.book._tab(this.title).values;
-    for (var r = v.length; r > 0; r--) { var row = v[r - 1] || []; for (var c = 0; c < row.length; c++) if (row[c] !== '' && row[c] !== null && row[c] !== undefined) return r; }
+    // like SpreadsheetApp: a cell counts if it has a value OR a formula (even one showing "")
+    var t = this.book._tab(this.title), v = t.values, f = t.formulas;
+    for (var r = Math.max(v.length, f.length); r > 0; r--) {
+      var row = v[r - 1] || [], frow = f[r - 1] || [];
+      for (var c = 0; c < Math.max(row.length, frow.length); c++) if ((row[c] !== '' && row[c] !== null && row[c] !== undefined) || frow[c]) return r;
+    }
     return 0;
   };
   Sheet.prototype.getLastColumn = function () {
-    var v = this.book._tab(this.title).values, max = 0;
-    v.forEach(function (row) { for (var c = row.length; c > max; c--) if (row[c - 1] !== '' && row[c - 1] !== null && row[c - 1] !== undefined) { max = c; break; } });
+    var t = this.book._tab(this.title), max = 0;
+    t.values.forEach(function (row) { for (var c = row.length; c > max; c--) if (row[c - 1] !== '' && row[c - 1] !== null && row[c - 1] !== undefined) { max = c; break; } });
+    t.formulas.forEach(function (row) { for (var c = row.length; c > max; c--) if (row[c - 1]) { max = c; break; } });
     return max;
   };
   Sheet.prototype.getRange = function (a, b, c, d) {
@@ -315,11 +347,22 @@ var SheetsAdapter = (function () {
       var p = parseA1_(a);
       return new Range(this, p.row, p.col, p.rows === null ? this.getMaxRows() - p.row + 1 : p.rows, p.cols === null ? this.getMaxColumns() - p.col + 1 : p.cols);
     }
-    return new Range(this, a, b, c || 1, d || 1);
+    if (c === 0 || d === 0) throw new Error('The number of ' + (c === 0 ? 'rows' : 'columns') + ' in the range must be at least 1.');
+    return new Range(this, a, b, c === undefined ? 1 : c, d === undefined ? 1 : d);
   };
   Sheet.prototype.getDataRange = function () { return new Range(this, 1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn())); };
   Sheet.prototype.appendRow = function (values) {
-    this.getRange(this.getLastRow() + 1, 1, 1, values.length).setValues([values]);
+    var row = this.getLastRow() + 1, sm = this.book._sheetMeta(this.title);
+    // SpreadsheetApp.appendRow adds a row when the tab is full; the values API does not
+    if (row > sm.rowCount) {
+      this.book._req({ appendDimension: { sheetId: sm.sheetId, dimension: 'ROWS', length: row - sm.rowCount } });
+      sm.rowCount = row;
+    }
+    if (values.length > sm.columnCount) {
+      this.book._req({ appendDimension: { sheetId: sm.sheetId, dimension: 'COLUMNS', length: values.length - sm.columnCount } });
+      sm.columnCount = values.length;
+    }
+    this.getRange(row, 1, 1, values.length).setValues([values]);
     return this;
   };
   Sheet.prototype._grid = function (row, col, rows, cols) {
@@ -451,19 +494,27 @@ var SheetsAdapter = (function () {
         return v;
       });
     });
-    // keep the in-memory copy in sync (so reads after writes see the new values)
+    // Keep the in-memory copy in sync (so reads after writes see the new values), storing
+    // what Google will store: typed-in "10" becomes the number 10, "2026-12-15" a date.
+    // When we can't be sure how Google will read a value, drop the cached tab instead -
+    // the next read then flushes and reloads it from the sheet (always correct).
     if (t) {
-      for (var r = 0; r < vals.length; r++) {
+      var unsure = false;
+      for (var r = 0; r < vals.length && !unsure; r++) {
         var i = this.row - 1 + r;
         while (t.values.length <= i) { t.values.push([]); t.formulas.push([]); }
         for (var c = 0; c < vals[r].length; c++) {
           var v = vals[r][c], j = this.col - 1 + c;
           var isF = typeof v === 'string' && v.charAt(0) === '=';
-          t.values[i][j] = isF ? '' : (v === null || v === undefined ? '' : v);
-          t.formulas[i][j] = isF ? v : '';
+          if (isF) { t.values[i][j] = ''; t.formulas[i][j] = v; continue; }
+          var cv = asStored_(v, tz);
+          if (cv === UNSURE_) { unsure = true; break; }
+          t.values[i][j] = cv;
+          t.formulas[i][j] = '';
         }
       }
-      if (wroteFormula) t.wroteFormula = true;
+      if (unsure) delete this.book._tabs[title];
+      else if (wroteFormula) t.wroteFormula = true;
     }
     var endCol = colToA1_(this.col + vals[0].length - 1), endRow = this.row + vals.length - 1;
     this.book._vals(title, colToA1_(this.col) + this.row + ':' + endCol + endRow, out);

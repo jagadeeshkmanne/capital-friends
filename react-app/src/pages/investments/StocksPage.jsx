@@ -14,6 +14,7 @@ import Modal, { FormDateInput } from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
 import BuyStockForm from '../../components/forms/BuyStockForm'
 import SellStockForm from '../../components/forms/SellStockForm'
+import EditStockTxnForm from '../../components/forms/EditStockTxnForm'
 import PageLoading from '../../components/PageLoading'
 import * as api from '../../services/api'
 

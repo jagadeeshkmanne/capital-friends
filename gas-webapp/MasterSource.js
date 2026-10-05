@@ -101,3 +101,33 @@ function gvizValue_(v, type, tz) {
 }
 
 function pad2_(x) { x = String(x); return x.length < 2 ? '0' + x : x; }
+
+// ---------------------------------------------------------------------------
+// Shared cache of the master tabs, used by the Sheets API adapter to answer reads
+// of a user's MutualFundData / MF_ATH_Data / StockMasterData tabs (which hold the
+// same data) without downloading ~15,000 rows per request. Cached for 1 hour for
+// all users (it is public data).
+// ---------------------------------------------------------------------------
+var USER_MASTER_TABS_ = { MutualFundData: ['MF_Data', 8], MF_ATH_Data: ['MF_ATH', 7], StockMasterData: ['Stock_Data', 10] };
+
+function userMasterTabSource_(userTab) {
+  var m = USER_MASTER_TABS_[userTab];
+  if (!m) return null;
+  var key = 'mtab_v1:' + m[0], cache = CacheService.getScriptCache();
+  var n = +cache.get(key + ':n');
+  if (n) {
+    var keys = []; for (var i = 0; i < n; i++) keys.push(key + ':' + i);
+    var got = cache.getAll(keys), json = '', ok = true;
+    for (var j = 0; j < n; j++) { if (got[keys[j]] === undefined || got[keys[j]] === null) { ok = false; break; } json += got[keys[j]]; }
+    if (ok) return JSON.parse(json, function (k, v) { return v && typeof v === 'object' && v.$d !== undefined ? new Date(v.$d) : v; });
+  }
+  var rows = masterRows_(m[0], m[1]);
+  try {
+    var str = JSON.stringify(rows, function (k, v) { return this[k] instanceof Date ? { $d: this[k].getTime() } : v; });
+    var put = {}, size = 90000, c = 0;
+    for (var p = 0; p < str.length; p += size) put[key + ':' + (c++)] = str.substring(p, p + size);
+    put[key + ':n'] = String(c);
+    cache.putAll(put, 3600);
+  } catch (e) { Logger.log('master tab cache put failed: ' + e); }
+  return rows;
+}

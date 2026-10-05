@@ -162,13 +162,14 @@ function deleteStockPortfolio(portfolioId) {
  * Original: buyStock(portfolioId, stockSymbol, quantity, pricePerShare, transactionDate, brokerage, notes)
  */
 function processBuyStock(params) {
+  // The form sends numbers as text ("10", "0"); "15000" + "0" would join as text
   return buyStock(
     params.portfolioId,
     params.stockSymbol || params.symbol,
-    params.quantity,
-    params.pricePerShare || params.price,
+    parseFloat(params.quantity) || 0,
+    parseFloat(params.pricePerShare || params.price) || 0,
     params.transactionDate || params.date,
-    params.brokerage || 0,
+    parseFloat(params.brokerage) || 0,
     params.notes || ''
   );
 }
@@ -181,10 +182,10 @@ function processSellStock(params) {
   return sellStock(
     params.portfolioId,
     params.stockSymbol || params.symbol,
-    params.quantity,
-    params.pricePerShare || params.price,
+    parseFloat(params.quantity) || 0,
+    parseFloat(params.pricePerShare || params.price) || 0,
     params.transactionDate || params.date,
-    params.brokerage || 0,
+    parseFloat(params.brokerage) || 0,
     params.notes || ''
   );
 }

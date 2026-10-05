@@ -200,7 +200,7 @@ function processAddInvestment(data) {
     if (data.quickLoan && data.quickLoan.lender && data.quickLoan.outstanding) {
       const suggestedLoanType = getLoanTypeSuggestion(data.investmentType);
       const loanData = {
-        liabilityType: data.quickLoan.loanType || suggestedLoanType,
+        liabilityType: data.quickLoan.loanType || data.quickLoan.liabilityType || suggestedLoanType,
         lenderName: data.quickLoan.lender,
         familyMember: data.familyMember || '',
         outstandingBalance: data.quickLoan.outstanding,
