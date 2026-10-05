@@ -251,3 +251,18 @@ function noScopeStep_(name, fn) {
     return null;
   }
 }
+
+/** TEST_7: create a portfolio (17 conditional-format rules) on the old sheet (old path) and the adapter sheet, compare. */
+function TEST_7_portfolio() {
+  var oldId = testProps_().getProperty('TEST_OLD_ID'), newId = testProps_().getProperty('TEST_NEW_ID');
+  var make = function () { return processAddPortfolio({ portfolioName: 'Test Portfolio', investmentAccount: '', initialInvestment: 0, sipTarget: 1000, lumpsumTarget: 0, rebalanceThreshold: 5 }); };
+  var a = runPath_(false, oldId, function () { return safeTry_(make); });
+  var b = runPath_(true, newId, function () { return safeTry_(make); });
+  Logger.log('old: ' + JSON.stringify(a.out).slice(0, 300));
+  Logger.log('new: ' + JSON.stringify(b.out).slice(0, 300) + '  [' + b.calls + ' API calls, ' + b.ms + ' ms]');
+  var o = SpreadsheetApp.openById(oldId), n = SpreadsheetApp.openById(newId);
+  var on = o.getSheets().map(function (s) { return s.getName(); }), nn = n.getSheets().map(function (s) { return s.getName(); });
+  var keep = on.filter(function (t) { return /^PFL/.test(t) || t === 'AllPortfolios'; });
+  Logger.log('portfolio tabs old: ' + keep.join(', ') + ' | new: ' + nn.filter(function (t) { return /^PFL/.test(t); }).join(', '));
+  compareSheets_(oldId, newId, on.filter(function (t) { return keep.indexOf(t) < 0; }), /ID$|Id$|Created|Updated|Date Added/);
+}

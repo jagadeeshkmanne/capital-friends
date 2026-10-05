@@ -169,7 +169,7 @@ function spreadsheetAccess_(id) {
 
 /** Conditional-format rule builder that works on both paths. */
 function newConditionalFormatRule_() {
-  return useSheetsApi_() ? SheetsAdapter.newConditionalFormatRule() : newConditionalFormatRule_();
+  return useSheetsApi_() ? SheetsAdapter.newConditionalFormatRule() : SpreadsheetApp.newConditionalFormatRule();
 }
 
 /**
