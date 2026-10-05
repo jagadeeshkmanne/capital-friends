@@ -13,14 +13,23 @@
  *   openMasterDB().getSheetByName(tab).getRange(2, 1, lastRow - 1, numCols).getValues()
  * returned (header row skipped, '' for empty cells, Date objects for dates).
  *
- * Needs scope: https://www.googleapis.com/auth/script.external_request
+ * Needs scope: https://www.googleapis.com/auth/script.external_request (sensitive - add it only
+ * together with the Google verification). Without it, falls back to SpreadsheetApp.
  * ============================================================================
  */
 
 function masterRows_(tabName, numCols) {
   // Note: cells formatted as date-only come back as whole days (time of day dropped).
   // In the master DB that is only MF_ATH "Last Checked", which the app never reads.
-  var json = gvizFetch_(tabName, 'select *');
+  var json;
+  try {
+    json = gvizFetch_(tabName, 'select *');
+  } catch (e) {
+    // Until Google approves script.external_request the app has no UrlFetch permission:
+    // read the master DB the old way (needs the spreadsheets scope, still present then).
+    if (/permission|Required permissions|not sufficient/i.test(String(e && e.message))) return masterRowsViaSpreadsheetApp_(tabName, numCols);
+    throw e;
+  }
 
   var tz = Session.getScriptTimeZone();
   var cols = json.table.cols || [];
@@ -39,6 +48,16 @@ function masterRows_(tabName, numCols) {
   return out;
 }
 
+/** Old way (same result as before the migration). */
+function masterRowsViaSpreadsheetApp_(tabName, numCols) {
+  var sh = SpreadsheetApp.openById(CONFIG.masterDbId).getSheetByName(tabName);
+  if (!sh) throw new Error(tabName + ' sheet not found in master database');
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  var lastCol = numCols ? Math.min(sh.getLastColumn(), numCols) : sh.getLastColumn();
+  return sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+}
+
 function gvizFetch_(tabName, tq) {
   var url = 'https://docs.google.com/spreadsheets/d/' + CONFIG.masterDbId +
     '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(tabName) + '&tq=' + encodeURIComponent(tq);
@@ -48,7 +67,10 @@ function gvizFetch_(tabName, tq) {
       resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
       if (resp.getResponseCode() === 200) break;
       lastErr = new Error('HTTP ' + resp.getResponseCode());
-    } catch (e) { lastErr = e; }
+    } catch (e) {
+      if (/permission|not sufficient/i.test(String(e && e.message))) throw e; // no retry: permission missing
+      lastErr = e;
+    }
     resp = null;
     Utilities.sleep(1000 * (attempt + 1));
   }
