@@ -69,7 +69,7 @@ function saveUserRecord(email, record) {
 function createNewUser(email, name) {
   email = email.toLowerCase();
 
-  var spreadsheet = SpreadsheetApp.create('Capital Friends - ' + name);
+  var spreadsheet = createUserSpreadsheet_('Capital Friends - ' + name);
   var spreadsheetId = spreadsheet.getId();
 
   var record = {
@@ -88,7 +88,7 @@ function createNewUser(email, name) {
   try {
     createAllSheets();
     log('All sheets created for: ' + email);
-    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var ss = getSpreadsheet();
     var sheet1 = ss.getSheetByName('Sheet1');
     if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
   } catch (e) {
@@ -110,13 +110,22 @@ function getOrCreateUser(email, name) {
   var existing = findUserByEmail(email);
   if (existing) {
     // Verify the spreadsheet still exists (user may have deleted it from Drive)
-    try {
-      SpreadsheetApp.openById(existing.spreadsheetId);
-    } catch (e) {
-      // Spreadsheet deleted or inaccessible — recreate for this user
+    var access = spreadsheetAccess_(existing.spreadsheetId);
+    if (access === 'missing' && existing.role === 'member') {
+      // A family member can't open the owner's sheet yet. With the drive.file permission
+      // they must pick it once in the Google Picker. NEVER create a new sheet for them -
+      // that would break the family link.
+      log('Member ' + email + ' has no access to ' + existing.spreadsheetId + ' yet - needs file picker');
+      existing.email = email;
+      existing.needsFilePicker = true;
+      return existing;
+    }
+    if (access === 'missing') {
+      // Owner's spreadsheet deleted - recreate for this user
       log('Spreadsheet missing for ' + email + ' (id: ' + existing.spreadsheetId + '). Recreating...');
       return createNewUser(email, existing.displayName || name);
     }
+    // access === 'error': temporary problem - carry on with the existing sheet
 
     // Heal any missing sheets if setup was interrupted on first login
     // Only runs createAllSheets if a required sheet is absent (cheap check first)
@@ -157,7 +166,7 @@ function getOrCreateUser(email, name) {
     }
 
     // Save a placeholder record first so any concurrent call finds it immediately
-    var spreadsheet = SpreadsheetApp.create('Capital Friends - ' + name);
+    var spreadsheet = createUserSpreadsheet_('Capital Friends - ' + name);
     var spreadsheetId = spreadsheet.getId();
     var record = {
       spreadsheetId: spreadsheetId,
@@ -178,7 +187,7 @@ function getOrCreateUser(email, name) {
     try {
       createAllSheets();
       log('All sheets created for: ' + email);
-      var ss = SpreadsheetApp.openById(spreadsheetId);
+      var ss = getSpreadsheet();
       var sheet1 = ss.getSheetByName('Sheet1');
       if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
     } catch (e) {
@@ -226,7 +235,7 @@ function inviteToFamily(ownerRecord, memberEmail, memberName) {
   }
 
   // Share the spreadsheet with the family member (runs as owner who owns the file)
-  var file = SpreadsheetApp.openById(ownerRecord.spreadsheetId);
+  var file = openSpreadsheetById_(ownerRecord.spreadsheetId);
   try { file.addEditor(memberEmail); } catch (shareErr) { throw new Error("Failed to share sheet on Google Drive. Is " + memberEmail + " a valid Google Account? (" + shareErr.message + ")"); }
 
   // Register in Script Properties as pending member
@@ -277,7 +286,7 @@ function removeFromFamily(ownerRecord, memberEmail) {
 
   // Remove spreadsheet access (runs as owner who owns the file)
   try {
-    var file = SpreadsheetApp.openById(ownerRecord.spreadsheetId);
+    var file = openSpreadsheetById_(ownerRecord.spreadsheetId);
     file.removeEditor(memberEmail);
   } catch (e) {
     log('Warning: Could not remove editor access: ' + e.toString());

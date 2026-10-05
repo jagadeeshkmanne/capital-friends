@@ -173,7 +173,7 @@ var SheetsAdapter = (function () {
   Book.prototype.addViewer = function (email) { return this._share(email, 'reader'); };
   Book.prototype._share = function (email, role) {
     var self = this;
-    api_(function () { return Drive.Permissions.create({ role: role, type: 'user', emailAddress: email }, self.id, { sendNotificationEmail: false }); });
+    api_(function () { return Drive.Permissions.create({ role: role, type: 'user', emailAddress: email }, self.id, { sendNotificationEmail: true }); }); // same as SpreadsheetApp.addEditor: Google sends its share email
     return this;
   };
   Book.prototype.removeEditor = function (email) {

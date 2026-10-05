@@ -58,6 +58,19 @@ function apiRouter(request) {
       return { success: false, error: 'Account suspended or unavailable.', code: 403 };
     }
 
+    // Family member who hasn't picked the owner's sheet in the Google Picker yet
+    // (drive.file permission). React shows the Picker, then retries the same call.
+    if (userRecord.needsFilePicker) {
+      var owner = userRecord.invitedBy ? findUserByEmail(userRecord.invitedBy) : null;
+      return {
+        success: false, code: 428, error: 'NEEDS_FILE_PICKER',
+        needsFilePicker: true,
+        spreadsheetId: userRecord.spreadsheetId,
+        sheetTitle: owner && owner.displayName ? 'Capital Friends - ' + owner.displayName : 'Capital Friends',
+        ownerEmail: userRecord.invitedBy || ''
+      };
+    }
+
     // Set spreadsheet context for all business logic functions
     _currentUserSpreadsheetId = userRecord.spreadsheetId;
 

@@ -463,15 +463,9 @@ function sendDashboardEmailReport(reportType, sendAsPDF = true) {
  */
 function convertHTMLToPDF(htmlContent, fileName, password) {
   try {
-    // Create temp HTML file in Drive and convert to PDF
-    const htmlFile = DriveApp.getRootFolder().createFile(fileName + '.html', htmlContent, MimeType.HTML);
-
-    // Get PDF blob from HTML file
-    const pdfBlob = htmlFile.getAs(MimeType.PDF);
+    // Convert in memory (no Drive file needed, so no Drive permission needed)
+    const pdfBlob = Utilities.newBlob(htmlContent, MimeType.HTML, fileName + '.html').getAs(MimeType.PDF);
     pdfBlob.setName(fileName + '.pdf');
-
-    // Clean up temp HTML file
-    htmlFile.setTrashed(true);
 
     if (password) {
       log('ℹ️ PDF password requested for member (not yet implemented server-side)');
