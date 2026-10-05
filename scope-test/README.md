@@ -51,3 +51,14 @@ uses, backed by the Sheets API, so most of gas-webapp stays unchanged.
 
 Next: same Picker step as Visali (needs her own browser profile / incognito because web-app links
 don't handle several signed-in accounts), then move the adapter into gas-webapp on this branch.
+
+### Public master data (5 Oct 2026)
+- Anonymous CSV fetch (gviz out:csv) of the master DB works: MF_Data 14,788 rows / 2.2 MB / 1.6 s,
+  MF_ATH 15,226 rows / 2.0 MB, Stock_Data 5,909 rows / 0.5 MB. Uses UrlFetch quota, NOT the Sheets API quota.
+- Plan: stop copying NAVs into user sheets; read master CSV once, cache, join at read time.
+
+### LEGACY test = existing users' sheets (5 Oct 2026)
+- Sheet created with SpreadsheetApp.create while the app HAD the spreadsheets scope, then scope removed:
+  FAIL SpreadsheetApp.openById (confirms spreadsheets scope really gone)
+  OK   Sheets API read, OK Sheets API write, OK Drive API files.get
+- => Existing owners need NO action after the switch. Only existing spouses need the one-time Picker.
