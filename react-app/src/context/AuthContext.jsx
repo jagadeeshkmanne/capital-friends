@@ -12,12 +12,14 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 // drive.file: GAS creates user spreadsheet (SpreadsheetApp.create)
 // gmail.send: GAS sends email reports via GmailApp from user's Gmail
 // script.scriptapp: GAS creates daily sync triggers for auto-refresh
+// script.external_request: GAS downloads the public master DB + live gold price (UrlFetchApp)
 // openid/email/profile: user identity
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/script.scriptapp',
+  'https://www.googleapis.com/auth/script.external_request', // master data download + gold price
   'openid',
   'email',
   'profile',

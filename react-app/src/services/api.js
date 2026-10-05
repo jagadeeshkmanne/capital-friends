@@ -56,9 +56,19 @@ export function setTokenRefreshFn(fn) {
   _refreshTokenFn = fn
 }
 
+// ── Family sheet picker (set by FilePickerGate) ──
+// With the drive.file permission a family member must pick the owner's sheet once
+// in the Google Picker. The backend then answers NEEDS_FILE_PICKER (code 428).
+
+let _filePickerHandler = null
+
+export function setFilePickerHandler(fn) {
+  _filePickerHandler = fn
+}
+
 // ── API Call (Apps Script Execution API) ──
 
-export async function callAPI(action, params = {}, retry = true) {
+export async function callAPI(action, params = {}, retry = true, pickerTried = false) {
   const token = getStoredToken()
   if (!token) {
     throw new Error('Not authenticated. Please sign in.')
@@ -94,7 +104,7 @@ export async function callAPI(action, params = {}, retry = true) {
       if (_refreshTokenFn) {
         try {
           await _refreshTokenFn()
-          return callAPI(action, params, false) // retry once
+          return callAPI(action, params, false, pickerTried) // retry once
         } catch {
           // Refresh failed — fall through to throw
         }
@@ -113,8 +123,12 @@ export async function callAPI(action, params = {}, retry = true) {
   // Successful execution — extract result from response
   if (data.response && data.response.result !== undefined) {
     const result = data.response.result
+    if (result && !result.success && result.needsFilePicker && !pickerTried && _filePickerHandler) {
+      const picked = await _filePickerHandler(result)
+      if (picked) return callAPI(action, params, retry, true)
+    }
     if (result && !result.success) {
-      const err = new Error(result.error || 'Unknown error')
+      const err = new Error(result.needsFilePicker ? 'Please open your family sheet to continue.' : (result.error || 'Unknown error'))
       err.code = result.code
       throw err
     }
