@@ -266,3 +266,438 @@ function TEST_7_portfolio() {
   Logger.log('portfolio tabs old: ' + keep.join(', ') + ' | new: ' + nn.filter(function (t) { return /^PFL/.test(t); }).join(', '));
   compareSheets_(oldId, newId, on.filter(function (t) { return keep.indexOf(t) < 0; }), /ID$|Id$|Created|Updated|Date Added/);
 }
+
+/**
+ * ============================================================================
+ * TEST_8: every WRITE action of routeAction(), same script on both sheets
+ * ============================================================================
+ * Runs one scripted create/update/delete sequence through routeAction() on the
+ * old-path sheet (SpreadsheetApp, TEST_OLD_ID) and on the adapter sheet (Sheets
+ * API, TEST_NEW_ID), then the read actions, then logs both side by side and
+ * compares every tab with compareSheets_.
+ *
+ *   ❌ = success / error / throw differs between the paths
+ *   ⚠️ = both "ok" (or both failed) but the result differs (IDs + volatile dates stripped)
+ *   ✅ = same
+ *
+ * Params are the shapes the React app sends (forms -> DataContext -> api.js).
+ * Where React and GAS disagree on field names (MF redeem / switch) the step sends
+ * both spellings, and an extra step sends the exact React shape.
+ *
+ * 6-minute limit: the work is split into phases (old path, new path, report,
+ * compare). Each phase only starts when there is enough time left; the rest is
+ * kept in the script cache (6 h). If the log says so, run TEST_8b_continue.
+ * The Sheets API allows ~60 reads/min per user, so the adapter phase usually
+ * needs its own run.
+ *
+ * Every step is followed by flushSheets_() and (T8_FRESH_PER_STEP) a fresh
+ * adapter, like a new apiRouter request. Set T8_FRESH_PER_STEP = false to keep
+ * the adapter's in-memory tab cache across steps (stress test for the cache).
+ *
+ * Run on the TEST sheets only: it adds fake data (names "Test ...") every run.
+ */
+var T8_FRESH_PER_STEP = true;
+var T8_BUDGET_MS = 330000;       // stop starting new steps after 5.5 min
+var T8_PATH_NEEDS_MS = 200000;   // only start a path phase with >= 200 s left
+var T8_COMPARE_NEEDS_MS = 100000;
+var T8_FUND_A = '120503', T8_FUND_B = '118989';
+var T8_READS = ['data:load-all', 'goals:list', 'mf-holdings:list', 'mf-transactions:list', 'stock-holdings:list-all', 'reminders:list', 'settings:list'];
+var T8_VOLATILE_KEY = /(Id|ID|Ids)$|^id$|^(createdDate|createdAt|created|lastUpdated|updatedAt|timestamp|lastSentDate|nextSendDate|stack)$/;
+var T8_ID_RE = /\b(?:[A-Z]{2,5}-)+\d{3,}\b/g; // FM-001, PFL-STK-002, TXN-STK-010, POL-INS-001, LIA-1696..., GOAL-003
+
+function TEST_8_crudAll() { crud8_(true); }
+function TEST_8b_continue() { crud8_(false); }
+function TEST_8c_compare() {
+  compareSheets_(testProps_().getProperty('TEST_OLD_ID'), testProps_().getProperty('TEST_NEW_ID'),
+    ['Sheet1', 'StockMasterData', 'MF_ATH_Data', 'MutualFundData'], /ID$|Id$|Created|Updated|Date Added|Last|Timestamp|Time/);
+}
+
+function crud8_(fresh) {
+  var t0 = Date.now();
+  var oldId = testProps_().getProperty('TEST_OLD_ID'), newId = testProps_().getProperty('TEST_NEW_ID');
+  if (!oldId || !newId || oldId === newId) { Logger.log('TEST_OLD_ID / TEST_NEW_ID missing or equal - run TEST_1_setupBoth (+ TEST_2_sampleData) first'); return; }
+  var state = fresh ? null : t8Get_('state');
+  if (!state) {
+    if (!fresh) { Logger.log('No saved TEST_8 state (cache expired?). Run TEST_8_crudAll.'); return; }
+    // one run stamp for both paths, so both sheets get the same names / PAN / account numbers
+    state = { run: Utilities.formatDate(new Date(), 'Asia/Kolkata', 'ddHHmm'), oldId: oldId, newId: newId, done: {} };
+    t8Put_('state', state);
+  }
+  if (state.oldId !== oldId || state.newId !== newId) { Logger.log('Sheet IDs changed since TEST_8_crudAll started - run TEST_8_crudAll again'); return; }
+  Logger.log('TEST_8 run ' + state.run + ' | done so far: ' + (Object.keys(state.done).join(', ') || 'nothing'));
+
+  var paths = [['old', false, oldId], ['new', true, newId]];
+  for (var i = 0; i < paths.length; i++) {
+    var key = paths[i][0];
+    if (state.done[key]) continue;
+    if (T8_BUDGET_MS - (Date.now() - t0) < T8_PATH_NEEDS_MS) return t8Later_();
+    var r = t8RunPath_(paths[i][1], paths[i][2], state.run, t0);
+    t8Put_(key, r.out);
+    state.done[key] = { ms: r.ms, calls: r.calls };
+    t8Put_('state', state);
+    var skipped = r.out.steps.filter(function (s) { return s.skipped; }).length;
+    Logger.log((key === 'old' ? 'Old path' : 'Adapter') + ' sequence: ' + r.ms + ' ms' + (paths[i][1] ? ', ' + r.calls + ' Sheets API calls' : '') +
+      (skipped ? ' - ' + skipped + ' steps SKIPPED (time limit), results incomplete' : ''));
+  }
+  if (!state.done.report) {
+    var A = t8Get_('old'), B = t8Get_('new');
+    if (!A || !B) { Logger.log('Saved results missing (cache expired?). Run TEST_8_crudAll on fresh sheets.'); return; }
+    t8Report_(A, B, state);
+    state.done.report = true;
+    t8Put_('state', state);
+  }
+  if (!state.done.compare) {
+    if (T8_BUDGET_MS - (Date.now() - t0) < T8_COMPARE_NEEDS_MS) return t8Later_('(or TEST_8c_compare)');
+    TEST_8c_compare();
+    state.done.compare = true;
+    t8Put_('state', state);
+  }
+  Logger.log('TEST_8 complete (run ' + state.run + ').');
+}
+
+function t8Later_(extra) { Logger.log('⏸ Time budget used. Run TEST_8b_continue ' + (extra || '') + ' to go on (state is kept in the script cache for 6 h).'); }
+
+/** One path: the whole sequence + read actions inside ONE runPath_ call. */
+function t8RunPath_(useApi, sheetId, run, t0) {
+  return runPath_(useApi, sheetId, function () {
+    var ctx = {
+      run: run, ids: {}, fund: {}, stockName: {},
+      user: { email: 'owner@example.com', role: 'owner', spreadsheetId: sheetId },
+      pan: 'TSTZZ' + run.slice(-4) + 'Q',     // unique per run: dup checks include inactive rows
+      aadhar: '8' + run + '00001',             // 12 digits
+      acct: '7' + run + '00042'                // 12 digits
+    };
+    var steps = t8Steps_(), out = [], reads = {};
+    steps.forEach(function (s) {
+      var rec = { name: s.name, action: s.action || '(setup)' };
+      if (Date.now() - t0 > T8_BUDGET_MS) { rec.skipped = true; out.push(rec); return; }
+      var c0 = SHEETS_API_CALLS, s0 = Date.now();
+      try {
+        var res = s.fn ? s.fn(ctx) : routeAction(s.action, s.params ? s.params(ctx) : {}, ctx.user);
+        t8EndRequest_();
+        rec.res = t8Norm_(res);
+        rec.status = t8Status_(res);
+        if (s.save) {
+          try { s.save(res, ctx); } catch (e) { rec.saveErr = String(e && e.message || e).slice(0, 200); }
+          t8EndRequest_();
+        }
+      } catch (e) {
+        rec.threw = String(e && e.message || e).slice(0, 300);
+        try { t8EndRequest_(); } catch (e2) { rec.flushErr = String(e2 && e2.message || e2).slice(0, 200); }
+      }
+      rec.ms = Date.now() - s0;
+      rec.calls = SHEETS_API_CALLS - c0;
+      out.push(rec);
+    });
+    T8_READS.forEach(function (a) {
+      if (Date.now() - t0 > T8_BUDGET_MS) { reads[a] = { __skipped: true }; return; }
+      try { reads[a] = t8Norm_(routeAction(a, {}, ctx.user)); }
+      catch (e) { reads[a] = { __threw: String(e && e.message || e).slice(0, 300) }; }
+      try { t8EndRequest_(); } catch (e3) { }
+    });
+    return { steps: out, reads: reads, ids: ctx.ids };
+  });
+}
+
+/** End of one "request": send queued writes; optionally start the next step with a fresh adapter. */
+function t8EndRequest_() {
+  flushSheets_();
+  if (T8_FRESH_PER_STEP) { _ssAdapter = null; _ssAdapterId = null; allPortfoliosCache = null; }
+}
+
+// ---------------------------------------------------------------------------
+// The scripted sequence. params(ctx) builds the request from this path's own
+// earlier results (ctx.ids); save(res, ctx) records new IDs.
+// ---------------------------------------------------------------------------
+function t8Steps_() {
+  var A = T8_FUND_A, B = T8_FUND_B;
+  function own(ctx) { return ctx.ids.ownerId; }
+  function member(ctx, edited) {
+    // MemberForm: { ...form, pan: upper, dynamicFields }
+    return { memberName: 'Test Temp ' + ctx.run + (edited ? ' Edited' : ''), relationship: 'Brother', dob: '1990-01-15',
+      pan: ctx.pan, aadhar: ctx.aadhar, email: 'temp' + ctx.run + '@example.com', mobile: edited ? '9000000004' : '9000000003',
+      includeInEmailReports: false, status: 'Active', dynamicFields: { DOB: '1990-01-15', 'Test Note': 'fake data' } };
+  }
+  function bank(ctx, edited) {
+    return { accountName: 'Test Bank Acct ' + ctx.run, memberId: own(ctx), bankName: 'Test Bank', accountNumber: ctx.acct,
+      ifscCode: 'TEST0000002', branchName: edited ? 'Test Branch 2' : 'Test Branch', accountType: 'Savings', status: 'Active' };
+  }
+  function invAcct(ctx, edited) {
+    return { accountName: 'Test Demat ' + ctx.run, memberId: own(ctx), bankAccountId: ctx.ids.bankId, accountType: 'Demat + Trading',
+      platformBroker: edited ? 'Test Broker 2' : 'Test Broker', accountClientId: 'TCL' + ctx.run, dematDpId: '',
+      registeredEmail: 'owner@example.com', registeredPhone: '9000000001', status: 'Active' };
+  }
+  function mfPortfolio(ctx, name, sip, lump) {
+    // MFPortfolioForm: { ...form, investmentAccount: "<account name> - <broker>", numbers }
+    return { portfolioName: name, investmentAccountId: ctx.ids.iaId, ownerId: own(ctx),
+      investmentAccount: 'Test Demat ' + ctx.run + ' - Test Broker 2',
+      initialInvestment: 0, sipTarget: sip, lumpsumTarget: lump, rebalanceThreshold: 5, skipRebalance: false };
+  }
+  function invest(ctx, code, type, date, units, price) {
+    // MFInvestForm (strings from the inputs)
+    return { portfolioId: ctx.ids.pfId, fundCode: code, fundName: ctx.fund[code] || '', transactionType: type,
+      purchaseDate: date, units: units, avgPrice: price, notes: 'Test ' + type.toLowerCase() };
+  }
+  function goal(ctx, name, amount, date) {
+    // GoalForm (undefined fields dropped by JSON)
+    return { goalType: 'Child Education', goalName: name, familyMemberId: own(ctx), familyMember: ctx.ownerName || 'Family',
+      targetAmount: amount, targetDate: date, priority: 'High', notes: 'Test goal', expectedInflation: 0.06, expectedCAGR: 0.12,
+      monthlyInvestment: 5000, lumpsumInvested: 0, isRetirement: false, initialCost: 800000 };
+  }
+  function policy(ctx, sum) {
+    return { policyType: 'Health', company: 'Test Insurer', policyNumber: 'TESTPOL' + ctx.run, policyName: 'Test Health Plan',
+      insuredMember: ctx.ownerName || '', memberId: own(ctx), sumAssured: sum, nominee: 'Test Nominee', premium: 12000,
+      premiumFrequency: 'Annual', status: 'Active', notes: 'Test policy' };
+  }
+  function liability(ctx, bal) {
+    return { liabilityType: 'Personal Loan', lenderName: 'Test Lender', familyMemberId: own(ctx), outstandingBalance: bal,
+      emiAmount: 5000, interestRate: 11.5, linkedInvestmentId: '', status: 'Active', notes: 'Test loan' };
+  }
+  function fd(ctx, value) {
+    // OtherInvestmentForm: familyMember = familyMemberId, linkedLiabilityId comma list, no customType
+    return { investmentType: 'Fixed Deposit', investmentCategory: 'Debt', investmentName: 'Test FD ' + ctx.run,
+      familyMemberId: own(ctx), familyMember: own(ctx), investedAmount: 100000, currentValue: value,
+      linkedLiabilityId: ctx.ids.liabilityId || '', status: 'Active', notes: 'Test FD' };
+  }
+  function stockPf(ctx, name) { return { portfolioName: name, ownerId: own(ctx), investmentAccountId: ctx.ids.iaId }; }
+  function stockTx(ctx, sym, date, qty, price) {
+    // BuyStockForm / SellStockForm send the raw input strings (brokerage '0')
+    return { portfolioId: ctx.ids.spId, symbol: sym, companyName: ctx.stockName[sym] || '', exchange: 'NSE', date: date,
+      quantity: qty, pricePerShare: price, brokerage: '0', notes: 'Test ' + sym };
+  }
+  function reminder(ctx, edited) {
+    return { reminderType: 'Insurance Renewal', title: 'Test Reminder ' + ctx.run + (edited ? ' Edited' : ''), description: 'Test reminder',
+      familyMemberId: own(ctx), dueDate: edited ? '2026-12-20' : '2026-12-15', advanceNoticeDays: 7, frequency: 'Yearly',
+      priority: 'High', status: 'Pending' };
+  }
+  function merge(a, b) { var o = {}; [a, b].forEach(function (x) { Object.keys(x).forEach(function (k) { o[k] = x[k]; }); }); return o; }
+  function pfIdByName(ctx, fullName) {
+    var list = routeAction('portfolios:list', {}, ctx.user) || [];
+    var m = list.filter(function (p) { return p.portfolioName === fullName; });
+    return m.length ? m[m.length - 1].portfolioId : '';
+  }
+  function mfTxnId(ctx, code, type) {
+    var list = routeAction('mf-transactions:list', {}, ctx.user) || [];
+    var m = list.filter(function (t) { return String(t.portfolioId) === String(ctx.ids.pfId) && String(t.fundCode) === code && t.transactionType === type; });
+    return m.length ? m[m.length - 1].transactionId : '';
+  }
+  function setId(name, keys) { return function (res, ctx) { ctx.ids[name] = t8Id_(res, keys); }; }
+
+  return [
+    { name: 'setup: owner, fund names, stocks', fn: function (ctx) {
+        var members = routeAction('members:list', {}, ctx.user) || [];
+        var act = members.filter(function (m) { return m.status === 'Active' && !/^Test Temp/.test(m.memberName); });
+        var owner = act.filter(function (m) { return String(m.relationship).toLowerCase() === 'self'; })[0] || act[0];
+        if (owner) { ctx.ids.ownerId = owner.memberId; ctx.ownerName = owner.memberName; }
+        var mf = getSheet(CONFIG.mutualFundDataSheet), rows = mf ? mf.getDataRange().getValues() : [];
+        rows.forEach(function (r) { var c = String(r[0]); if (c === A || c === B) ctx.fund[c] = r[1]; });
+        ['INFY', 'TCS'].forEach(function (s) { var x = getStockBySymbol(s); ctx.stockName[s] = x ? x.companyName : ''; });
+        return { members: members.length, owner: owner ? owner.memberName : '(none - the temp member is used)', funds: ctx.fund, stocks: ctx.stockName };
+      } },
+
+    // ── Family members (throwaway member; existing members are kept) ──
+    { name: 'member:create (temp)', action: 'member:create', params: function (c) { return member(c, false); },
+      save: function (res, ctx) { ctx.ids.tmpMemberId = t8Id_(res, ['memberId']); if (!ctx.ids.ownerId) { ctx.ids.ownerId = ctx.ids.tmpMemberId; ctx.ownerName = 'Test Temp ' + ctx.run; } } },
+    { name: 'member:update (temp)', action: 'member:update', params: function (c) { return merge({ memberId: c.ids.tmpMemberId }, member(c, true)); } },
+
+    // ── Bank + investment account ──
+    { name: 'bank:create', action: 'bank:create', params: function (c) { return bank(c, false); }, save: setId('bankId', ['accountId']) },
+    { name: 'bank:update', action: 'bank:update', params: function (c) { return merge({ accountId: c.ids.bankId }, bank(c, true)); } },
+    { name: 'invacct:create', action: 'invacct:create', params: function (c) { return invAcct(c, false); }, save: setId('iaId', ['accountId', 'investmentAccountId']) },
+    { name: 'invacct:update', action: 'invacct:update', params: function (c) { return merge({ accountId: c.ids.iaId }, invAcct(c, true)); } },
+
+    // ── MF portfolios ──
+    { name: 'portfolio:create', action: 'portfolio:create', params: function (c) { return mfPortfolio(c, 'Test MF ' + c.run, 5000, 10000); },
+      save: function (res, ctx) { ctx.ids.pfId = pfIdByName(ctx, 'PFL-Test MF ' + ctx.run); } },
+    { name: 'portfolio:update', action: 'portfolio:update', params: function (c) { return merge({ portfolioId: c.ids.pfId }, mfPortfolio(c, 'Test MF ' + c.run, 6000, 12000)); } },
+    { name: 'portfolio:create (temp)', action: 'portfolio:create', params: function (c) { return mfPortfolio(c, 'Test MF Temp ' + c.run, 1000, 0); },
+      save: function (res, ctx) { ctx.ids.pf2Id = pfIdByName(ctx, 'PFL-Test MF Temp ' + ctx.run); } },
+    { name: 'portfolio:delete (temp)', action: 'portfolio:delete', params: function (c) { return { portfolioId: c.ids.pf2Id }; } },
+
+    // ── MF transactions ──
+    { name: 'mf:invest LUMPSUM fund A (adds fund)', action: 'mf:invest', params: function (c) { return invest(c, A, 'LUMPSUM', '2026-09-01', '100', '50'); } },
+    { name: 'mf:invest SIP fund A', action: 'mf:invest', params: function (c) { return invest(c, A, 'SIP', '2026-09-15', '20', '52'); },
+      save: function (res, ctx) { ctx.ids.sipTxnId = mfTxnId(ctx, A, 'SIP'); } },
+    { name: 'mf:invest LUMPSUM fund B (adds fund)', action: 'mf:invest', params: function (c) { return invest(c, B, 'LUMPSUM', '2026-09-05', '50', '80'); } },
+    { name: 'mf:redeem (exact React form params)', action: 'mf:redeem', params: function (c) {
+        return { portfolioId: c.ids.pfId, fundCode: A, fundName: c.fund[A] || '', date: '2026-09-20', units: '10', price: '55', notes: 'Test redeem' }; } },
+    { name: 'mf:redeem fund A', action: 'mf:redeem', params: function (c) {
+        // MFRedeemForm keys + the keys processRedeem reads (as GoalWithdrawalPlan sends them)
+        return { portfolioId: c.ids.pfId, fundCode: A, fundName: c.fund[A] || '', date: '2026-09-20', units: '10', price: '55', notes: 'Test redeem',
+          saleDate: '2026-09-20', salePrice: '55' }; } },
+    { name: 'mf:switch (exact React form params)', action: 'mf:switch', params: function (c) {
+        return { fromPortfolioId: c.ids.pfId, toPortfolioId: c.ids.pfId, fromFundCode: A, fromFundName: c.fund[A] || '', toFundCode: B, toFundName: c.fund[B] || '',
+          date: '2026-09-25', units: '10', fromPrice: '56', toPrice: '82', targetAllocation: '', notes: 'Test switch' }; } },
+    { name: 'mf:switch fund A -> B', action: 'mf:switch', params: function (c) {
+        // MFSwitchForm keys + the keys processSwitchFunds reads (as GlidepathRebalancePlan sends them)
+        return { fromPortfolioId: c.ids.pfId, toPortfolioId: c.ids.pfId, fromFundCode: A, fromFundName: c.fund[A] || '', toFundCode: B, toFundName: c.fund[B] || '',
+          date: '2026-09-25', units: '10', fromPrice: '56', toPrice: '82', targetAllocation: '', notes: 'Test switch',
+          switchDate: '2026-09-25', fromFundPrice: '56', toFundPrice: '82' }; } },
+    { name: 'mf:allocations-update 60/40', action: 'mf:allocations-update', params: function (c) {
+        return { portfolioId: c.ids.pfId, allocations: [
+          { schemeCode: A, fundName: c.fund[A] || '', targetAllocationPct: 60, isNew: false },
+          { schemeCode: B, fundName: c.fund[B] || '', targetAllocationPct: 40, isNew: false }] }; } },
+    { name: 'asset-allocation:save fund A', action: 'asset-allocation:save', params: function (c) {
+        return { fundCode: A, fundName: c.fund[A] || 'Test Fund', equity: 95, debt: 0, cash: 5, commodities: 0, realEstate: 0, other: 0, customAsset: {},
+          giantCap: 50, largeCap: 30, midCap: 15, smallCap: 5, microCap: 0, customCap: {}, geoIndia: 90, geoGlobal: 10, customGeo: {} }; } },
+    { name: 'mf:lumpsum-restricted A = true', action: 'mf:lumpsum-restricted', params: function (c) { return { portfolioId: c.ids.pfId, fundCode: A, restricted: true }; } },
+    { name: 'mf:sip-restricted A = true', action: 'mf:sip-restricted', params: function (c) { return { portfolioId: c.ids.pfId, fundCode: A, restricted: true }; } },
+    { name: 'mf:lumpsum-restricted A = false', action: 'mf:lumpsum-restricted', params: function (c) { return { portfolioId: c.ids.pfId, fundCode: A, restricted: false }; } },
+    { name: 'mf-transaction:edit (SIP)', action: 'mf-transaction:edit', params: function (c) {
+        return { transactionId: c.ids.sipTxnId, date: '2026-09-16', units: '21', price: '52.5', notes: 'Test SIP edited' }; } },
+    { name: 'mf-transaction:delete (SIP)', action: 'mf-transaction:delete', params: function (c) { return { transactionId: c.ids.sipTxnId }; } },
+    { name: 'mf:delete-fund B', action: 'mf:delete-fund', params: function (c) { return { portfolioId: c.ids.pfId, fundCode: B }; } },
+
+    // ── Goals ──
+    { name: 'goal:create', action: 'goal:create', params: function (c) { return goal(c, 'Test Goal ' + c.run, 1500000, '2036-06-01'); }, save: setId('goalId', ['goalId']) },
+    { name: 'goal:update', action: 'goal:update', params: function (c) { return merge({ goalId: c.ids.goalId }, goal(c, 'Test Goal ' + c.run + ' Edited', 1600000, '2036-07-01')); } },
+    { name: 'goal:mappings-update', action: 'goal:mappings-update', params: function (c) {
+        return { goalId: c.ids.goalId, mappings: [{ portfolioId: c.ids.pfId, allocationPct: 100, investmentType: 'MF' }] }; } },
+    { name: 'goal:create (temp)', action: 'goal:create', params: function (c) { return goal(c, 'Test Goal Temp ' + c.run, 500000, '2030-01-01'); }, save: setId('goal2Id', ['goalId']) },
+    { name: 'goal:delete (temp)', action: 'goal:delete', params: function (c) { return { goalId: c.ids.goal2Id }; } },
+
+    // ── Insurance ──
+    { name: 'insurance:create', action: 'insurance:create', params: function (c) { return policy(c, 500000); }, save: setId('policyId', ['policyId']) },
+    { name: 'insurance:update', action: 'insurance:update', params: function (c) { return merge({ policyId: c.ids.policyId }, policy(c, 700000)); } },
+    { name: 'insurance:delete', action: 'insurance:delete', params: function (c) { return { policyId: c.ids.policyId }; } },
+
+    // ── Liabilities + other investments (linked both ways) ──
+    { name: 'liability:create', action: 'liability:create', params: function (c) { return liability(c, 200000); }, save: setId('liabilityId', ['liabilityId']) },
+    { name: 'liability:update', action: 'liability:update', params: function (c) { return merge({ liabilityId: c.ids.liabilityId }, liability(c, 190000)); } },
+    { name: 'otherinv:create FD (linked to loan)', action: 'otherinv:create', params: function (c) { return fd(c, 105000); }, save: setId('investmentId', ['investmentId']) },
+    { name: 'otherinv:update FD', action: 'otherinv:update', params: function (c) { return merge({ investmentId: c.ids.investmentId }, fd(c, 106000)); } },
+    { name: 'otherinv:create gold + quickLoan (kept)', action: 'otherinv:create', params: function (c) {
+        return { investmentType: 'Physical Gold', investmentCategory: 'Gold', investmentName: 'Test Gold ' + c.run, familyMemberId: own(c), familyMember: own(c),
+          investedAmount: 50000, currentValue: 60000, linkedLiabilityId: '', status: 'Active', notes: 'Test gold',
+          dynamicFields: JSON.stringify({ weightGrams: 10, purity: '22K' }),
+          quickLoan: { liabilityType: 'Gold Loan', lender: 'Test Gold Lender', outstanding: 30000, emiAmount: 0, interestRate: 9 } }; } },
+    { name: 'liability:delete (unlinks FD)', action: 'liability:delete', params: function (c) { return { liabilityId: c.ids.liabilityId }; } },
+    { name: 'otherinv:delete FD', action: 'otherinv:delete', params: function (c) { return { investmentId: c.ids.investmentId }; } },
+
+    // ── Stocks ──
+    { name: 'stock-portfolio:create', action: 'stock-portfolio:create', params: function (c) { return stockPf(c, 'Test Stocks ' + c.run); }, save: setId('spId', ['portfolioId']) },
+    { name: 'stock-portfolio:update', action: 'stock-portfolio:update', params: function (c) { return merge({ portfolioId: c.ids.spId }, stockPf(c, 'Test Stocks ' + c.run + ' Edited')); } },
+    { name: 'stock:buy INFY 10 @1500', action: 'stock:buy', params: function (c) { return stockTx(c, 'INFY', '2026-09-02', '10', '1500'); }, save: setId('buyInfyId', ['transactionId']) },
+    { name: 'stock:buy TCS 5 @3500', action: 'stock:buy', params: function (c) { return stockTx(c, 'TCS', '2026-09-03', '5', '3500'); }, save: setId('buyTcsId', ['transactionId']) },
+    { name: 'stock:buy INFY 5 @1550 (2nd lot)', action: 'stock:buy', params: function (c) { return stockTx(c, 'INFY', '2026-09-10', '5', '1550'); } },
+    { name: 'stock:sell INFY 4 @1600', action: 'stock:sell', params: function (c) { return stockTx(c, 'INFY', '2026-09-20', '4', '1600'); }, save: setId('sellInfyId', ['transactionId']) },
+    { name: 'stock-transaction:edit (TCS buy)', action: 'stock-transaction:edit', params: function (c) {
+        return { transactionId: c.ids.buyTcsId, date: '2026-09-04', quantity: '6', pricePerShare: '3450', brokerage: '0', notes: 'Test TCS edited' }; } },
+    { name: 'stock-transaction:delete (TCS buy)', action: 'stock-transaction:delete', params: function (c) { return { transactionId: c.ids.buyTcsId }; } },
+    { name: 'stock-portfolio:create (temp)', action: 'stock-portfolio:create', params: function (c) { return stockPf(c, 'Test Stocks Temp ' + c.run); }, save: setId('sp2Id', ['portfolioId']) },
+    { name: 'stock-portfolio:delete (temp)', action: 'stock-portfolio:delete', params: function (c) { return { portfolioId: c.ids.sp2Id }; } },
+
+    // ── Reminders ──
+    { name: 'reminder:create', action: 'reminder:create', params: function (c) { return reminder(c, false); }, save: setId('reminderId', ['reminderId']) },
+    { name: 'reminder:update', action: 'reminder:update', params: function (c) { return merge({ reminderId: c.ids.reminderId }, reminder(c, true)); } },
+    { name: 'reminder:delete', action: 'reminder:delete', params: function (c) { return { reminderId: c.ids.reminderId }; } },
+
+    // ── Settings + health check ──
+    // Email*/Reminder* keys would reinstall triggers on the TEST project, so a neutral key is used.
+    { name: 'settings:update', action: 'settings:update', params: function (c) { return { TestCrudSetting: 'Test value ' + c.run, TestCrudFlag: 'TRUE' }; } },
+    { name: 'healthcheck:save', action: 'healthcheck:save', params: function () {
+        return { healthIns: 'Yes', termLife: 'No', emergencyFund: 'Yes', familyAware: 'Yes', hasWill: 'No', nominees: 'Yes', goals: 'Yes', score: 5, total: 7 }; } },
+
+    // ── Clean-up deletes (soft deletes: status Inactive) ──
+    { name: 'invacct:delete', action: 'invacct:delete', params: function (c) { return { accountId: c.ids.iaId }; } },
+    { name: 'bank:delete', action: 'bank:delete', params: function (c) { return { accountId: c.ids.bankId }; } },
+    { name: 'member:delete (temp)', action: 'member:delete', params: function (c) { return { memberId: c.ids.tmpMemberId }; } }
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Report
+// ---------------------------------------------------------------------------
+function t8Report_(A, B, state) {
+  Logger.log('══ TEST_8 run ' + state.run + ': ' + A.steps.length + ' steps, OLD (SpreadsheetApp) vs NEW (Sheets API adapter) ══');
+  var hard = 0, soft = 0;
+  for (var i = 0; i < Math.max(A.steps.length, B.steps.length); i++) {
+    var a = A.steps[i], b = B.steps[i];
+    var name = (a || b).name;
+    var ka = t8Kind_(a), kb = t8Kind_(b), d = [];
+    var bad = ka !== 'skip' && kb !== 'skip' && (ka !== kb || t8Success_(a) !== t8Success_(b));
+    if (!bad && ka !== 'skip' && kb !== 'skip') diff_(a.res, b.res, '', d, true);
+    var mark = (ka === 'skip' || kb === 'skip') ? '⏭' : bad ? '❌' : d.length ? '⚠️' : '✅';
+    if (bad) hard++; else if (d.length) soft++;
+    Logger.log(mark + ' ' + (i + 1) + '. ' + name +
+      '\n     OLD: ' + t8Desc_(a) + (a && !a.skipped ? '  [' + a.ms + ' ms]' : '') +
+      '\n     NEW: ' + t8Desc_(b) + (b && !b.skipped ? '  [' + b.ms + ' ms, ' + b.calls + ' API calls]' : '') +
+      (d.length ? '\n     result diff: ' + d.slice(0, 6).join(' | ') : '') +
+      ((a && a.saveErr) || (b && b.saveErr) ? '\n     id lookup error: ' + ((a && a.saveErr) || '-') + ' / ' + ((b && b.saveErr) || '-') : ''));
+  }
+  Logger.log('IDs old: ' + JSON.stringify(A.ids));
+  Logger.log('IDs new: ' + JSON.stringify(B.ids));
+  var readDiffs = 0;
+  T8_READS.forEach(function (r) {
+    var d = [];
+    diff_(A.reads[r], B.reads[r], '', d, true);
+    if (d.length) readDiffs++;
+    Logger.log((d.length ? '❌ ' : '✅ ') + 'read ' + r + (d.length ? ': ' + d.length + ' differences\n     ' + d.slice(0, 25).join('\n     ') : ': identical (IDs/timestamps stripped)'));
+  });
+  Logger.log('SUMMARY: ' + hard + ' steps with different success/error, ' + soft + ' steps with different results, ' + readDiffs + '/' + T8_READS.length + ' read actions differ.');
+}
+
+function t8Kind_(r) {
+  if (!r || r.skipped) return 'skip';
+  if (r.threw) return 'threw';
+  return /^ERR/.test(r.status) ? 'err' : 'ok';
+}
+function t8Success_(r) {
+  if (!r || r.threw) return 'threw';
+  return r.res && typeof r.res === 'object' && !Array.isArray(r.res) && r.res.success !== undefined ? r.res.success : true;
+}
+function t8Desc_(r) {
+  if (!r) return '(missing)';
+  if (r.skipped) return 'SKIPPED (time)';
+  if (r.threw) return 'THREW ' + r.threw;
+  var msg = r.res && typeof r.res === 'object' && !Array.isArray(r.res) ? (r.res.message || r.res.error || '') : '';
+  return (r.status === 'ok' ? 'ok' : r.status) + (msg && r.status === 'ok' ? ' - ' + String(msg) : '').slice(0, 160);
+}
+function t8Status_(res) {
+  if (res && typeof res === 'object' && !Array.isArray(res)) {
+    if (res.success === false) return 'ERR ' + String(res.error || res.message || '(no message)').slice(0, 200);
+    if (res.error && res.success !== true) return 'ERR ' + String(res.error).slice(0, 200);
+  }
+  return 'ok';
+}
+function t8Id_(res, keys) {
+  for (var i = 0; i < keys.length; i++) {
+    if (res && res[keys[i]]) return res[keys[i]];
+    if (res && res.data && res.data[keys[i]]) return res.data[keys[i]];
+  }
+  return '';
+}
+/** JSON round trip (what apiRouter sends to React), then drop IDs / volatile timestamps. */
+function t8Norm_(v) {
+  if (v === undefined) return null;
+  var j;
+  try { j = JSON.parse(JSON.stringify(v)); } catch (e) { return String(v); }
+  return t8Strip_(j);
+}
+function t8Strip_(v) {
+  if (Array.isArray(v)) return v.map(t8Strip_);
+  if (v && typeof v === 'object') {
+    var o = {};
+    Object.keys(v).forEach(function (k) { if (!T8_VOLATILE_KEY.test(k)) o[k] = t8Strip_(v[k]); });
+    return o;
+  }
+  if (typeof v === 'string') return v.replace(T8_ID_RE, '<ID>');
+  return v;
+}
+
+// Script cache, chunked (100 KB per value; 25k chars stays below it even with ₹).
+function t8Put_(key, obj) {
+  var s = JSON.stringify(obj), size = 25000, n = Math.max(1, Math.ceil(s.length / size)), m = {};
+  for (var i = 0; i < n; i++) m['T8_' + key + '_' + i] = s.substr(i * size, size);
+  m['T8_' + key + '_n'] = String(n);
+  CacheService.getScriptCache().putAll(m, 21600);
+}
+function t8Get_(key) {
+  var c = CacheService.getScriptCache(), n = +c.get('T8_' + key + '_n');
+  if (!n) return null;
+  var keys = [];
+  for (var i = 0; i < n; i++) keys.push('T8_' + key + '_' + i);
+  var got = c.getAll(keys), s = '';
+  for (var j = 0; j < n; j++) { if (got[keys[j]] === undefined || got[keys[j]] === null) return null; s += got[keys[j]]; }
+  return JSON.parse(s);
+}
