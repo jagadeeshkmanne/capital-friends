@@ -35,8 +35,15 @@ function runPath_(useApi, sheetId, fn) {
 
 function TEST_1_setupBoth() {
   var stamp = new Date().toISOString().slice(0, 16);
-  var oldSs = SpreadsheetApp.create('CF TEST old-path ' + stamp);
-  var r1 = runPath_(false, oldSs.getId(), function () { return createAllSheets(); });
+  // Reuse the old-path sheet from an earlier run (it never changes); only the
+  // adapter sheet is made fresh each time.
+  var oldSs = null, r1 = { ms: 0, out: 'reused existing old-path sheet' };
+  var prevOld = testProps_().getProperty('TEST_OLD_ID');
+  if (prevOld) { try { oldSs = SpreadsheetApp.openById(prevOld); oldSs.getSheetByName('FamilyMembers').getLastRow(); } catch (e) { oldSs = null; } }
+  if (!oldSs) {
+    oldSs = SpreadsheetApp.create('CF TEST old-path ' + stamp);
+    r1 = runPath_(false, oldSs.getId(), function () { return createAllSheets(); });
+  }
   var newSs = SheetsAdapter.create('CF TEST adapter ' + stamp);
   var r2 = runPath_(true, newSs.getId(), function () { return createAllSheets(); });
   testProps_().setProperty('TEST_OLD_ID', oldSs.getId());
