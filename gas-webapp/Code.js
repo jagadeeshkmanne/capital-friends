@@ -131,10 +131,10 @@ function useSheetsApi_() {
   return _useSheetsApi;
 }
 
-/** Send queued sheet changes now (replaces flushSheets_()). */
+/** Send queued sheet changes now (replaces SpreadsheetApp.flush()). */
 function flushSheets_() {
   if (_ssAdapter) { _ssAdapter.flush(); return; }
-  if (!useSheetsApi_()) flushSheets_();
+  if (!useSheetsApi_()) SpreadsheetApp.flush();
 }
 
 /** Conditional-format rule builder that works on both paths. */
