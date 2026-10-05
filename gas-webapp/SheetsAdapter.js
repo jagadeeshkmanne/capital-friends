@@ -52,13 +52,14 @@ var SheetsAdapter = (function () {
   }
   function api_(fn) { SHEETS_API_CALLS++; return withRetry_(fn); }
   function withRetry_(fn) {
-    var wait = 500;
+    var wait = 1000;
     for (var i = 0; ; i++) {
       try { return fn(); }
       catch (e) {
         var msg = String(e && e.message || e);
-        if (i < 4 && /429|Quota exceeded|Rate Limit|rateLimitExceeded|503|backendError|internal error/i.test(msg)) {
-          Utilities.sleep(wait + Math.floor(Math.random() * 300)); wait *= 2; continue;
+        // per-minute quota: back off 1+2+4+8+16+32 s (~1 min) before giving up
+        if (i < 6 && /429|Quota exceeded|Rate Limit|rateLimitExceeded|503|backendError|internal error/i.test(msg)) {
+          Utilities.sleep(wait + Math.floor(Math.random() * 500)); wait *= 2; continue;
         }
         throw e;
       }
@@ -183,9 +184,30 @@ var SheetsAdapter = (function () {
   };
 
   // ---- queue ----
+  // Formatting-type requests don't depend on cell values, so they may jump ahead of
+  // value writes queued after the last request batch. That keeps the queue to a few
+  // calls instead of one call per format/value switch (Sheets API write quota is
+  // 60 calls per minute per user). Requests never move past other requests.
+  var HOISTABLE_ = { addSheet: 1, repeatCell: 1, updateBorders: 1, mergeCells: 1, unmergeCells: 1, addConditionalFormatRule: 1,
+    addProtectedRange: 1, updateDimensionProperties: 1, updateSheetProperties: 1 };
+  function hoistable_(req) {
+    var k = Object.keys(req)[0];
+    if (!HOISTABLE_[k]) return false;
+    if (k === 'repeatCell') {   // a Text (@) number format changes how later values are parsed: keep order
+      var nf = req.repeatCell.cell && req.repeatCell.cell.userEnteredFormat && req.repeatCell.cell.userEnteredFormat.numberFormat;
+      if (nf && (nf.type === 'TEXT' || nf.pattern === '@')) return false;
+    }
+    return true;
+  }
   Book.prototype._req = function (request) {
-    var last = this._queue[this._queue.length - 1];
-    if (last && last.kind === 'req') last.requests.push(request); else this._queue.push({ kind: 'req', requests: [request] });
+    var q = this._queue, last = q[q.length - 1];
+    if (last && last.kind === 'req') last.requests.push(request);
+    else if (last && last.kind === 'values' && hoistable_(request)) {
+      var prev = q[q.length - 2];
+      if (prev && prev.kind === 'req') prev.requests.push(request);
+      else q.splice(q.length - 1, 0, { kind: 'req', requests: [request] });
+    }
+    else q.push({ kind: 'req', requests: [request] });
     if (this.autoFlush) this.flush();
   };
   Book.prototype._vals = function (title, range, values) {
