@@ -297,7 +297,7 @@ function TEST_7_portfolio() {
  * Run on the TEST sheets only: it adds fake data (names "Test ...") every run.
  */
 var T8_FRESH_PER_STEP = true;
-var T8_BUDGET_MS = 330000;       // stop starting new steps after 5.5 min
+var T8_BUDGET_MS = 290000;       // stop starting new steps after ~5 min (one slow step can take 40 s)
 var T8_PATH_NEEDS_MS = 200000;   // only start a path phase with >= 200 s left
 var T8_COMPARE_NEEDS_MS = 100000;
 var T8_FUND_A = '120503', T8_FUND_B = '118989';
@@ -331,7 +331,8 @@ function crud8_(fresh) {
     var key = paths[i][0];
     if (state.done[key]) continue;
     if (T8_BUDGET_MS - (Date.now() - t0) < T8_PATH_NEEDS_MS) return t8Later_();
-    var r = t8RunPath_(paths[i][1], paths[i][2], state.run, t0);
+    var r = t8RunPath_(paths[i][1], paths[i][2], state.run, t0, key);
+    if (r.out.partial) { Logger.log((key === 'old' ? 'Old path' : 'Adapter') + ': ' + r.out.stepsDone + ' steps done so far'); return t8Later_(); }
     t8Put_(key, r.out);
     state.done[key] = { ms: r.ms, calls: r.calls };
     t8Put_('state', state);
@@ -358,19 +359,25 @@ function crud8_(fresh) {
 function t8Later_(extra) { Logger.log('⏸ Time budget used. Run TEST_8b_continue ' + (extra || '') + ' to go on (state is kept in the script cache for 6 h).'); }
 
 /** One path: the whole sequence + read actions inside ONE runPath_ call. */
-function t8RunPath_(useApi, sheetId, run, t0) {
+function t8RunPath_(useApi, sheetId, run, t0, key) {
+  // progress is saved after every step, so a path can continue in the next run
+  var prog = t8Get_('prog_' + key) || { i: 0, out: [], ids: {}, fund: {}, stockName: {} };
   return runPath_(useApi, sheetId, function () {
     var ctx = {
-      run: run, ids: {}, fund: {}, stockName: {},
+      run: run, ids: prog.ids, fund: prog.fund, stockName: prog.stockName,
       user: { email: 'owner@example.com', role: 'owner', spreadsheetId: sheetId },
       pan: 'TSTZZ' + run.slice(-4) + 'Q',     // unique per run: dup checks include inactive rows
       aadhar: '8' + run + '00001',             // 12 digits
       acct: '7' + run + '00042'                // 12 digits
     };
-    var steps = t8Steps_(), out = [], reads = {};
-    steps.forEach(function (s) {
+    var steps = t8Steps_(), out = prog.out, reads = {};
+    for (var si = prog.i; si < steps.length; si++) {
+      var s = steps[si];
       var rec = { name: s.name, action: s.action || '(setup)' };
-      if (Date.now() - t0 > T8_BUDGET_MS) { rec.skipped = true; out.push(rec); return; }
+      if (Date.now() - t0 > T8_BUDGET_MS) {
+        prog.i = si; t8Put_('prog_' + key, prog);
+        return { partial: true, stepsDone: si };
+      }
       var c0 = SHEETS_API_CALLS, s0 = Date.now();
       try {
         var res = s.fn ? s.fn(ctx) : routeAction(s.action, s.params ? s.params(ctx) : {}, ctx.user);
@@ -388,7 +395,9 @@ function t8RunPath_(useApi, sheetId, run, t0) {
       rec.ms = Date.now() - s0;
       rec.calls = SHEETS_API_CALLS - c0;
       out.push(rec);
-    });
+      prog.i = si + 1; t8Put_('prog_' + key, prog);
+    }
+    if (Date.now() - t0 > T8_BUDGET_MS - 60000) { return { partial: true, stepsDone: prog.i }; }
     T8_READS.forEach(function (a) {
       if (Date.now() - t0 > T8_BUDGET_MS) { reads[a] = { __skipped: true }; return; }
       try { reads[a] = t8Norm_(routeAction(a, {}, ctx.user)); }
@@ -700,4 +709,11 @@ function t8Get_(key) {
   var got = c.getAll(keys), s = '';
   for (var j = 0; j < n; j++) { if (got[keys[j]] === undefined || got[keys[j]] === null) return null; s += got[keys[j]]; }
   return JSON.parse(s);
+}
+
+/** Start over with two brand-new sheets: run this, then TEST_1_setupBoth, TEST_2_sampleData, TEST_8_crudAll (+ TEST_8b_continue). */
+function TEST_0_reset() {
+  ['TEST_OLD_ID', 'TEST_NEW_ID'].forEach(function (k) { testProps_().deleteProperty(k); });
+  ['state', 'old', 'new', 'prog_old', 'prog_new'].forEach(function (k) { CacheService.getScriptCache().remove('T8_' + k + '_n'); });
+  Logger.log('Reset done. Next: TEST_1_setupBoth, then TEST_2_sampleData, then TEST_8_crudAll.');
 }

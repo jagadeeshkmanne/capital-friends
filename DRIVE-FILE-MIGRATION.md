@@ -73,3 +73,18 @@ Google refused the "spreadsheets" scope and asked for drive.file + Google Picker
 3. Remove "spreadsheets" from appsscript.json and React SCOPES, deploy, re-submit verification
    (drive.file + Picker justification). Spouses see the one-time Picker.
 4. Rollback at any step: USE_SHEETS_API = '' (old path) while the scope is still present.
+
+## Full CRUD test (TEST_8, 6 Oct 2026)
+59 create/edit/delete steps through routeAction() on both paths (members, banks, investment
+accounts, MF portfolios, invest/SIP/redeem/switch, allocations, restrictions, MF txn edit/delete,
+delete fund, goals + mappings, insurance, liabilities, other investments + quick loan, stock
+portfolios, buy/sell/edit/delete stock txns, reminders, settings, health check) + 7 read actions.
+Result: 0 steps differ in success/error, 0 differ in result; all sheet values identical except
+timestamps / timestamp-based IDs. Cosmetic only: date cells written by the adapter get an explicit
+yyyy-mm-dd hh:mm:ss format (old path leaves "Automatic").
+Speed: big master tabs (MutualFundData / MF_ATH_Data / StockMasterData) are served from a shared
+1-hour cache of the master data (MasterSource.userMasterTabSource_) - load-all 7 s (old path 12 s).
+Fixed during the review: adapter cache typing ('10'+'5'), formula dates, last row with formulas,
+zero-size ranges, appendRow on a full tab; old bugs: MF redeem/switch field names, stock numbers
+as text, missing EditStockTxnForm, quick-loan type, reminder type/member + dates, portfolio
+conditional-format recursion (live hotfix 259).
