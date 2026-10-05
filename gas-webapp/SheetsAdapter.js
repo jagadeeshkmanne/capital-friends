@@ -124,7 +124,9 @@ var SheetsAdapter = (function () {
     var sheetId, used = {};
     m.sheets.forEach(function (s) { used[s.sheetId] = true; });
     do { sheetId = 1 + Math.floor(Math.random() * 2000000000); } while (used[sheetId]);
-    var idx = typeof index === 'number' ? index : m.sheets.length;
+    // SpreadsheetApp (opened by id) inserts right after the active sheet, which is
+    // the first tab - so new tabs land at position 2, newest first. Match that.
+    var idx = typeof index === 'number' ? index : Math.min(1, m.sheets.length);
     this._req({ addSheet: { properties: { title: name, sheetId: sheetId, index: idx } } });
     m.sheets.forEach(function (s) { if (s.index >= idx) s.index++; });
     m.sheets.push({ title: name, sheetId: sheetId, index: idx, hidden: false, rowCount: 1000, columnCount: 26, cfCount: 0 });
@@ -139,8 +141,9 @@ var SheetsAdapter = (function () {
     delete this._tabs[title];
   };
   Book.prototype.setSpreadsheetTimeZone = function (tz) {
+    this._m();  // load metadata first, so the server's old time zone can't overwrite ours later
     this._req({ updateSpreadsheetProperties: { properties: { timeZone: tz }, fields: 'timeZone' } });
-    if (this._meta) this._meta.timeZone = tz;
+    this._meta.timeZone = tz;
   };
   // The Sheets API rejects some locales SpreadsheetApp accepts (e.g. en_IN).
   // Send it on its own (never inside the batch, one bad request fails the whole

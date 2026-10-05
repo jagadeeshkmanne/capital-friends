@@ -51,7 +51,11 @@ function TEST_1_setupBoth() {
   testProps_().setProperty('TEST_NEW_ID', newSs.getId());
   Logger.log('Old path setup: ' + r1.ms + ' ms, result ' + JSON.stringify(r1.out).slice(0, 300));
   Logger.log('Adapter setup:  ' + r2.ms + ' ms, ' + r2.calls + ' Sheets API calls, result ' + JSON.stringify(r2.out).slice(0, 300));
-  compareSheets_(oldSs.getId(), newSs.getId(), ['Sheet1']);
+  Logger.log('Now run TEST_1b_compare (separate run, the 6-minute limit is too short for both).');
+}
+
+function TEST_1b_compare() {
+  compareSheets_(testProps_().getProperty('TEST_OLD_ID'), testProps_().getProperty('TEST_NEW_ID'), ['Sheet1']);
 }
 
 function TEST_2_sampleData() {
