@@ -163,7 +163,8 @@ function sameFormatting_(a, b) {
   var lc = Math.max(1, Math.min(a.getLastColumn(), 20));
   var ra = a.getRange(1, 1, Math.min(3, a.getMaxRows()), lc), rb = b.getRange(1, 1, Math.min(3, b.getMaxRows()), lc);
   if (JSON.stringify(ra.getBackgrounds()) !== JSON.stringify(rb.getBackgrounds())) issues.push('header backgrounds');
-  if (JSON.stringify(ra.getNumberFormats()) !== JSON.stringify(rb.getNumberFormats())) issues.push('header number formats');
+  var na = ra.getNumberFormats(), nb = rb.getNumberFormats();
+  outer: for (var r = 0; r < na.length; r++) for (var c = 0; c < na[r].length; c++) if (na[r][c] !== nb[r][c]) { issues.push('number format R' + (r + 1) + 'C' + (c + 1) + ' "' + na[r][c] + '" vs "' + nb[r][c] + '"'); break outer; }
   if (JSON.stringify(ra.getFontWeights()) !== JSON.stringify(rb.getFontWeights())) issues.push('header bold');
   if (a.getConditionalFormatRules().length !== b.getConditionalFormatRules().length) issues.push('cond. rules ' + a.getConditionalFormatRules().length + '/' + b.getConditionalFormatRules().length);
   return issues.join(', ');

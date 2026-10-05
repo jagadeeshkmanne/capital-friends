@@ -193,10 +193,9 @@ var SheetsAdapter = (function () {
   function hoistable_(req) {
     var k = Object.keys(req)[0];
     if (!HOISTABLE_[k]) return false;
-    if (k === 'repeatCell') {   // a Text (@) number format changes how later values are parsed: keep order
-      var nf = req.repeatCell.cell && req.repeatCell.cell.userEnteredFormat && req.repeatCell.cell.userEnteredFormat.numberFormat;
-      if (nf && (nf.type === 'TEXT' || nf.pattern === '@')) return false;
-    }
+    // Number formats interact with typed-in values (a typed date sets a date format,
+    // a Text format changes parsing), so those keep their original order.
+    if (k === 'repeatCell' && /numberFormat/.test(req.repeatCell.fields || '')) return false;
     return true;
   }
   Book.prototype._req = function (request) {
@@ -434,8 +433,8 @@ var SheetsAdapter = (function () {
     var out = vals.map(function (row) {
       return row.map(function (v) {
         if (v instanceof Date) {
-          var hms = Utilities.formatDate(v, tz, 'HH:mm:ss');
-          return Utilities.formatDate(v, tz, hms === '00:00:00' ? 'yyyy-MM-dd' : 'yyyy-MM-dd HH:mm:ss');
+          var hms = Utilities.formatDate(v, tz, 'HH:mm:ss.SSS');
+          return Utilities.formatDate(v, tz, hms === '00:00:00.000' ? 'yyyy-MM-dd' : (v.getMilliseconds() ? 'yyyy-MM-dd HH:mm:ss.SSS' : 'yyyy-MM-dd HH:mm:ss'));
         }
         if (v === null || v === undefined) return '';
         if (typeof v === 'string' && v.charAt(0) === '=') wroteFormula = true;
