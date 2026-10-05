@@ -74,7 +74,7 @@ function TEST_2_sampleData() {
   var a = runPath_(false, oldId, script), b = runPath_(true, newId, script);
   Logger.log('Old path sample data: ' + JSON.stringify(a.out).slice(0, 400));
   Logger.log('Adapter sample data:  ' + JSON.stringify(b.out).slice(0, 400) + '  [' + b.calls + ' API calls]');
-  compareSheets_(oldId, newId, ['Sheet1'], /ID$|Id$|Created|Updated|Date Added/);
+  compareSheets_(oldId, newId, ['Sheet1', 'StockMasterData', 'MF_ATH_Data', 'MutualFundData'], /ID$|Id$|Created|Updated|Date Added/);
 }
 
 function TEST_3_loadAllBoth() {

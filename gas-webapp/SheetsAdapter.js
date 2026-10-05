@@ -32,6 +32,8 @@ var SHEETS_API_CALLS = 0; // per execution, for logging / tests
 
 var SheetsAdapter = (function () {
 
+  var SMALL_TAB_ROWS_ = 3000;
+
   // ---------- helpers ----------
   function q_(name) { return "'" + String(name).replace(/'/g, "''") + "'"; }
   function colToA1_(c) { var s = ''; while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; }
@@ -44,6 +46,8 @@ var SheetsAdapter = (function () {
       var r1 = +m[2], c1 = a1ColToNum_(m[1]), r2 = m[4] ? +m[4] : r1, c2 = m[3] ? a1ColToNum_(m[3]) : c1;
       return { row: Math.min(r1, r2), col: Math.min(c1, c2), rows: Math.abs(r2 - r1) + 1, cols: Math.abs(c2 - c1) + 1 };
     }
+    var mo = s.match(/^([A-Z]+)(\d+):([A-Z]+)$/); // open-ended down, e.g. A3:A or A3:C
+    if (mo) { var o1 = a1ColToNum_(mo[1]), o2 = a1ColToNum_(mo[3]); return { row: +mo[2], col: Math.min(o1, o2), rows: null, cols: Math.abs(o2 - o1) + 1 }; }
     var mc = s.match(/^([A-Z]+):([A-Z]+)$/); // whole columns, e.g. A:A
     if (mc) { var a = a1ColToNum_(mc[1]), b = a1ColToNum_(mc[2]); return { row: 1, col: Math.min(a, b), rows: null, cols: Math.abs(b - a) + 1 }; }
     var mr = s.match(/^(\d+):(\d+)$/); // whole rows, e.g. 2:2
@@ -272,7 +276,13 @@ var SheetsAdapter = (function () {
     var t = this._tabs[title];
     // pending writes on a formula tab: flush so computed values are fresh
     if (t && this._queue.length && (t.hasFormulas || t.wroteFormula)) { this.flush(); t = this._tabs[title]; }
-    if (!t) { this.preload([title]); t = this._tabs[title]; }
+    if (!t) {
+      // First read of a tab: load it together with every other small tab not yet
+      // loaded (2 calls total instead of 2 per tab). Big tabs (master data) only on demand.
+      var self = this, titles = [title];
+      this._m().sheets.forEach(function (s) { if (s.title !== title && !self._tabs[s.title] && s.rowCount <= SMALL_TAB_ROWS_) titles.push(s.title); });
+      this.preload(titles); t = this._tabs[title];
+    }
     return t;
   };
   function serialToDate_(serial, tz) {
@@ -303,7 +313,7 @@ var SheetsAdapter = (function () {
   Sheet.prototype.getRange = function (a, b, c, d) {
     if (typeof a === 'string') {
       var p = parseA1_(a);
-      return new Range(this, p.row, p.col, p.rows === null ? this.getMaxRows() : p.rows, p.cols === null ? this.getMaxColumns() : p.cols);
+      return new Range(this, p.row, p.col, p.rows === null ? this.getMaxRows() - p.row + 1 : p.rows, p.cols === null ? this.getMaxColumns() - p.col + 1 : p.cols);
     }
     return new Range(this, a, b, c || 1, d || 1);
   };
