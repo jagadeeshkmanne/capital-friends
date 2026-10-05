@@ -110,7 +110,7 @@ function copyMFDataFromMasterDB(targetSheet) {
 
   // Read from the public master DB (no spreadsheets scope / Sheets API quota needed)
   var data = masterRows_(CONFIG.masterMFDataSheet, 8); // Max 8 columns (A-H)
-  if (!data.length) { log('Master DB MF_Data is empty'); return; }
+  if (!data.length) { log('Master DB MF_Data is empty'); return 0; }
   var lastCol = data[0].length;
 
   // Write to user's sheet (starting at row 2, after headers)
@@ -119,6 +119,7 @@ function copyMFDataFromMasterDB(targetSheet) {
   }
 
   log('Copied ' + data.length + ' MF records from master DB');
+  return data.length;
 }
 
 /**
@@ -130,7 +131,7 @@ function copyATHDataFromMasterDB(targetSheet) {
 
   // Columns A-G (F and G are formula results in the master DB; we get their values)
   var data = masterRows_(CONFIG.masterATHSheet, 7);
-  if (!data.length) { log('Master DB MF_ATH is empty'); return; }
+  if (!data.length) { log('Master DB MF_ATH is empty'); return 0; }
 
   // Write to user's sheet (all 7 columns as plain values)
   if (data.length > 0) {
@@ -138,6 +139,7 @@ function copyATHDataFromMasterDB(targetSheet) {
   }
 
   log('Copied ' + data.length + ' ATH records from master DB');
+  return data.length;
 }
 
 /**
@@ -148,7 +150,7 @@ function copyStockDataFromMasterDB(targetSheet) {
   log('Copying stock data from master DB...');
 
   var data = masterRows_(CONFIG.masterStockDataSheet, 10); // Max 10 columns (A-J)
-  if (!data.length) { log('Master DB Stock_Data is empty'); return; }
+  if (!data.length) { log('Master DB Stock_Data is empty'); return 0; }
   var lastCol = data[0].length;
 
   // Write to user's sheet
@@ -157,6 +159,7 @@ function copyStockDataFromMasterDB(targetSheet) {
   }
 
   log('Copied ' + data.length + ' stock records from master DB');
+  return data.length;
 }
 
 // ============================================================================
@@ -174,17 +177,14 @@ function refreshMutualFundData() {
     throw new Error('MutualFundData sheet not found');
   }
 
-  // Clear existing data (keep headers in row 1)
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+  // Clear existing data below the header (no need to read the big tab first)
+  if (sheet.getMaxRows() > 1) {
+    sheet.getRange(2, 1, sheet.getMaxRows() - 1, Math.min(8, sheet.getMaxColumns())).clearContent(); // data columns only
   }
 
   // Re-copy from master DB
-  copyMFDataFromMasterDB(sheet);
-
-  var newLastRow = sheet.getLastRow();
-  return { success: true, count: Math.max(0, newLastRow - 1) };
+  var count = copyMFDataFromMasterDB(sheet) || 0;
+  return { success: true, count: count };
 }
 
 /**
@@ -197,17 +197,14 @@ function refreshATHData() {
     throw new Error('MF_ATH_Data sheet not found');
   }
 
-  // Clear existing data (keep headers)
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+  // Clear existing data below the header (no need to read the big tab first)
+  if (sheet.getMaxRows() > 1) {
+    sheet.getRange(2, 1, sheet.getMaxRows() - 1, Math.min(7, sheet.getMaxColumns())).clearContent(); // data columns only
   }
 
   // Re-copy from master DB
-  copyATHDataFromMasterDB(sheet);
-
-  var newLastRow = sheet.getLastRow();
-  return { success: true, count: Math.max(0, newLastRow - 1) };
+  var count = copyATHDataFromMasterDB(sheet) || 0;
+  return { success: true, count: count };
 }
 
 /**
@@ -220,17 +217,14 @@ function refreshStockData() {
     throw new Error('StockMasterData sheet not found');
   }
 
-  // Clear existing data (keep headers)
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+  // Clear existing data below the header (no need to read the big tab first)
+  if (sheet.getMaxRows() > 1) {
+    sheet.getRange(2, 1, sheet.getMaxRows() - 1, Math.min(10, sheet.getMaxColumns())).clearContent(); // data columns only
   }
 
   // Re-copy from master DB
-  copyStockDataFromMasterDB(sheet);
-
-  var newLastRow = sheet.getLastRow();
-  return { success: true, count: Math.max(0, newLastRow - 1) };
+  var count = copyStockDataFromMasterDB(sheet) || 0;
+  return { success: true, count: count };
 }
 
 /**
