@@ -18,8 +18,30 @@
  */
 
 function masterRows_(tabName, numCols) {
+  // Note: cells formatted as date-only come back as whole days (time of day dropped).
+  // In the master DB that is only MF_ATH "Last Checked", which the app never reads.
+  var json = gvizFetch_(tabName, 'select *');
+
+  var tz = Session.getScriptTimeZone();
+  var cols = json.table.cols || [];
+  var n = numCols ? Math.min(numCols, cols.length) : cols.length;
+  var out = [];
+  (json.table.rows || []).forEach(function (row) {
+    var cells = row.c || [], vals = [];
+    for (var i = 0; i < n; i++) {
+      var cell = cells[i], type = cols[i] ? cols[i].type : 'string';
+      if (!cell || cell.v === null || cell.v === undefined) { vals.push(''); continue; }
+      vals.push(gvizValue_(cell.v, type, tz));
+    }
+    // skip fully empty rows (getValues() range ended at lastRow, so trailing blanks never appear)
+    if (vals.some(function (v) { return v !== ''; })) out.push(vals);
+  });
+  return out;
+}
+
+function gvizFetch_(tabName, tq) {
   var url = 'https://docs.google.com/spreadsheets/d/' + CONFIG.masterDbId +
-    '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(tabName);
+    '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(tabName) + '&tq=' + encodeURIComponent(tq);
   var resp = null, lastErr = null;
   for (var attempt = 0; attempt < 3; attempt++) {
     try {
@@ -31,28 +53,12 @@ function masterRows_(tabName, numCols) {
     Utilities.sleep(1000 * (attempt + 1));
   }
   if (!resp) throw new Error('Master DB download failed for ' + tabName + ': ' + (lastErr && lastErr.message));
-
   var text = resp.getContentText();
-  var start = text.indexOf('{'), end = text.lastIndexOf('}');
-  var json = JSON.parse(text.substring(start, end + 1));
+  var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
   if (json.status !== 'ok') {
     throw new Error('Master DB query error for ' + tabName + ': ' + JSON.stringify(json.errors || json.status).slice(0, 300));
   }
-
-  var tz = Session.getScriptTimeZone();
-  var cols = json.table.cols || [];
-  var n = numCols ? Math.min(numCols, cols.length) : cols.length;
-  var out = [];
-  (json.table.rows || []).forEach(function (row) {
-    var cells = row.c || [], vals = [];
-    for (var i = 0; i < n; i++) {
-      var cell = cells[i], type = cols[i] ? cols[i].type : 'string';
-      vals.push(cell && cell.v !== null && cell.v !== undefined ? gvizValue_(cell.v, type, tz) : '');
-    }
-    // skip fully empty rows (getValues() range ended at lastRow, so trailing blanks never appear)
-    if (vals.some(function (v) { return v !== ''; })) out.push(vals);
-  });
-  return out;
+  return json;
 }
 
 function gvizValue_(v, type, tz) {
