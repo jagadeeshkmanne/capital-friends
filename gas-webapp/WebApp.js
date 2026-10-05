@@ -36,6 +36,7 @@ var WEBAPP_CONFIG = {
  * @returns {Object} - { success: boolean, data: any, error: string }
  */
 function apiRouter(request) {
+  _inApiRequest = true; // Sheets API adapter batches all writes of this request
   try {
     // With Execution API, Session.getActiveUser() returns the calling user
     var email = Session.getActiveUser().getEmail();
@@ -62,11 +63,13 @@ function apiRouter(request) {
 
     // Route to action handler
     var result = routeAction(action, params, userRecord);
+    flushSheets_(); // send all queued sheet writes in one go
 
     // Sanitize: strip non-serializable types (Date, Range, Sheet) for Execution API
     return JSON.parse(JSON.stringify({ success: true, data: result }));
 
   } catch (error) {
+    try { if (_ssAdapter) _ssAdapter.flush(); } catch (e2) { log('flush after error failed: ' + e2); }
     log('apiRouter error: ' + error.toString());
     return { success: false, error: error.message || 'Internal server error', stack: error.stack, code: 500 };
   }

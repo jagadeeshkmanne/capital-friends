@@ -200,7 +200,7 @@ function getStockPrice(gfSymbol) {
     // Use cell Z1 as temp cell (far from settings data)
     var cell = sheet.getRange('Z1');
     cell.setFormula('=IFERROR(GOOGLEFINANCE("' + gfSymbol + '", "price"), 0)');
-    SpreadsheetApp.flush();
+    flushSheets_();
     var price = cell.getValue();
     cell.clearContent();
 

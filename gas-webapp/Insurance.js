@@ -205,7 +205,7 @@ function addInsurancePolicy(policyData) {
     sheet.appendRow(rowData);
 
     // CRITICAL FIX: Force immediate flush to prevent delayed row insertion
-    SpreadsheetApp.flush();
+    flushSheets_();
 
     // Format the new row
     const lastRow = sheet.getLastRow();
@@ -350,7 +350,7 @@ function updateInsurancePolicy(policyId, policyData) {
     sheet.getRange(rowIndex, 1, 1, 13).setValues([rowData]);
 
     // CRITICAL FIX: Force immediate flush to prevent delayed update
-    SpreadsheetApp.flush();
+    flushSheets_();
 
     // Re-apply formatting
     applyDataRowFormatting(sheet, rowIndex, rowIndex, 13);
@@ -498,7 +498,7 @@ function updateQuestionnaireForInsurance(policyType) {
     questionnaireSheet.getRange(lastRow, 10).setValue(newScore);
     Logger.log('Updated Questionnaire Score: ' + newScore + '/8');
 
-    SpreadsheetApp.flush();
+    flushSheets_();
 
   } catch (error) {
     Logger.log('Error updating questionnaire for insurance: ' + error.toString());
