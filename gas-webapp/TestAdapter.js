@@ -173,3 +173,23 @@ function sameFormatting_(a, b) {
 }
 
 function safeTry_(fn) { try { return fn(); } catch (e) { return 'ERROR: ' + e.message; } }
+
+/** Master data via public download vs SpreadsheetApp (TEST project still has the spreadsheets scope). */
+function TEST_5_masterSource() {
+  var master = SpreadsheetApp.openById(CONFIG.masterDbId);
+  [[CONFIG.masterMFDataSheet, 8], [CONFIG.masterATHSheet, 7], [CONFIG.masterStockDataSheet, 10]].forEach(function (x) {
+    var t0 = Date.now(), got = masterRows_(x[0], x[1]), ms = Date.now() - t0;
+    var sh = master.getSheetByName(x[0]), lr = sh.getLastRow(), lc = Math.min(sh.getLastColumn(), x[1]);
+    var exp = sh.getRange(2, 1, lr - 1, lc).getValues().filter(function (r) { return r.some(function (v) { return v !== ''; }); });
+    var d = [], types = {};
+    if (got.length !== exp.length) d.push('rows ' + exp.length + ' vs ' + got.length);
+    if (got[0] && got[0].length !== lc) d.push('cols ' + lc + ' vs ' + got[0].length);
+    for (var r = 0; r < Math.min(got.length, exp.length) && d.length < 12; r++) for (var c = 0; c < lc; c++) {
+      var a = exp[r][c], b = got[r][c];
+      if (a instanceof Date && b instanceof Date) { if (a.getTime() !== b.getTime()) d.push('R' + (r + 2) + 'C' + (c + 1) + ' date ' + a.toISOString() + ' vs ' + b.toISOString()); continue; }
+      if (typeof a !== typeof b || (a instanceof Date) !== (b instanceof Date)) { types[c + 1] = (types[c + 1] || 0) + 1; if (types[c + 1] <= 2) d.push('R' + (r + 2) + 'C' + (c + 1) + ' type ' + (a instanceof Date ? 'Date' : typeof a) + ' "' + String(a).slice(0, 25) + '" vs ' + (b instanceof Date ? 'Date' : typeof b) + ' "' + String(b).slice(0, 25) + '"'); continue; }
+      if (typeof a === 'number' ? Math.abs(a - b) > 1e-9 : a !== b) d.push('R' + (r + 2) + 'C' + (c + 1) + ' "' + String(a).slice(0, 25) + '" vs "' + String(b).slice(0, 25) + '"');
+    }
+    Logger.log((d.length ? '❌ ' : '✅ ') + x[0] + ': ' + got.length + ' rows downloaded in ' + ms + ' ms' + (d.length ? '\n   ' + d.join('\n   ') : ', identical to SpreadsheetApp'));
+  });
+}
