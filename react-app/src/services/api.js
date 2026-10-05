@@ -62,6 +62,16 @@ export function setTokenRefreshFn(fn) {
 
 let _filePickerHandler = null
 
+// ── Re-consent (set by AuthContext) ──
+// When the app asks Google for a new permission, the silent refresh can't show the
+// consent popup (browsers block popups without a click). The handler shows a button.
+
+let _reauthHandler = null
+
+export function setReauthHandler(fn) {
+  _reauthHandler = fn
+}
+
 export function setFilePickerHandler(fn) {
   _filePickerHandler = fn
 }
@@ -106,7 +116,15 @@ export async function callAPI(action, params = {}, retry = true, pickerTried = f
           await _refreshTokenFn()
           return callAPI(action, params, false, pickerTried) // retry once
         } catch {
-          // Refresh failed — fall through to throw
+          // Silent refresh failed (e.g. a new permission needs the user's OK)
+          if (_reauthHandler) {
+            try {
+              await _reauthHandler()
+              return callAPI(action, params, false, pickerTried)
+            } catch {
+              // user closed it — fall through to throw
+            }
+          }
         }
       }
     }
