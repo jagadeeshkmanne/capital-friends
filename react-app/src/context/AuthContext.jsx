@@ -8,17 +8,16 @@ const AuthContext = createContext(null)
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 // OAuth scopes — must match all scopes in webapp's appsscript.json
-// spreadsheets: GAS reads/writes user spreadsheets + master DB
-// drive.file: GAS creates user spreadsheet (SpreadsheetApp.create)
+// drive.file: GAS creates + reads/writes the user's own spreadsheet (Sheets API); spouses pick it once (Google Picker)
 // gmail.send: GAS sends email reports via GmailApp from user's Gmail
 // script.scriptapp: GAS creates daily sync triggers for auto-refresh
-// (script.external_request is added in stage 3, together with Google verification - it is a sensitive scope)
+// script.external_request: GAS downloads the public master fund data + live gold price
 // openid/email/profile: user identity
 const SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/script.scriptapp',
+  'https://www.googleapis.com/auth/script.external_request', // master fund data download + gold price
   'openid',
   'email',
   'profile',
