@@ -64,6 +64,7 @@ function apiRouter(request) {
       // Owner who really deleted their sheet: start over with a new one (asked in the app)
       if (action === 'auth:recreate-sheet' && userRecord.canRecreate && userRecord.role === 'owner') {
         var fresh = createNewUser(email, userRecord.displayName || userName);
+        flushSheets_(); // send the new sheet's queued writes before answering
         return JSON.parse(JSON.stringify({ success: true, data: { recreated: true, spreadsheetId: fresh.spreadsheetId } }));
       }
       var isMember = userRecord.role === 'member';

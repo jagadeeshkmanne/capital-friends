@@ -53,7 +53,8 @@ export async function pickSpreadsheet({ token, title }) {
         if (action === gp.Action.PICKED) {
           const doc = data[gp.Response.DOCUMENTS]?.[0]
           resolve(doc ? doc[gp.Document.ID] : null)
-        } else if (action === gp.Action.CANCEL) {
+        } else if (action && action !== gp.Action.LOADED) {
+          // cancelled or closed in any other way
           resolve(null)
         }
       })
