@@ -121,9 +121,15 @@ function getOrCreateUser(email, name) {
       return existing;
     }
     if (access === 'missing') {
-      // Owner's spreadsheet deleted - recreate for this user
-      log('Spreadsheet missing for ' + email + ' (id: ' + existing.spreadsheetId + '). Recreating...');
-      return createNewUser(email, existing.displayName || name);
+      // Owner can't open their sheet. With drive.file that also happens when the sheet
+      // was not created by this app (e.g. copied by hand). Never create a new sheet
+      // silently: ask the owner to pick their sheet once; they can choose to start
+      // fresh (auth:recreate-sheet) only if they really deleted it.
+      log('Owner ' + email + ' has no access to ' + existing.spreadsheetId + ' - needs file picker');
+      existing.email = email;
+      existing.needsFilePicker = true;
+      existing.canRecreate = true;
+      return existing;
     }
     // access === 'error': temporary problem - carry on with the existing sheet
 
