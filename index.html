@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1a3a2a" />
-    <meta name="description" content="Capital Friends is a free, open-source family portfolio tracker. Track mutual funds, stocks, FDs, insurance, loans, and goals for your entire family — all stored privately in your Google Drive." />
+    <meta name="description" content="Capital Friends is a free, open-source family portfolio tracker web app. Track mutual funds, stocks, FDs, insurance, loans, and goals for your entire family — all stored privately in your Google Drive." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -24,7 +24,7 @@
         }
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-Dk2cOneU.js"></script>
+    <script type="module" crossorigin src="/assets/index-nY7lYcap.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/ag-grid-CeCyAIKc.js">
     <link rel="stylesheet" crossorigin href="/assets/index-Di4YkZOJ.css">
   </head>
@@ -61,6 +61,34 @@
           </button>
           <div style="margin-top:10px;font-size:11.5px;color:#94a3b8">
             Free · Open source · No bank credentials · Data stays in your Google Drive
+          </div>
+        </section>
+
+        <!-- About: purpose of the app + how it uses Google data (same as React) -->
+        <section id="about" style="background:#fff;border-bottom:1px solid #e2e8f0;padding:28px 20px">
+          <div style="max-width:960px;margin:0 auto">
+            <h2 style="font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;color:#0f172a;margin:0 0 8px">What is Capital Friends?</h2>
+            <p style="font-size:14px;color:#334155;line-height:1.7;margin:0 0 18px">Capital Friends is a free, open-source web app that helps Indian families keep track of their money in one place: mutual funds, stocks, fixed deposits, gold, bank and investment accounts, insurance policies, loans and financial goals, for every family member. Its main purpose is family awareness: the app sends a regular email summary to the family members you choose, so your spouse or parents always know what you own and where, even if something happens to you. It also shows each fund's current value and distance from its all-time high, suggests rebalancing amounts when a portfolio drifts from its target split, and tracks goals such as retirement and children's education.</p>
+            <h3 style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 10px">How Capital Friends uses your Google account</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+            <div style="padding:16px 18px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">
+              <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Your own Google Sheet (Google Drive, app files only)</div>
+              <div style="font-size:13px;color:#475569;line-height:1.6">When you sign in, Capital Friends creates one spreadsheet in your Google Drive and stores all your data there. The app can only open the file it created, or a family member's Capital Friends sheet that you pick yourself in the Google Picker. It cannot see any other files in your Drive.</div>
+            </div>
+            <div style="padding:16px 18px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">
+              <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Email reports and reminders (Gmail, send only)</div>
+              <div style="font-size:13px;color:#475569;line-height:1.6">Sends your portfolio summary, SIP dates, insurance renewals and goal updates from your own Gmail to you and the family members you add. The app never reads your email.</div>
+            </div>
+            <div style="padding:16px 18px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">
+              <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Scheduled updates (Apps Script triggers)</div>
+              <div style="font-size:13px;color:#475569;line-height:1.6">Refreshes fund prices daily and sends the scheduled reports and reminders, even when you are not using the app.</div>
+            </div>
+            <div style="padding:16px 18px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">
+              <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Public market prices (external requests)</div>
+              <div style="font-size:13px;color:#475569;line-height:1.6">Downloads public mutual fund NAVs and stock prices from the Capital Friends public price sheet. No personal data is sent out.</div>
+            </div>
+            </div>
+            <p style="font-size:13px;color:#475569;line-height:1.6;margin:14px 0 0">There is no Capital Friends server or database. Your data stays in your own Google Drive, and the app never asks for bank passwords. Capital Friends is a tracking tool, not investment advice. Read the <a href="https://capitalfriends.in/privacy" style="color:#0891b2">Privacy Policy</a> and <a href="https://capitalfriends.in/terms" style="color:#0891b2">Terms &amp; Conditions</a>.</p>
           </div>
         </section>
 
