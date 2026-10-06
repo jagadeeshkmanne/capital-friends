@@ -602,6 +602,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ─── ABOUT: purpose of the app + how it uses Google data (needed for Google OAuth verification) ─── */}
+      <section id="about" style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '24px 16px' : '28px 24px' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>What is Capital Friends?</h2>
+          <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.7, marginBottom: 18 }}>Capital Friends is a free, open-source web app that helps Indian families keep track of their money in one place: mutual funds, stocks, fixed deposits, gold, bank and investment accounts, insurance policies, loans and financial goals, for every family member. Its main purpose is family awareness: the app sends a regular email summary to the family members you choose, so your spouse or parents always know what you own and where, even if something happens to you. It also shows each fund's current value and distance from its all-time high, suggests rebalancing amounts when a portfolio drifts from its target split, and tracks goals such as retirement and children's education.</p>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>How Capital Friends uses your Google account</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Your own Google Sheet (Google Drive, app files only)</div>
+              <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>When you sign in, Capital Friends creates one spreadsheet in your Google Drive and stores all your data there. The app can only open the file it created, or a family member's Capital Friends sheet that you pick yourself in the Google Picker. It cannot see any other files in your Drive.</div>
+            </div>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Email reports and reminders (Gmail, send only)</div>
+              <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>Sends your portfolio summary, SIP dates, insurance renewals and goal updates from your own Gmail to you and the family members you add. The app never reads your email.</div>
+            </div>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Scheduled updates (Apps Script triggers)</div>
+              <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>Refreshes fund prices daily and sends the scheduled reports and reminders, even when you are not using the app.</div>
+            </div>
+            <div style={{ padding: '16px 18px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Public market prices (external requests)</div>
+              <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>Downloads public mutual fund NAVs and stock prices from the Capital Friends public price sheet. No personal data is sent out.</div>
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, marginTop: 14 }}>
+            There is no Capital Friends server or database. Your data stays in your own Google Drive, and the app never asks for bank passwords. Capital Friends is a tracking tool, not investment advice. Read the <a href="https://capitalfriends.in/privacy" style={{ color: '#0891b2' }}>Privacy Policy</a> and <a href="https://capitalfriends.in/terms" style={{ color: '#0891b2' }}>Terms &amp; Conditions</a>.
+          </p>
+        </div>
+      </section>
+
       {/* ─── SHOWCASE ─── */}
       <section style={{ display: 'flex', flexDirection: 'column' }}>
         {/* Tabs bar */}
