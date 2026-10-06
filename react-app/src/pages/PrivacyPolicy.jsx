@@ -24,7 +24,7 @@ export default function PrivacyPolicy() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-slate-500 mb-10">Last updated: August 25, 2026</p>
+        <p className="text-sm text-slate-500 mb-10">Last updated: October 6, 2026</p>
 
         {/* Overview */}
         <Section icon={<Shield size={20} />} color="emerald" title="Overview">
@@ -49,20 +49,20 @@ export default function PrivacyPolicy() {
           <p>When you sign in with Google, we request the following permissions. Each is required for the app to function:</p>
 
           <Scope
-            name="Google Sheets"
-            scope="auth/spreadsheets"
-            badge="Sensitive"
-            badgeColor="amber"
-            desc="See, edit, create and delete all your Google Sheets spreadsheets"
-            why="Required to create your Capital Friends spreadsheet on first sign-in, and to read/write your portfolio data, goals, settings, family members, insurance, liabilities, and all other financial information. The app only accesses the Capital Friends spreadsheet it created — no other spreadsheets."
-          />
-          <Scope
-            name="Google Drive (App-Created Files)"
+            name="Google Drive (App-Created and Selected Files)"
             scope="auth/drive.file"
             badge="Non-Sensitive"
             badgeColor="emerald"
-            desc="See, edit, create and delete only files created by this app"
-            why={<>Used to create your Capital Friends spreadsheet via <code className="text-xs text-violet-400 bg-violet-500/10 px-1 rounded">SpreadsheetApp.create()</code> during first-time setup. This scope only grants access to the single spreadsheet the app creates — <strong className="text-white">we cannot access any other files in your Google Drive.</strong></>}
+            desc="See, edit, create and delete only the specific Google Drive files you use with this app"
+            why={<>Used to create your Capital Friends spreadsheet on first sign-in and to read and write your portfolio data in it (holdings, transactions, goals, insurance, liabilities, family members, settings). If a family member shares their Capital Friends sheet with you, you choose that one sheet once in the Google Picker. <strong className="text-white">The app can only open files it created or files you picked — it cannot see any other files in your Google Drive.</strong></>}
+          />
+          <Scope
+            name="External Requests"
+            scope="auth/script.external_request"
+            badge="Sensitive"
+            badgeColor="amber"
+            desc="Connect to an external service"
+            why="Used only to download public market data (mutual fund names, daily NAVs, all-time highs and stock prices) from the Capital Friends public master data sheet, which anyone with the link can view. Nothing from your account or your portfolio is sent out by these requests."
           />
           <Scope
             name="Gmail (Send Only)"
@@ -107,7 +107,7 @@ export default function PrivacyPolicy() {
           <p>Capital Friends accesses Google user data exclusively to provide its core portfolio tracking functionality. Below is a complete disclosure of how each type of data is used:</p>
           <ul className="mt-3 space-y-3">
             <Li><strong className="text-white">Google Sheets data:</strong> Your financial data (mutual fund holdings, stock portfolios, insurance policies, loan records, family members, goals, and transaction history) is read from and written to the Capital Friends spreadsheet in your Google Drive. It is processed through Google APIs and Apps Script to render the app and run features you enable. Capital Friends does not keep a separate server-side copy of this portfolio data.</Li>
-            <Li><strong className="text-white">Google Drive access:</strong> Used only to create the Capital Friends spreadsheet during first-time setup. No other files in your Drive are listed, accessed, read, or modified.</Li>
+            <Li><strong className="text-white">Google Drive access:</strong> Used to create your Capital Friends spreadsheet and to read and write your data in it, plus a family member&apos;s shared Capital Friends sheet if you pick it in the Google Picker. No other files in your Drive are listed, accessed, read, or modified.</Li>
             <Li><strong className="text-white">Gmail (send only):</strong> Used exclusively to send scheduled portfolio summary emails and reminder notifications (SIP reminders, insurance renewal alerts, goal progress) from your own Gmail account to recipients you configure. Capital Friends does not keep a separate copy of the generated email; normal retention in your Sent folder and recipients&apos; mailboxes still applies. We do not read, search, or delete your emails.</Li>
             <Li><strong className="text-white">Apps Script triggers:</strong> Used to schedule background tasks that refresh mutual fund NAV prices daily and send automated email reports. These triggers run entirely within Google&apos;s infrastructure under your authenticated session.</Li>
             <Li><strong className="text-white">Profile information:</strong> Your name, email, and profile picture (from Google Sign-In) are displayed within the app&apos;s UI for identification purposes only. This information is not stored on any server or shared with any third party.</Li>
@@ -123,7 +123,7 @@ export default function PrivacyPolicy() {
             <Li><strong className="text-white">Encryption in transit:</strong> All communication between your browser and Google APIs is encrypted using HTTPS/TLS. The app is served over HTTPS from GitHub Pages.</Li>
             <Li><strong className="text-white">Encryption at rest:</strong> Your spreadsheet data is stored in Google Drive, which encrypts all data at rest using AES-256 encryption as part of Google&apos;s standard infrastructure security.</Li>
             <Li><strong className="text-white">OAuth 2.0 authentication:</strong> The app uses Google&apos;s OAuth 2.0 protocol for authentication. To restore your session, the access token and its expiry are stored in your browser&apos;s local storage and removed when you sign out or when the token expires. They are not stored on a Capital Friends server. Anyone who can access the same browser profile may be able to access local session data, so sign out on shared devices.</Li>
-            <Li><strong className="text-white">Minimal data access:</strong> The app accesses only the single spreadsheet it created. It does not scan, index, or access any other files in your Google Drive, emails in your Gmail, or data in any other Google service.</Li>
+            <Li><strong className="text-white">Minimal data access:</strong> The app accesses only the Capital Friends spreadsheet it created, or a family sheet you picked yourself. It does not scan, index, or access any other files in your Google Drive, emails in your Gmail, or data in any other Google service.</Li>
             <Li><strong className="text-white">No third-party data sharing:</strong> Your Google user data is never shared with, disclosed to, or made accessible to any third party, including analytics services, advertising networks, or data brokers.</Li>
             <Li><strong className="text-white">Open source:</strong> The entire application source code is publicly available on <a href="https://github.com/jagadeeshkmanne/capital-friends" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">GitHub</a>, allowing independent verification of all data handling practices.</Li>
           </ul>
