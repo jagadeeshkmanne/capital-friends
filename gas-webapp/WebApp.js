@@ -61,13 +61,22 @@ function apiRouter(request) {
     // Family member who hasn't picked the owner's sheet in the Google Picker yet
     // (drive.file permission). React shows the Picker, then retries the same call.
     if (userRecord.needsFilePicker) {
-      var owner = userRecord.invitedBy ? findUserByEmail(userRecord.invitedBy) : null;
+      // Owner who really deleted their sheet: start over with a new one (asked in the app)
+      if (action === 'auth:recreate-sheet' && userRecord.canRecreate && userRecord.role === 'owner') {
+        var fresh = createNewUser(email, userRecord.displayName || userName);
+        return JSON.parse(JSON.stringify({ success: true, data: { recreated: true, spreadsheetId: fresh.spreadsheetId } }));
+      }
+      var isMember = userRecord.role === 'member';
+      var owner = isMember && userRecord.invitedBy ? findUserByEmail(userRecord.invitedBy) : null;
+      var titleName = isMember ? (owner && owner.displayName) : userRecord.displayName;
       return {
         success: false, code: 428, error: 'NEEDS_FILE_PICKER',
         needsFilePicker: true,
         spreadsheetId: userRecord.spreadsheetId,
-        sheetTitle: owner && owner.displayName ? 'Capital Friends - ' + owner.displayName : 'Capital Friends',
-        ownerEmail: userRecord.invitedBy || ''
+        sheetTitle: titleName ? 'Capital Friends - ' + titleName : 'Capital Friends',
+        ownerEmail: isMember ? (userRecord.invitedBy || '') : '',
+        isOwner: !isMember,
+        canRecreate: !!userRecord.canRecreate
       };
     }
 
