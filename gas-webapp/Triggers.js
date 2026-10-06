@@ -289,3 +289,15 @@ function handleSettingsEdit(sheet, row, col) {
 // ============================================================================
 // END OF TRIGGERS.GS
 // ============================================================================
+
+/**
+ * Old handler name. Some users still have an hourly trigger from an old version that
+ * calls this function, which no longer exists, so it fails every hour.
+ * When it fires now, it removes that leftover trigger for the user it runs as.
+ * It touches only triggers whose handler is 'hourlyPriceCheck'.
+ */
+function hourlyPriceCheck() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'hourlyPriceCheck') ScriptApp.deleteTrigger(t);
+  });
+}
