@@ -115,19 +115,18 @@ function getSpreadsheet() {
 
 // ---------------------------------------------------------------------------
 // Sheets API switch (drive.file migration)
-// Script Property USE_SHEETS_API:  '' / missing = off (old SpreadsheetApp path),
-//   'all' = everyone, or a comma list of emails = only those users.
+// The spreadsheets scope is removed, so the Sheets API path is the default for everyone.
+// Script Property USE_SHEETS_API = 'off' brings back the old SpreadsheetApp path, but ONLY
+// works if the spreadsheets scope is added back to appsscript.json + React SCOPES.
 // ---------------------------------------------------------------------------
 var _ssAdapter = null, _ssAdapterId = null, _useSheetsApi = null, _inApiRequest = false;
 
 function useSheetsApi_() {
   if (_useSheetsApi !== null) return _useSheetsApi;
+  // Only 'off' turns the new path off (any old value such as an email list is ignored,
+  // because without the spreadsheets scope the old path cannot work).
   var flag = (PropertiesService.getScriptProperties().getProperty('USE_SHEETS_API') || '').trim().toLowerCase();
-  if (!flag) { _useSheetsApi = false; return false; }
-  if (flag === 'all') { _useSheetsApi = true; return true; }
-  var email = '';
-  try { email = (Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || '').toLowerCase(); } catch (e) {}
-  _useSheetsApi = flag.split(',').map(function (s) { return s.trim(); }).indexOf(email) >= 0;
+  _useSheetsApi = flag !== 'off';
   return _useSheetsApi;
 }
 
