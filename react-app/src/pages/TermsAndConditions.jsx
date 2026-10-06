@@ -24,7 +24,7 @@ export default function TermsAndConditions() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">Terms & Conditions</h1>
-        <p className="text-sm text-slate-500 mb-10">Last updated: March 4, 2026</p>
+        <p className="text-sm text-slate-500 mb-10">Last updated: October 6, 2026</p>
 
         <Sec num="1" title="Acceptance of Terms">
           <p>By accessing and using Capital Friends (<strong className="text-white">capitalfriends.in</strong>), you agree to be bound by these Terms & Conditions and our <Link to="/privacy" className="text-cyan-400 hover:underline no-underline">Privacy Policy</Link>. If you do not agree to these terms, please do not use the app.</p>
@@ -53,7 +53,8 @@ export default function TermsAndConditions() {
             <Li>You sign in using your Google account via Google OAuth 2.0</Li>
             <Li>You are solely responsible for the security of your Google account</Li>
             <Li>On first sign-in, the app creates a Google Spreadsheet in your Drive to store your financial data</Li>
-            <Li>You may invite family members to share access to your spreadsheet — you are responsible for managing who has access</Li>
+          <Li>The app can only open the Capital Friends spreadsheet it created, or a sheet you choose yourself in the Google file picker (Google&apos;s drive.file permission). It cannot see or open any other files in your Drive</Li>
+            <Li>You may invite family members to share access to your spreadsheet — each family member opens it once through the Google file picker. You are responsible for managing who has access</Li>
           </ul>
         </Sec>
 
@@ -69,7 +70,7 @@ export default function TermsAndConditions() {
         </Sec>
 
         <Sec num="6" title="Google API Compliance">
-          <p>Capital Friends uses Google APIs (Sheets, Drive, Gmail, Apps Script) to function. By using this app:</p>
+          <p>Capital Friends uses Google APIs (Google Sheets, Google Drive with the drive.file permission only, Gmail send-only for your own email reports, and Apps Script) to function. By using this app:</p>
           <ul className="mt-3 space-y-2">
             <Li>You agree to <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Google&apos;s Terms of Service</a></Li>
             <Li>Our use of Google APIs complies with the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Google API Services User Data Policy</a>, including the Limited Use requirements</Li>
