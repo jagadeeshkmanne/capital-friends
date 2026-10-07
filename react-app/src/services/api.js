@@ -302,6 +302,8 @@ export const refreshMasterData = () => callAPI('data:refresh-master')
 export const checkDataFreshness = () => callAPI('data:check-freshness')
 // Background safety net: refreshes NAV/master data only if the master DB is newer than this user's copy
 export const syncMasterIfStale = () => callAPI('data:sync-if-stale')
+// Are this user's daily update + email jobs switched on? { sync, email, emailConfigured, reminders } or { unknown }
+export const getDailyJobsStatus = () => callAPI('triggers:status')
 
 // Email Reports
 export const sendDashboardEmail = () => callAPI('email:send-report-now')

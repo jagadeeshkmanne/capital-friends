@@ -436,6 +436,9 @@ function routeAction(action, params, userRecord) {
     case 'data:sync-if-stale':   // background safety net on app open (see MasterDataSync.js)
       return syncMasterDataIfStale();
 
+    case 'triggers:status':      // are this user's daily update / email jobs switched on?
+      return getMyDailyJobsStatus();
+
     case 'data:market':
       return {
         metals: [{

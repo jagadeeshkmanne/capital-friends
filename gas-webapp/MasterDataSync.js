@@ -429,6 +429,28 @@ function syncMasterDataIfStale() {
   }
 }
 
+/**
+ * Which of this user's own background jobs exist (installable triggers are per user).
+ * Used by the app to ask, in plain words, to switch on daily updates when they are missing.
+ * Never throws: { unknown: true } when it can't tell, so the app doesn't nag.
+ */
+function getMyDailyJobsStatus() {
+  try {
+    var names = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
+    var emailOn = false;
+    try { emailOn = isEmailConfigured(); } catch (e) {}
+    return {
+      sync: names.indexOf('dailyUserSync') !== -1,
+      email: names.indexOf('sendScheduledDailyEmail') !== -1,
+      emailConfigured: emailOn,
+      reminders: names.indexOf('checkAndSendReminders') !== -1
+    };
+  } catch (e) {
+    log('getMyDailyJobsStatus: ' + e.message);
+    return { unknown: true };
+  }
+}
+
 /** This user's last master-data copy time (Settings 'masterDataLastSync'), or null. */
 function getMasterDataLastSync_() {
   try {

@@ -218,14 +218,14 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-[var(--text-primary)]">Auto NAV Refresh</p>
-                <p className="text-xs text-[var(--text-dim)] mt-0.5">Enable background sync for NAVs & emails</p>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">Daily updates</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">Updates your fund prices and sends your summary email every day, even when the app is closed</p>
               </div>
               <button
                 onClick={() => api.installUserTriggers()}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                Enable Auto-Refresh
+                Turn on
               </button>
             </div>
           </div>

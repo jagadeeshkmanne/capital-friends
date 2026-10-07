@@ -4,6 +4,7 @@ import Header from './Header'
 import BottomNav from './BottomNav'
 import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
+import DailyUpdatesBanner from './DailyUpdatesBanner'
 import { useData } from '../context/DataContext'
 import { Heart, X, Youtube } from 'lucide-react'
 
@@ -48,6 +49,7 @@ export default function Layout() {
 
       <main className="flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
         <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
+          <DailyUpdatesBanner />
           <Outlet />
         </div>
 
