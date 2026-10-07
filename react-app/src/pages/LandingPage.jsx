@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Users, LockKeyhole, HardDrive, CodeXml } from 'lucide-react'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
 
@@ -551,8 +552,8 @@ function useFamiliesCount() {
       const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
       if (String(j?.table?.cols?.[0]?.label || '').toLowerCase() !== 'families') return
       const c = j?.table?.rows?.[0]?.c || []
-      const families = Number(c[0]?.v), users = Number(c[1]?.v)
-      if (alive && Number.isFinite(families) && families > 0) setN({ families, users: Number.isFinite(users) ? users : 0 })
+      const families = Number(c[0]?.v)
+      if (alive && Number.isFinite(families) && families > 0) setN({ families })
     }).catch(() => {})
     return () => { alive = false }
   }, [])
@@ -568,67 +569,42 @@ function CountUp({ to }) {
   }, [to])
   return v.toLocaleString('en-IN')
 }
-// Big "LIVE" usage badge in the hero: pulsing dot, counting-up numbers, a soft glowing border.
-function LiveFamilies({ isMobile }) {
+// Hero stats row: four matching stats, each with an icon. Big number + its word on one line, a short caption under it.
+// The first one is the live families count (from App_Stats), marked LIVE.
+// Hero social proof under the button: glowing pill, family icons pop in one by one, the live count counts up.
+function FamiliesProof({ isMobile }) {
   const n = useFamiliesCount()
   if (!n) return null
-  const big = { fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 26 : 30, fontWeight: 800, color: '#16a34a', lineHeight: 1 }
-  const small = { fontSize: 12, color: '#475569', fontWeight: 600, marginTop: 4 }
+  const cols = ['#7c3aed', '#0891b2', '#16a34a', '#f59e0b']
   return (
-    <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
+    <div className="cf-proof" style={{ display: 'inline-flex', alignItems: 'center', gap: 14, marginTop: 22, padding: isMobile ? '12px 16px 12px 12px' : '14px 26px 14px 16px', borderRadius: 20,
+      background: 'linear-gradient(135deg, rgba(74,222,128,.12), rgba(34,211,238,.08))', border: '1px solid rgba(74,222,128,.45)', position: 'relative', overflow: 'hidden' }}>
       <style>{`
-        @keyframes cfPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.6)}70%{box-shadow:0 0 0 10px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
-        @keyframes cfLiveGlow{0%,100%{box-shadow:0 0 0 1px rgba(22,163,74,.25),0 6px 24px -8px rgba(22,163,74,.35)}50%{box-shadow:0 0 0 1px rgba(22,163,74,.55),0 8px 32px -6px rgba(22,163,74,.55)}}
-        @keyframes cfLiveIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
-        @media (prefers-reduced-motion:reduce){.cf-live,.cf-live *{animation:none!important}}
+        .cf-proof{animation:cfProofIn .7s cubic-bezier(.2,.8,.2,1) .5s both, cfProofGlow 2.6s ease-in-out 1.2s infinite}
+        .cf-proof::after{content:'';position:absolute;top:0;bottom:0;left:-40%;width:30%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.18),transparent);transform:skewX(-20deg);animation:cfShine 4s ease-in-out 1.4s infinite}
+        .cf-av{opacity:0;transform:scale(.4);animation:cfPop .45s cubic-bezier(.3,1.6,.5,1) forwards}
+        @keyframes cfProofIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+        @keyframes cfProofGlow{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}50%{box-shadow:0 0 28px 2px rgba(74,222,128,.35)}}
+        @keyframes cfShine{0%,55%{left:-40%}100%{left:130%}}
+        @keyframes cfPop{to{opacity:1;transform:scale(1)}}
+        @media (prefers-reduced-motion:reduce){.cf-proof,.cf-proof::after,.cf-av{animation:none!important;opacity:1;transform:none}}
       `}</style>
-      <div className="cf-live" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 22, padding: isMobile ? '12px 16px' : '14px 26px', borderRadius: 16, background: 'linear-gradient(135deg,#f0fdf4 0%,#ecfeff 100%)', animation: 'cfLiveIn .6s ease-out both, cfLiveGlow 3s ease-in-out .6s infinite', textAlign: 'left' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '.08em' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', animation: 'cfPulse 1.6s infinite' }} /> LIVE
-        </span>
-        <div>
-          <div style={big}><CountUp to={n.families} /></div>
-          <div style={small}>families use it</div>
-        </div>
-        {n.users > n.families && (
-          <>
-            <span style={{ width: 1, alignSelf: 'stretch', background: '#bbf7d0' }} />
-            <div>
-              <div style={{ ...big, color: '#0891b2' }}><CountUp to={n.users} /></div>
-              <div style={small}>people signed in</div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Hero trust chips: appear one by one, the tick draws in, then a soft green glow walks across them.
-const TRUST_ITEMS = ['Free forever', 'Open source', 'No bank credentials', 'Data stays in your Google Drive']
-function TrustChips({ isMobile }) {
-  return (
-    <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: isMobile ? 8 : 12, justifyContent: 'center' }}>
-      <style>{`
-        .cf-trust{display:inline-flex;align-items:center;gap:10px;padding:8px 18px 8px 8px;border-radius:999px;border:1.5px solid rgba(22,163,74,.25);background:linear-gradient(180deg,#f0fdf4,#ffffff);color:#0f172a;font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;box-shadow:0 1px 2px rgba(15,23,42,.06);opacity:0;transform:translateY(10px);animation:cfTrustIn .6s cubic-bezier(.2,.8,.2,1) forwards, cfTrustGlow 8s ease-in-out infinite}
-        .cf-trust .cf-badge{width:26px;height:26px;border-radius:50%;background:#16a34a;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 4px rgba(22,163,74,.14)}
-        .cf-trust .cf-badge path{stroke-dasharray:24;stroke-dashoffset:24;animation:cfTick .5s ease-out forwards}
-        @keyframes cfTrustIn{to{opacity:1;transform:none}}
-        @keyframes cfTick{to{stroke-dashoffset:0}}
-        @keyframes cfTrustGlow{0%,22%,100%{border-color:rgba(22,163,74,.25);box-shadow:0 1px 2px rgba(15,23,42,.06);transform:none}8%{border-color:rgba(22,163,74,.85);box-shadow:0 6px 20px rgba(22,163,74,.28);transform:translateY(-2px)}}
-        @media (max-width:600px){.cf-trust{font-size:13px;padding:6px 14px 6px 6px}.cf-trust .cf-badge{width:22px;height:22px}}
-        @media (prefers-reduced-motion:reduce){.cf-trust{animation:none;opacity:1;transform:none}.cf-trust .cf-badge path{animation:none;stroke-dashoffset:0}}
-      `}</style>
-      {TRUST_ITEMS.map((t, i) => (
-        <span key={t} className="cf-trust" style={{ animationDelay: `${0.3 + i * 0.25}s, ${1.8 + i * 2}s` }}>
-          <span className="cf-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12l5 5L20 7" style={{ animationDelay: `${0.6 + i * 0.25}s` }} />
-            </svg>
+      <div style={{ display: 'flex' }}>
+        {(isMobile ? cols.slice(0, 3) : cols).map((c, k) => (
+          <span key={k} className="cf-av" style={{ animationDelay: `${0.8 + k * 0.12}s`, width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: '50%', marginLeft: k ? -11 : 0, background: c, border: '2px solid #0b1120', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+            <Users size={isMobile ? 15 : 16} strokeWidth={2.4} />
           </span>
-          {t}
-        </span>
-      ))}
+        ))}
+      </div>
+      <div style={{ textAlign: 'left', lineHeight: 1.15 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 34 : 42, fontWeight: 800, letterSpacing: '-.02em', lineHeight: 1, background: 'linear-gradient(135deg,#4ade80,#22d3ee)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}><CountUp to={n.families} /></span>
+          <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 16 : 23, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>{n.families === 1 ? 'family is' : 'families are'} using it</span>
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, letterSpacing: '.12em', color: '#4ade80', marginTop: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', animation: 'cfLiveDot 1.6s infinite' }} />LIVE COUNT
+        </div>
+      </div>
     </div>
   )
 }
@@ -694,20 +670,67 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* ─── HERO ─── */}
-      <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '24px 20px 20px' : '20px 24px 16px', textAlign: 'center' }}>
-        <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 22 : 26, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1.3, marginBottom: 10 }}>
-          One dashboard for your family's <span style={{ color: '#16a34a' }}>entire wealth</span>
-        </h1>
-        <p style={{ fontSize: 13.5, color: '#475569', marginBottom: 14, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
-          Track mutual funds, stocks, insurance, loans for every family member — stored privately in your own Google Drive.
-        </p>
-        <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 20px', borderRadius: 9, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-          <GI s={14} />
-          Sign in with Google — it's free
-        </button>
-        <TrustChips isMobile={isMobile} />
-        <LiveFamilies isMobile={isMobile} />
+      {/* ─── HERO: dark, split — words + one button on the left, the real dashboard on the right (fintech-style) ─── */}
+      <section style={{ position: 'relative', overflow: 'hidden', padding: isMobile ? '34px 18px 40px' : '64px 32px 72px',
+        background: 'radial-gradient(ellipse 55% 70% at 10% 0%, rgba(124,58,237,.30), transparent 60%), radial-gradient(ellipse 50% 70% at 95% 90%, rgba(8,145,178,.26), transparent 60%), #0b1120' }}>
+        <style>{`
+          .cf-gbtn{transition:transform .18s ease, box-shadow .18s ease, filter .18s ease}
+          .cf-gbtn:hover{transform:translateY(-2px);box-shadow:0 16px 34px -12px rgba(124,58,237,.75);filter:brightness(1.08)}
+          .cf-gbtn:hover .cf-arrow{transform:translateX(3px)}
+          .cf-arrow{transition:transform .18s ease}
+          .cf-shot{transform:perspective(1600px) rotateY(-9deg) rotateX(4deg);transition:transform .6s ease}
+          .cf-shot:hover{transform:perspective(1600px) rotateY(-3deg) rotateX(1deg)}
+          .cf-float{animation:cfFloat 5s ease-in-out infinite}
+          .cf-float2{animation:cfFloat 6s ease-in-out infinite .8s}
+          .cf-in{opacity:0;animation:cfIn .7s cubic-bezier(.2,.8,.2,1) forwards}
+          @keyframes cfFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+          @keyframes cfIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+          @keyframes cfLiveDot{0%{box-shadow:0 0 0 0 rgba(74,222,128,.7)}70%{box-shadow:0 0 0 7px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+          @media (max-width:767px){.cf-shot{transform:none}.cf-shot:hover{transform:none}}
+          @media (prefers-reduced-motion:reduce){.cf-float,.cf-float2,.cf-in{animation:none;opacity:1}}
+        `}</style>
+        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1.15fr)', gap: isMobile ? 34 : 56, alignItems: 'center' }}>
+          {/* words */}
+          <div className="cf-in" style={{ minWidth: 0, textAlign: isMobile ? 'center' : 'left' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)', fontSize: 12.5, fontWeight: 600, color: '#cbd5e1', marginBottom: 18 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80' }} /> Free · open source · made in India
+            </div>
+            <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 30 : 48, fontWeight: 700, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.1, margin: '0 0 16px' }}>
+              One dashboard for your family's <span style={{ background: 'linear-gradient(90deg,#4ade80,#22d3ee)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>entire wealth</span>
+            </h1>
+            <p style={{ fontSize: isMobile ? 15 : 17.5, color: '#94a3b8', margin: isMobile ? '0 auto 24px' : '0 0 28px', maxWidth: 500, lineHeight: 1.6 }}>
+              Mutual funds, stocks, insurance and loans for every family member — and your data is stored in <b style={{ color: '#4ade80', fontWeight: 700 }}>your own Google Sheet</b>, in your Drive.
+            </p>
+            <button onClick={signIn} className="cf-gbtn" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, padding: isMobile ? '8px 22px 8px 8px' : '9px 28px 9px 9px', borderRadius: 14,
+              background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 15.5 : 17, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 14px 30px -12px rgba(124,58,237,.65)' }}>
+              <span style={{ width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, borderRadius: 10, background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><GI s={isMobile ? 19 : 21} /></span>
+              Sign in with Google — it's free
+              <svg className="cf-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </button>
+            <FamiliesProof isMobile={isMobile} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start', gap: isMobile ? '8px 16px' : '10px 22px', marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,.08)', maxWidth: 520, marginLeft: isMobile ? 'auto' : 0, marginRight: isMobile ? 'auto' : 0 }}>
+              {[[LockKeyhole, 'No bank logins'], [HardDrive, 'Data in your Google Sheet'], [CodeXml, 'Open source']].map(([Ic, l]) => (
+                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: '#cbd5e1' }}><Ic size={15} color="#4ade80" strokeWidth={2.3} />{l}</span>
+              ))}
+            </div>
+          </div>
+          {/* product preview */}
+          <div className="cf-in" style={{ position: 'relative', minWidth: 0, animationDelay: '.15s', padding: isMobile ? '6px 0 0' : 0 }}>
+            <div style={{ position: 'absolute', inset: '8% 6%', background: 'radial-gradient(closest-side, rgba(124,58,237,.45), transparent)', filter: 'blur(30px)' }} />
+            <div className="cf-shot" style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)', boxShadow: '0 40px 80px -20px rgba(0,0,0,.8)', display: 'flex', flexDirection: 'column', height: isMobile ? 330 : 430, pointerEvents: 'none', userSelect: 'none' }}>
+              <WinBar url="capitalfriends.in/dashboard" />
+              <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}><Slide0 /></div>
+            </div>
+            <div className="cf-float2" style={{ position: 'absolute', right: isMobile ? 10 : -22, bottom: isMobile ? -18 : 28, zIndex: 3, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 14,
+              background: 'rgba(15,23,42,.92)', border: '1px solid rgba(255,255,255,.14)', boxShadow: '0 18px 40px -12px rgba(0,0,0,.7)' }}>
+              <span style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(34,211,238,.14)', color: '#22d3ee', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><HardDrive size={17} strokeWidth={2.3} /></span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Stored in your Google Sheet</div>
+                <div style={{ fontSize: 11.5, color: '#94a3b8' }}>in your own Google Drive</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ─── ABOUT (collapsed): purpose of the app + how it uses Google data.
