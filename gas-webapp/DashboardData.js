@@ -319,7 +319,8 @@ function getMemberOtherInvestments(memberId) {
       // Gold / silver held by weight: value at today's live price
       try {
         if (row[10]) {
-          const dynamicFields = JSON.parse(decodeHtmlEntities(row[10]));
+          let dynamicFields = JSON.parse(decodeHtmlEntities(row[10]));
+          if (typeof dynamicFields === 'string') dynamicFields = JSON.parse(dynamicFields); // saved twice-encoded
           if (dynamicFields && Number(dynamicFields.weightGrams) > 0) {
             if (!metalPrices) metalPrices = getLiveMetalPrices();
             const live = metalLiveValue_(investmentType, dynamicFields, metalPrices);

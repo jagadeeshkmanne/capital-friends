@@ -70,6 +70,16 @@ function getMarketMetalPrice(metalType) {
   } catch { return null }
 }
 
+// dynamicFields may arrive as an object, a JSON string, or (older rows) a JSON string inside a JSON string
+function parseDynamic(v) {
+  try {
+    let d = v || {}
+    if (typeof d === 'string') d = JSON.parse(d)
+    if (typeof d === 'string') d = JSON.parse(d)
+    return d && typeof d === 'object' ? d : {}
+  } catch { return {} }
+}
+
 export default function OtherInvestmentForm({ initial, onSave, onDelete, onCancel }) {
   const { mv } = useMask()
   const { activeMembers, liabilityList } = useData()
@@ -80,7 +90,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   }
 
   // Parse dynamic fields from initial data
-  const initDynamic = initial?.dynamicFields ? (typeof initial.dynamicFields === 'string' ? JSON.parse(initial.dynamicFields) : initial.dynamicFields) : {}
+  const initDynamic = parseDynamic(initial?.dynamicFields)
 
   const initType = initial?.investmentType || ''
   const isStandardType = !initType || INVESTMENT_TYPES.some(t => t.value === initType)
@@ -185,10 +195,11 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     delete data.customType
     // Include metal dynamic fields if applicable
     if (isMetalType(form.investmentType)) {
-      data.dynamicFields = JSON.stringify({
+      // send as an object: the server stores it as JSON (stringifying here saved it twice-encoded)
+      data.dynamicFields = {
         weightGrams: Number(weightGrams) || 0,
         purity: purity || '',
-      })
+      }
     }
     if (showQuickLoan && quickLoan.lenderName) {
       data.quickLoan = {

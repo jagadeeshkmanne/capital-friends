@@ -489,35 +489,35 @@ export default function Dashboard() {
     }
 
     if (healthCheckCompleted && healthCheckAnswers) {
-      if (healthCheckAnswers.termLife !== 'yes') {
+      if (String(healthCheckAnswers.termLife || '').toLowerCase() !== 'yes') {
         items.push({
           type: 'critical', title: 'No Term Life Insurance',
           description: 'Family loses its sole income source if primary earner passes away. Get 10-15x annual income cover.',
           action: 'Add Policy', navigateTo: '/insurance',
         })
       }
-      if (healthCheckAnswers.healthIns !== 'yes') {
+      if (String(healthCheckAnswers.healthIns || '').toLowerCase() !== 'yes') {
         items.push({
           type: 'critical', title: 'No Health Insurance',
           description: 'Medical emergencies without cover can wipe out years of savings. Get minimum 10L family cover.',
           action: 'Add Policy', navigateTo: '/insurance',
         })
       }
-      if (healthCheckAnswers.hasWill !== 'yes') {
+      if (String(healthCheckAnswers.hasWill || '').toLowerCase() !== 'yes') {
         items.push({
           type: 'warning', title: 'Create a Legal Will',
           description: 'A registered Will ensures smooth transfer of assets to your heirs without family disputes.',
           action: 'Update', navigateTo: '/health-check',
         })
       }
-      if (healthCheckAnswers.nominees !== 'yes') {
+      if (String(healthCheckAnswers.nominees || '').toLowerCase() !== 'yes') {
         items.push({
           type: 'warning', title: 'Missing Nominees',
           description: 'Ensure nominees are updated on all your bank, demat, and insurance accounts.',
           action: 'Update', navigateTo: '/health-check',
         })
       }
-      if (healthCheckAnswers.familyAware !== 'yes') {
+      if (String(healthCheckAnswers.familyAware || '').toLowerCase() !== 'yes') {
         items.push({
           type: 'warning', title: 'Family Not Aware',
           description: 'Your family is unaware of your investments. Ensure they know how to access this dashboard.',

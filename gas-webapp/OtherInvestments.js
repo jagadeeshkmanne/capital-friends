@@ -80,6 +80,8 @@ function getAllInvestments() {
           // Decode HTML entities before parsing
           const decodedJson = decodeHtmlEntities(row[10]);
           dynamicFields = JSON.parse(decodedJson);
+          // some rows were saved JSON-encoded twice ("{\"weightGrams\":...}"): unwrap
+          if (typeof dynamicFields === 'string') dynamicFields = JSON.parse(dynamicFields);
         }
       } catch (e) {
         Logger.log('Error parsing dynamic fields for row ' + (index + 3) + ': ' + e.message);

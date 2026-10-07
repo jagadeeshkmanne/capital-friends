@@ -34,7 +34,7 @@ export default function OtherInvestmentsTab() {
   const filtered = useMemo(() => {
     const active = otherInvList.filter((i) => i.status !== 'Inactive').map((i) => {
       // gold / silver held by weight: today's value at the live rate
-      const df = typeof i.dynamicFields === 'string' ? (() => { try { return JSON.parse(i.dynamicFields) } catch { return {} } })() : (i.dynamicFields || {})
+      const df = (() => { try { let d = i.dynamicFields || {}; if (typeof d === 'string') d = JSON.parse(d); if (typeof d === 'string') d = JSON.parse(d); return d || {} } catch { return {} } })()
       const live = metalLiveValue(i.investmentType, df, metalPrices)
       return live > 0 ? { ...i, currentValue: live, _live: true } : i
     })

@@ -33,6 +33,9 @@ var SHEETS_API_CALLS = 0; // per execution, for logging / tests
 var SheetsAdapter = (function () {
 
   var SMALL_TAB_ROWS_ = 3000;
+  // Tabs that are large or rarely needed are read only when asked for, not with every first read:
+  // the transaction log (thousands of rows after a statement import) and the import backup / log.
+  var BUNDLE_SKIP_ = { TransactionHistory: true, TransactionHistory_Backup: true, ImportLog: true };
 
   // ---------- helpers ----------
   function q_(name) { return "'" + String(name).replace(/'/g, "''") + "'"; }
@@ -300,7 +303,7 @@ var SheetsAdapter = (function () {
       // First read of a tab: load it together with every other small tab not yet
       // loaded (2 calls total instead of 2 per tab). Big tabs (master data) only on demand.
       var self = this, titles = [title];
-      this._m().sheets.forEach(function (s) { if (s.title !== title && !self._tabs[s.title] && s.rowCount <= SMALL_TAB_ROWS_) titles.push(s.title); });
+      this._m().sheets.forEach(function (s) { if (s.title !== title && !self._tabs[s.title] && s.rowCount <= SMALL_TAB_ROWS_ && !BUNDLE_SKIP_[s.title]) titles.push(s.title); });
       this.preload(titles); t = this._tabs[title];
     }
     return t;
