@@ -320,3 +320,11 @@ if (typeof window !== 'undefined') {
 
 // Market Data
 export const getMarketData = () => callAPI('data:market')
+
+// Statement import (beta, only for accounts in the server's IMPORT_BETA_EMAILS list)
+export const importEnabled = () => callAPI('import:enabled')
+export const importPreview = (statement, mapping) => callAPI('import:preview', { statement, mapping })
+export const importSave = (statement, mapping, token, accounts) => callAPI('import:save', { statement, mapping, token, accounts })
+export const importStatus = () => callAPI('import:status')
+export const importUndo = (importId) => callAPI('import:undo', { importId })
+export const importMoveFund = (fromPortfolioId, toPortfolioId, code, folio) => callAPI('import:move-fund', { fromPortfolioId, toPortfolioId, code, folio })

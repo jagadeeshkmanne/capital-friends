@@ -514,6 +514,15 @@ function routeAction(action, params, userRecord) {
       return { success: true, sentCount: sent, totalRecipients: recipients.length, pdfSizeKB: pdfSizeKB };
     }
 
+    // ── Statement import (beta, see CasImport.js; every action checks IMPORT_BETA_EMAILS) ──
+    case 'import:enabled':
+    case 'import:preview':
+    case 'import:save':
+    case 'import:status':
+    case 'import:undo':
+    case 'import:move-fund':
+      return casImportRoute_(action, params);
+
     // ── Diagnostics (for testing) ──
     case 'test:diagnose':
       return runDiagnostics();

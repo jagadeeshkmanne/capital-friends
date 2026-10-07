@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { X, ChevronDown, TrendingDown, RefreshCw } from 'lucide-react'
 import navigation from '../data/navigation'
 import useAlerts from '../hooks/useAlerts'
+import FollowCard from './FollowCard'
 
 export default function Sidebar({ open, onClose }) {
   const location = useLocation()
@@ -86,6 +87,7 @@ export default function Sidebar({ open, onClose }) {
             )
           )}
         </nav>
+        <FollowCard compact />
       </aside>
     </>
   )

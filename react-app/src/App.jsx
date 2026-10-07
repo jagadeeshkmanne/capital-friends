@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -26,6 +27,8 @@ import Dashboard from './pages/dashboard/Dashboard'
 import DonatePage from './pages/DonatePage'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsAndConditions from './pages/TermsAndConditions'
+// Statement import (beta): loaded only when opened, so the PDF reader is not in the main bundle
+const ImportStatementPage = lazy(() => import('./pages/ImportStatementPage'))
 
 export default function App() {
   return (
@@ -75,6 +78,7 @@ export default function App() {
 
           {/* Settings */}
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="import" element={<Suspense fallback={null}><ImportStatementPage /></Suspense>} />
 
           {/* More (mobile) */}
           <Route path="more" element={<MorePage />} />

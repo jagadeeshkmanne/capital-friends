@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun, Mail, ChevronDown, ChevronRight, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye, CloudDownload, Heart, Send, Palette } from 'lucide-react'
+import { Moon, Sun, Mail, ChevronDown, ChevronRight, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye, CloudDownload, Heart, Send, Palette, FileUp } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
 import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
@@ -36,6 +36,14 @@ export default function SettingsPage() {
   // Data refresh state
   const [refreshing, setRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState(null)
+
+  // Statement import (beta): the entry is shown only to accounts the server has switched on
+  const [importBeta, setImportBeta] = useState(false)
+  useEffect(() => {
+    let alive = true
+    api.importEnabled().then((r) => { if (alive) setImportBeta(!!r?.enabled) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   // Sync local state from backend settings when they load
   useEffect(() => {
@@ -229,6 +237,24 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+
+          {importBeta && (
+            <>
+              <div className="h-px bg-[var(--border-light)] w-full my-4"></div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">Import statement <span className="text-[10px] font-semibold px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-400">NEW</span></p>
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5">Bring all mutual fund transactions from a CAMS statement PDF</p>
+                </div>
+                <button
+                  onClick={() => navigate('/import')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <FileUp size={12} /> Open
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Card>
 

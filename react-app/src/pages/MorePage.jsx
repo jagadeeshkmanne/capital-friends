@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Settings, Info, Heart, Zap, Users, Landmark, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, Wallet, Target } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
+import FollowCard from '../components/FollowCard'
 
 const navItems = [
   { label: 'Family Members', desc: 'Manage family profiles', icon: Users, path: '/family', color: 'bg-violet-500/15 text-violet-400' },
@@ -67,6 +68,8 @@ export default function MorePage() {
           ))}
         </div>
       </div>
+
+      <FollowCard />
 
       {/* Support Developer — highlighted, opens donate dialog */}
       <button

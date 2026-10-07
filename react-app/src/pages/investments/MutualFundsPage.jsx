@@ -1,8 +1,8 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { FileUp, Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceDot } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -20,6 +20,7 @@ import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
 import FundAllocationForm from '../../components/forms/FundAllocationForm'
 import PageLoading from '../../components/PageLoading'
 import { isBuyOpportunity } from '../../utils/buyOpportunities'
+import { buildFundsModel } from '../../utils/fundsDashboard'
 
 // Strip PFL- prefix for display
 const displayName = (name) => name?.replace(/^PFL-/, '') || name
@@ -104,98 +105,131 @@ function athColor(pct) {
   return { color: 'var(--text-dim)', fontWeight: 400 }
 }
 
-// Reusable Investment Journey chart with dot-only tooltip positioned at dot center
+const MONTHS_ = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function dayLabel(d) { return `${d.getDate()} ${MONTHS_[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` }
+function shortINR(v) {
+  const a = Math.abs(v)
+  if (a >= 10000000) return `${+(v / 10000000).toFixed(2)}Cr`
+  if (a >= 100000) return `${+(v / 100000).toFixed(a >= 1000000 ? 0 : 1)}L`
+  if (a >= 1000) return `${Math.round(v / 1000)}K`
+  return String(Math.round(v))
+}
+
+/**
+ * Points for the Investment Journey chart: net money put in over time.
+ * Purchases add, withdrawals subtract; switches / STPs and dividend reinvestment move money
+ * between funds, so they don't change the line (they still show in the tooltip).
+ * The last point is today, with the current value.
+ */
+function buildJourney(txns, currentValue) {
+  const sorted = (txns || [])
+    .map((t) => ({ ...t, _date: parseDate(t.date) }))
+    .filter((t) => t._date && Number(t.totalAmount) > 0)
+    .sort((a, b) => a._date - b._date)
+  const groups = []
+  const byDay = {}
+  let invested = 0
+  sorted.forEach((t) => {
+    const isBuy = t.type === 'BUY'
+    const tt = String(t.transactionType || '').toUpperCase()
+    const internal = tt === 'SWITCH' || tt === 'DIVIDEND'
+    if (!internal) invested += isBuy ? Number(t.totalAmount) : -Number(t.totalAmount)
+    const key = t._date.toDateString()
+    let g = byDay[key]
+    if (!g) {
+      g = byDay[key] = { t: new Date(t._date.getFullYear(), t._date.getMonth(), t._date.getDate()).getTime(), date: dayLabel(t._date), invested: 0, txns: [], hasBuy: false, hasSell: false }
+      groups.push(g)
+    }
+    g.invested = Math.round(invested)
+    g.txns.push({
+      fundName: splitFundName(t.fundName || '').main,
+      portfolioName: displayName(t.portfolioName || ''),
+      txnType: internal ? (tt === 'SWITCH' ? (isBuy ? 'SWITCH IN' : 'SWITCH OUT') : 'DIVIDEND') : (t.transactionType || t.type),
+      type: t.type,
+      amount: Math.round(t.totalAmount),
+      units: Math.round((t.units || 0) * 1000) / 1000,
+      realizedPL: !isBuy && !internal ? Math.round(t.gainLoss || 0) : null,
+      isBuy,
+    })
+    if (!internal) { if (isBuy) g.hasBuy = true; else g.hasSell = true }
+  })
+  if (!groups.length) return []
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const last = groups[groups.length - 1]
+  if (last.t >= today.getTime()) last.currentValue = Math.round(currentValue || 0)
+  else groups.push({ t: today.getTime(), date: 'Today', invested: last.invested, txns: [], now: true, currentValue: Math.round(currentValue || 0) })
+  return groups
+}
+
+// Investment Journey: net invested (step line) on a real time axis, value today as a marker
 function JourneyChart({ data, gradientId, height = 220 }) {
-  const [hoveredIdx, setHoveredIdx] = useState(null)
-  const [dotPos, setDotPos] = useState(null) // { x, y } screen coords
-  const chartRef = useRef(null)
-  const tooltipRef = useRef(null)
-  const dotMouseEnter = useCallback((e, index) => {
-    setHoveredIdx(index)
-    const rect = e.target.getBoundingClientRect()
-    setDotPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
-  }, [])
-  const dotMouseLeave = useCallback(() => { setHoveredIdx(null); setDotPos(null) }, [])
+  if (!data || data.length < 2) return null
   const lastPoint = data[data.length - 1]
-
-  // Viewport-aware tooltip positioning — works on mobile & desktop
-  const [tooltipStyle, setTooltipStyle] = useState({ position: 'fixed', left: -9999, top: -9999, pointerEvents: 'none' })
-  useMemo(() => {
-    if (!dotPos) { setTooltipStyle({ position: 'fixed', left: -9999, top: -9999, pointerEvents: 'none' }); return }
-    // Double rAF to ensure content is rendered and measurable
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const el = tooltipRef.current
-      if (!el) return
-      const tw = el.offsetWidth || 300
-      const th = el.offsetHeight || 200
-      const vw = window.innerWidth
-      const pad = 12
-      const gap = 12
-      let left = dotPos.x - tw / 2
-      if (left + tw > vw - pad) left = vw - tw - pad
-      if (left < pad) left = pad
-      let top = dotPos.y - th - gap
-      if (top < pad) top = dotPos.y + gap
-      setTooltipStyle({
-        position: 'fixed', zIndex: 9999, pointerEvents: 'none',
-        left, top,
-      })
-    }))
-  }, [dotPos])
-
+  const showDots = data.length <= 40
+  const first = data[0].t, end = lastPoint.t
+  const years = (end - first) / (365.25 * 86400000)
+  const tickFmt = (t) => { const d = new Date(t); return years > 2 ? `${MONTHS_[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` : `${d.getDate()} ${MONTHS_[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` }
+  const value = lastPoint.currentValue || 0
+  // round axis steps (0, 25L, 50L ... / 0, 50L, 1Cr ...) and never below zero
+  const rawMax = Math.max(value, ...data.map((d) => d.invested), 1)
+  const mag = Math.pow(10, Math.floor(Math.log10(rawMax / 4)))
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => x * 4 >= rawMax) || mag * 10
+  const yTicks = []
+  for (let y = 0; y <= rawMax + step * 0.999; y += step) yTicks.push(y)
+  const maxY = yTicks[yTicks.length - 1]
+  const gain = value - lastPoint.invested
   return (
-    <div style={{ height, position: 'relative' }} ref={chartRef}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
-          onMouseLeave={() => { setHoveredIdx(null); setDotPos(null) }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" />
-          <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-dim)' }} interval="preserveStartEnd" />
-          <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)' }} tickFormatter={v => v >= 10000000 ? `${(v / 10000000).toFixed(1)}Cr` : v >= 100000 ? `${(v / 100000).toFixed(1)}L` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v} width={50} />
-          <Tooltip content={() => null} cursor={false} isAnimationActive={false} />
-          <Area type="monotone" dataKey="invested" stroke="#8b5cf6" fill={`url(#${gradientId})`} strokeWidth={2} name="Net Invested" isAnimationActive={false}
-            dot={(props) => {
-              const { cx, cy, payload, index } = props
-              if (!cx || !cy) return null
-              // Show current value as a larger green dot on the last point
-              const isLast = index === data.length - 1 && lastPoint?.currentValue
-              return (
-                <g>
-                  <circle cx={cx} cy={cy} r={hoveredIdx === index ? 6 : 4}
-                    fill={payload.hasSell ? '#fb7185' : '#34d399'}
-                    stroke={hoveredIdx === index ? '#8b5cf6' : 'none'} strokeWidth={hoveredIdx === index ? 2 : 0}
-                    style={{ cursor: 'pointer', transition: 'r 0.15s' }}
-                    onMouseEnter={(e) => dotMouseEnter(e, index)}
-                    onMouseLeave={dotMouseLeave}
-                  />
-                  {isLast && (
-                    <circle cx={cx} cy={cy} r={6} fill="#34d399" stroke="#34d399" strokeWidth={1} opacity={0.5} pointerEvents="none" />
-                  )}
-                </g>
-              )
-            }}
-            activeDot={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-      {createPortal(
-        <div style={tooltipStyle} ref={tooltipRef}>
-          {hoveredIdx !== null && data[hoveredIdx] && <JourneyTooltipContent data={data[hoveredIdx]} />}
-        </div>,
-        document.body
-      )}
+    <div>
+      <div style={{ height, position: 'relative' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 10, right: 22, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" vertical={false} />
+            <XAxis dataKey="t" type="number" scale="time" domain={[first, end]} tickFormatter={tickFmt} tickCount={6}
+              tick={{ fontSize: 10, fill: 'var(--text-dim)' }} minTickGap={24} />
+            <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)' }} tickFormatter={shortINR} width={44} domain={[0, maxY]} ticks={yTicks} allowDataOverflow />
+            <Tooltip cursor={{ stroke: 'rgba(139,92,246,0.4)', strokeWidth: 1 }} isAnimationActive={false}
+              wrapperStyle={{ zIndex: 50, outline: 'none' }}
+              content={({ active, payload }) => (active && payload && payload[0] ? <JourneyTooltipContent data={payload[0].payload} /> : null)} />
+            <Area type="stepAfter" dataKey="invested" stroke="#8b5cf6" fill={`url(#${gradientId})`} strokeWidth={2} name="Net invested" isAnimationActive={false}
+              dot={showDots ? (props) => {
+                const { cx, cy, payload, index } = props
+                if (!cx || !cy || payload.now) return <g key={index} />
+                return <circle key={index} cx={cx} cy={cy} r={3} fill={payload.hasSell && !payload.hasBuy ? '#fb7185' : '#34d399'} />
+              } : false}
+              activeDot={{ r: 5, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 1 }}
+            />
+            {value > 0 && <ReferenceDot x={end} y={value} r={6} fill="#34d399" stroke="#0b1020" strokeWidth={2} ifOverflow="extendDomain" />}
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-dim)]">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-violet-500 inline-block" /> Net invested {formatINR(lastPoint.invested)}</span>
+        {value > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Value today {formatINR(value)}</span>}
+        {value > 0 && <span className={gain >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{gain >= 0 ? '+' : ''}{formatINR(gain)}</span>}
+      </div>
     </div>
   )
 }
 
 // Tooltip content for Investment Journey chart
 function JourneyTooltipContent({ data: d }) {
-  if (!d || !d.txns || !d.txns.length) return null
+  if (!d) return null
+  if (!d.txns || !d.txns.length) {
+    return (
+      <div className="bg-[var(--bg-dropdown)] rounded-xl shadow-2xl text-xs px-3.5 py-2.5 space-y-0.5" style={{ minWidth: 180 }}>
+        <p className="font-bold text-[var(--text-primary)] text-sm">{d.date}</p>
+        <div className="flex justify-between gap-4"><span className="text-[var(--text-dim)]">Net invested</span><span className="font-bold text-violet-400 tabular-nums">{formatINR(d.invested)}</span></div>
+        {d.currentValue ? <div className="flex justify-between gap-4"><span className="text-[var(--text-dim)]">Value today</span><span className="font-bold text-emerald-400 tabular-nums">{formatINR(d.currentValue)}</span></div> : null}
+      </div>
+    )
+  }
+  const MAX_ROWS = 8
   // Group by portfolio
   const byPortfolio = {}
   d.txns.forEach(t => {
@@ -242,17 +276,18 @@ function JourneyTooltipContent({ data: d }) {
             <div key={pName}>
               {pi > 0 && <div className="border-t border-[var(--border-light)] my-1" />}
               <p className="text-[var(--text-dim)] font-semibold text-[10px] uppercase tracking-wider pt-1.5 pb-0.5">{pName}</p>
-              {byPortfolio[pName].map((t, i) => <TxnRow key={i} t={t} />)}
+              {byPortfolio[pName].slice(0, MAX_ROWS).map((t, i) => <TxnRow key={i} t={t} />)}
             </div>
           ))
         ) : (
-          d.txns.map((t, i) => <TxnRow key={i} t={t} />)
+          d.txns.slice(0, MAX_ROWS).map((t, i) => <TxnRow key={i} t={t} />)
         )}
+        {!showPortfolios && d.txns.length > MAX_ROWS && <p className="py-1 text-[var(--text-dim)]">+ {d.txns.length - MAX_ROWS} more</p>}
       </div>
       {/* Footer */}
       <div className="px-3.5 py-2 bg-[var(--bg-inset)] border-t border-[var(--border-light)]">
         <div className="flex items-center justify-between">
-          <span className="text-[var(--text-dim)]">Total Invested</span>
+          <span className="text-[var(--text-dim)]">Net invested</span>
           <span className="font-bold text-violet-400 tabular-nums">{formatINR(d.invested)}</span>
         </div>
         {d.currentValue && (
@@ -332,6 +367,23 @@ export default function MutualFundsPage() {
       }
     })
   }, [portfolios, mfHoldings, mfTransactions])
+
+  // XIRR / CAGR for the selected view: same rules as the All Funds dashboard (hidden when history is incomplete)
+  const returns = useMemo(() => {
+    if (!mfHoldings) return null
+    const scope = selectedPortfolioId === 'all' ? portfolios : portfolios.filter((p) => p.portfolioId === selectedPortfolioId)
+    if (!scope.length) return null
+    try {
+      return buildFundsModel({ portfolios: scope, holdings: mfHoldings, transactions: mfTransactions || [], withBreakdown: false }).totals
+    } catch { return null }
+  }, [portfolios, selectedPortfolioId, mfHoldings, mfTransactions])
+  const RETURNS_WHY = {
+    'no-history': 'Some holdings have no purchase history. Import your statement or add the earlier transactions.',
+    'opening-balance': 'Some holdings were added with a recent date instead of the real purchase date.',
+    'too-new': 'Less than three months of history.',
+    'funds-unreliable': 'Some funds here have incomplete purchase history, so this is hidden. Import your statement to fix it.',
+  }
+  const ratePct = (v) => (v == null || !Number.isFinite(v) ? 'N/A' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`)
 
   // Stats for selected view
   const stats = useMemo(() => {
@@ -641,38 +693,8 @@ export default function MutualFundsPage() {
       ...h, pctOfTotal: totalValue > 0 ? (h.currentValue / totalValue) * 100 : 0
     }))
 
-    // Investment timeline — group transactions by date
-    const sortedTxns = [...relevantTxns]
-      .map(t => ({ ...t, _date: parseDate(t.date) }))
-      .filter(t => t._date)
-      .sort((a, b) => a._date - b._date)
-    let cumInvested = 0
-    const dateGroups = {}
-    sortedTxns.forEach(t => {
-      const d = t._date
-      const label = `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${String(d.getFullYear()).slice(2)}`
-      const isBuy = t.type === 'BUY'
-      cumInvested += isBuy ? t.totalAmount : -t.totalAmount
-      if (!dateGroups[label]) dateGroups[label] = { date: label, invested: 0, txns: [], hasBuy: false, hasSell: false }
-      dateGroups[label].invested = Math.round(cumInvested)
-      dateGroups[label].txns.push({
-        fundName: splitFundName(t.fundName || '').main,
-        portfolioName: displayName(t.portfolioName || ''),
-        txnType: t.transactionType || t.type,
-        type: t.type,
-        amount: Math.round(t.totalAmount),
-        units: Math.round((t.units || 0) * 1000) / 1000,
-        realizedPL: !isBuy ? Math.round(t.gainLoss || 0) : null,
-        isBuy,
-      })
-      if (isBuy) dateGroups[label].hasBuy = true
-      else dateGroups[label].hasSell = true
-    })
-    const timeline = Object.values(dateGroups)
-    // Add current value as final point
-    if (timeline.length > 0) {
-      timeline[timeline.length - 1].currentValue = Math.round(totalValue)
-    }
+    // Investment timeline (net money in over time, value today at the end)
+    const timeline = buildJourney(relevantTxns, totalValue)
 
     // Category breakdown from holdings
     const catMap = {}
@@ -879,8 +901,12 @@ export default function MutualFundsPage() {
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Wallet size={32} className="text-[var(--text-dim)]" />
           <p className="text-sm text-[var(--text-muted)]">No mutual fund portfolios yet</p>
+          <button onClick={() => navigate('/import')} className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white">
+            <FileUp size={15} /> Import from CAMS statement
+          </button>
+          <p className="text-xs text-[var(--text-dim)] -mt-1">Brings all your funds and their full history in one go</p>
           <button onClick={() => setModal('addPortfolio')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
-            Create your first portfolio
+            or create a portfolio yourself
           </button>
         </div>
       ) : (
@@ -965,6 +991,9 @@ export default function MutualFundsPage() {
                   </button>
                 </>
               )}
+              <button onClick={() => navigate('/import')} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors">
+                <FileUp size={13} /> Import statement
+              </button>
               <button onClick={() => setModal('addPortfolio')} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
                 <Plus size={13} /> New Portfolio
               </button>
@@ -988,7 +1017,7 @@ export default function MutualFundsPage() {
           </>)}
 
           {/* ── Stat Cards ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
             <StatCard label="Invested" value={formatINR(stats.invested)} />
             <StatCard label="Current Value" value={formatINR(stats.current)} bold />
             <StatCard
@@ -1009,6 +1038,20 @@ export default function MutualFundsPage() {
               sub={`${stats.totalPLPct >= 0 ? '+' : ''}${stats.totalPLPct.toFixed(1)}%`}
               positive={stats.totalPL >= 0}
               bold
+            />
+            <StatCard
+              label="XIRR"
+              value={ratePct(returns?.xirr)}
+              positive={returns?.xirr == null ? undefined : returns.xirr >= 0}
+              sub={returns?.xirr == null ? 'needs full history' : undefined}
+              title={returns?.xirr == null ? (RETURNS_WHY[returns?.returnsReason] || 'Not enough history yet') : 'Yearly return, counting the date and amount of every purchase and sale'}
+            />
+            <StatCard
+              label="CAGR"
+              value={ratePct(returns?.cagr)}
+              positive={returns?.cagr == null ? undefined : returns.cagr >= 0}
+              sub={returns?.cagr == null ? 'needs full history' : undefined}
+              title={returns?.cagr == null ? (RETURNS_WHY[returns?.returnsReason] || 'Not enough history yet') : 'Average yearly growth of the money invested'}
             />
             <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
           </div>
@@ -1058,11 +1101,6 @@ export default function MutualFundsPage() {
               <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
                 <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
                 <JourneyChart data={insights.timeline} gradientId="globalInvestedGrad" />
-                <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-dim)]">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Buy</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Sell</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" /> Current Value</span>
-                </div>
               </div>
             )}
 
@@ -1070,6 +1108,9 @@ export default function MutualFundsPage() {
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolios</p>
               <div className="flex items-center gap-2">
+                <button onClick={() => navigate('/import')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors shadow-sm">
+                  <FileUp size={13} /> Import statement
+                </button>
                 <button onClick={() => setModal('addPortfolio')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors shadow-sm">
                   <Plus size={13} /> New Portfolio
                 </button>
@@ -1264,6 +1305,17 @@ export default function MutualFundsPage() {
                     <DetailRow label="Monthly SIP" value={formatINR(h.ongoingSIP)} valueClass="text-blue-400" />
                   )}
                 </div>
+
+                {/* Investment Journey for this fund */}
+                {(() => {
+                  const fj = buildJourney(fundTxns, h.currentValue)
+                  return fj.length >= 2 ? (
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3">
+                      <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Investment Journey</p>
+                      <JourneyChart data={fj} gradientId={`fundGrad-${h.portfolioId}-${h.schemeCode}`} height={170} />
+                    </div>
+                  ) : null
+                })()}
 
                 {/* Actions — compact inline buttons */}
                 <div className="flex items-center gap-2">
@@ -1465,11 +1517,6 @@ export default function MutualFundsPage() {
             <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
               <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
               <JourneyChart data={insights.timeline} gradientId="portfolioInvestedGrad" height={200} />
-              <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-dim)]">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Buy</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Sell</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" /> Current Value</span>
-              </div>
             </div>
           )}
 
@@ -2315,9 +2362,9 @@ export default function MutualFundsPage() {
 }
 
 /* ── Stat Card ── */
-function StatCard({ label, value, sub, positive, bold }) {
+function StatCard({ label, value, sub, positive, bold, title }) {
   return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3">
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3" title={title}>
       <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-sm tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${
         positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
@@ -2325,7 +2372,7 @@ function StatCard({ label, value, sub, positive, bold }) {
         {value}
       </p>
       {sub && (
-        <p className={`text-xs font-semibold tabular-nums mt-0.5 ${positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+        <p className={`text-xs font-semibold tabular-nums mt-0.5 ${positive === undefined ? 'text-[var(--text-dim)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
           {sub}
         </p>
       )}
