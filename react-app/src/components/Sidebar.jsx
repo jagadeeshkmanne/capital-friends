@@ -111,6 +111,7 @@ function SidebarLink({ item, onNavigate, nested }) {
         <>
           <Icon size={nested ? 14 : 17} strokeWidth={isActive ? 2.2 : 1.7} />
           <span>{label}</span>
+          {item.badge && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">{item.badge}</span>}
         </>
       )}
     </NavLink>

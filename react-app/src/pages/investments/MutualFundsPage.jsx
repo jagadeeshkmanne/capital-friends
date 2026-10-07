@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { FileUp, Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceDot } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -21,6 +21,8 @@ import FundAllocationForm from '../../components/forms/FundAllocationForm'
 import PageLoading from '../../components/PageLoading'
 import { isBuyOpportunity } from '../../utils/buyOpportunities'
 import { buildFundsModel } from '../../utils/fundsDashboard'
+import JourneyChartLW from '../../components/JourneyChart'
+import ImportNudge from '../../components/ImportNudge'
 
 // Strip PFL- prefix for display
 const displayName = (name) => name?.replace(/^PFL-/, '') || name
@@ -105,15 +107,12 @@ function athColor(pct) {
   return { color: 'var(--text-dim)', fontWeight: 400 }
 }
 
+// transactions in the shape the value-over-time line needs
+function toValueTxns(txns) {
+  return (txns || []).map((t) => ({ date: parseDate(t.date)?.getTime() || 0, fundCode: String(t.fundCode || ''), type: t.type, units: Number(t.units) || 0, price: Number(t.price) || 0 })).filter((t) => t.date && t.units > 0)
+}
 const MONTHS_ = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function dayLabel(d) { return `${d.getDate()} ${MONTHS_[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` }
-function shortINR(v) {
-  const a = Math.abs(v)
-  if (a >= 10000000) return `${+(v / 10000000).toFixed(2)}Cr`
-  if (a >= 100000) return `${+(v / 100000).toFixed(a >= 1000000 ? 0 : 1)}L`
-  if (a >= 1000) return `${Math.round(v / 1000)}K`
-  return String(Math.round(v))
-}
 
 /**
  * Points for the Investment Journey chart: net money put in over time.
@@ -161,145 +160,6 @@ function buildJourney(txns, currentValue) {
   return groups
 }
 
-// Investment Journey: net invested (step line) on a real time axis, value today as a marker
-function JourneyChart({ data, gradientId, height = 220 }) {
-  if (!data || data.length < 2) return null
-  const lastPoint = data[data.length - 1]
-  const showDots = data.length <= 40
-  const first = data[0].t, end = lastPoint.t
-  const years = (end - first) / (365.25 * 86400000)
-  const tickFmt = (t) => { const d = new Date(t); return years > 2 ? `${MONTHS_[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` : `${d.getDate()} ${MONTHS_[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` }
-  const value = lastPoint.currentValue || 0
-  // round axis steps (0, 25L, 50L ... / 0, 50L, 1Cr ...) and never below zero
-  const rawMax = Math.max(value, ...data.map((d) => d.invested), 1)
-  const mag = Math.pow(10, Math.floor(Math.log10(rawMax / 4)))
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => x * 4 >= rawMax) || mag * 10
-  const yTicks = []
-  for (let y = 0; y <= rawMax + step * 0.999; y += step) yTicks.push(y)
-  const maxY = yTicks[yTicks.length - 1]
-  const gain = value - lastPoint.invested
-  return (
-    <div>
-      <div style={{ height, position: 'relative' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 22, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" vertical={false} />
-            <XAxis dataKey="t" type="number" scale="time" domain={[first, end]} tickFormatter={tickFmt} tickCount={6}
-              tick={{ fontSize: 10, fill: 'var(--text-dim)' }} minTickGap={24} />
-            <YAxis tick={{ fontSize: 10, fill: 'var(--text-dim)' }} tickFormatter={shortINR} width={44} domain={[0, maxY]} ticks={yTicks} allowDataOverflow />
-            <Tooltip cursor={{ stroke: 'rgba(139,92,246,0.4)', strokeWidth: 1 }} isAnimationActive={false}
-              wrapperStyle={{ zIndex: 50, outline: 'none' }}
-              content={({ active, payload }) => (active && payload && payload[0] ? <JourneyTooltipContent data={payload[0].payload} /> : null)} />
-            <Area type="stepAfter" dataKey="invested" stroke="#8b5cf6" fill={`url(#${gradientId})`} strokeWidth={2} name="Net invested" isAnimationActive={false}
-              dot={showDots ? (props) => {
-                const { cx, cy, payload, index } = props
-                if (!cx || !cy || payload.now) return <g key={index} />
-                return <circle key={index} cx={cx} cy={cy} r={3} fill={payload.hasSell && !payload.hasBuy ? '#fb7185' : '#34d399'} />
-              } : false}
-              activeDot={{ r: 5, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 1 }}
-            />
-            {value > 0 && <ReferenceDot x={end} y={value} r={6} fill="#34d399" stroke="#0b1020" strokeWidth={2} ifOverflow="extendDomain" />}
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-dim)]">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-violet-500 inline-block" /> Net invested {formatINR(lastPoint.invested)}</span>
-        {value > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Value today {formatINR(value)}</span>}
-        {value > 0 && <span className={gain >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{gain >= 0 ? '+' : ''}{formatINR(gain)}</span>}
-      </div>
-    </div>
-  )
-}
-
-// Tooltip content for Investment Journey chart
-function JourneyTooltipContent({ data: d }) {
-  if (!d) return null
-  if (!d.txns || !d.txns.length) {
-    return (
-      <div className="bg-[var(--bg-dropdown)] rounded-xl shadow-2xl text-xs px-3.5 py-2.5 space-y-0.5" style={{ minWidth: 180 }}>
-        <p className="font-bold text-[var(--text-primary)] text-sm">{d.date}</p>
-        <div className="flex justify-between gap-4"><span className="text-[var(--text-dim)]">Net invested</span><span className="font-bold text-violet-400 tabular-nums">{formatINR(d.invested)}</span></div>
-        {d.currentValue ? <div className="flex justify-between gap-4"><span className="text-[var(--text-dim)]">Value today</span><span className="font-bold text-emerald-400 tabular-nums">{formatINR(d.currentValue)}</span></div> : null}
-      </div>
-    )
-  }
-  const MAX_ROWS = 8
-  // Group by portfolio
-  const byPortfolio = {}
-  d.txns.forEach(t => {
-    const key = t.portfolioName || '_'
-    if (!byPortfolio[key]) byPortfolio[key] = []
-    byPortfolio[key].push(t)
-  })
-  const portfolioKeys = Object.keys(byPortfolio)
-  const showPortfolios = portfolioKeys.length > 1 || (portfolioKeys.length === 1 && portfolioKeys[0] !== '_')
-
-  const TxnRow = ({ t }) => (
-    <div className="py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.isBuy ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-          <span className="text-white/80 truncate">{t.fundName}</span>
-        </div>
-        <span className={`font-semibold tabular-nums shrink-0 ${t.isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>
-          {t.isBuy ? '+' : '-'}{formatINR(t.amount)}
-        </span>
-      </div>
-      <div className="flex items-center gap-3 ml-[14px] mt-0.5 text-[11px]">
-        <span className="text-white/30">{t.txnType}</span>
-        {t.units > 0 && <span className="text-white/30 tabular-nums">{t.isBuy ? '+' : '-'}{t.units} units</span>}
-        {t.realizedPL !== null && t.realizedPL !== 0 && (
-          <span className={`tabular-nums font-medium ${t.realizedPL >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>
-            P&L {t.realizedPL >= 0 ? '+' : ''}{formatINR(t.realizedPL)}
-          </span>
-        )}
-      </div>
-    </div>
-  )
-
-  return (
-    <div className="bg-[var(--bg-dropdown)] rounded-xl shadow-2xl text-xs overflow-hidden" style={{ minWidth: 220, maxWidth: 'min(340px, calc(100vw - 24px))' }}>
-      {/* Header */}
-      <div className="px-3.5 py-2 bg-[var(--bg-inset)] border-b border-[var(--border-light)]">
-        <span className="font-bold text-[var(--text-primary)] text-sm">{d.date}</span>
-      </div>
-      {/* Transactions */}
-      <div className="px-3.5 py-1">
-        {showPortfolios ? (
-          portfolioKeys.map((pName, pi) => (
-            <div key={pName}>
-              {pi > 0 && <div className="border-t border-[var(--border-light)] my-1" />}
-              <p className="text-[var(--text-dim)] font-semibold text-[10px] uppercase tracking-wider pt-1.5 pb-0.5">{pName}</p>
-              {byPortfolio[pName].slice(0, MAX_ROWS).map((t, i) => <TxnRow key={i} t={t} />)}
-            </div>
-          ))
-        ) : (
-          d.txns.slice(0, MAX_ROWS).map((t, i) => <TxnRow key={i} t={t} />)
-        )}
-        {!showPortfolios && d.txns.length > MAX_ROWS && <p className="py-1 text-[var(--text-dim)]">+ {d.txns.length - MAX_ROWS} more</p>}
-      </div>
-      {/* Footer */}
-      <div className="px-3.5 py-2 bg-[var(--bg-inset)] border-t border-[var(--border-light)]">
-        <div className="flex items-center justify-between">
-          <span className="text-[var(--text-dim)]">Net invested</span>
-          <span className="font-bold text-violet-400 tabular-nums">{formatINR(d.invested)}</span>
-        </div>
-        {d.currentValue && (
-          <div className="flex items-center justify-between mt-0.5">
-            <span className="text-[var(--text-dim)]">Current Value</span>
-            <span className="font-bold text-emerald-400 tabular-nums">{formatINR(d.currentValue)}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export default function MutualFundsPage() {
   const navigate = useNavigate()
@@ -695,6 +555,7 @@ export default function MutualFundsPage() {
 
     // Investment timeline (net money in over time, value today at the end)
     const timeline = buildJourney(relevantTxns, totalValue)
+    const valueTxns = toValueTxns(allFilteredTxns)
 
     // Category breakdown from holdings
     const catMap = {}
@@ -707,7 +568,7 @@ export default function MutualFundsPage() {
       .sort(([, a], [, b]) => b - a)
       .map(([name, value]) => ({ name, value, pct: totalValue > 0 ? (value / totalValue) * 100 : 0 }))
 
-    return { weightedDrawdown, athSorted, athDeduped, topPerformers, bottomPerformers, losersDeduped, gainersDeduped, concentration, concentrationDeduped, top5Pct, xirr, cagr, totalValue, totalInvested, totalPL, totalPLPct, timeline, categoryBreakdown }
+    return { weightedDrawdown, athSorted, athDeduped, topPerformers, bottomPerformers, losersDeduped, gainersDeduped, concentration, concentrationDeduped, top5Pct, xirr, cagr, totalValue, totalInvested, totalPL, totalPLPct, timeline, valueTxns, categoryBreakdown }
   }, [enrichedHoldings, holdings, allFilteredTxns])
 
   // Loading state — after all hooks
@@ -1016,6 +877,9 @@ export default function MutualFundsPage() {
           )}
           </>)}
 
+          {/* ── Invite to import the CAMS statement (hidden once imported with full history) ── */}
+          <ImportNudge transactions={mfTransactions} returnsReason={returns?.returnsReason} />
+
           {/* ── Stat Cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
             <StatCard label="Invested" value={formatINR(stats.invested)} />
@@ -1043,14 +907,14 @@ export default function MutualFundsPage() {
               label="XIRR"
               value={ratePct(returns?.xirr)}
               positive={returns?.xirr == null ? undefined : returns.xirr >= 0}
-              sub={returns?.xirr == null ? 'needs full history' : undefined}
+              sub={returns?.xirr == null ? <button onClick={() => navigate('/import')} className="underline">Import statement</button> : undefined}
               title={returns?.xirr == null ? (RETURNS_WHY[returns?.returnsReason] || 'Not enough history yet') : 'Yearly return, counting the date and amount of every purchase and sale'}
             />
             <StatCard
               label="CAGR"
               value={ratePct(returns?.cagr)}
               positive={returns?.cagr == null ? undefined : returns.cagr >= 0}
-              sub={returns?.cagr == null ? 'needs full history' : undefined}
+              sub={returns?.cagr == null ? <button onClick={() => navigate('/import')} className="underline">Import statement</button> : undefined}
               title={returns?.cagr == null ? (RETURNS_WHY[returns?.returnsReason] || 'Not enough history yet') : 'Average yearly growth of the money invested'}
             />
             <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
@@ -1100,7 +964,7 @@ export default function MutualFundsPage() {
             {insights && insights.timeline.length >= 2 && (
               <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
                 <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
-                <JourneyChart data={insights.timeline} gradientId="globalInvestedGrad" />
+                <JourneyChartLW data={insights.timeline} txns={insights.valueTxns} formatMoney={formatINR} />
               </div>
             )}
 
@@ -1312,7 +1176,7 @@ export default function MutualFundsPage() {
                   return fj.length >= 2 ? (
                     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3">
                       <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Investment Journey</p>
-                      <JourneyChart data={fj} gradientId={`fundGrad-${h.portfolioId}-${h.schemeCode}`} height={170} />
+                      <JourneyChartLW data={fj} txns={toValueTxns(fundTxns)} height={170} formatMoney={formatINR} />
                     </div>
                   ) : null
                 })()}
@@ -1516,7 +1380,7 @@ export default function MutualFundsPage() {
           {selectedPortfolioId !== 'all' && insights && insights.timeline.length >= 2 && (
             <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
               <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
-              <JourneyChart data={insights.timeline} gradientId="portfolioInvestedGrad" height={200} />
+              <JourneyChartLW data={insights.timeline} txns={insights.valueTxns} height={200} formatMoney={formatINR} />
             </div>
           )}
 

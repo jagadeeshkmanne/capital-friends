@@ -766,11 +766,6 @@ export default function Dashboard() {
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
                     <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Assets</p>
                     <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(data.totalAssets)}</p>
-                    {data.totalInvested > 0 && (
-                      <p className="text-xs tabular-nums mt-0.5" style={{ color: data.totalPL >= 0 ? '#34d399' : '#f87171' }}>
-                        {data.totalPL >= 0 ? '+' : ''}{formatINR(data.totalPL)} P&L
-                      </p>
-                    )}
                   </div>
                   {data.totalLiabilities > 0 ? (
                     <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(244,63,94,0.08)' }}>

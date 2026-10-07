@@ -433,8 +433,11 @@ function routeAction(action, params, userRecord) {
     case 'data:check-freshness':
       return { stale: isMasterDataStale() };
 
-    case 'data:sync-if-stale':   // background safety net on app open (see MasterDataSync.js)
-      return syncMasterDataIfStale();
+    case 'data:sync-if-stale': { // background safety net on app open (see MasterDataSync.js)
+      var syncRes = syncMasterDataIfStale();
+      publishAppStats_(false); // at most every 6 h: landing page "families using" count (AppStats.js)
+      return syncRes;
+    }
 
     case 'triggers:status':      // are this user's daily update / email jobs switched on?
       return getMyDailyJobsStatus();

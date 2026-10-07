@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Settings, Info, Heart, Zap, Users, Landmark, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, Wallet, Target } from 'lucide-react'
+import { Bell, Settings, Info, Heart, Zap, Users, Landmark, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, Wallet, Target, FileUp } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
 import FollowCard from '../components/FollowCard'
 
@@ -10,6 +10,7 @@ const navItems = [
   { label: 'Investment Accounts', desc: 'Demat & trading accounts', icon: Briefcase, path: '/accounts/investment', color: 'bg-blue-500/15 text-blue-400' },
   { label: 'Insurance', desc: 'Life & health policies', icon: Shield, path: '/insurance', color: 'bg-cyan-500/15 text-cyan-400' },
   { label: 'Mutual Funds', desc: 'MF portfolios & holdings', icon: Wallet, path: '/investments/mutual-funds', color: 'bg-emerald-500/15 text-emerald-400' },
+  { label: 'Import Statement', desc: 'All your mutual funds from a CAMS PDF', icon: FileUp, path: '/import', color: 'bg-violet-500/15 text-violet-400', badge: 'NEW' },
   { label: 'Stocks', desc: 'Stock portfolio holdings', icon: BarChart3, path: '/investments/stocks', color: 'bg-indigo-500/15 text-indigo-400' },
   { label: 'Other Investments', desc: 'FD, PPF, Gold, NPS & more', icon: Package, path: '/investments/other', color: 'bg-teal-500/15 text-teal-400' },
   { label: 'Liabilities', desc: 'Loans & outstanding balances', icon: CreditCard, path: '/liabilities', color: 'bg-rose-500/15 text-rose-400' },
@@ -33,7 +34,7 @@ function NavItem({ item, onClick }) {
         <item.icon size={17} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+        <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}{item.badge && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">{item.badge}</span>}</p>
         <p className="text-xs text-[var(--text-dim)]">{item.desc}</p>
       </div>
       <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />

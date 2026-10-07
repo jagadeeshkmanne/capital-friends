@@ -11,6 +11,7 @@ import {
   Target,
   Bell,
   Settings,
+  FileUp,
 } from 'lucide-react'
 
 const navigation = [
@@ -20,6 +21,7 @@ const navigation = [
   { label: 'Insurance',         icon: Shield,     path: '/insurance' },
   { label: 'Mutual Funds',      icon: Wallet,     path: '/investments/mutual-funds' },
   { label: 'All Funds',         icon: Layers,     path: '/investments/funds' },
+  { label: 'Import Statement',  icon: FileUp,     path: '/import', badge: 'NEW' },
   { label: 'Stocks',            icon: BarChart3,  path: '/investments/stocks' },
   { label: 'Other Investments', icon: Package,    path: '/investments/other' },
   { label: 'Liabilities',       icon: CreditCard, path: '/liabilities' },

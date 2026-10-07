@@ -97,6 +97,7 @@ function createNewUser(email, name) {
 
   try { installDailyTriggerForUser(); } catch (e) { log('Warning: trigger: ' + e); }
   try { installReminderTrigger(); } catch (e) { log('Warning: reminder trigger: ' + e); }
+  try { publishAppStats_(true); } catch (e) { } // landing page "families using" count
 
   record.email = email;
   record.isNew = true; // signal to client that this is a fresh account

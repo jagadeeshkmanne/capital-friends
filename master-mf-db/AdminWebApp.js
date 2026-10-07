@@ -65,6 +65,11 @@ function doPost(e) {
     case 'fullPipeline':
       return _runFullPipeline();
 
+    case 'setAppStats':   // from gas-webapp: how many families use the app (shown on the landing page)
+      return _runAction('setAppStats', function() {
+        return setAppStats_(body.stats || {});
+      });
+
     case 'status':
       return _runAction('status', function() {
         return getAdminStatus();
@@ -331,4 +336,21 @@ function _jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * App usage numbers, written to the App_Stats tab (public, read by the landing page).
+ * Only plain counts - no emails or sheet ids. Called by gas-webapp publishAppStats_().
+ */
+function setAppStats_(stats) {
+  var families = Math.max(0, Math.floor(+stats.families || 0));
+  var users = Math.max(0, Math.floor(+stats.users || 0));
+  var active30 = Math.max(0, Math.floor(+stats.active30 || 0));
+  var ss = SpreadsheetApp.getActiveSpreadsheet(); // this script is bound to the master DB
+  var sh = ss.getSheetByName('App_Stats') || ss.insertSheet('App_Stats');
+  sh.getRange(1, 1, 2, 4).setValues([
+    ['Families', 'Users', 'Active last 30 days', 'Updated'],
+    [families, users, active30, new Date()]
+  ]);
+  return { families: families, users: users, active30: active30 };
 }

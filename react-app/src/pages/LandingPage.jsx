@@ -516,6 +516,7 @@ const TRACK_CARDS = [
 ]
 
 const SMART_CARDS = [
+  { color: '#16a34a', title: 'Import from CAMS Statement', desc: 'Upload your CAMS + KFintech statement PDF and every purchase, SIP, switch and redemption since day one comes in — with true XIRR, CAGR and profit. Read on your device; undo anytime.', uniq: true },
   { color: '#c62828', title: 'ATH Buy Signals', desc: 'See how far each fund is from its All-Time High NAV. Strong Buy / Good Buy / Watch — color-coded signals updated daily from AMFI.', uniq: true },
   { color: '#7c3aed', title: 'Smart Rebalancing — 3 Modes', desc: 'Set target allocation per fund. Get exact SIP adjustment, lumpsum top-up, or buy/sell units when portfolio drifts beyond threshold.', uniq: true },
   { color: '#0891b2', title: 'Goals & Glide Path De-risk', desc: 'Link portfolios to goals. Equity % auto-checked against years left. De-risk alert fires when you\'re overexposed — one click to rebalance.', uniq: true },
@@ -523,6 +524,60 @@ const SMART_CARDS = [
   { color: '#0d9488', title: 'Smart Reminders', desc: 'Insurance renewals, FD maturities, SIP due dates, loan EMIs. Sorted by urgency — never let a policy lapse or a date slip by.' },
   { color: '#2563eb', title: 'Your Data, Your Drive', desc: 'Everything stored in a Google Spreadsheet in YOUR Google Drive. No servers, no database. Auto monthly email reports to your whole family.' },
 ]
+
+
+// Questions people search for (shown on the page and sent to Google as FAQ data in index.html)
+export const LANDING_FAQ = [
+  ['What is the best free stock and mutual fund portfolio tracker in India?', 'Capital Friends is a free, open-source stock and mutual fund portfolio tracker built for Indian families. It tracks mutual funds, stocks, FDs, PPF, EPF, gold, insurance and loans for every family member in one dashboard, with daily NAV updates from AMFI.'],
+  ['Is there a portfolio tracker in Excel or Google Sheets?', 'Yes. Capital Friends keeps all your data in a Google Sheet in your own Google Drive (you can download it as Excel any time). You get a ready-made portfolio tracker spreadsheet with an app on top: dashboards, XIRR, goals, rebalancing and monthly family email reports.'],
+  ['How do I track mutual funds of my whole family in one place?', 'Add each family member and their investment accounts (Zerodha, Groww, a distributor or direct). Then import each person\'s CAMS statement or add funds yourself. You see every portfolio separately and the family total together.'],
+  ['Can I import my CAMS / KFintech CAS statement?', 'Yes. Download the Detailed CAMS + KFintech consolidated statement (CAS) PDF and import it. Every purchase, SIP, switch, STP and redemption is added with its real date, so invested amount, profit, XIRR and CAGR are correct.'],
+  ['How is XIRR calculated for my mutual funds?', 'XIRR uses the date and amount of every purchase, SIP and redemption, plus today\'s value. Switches between your own funds are not counted as new money. You see XIRR for each fund, each portfolio and the whole family.'],
+  ['Is my financial data safe?', 'Your data stays in your own Google Drive. Capital Friends never asks for bank or broker passwords, has no server database, and the developer cannot see your data. The code is open source on GitHub.'],
+  ['Is Capital Friends really free?', 'Yes, free forever with no ads. It is a personal project shared openly; you can support it with a voluntary donation if it helps you.'],
+]
+export const YOUTUBE_URL = 'https://www.youtube.com/@capitalfriendsin'
+export const INSTAGRAM_URL = 'https://www.instagram.com/jags.manne/'
+
+// Live usage count: plain numbers the server publishes to the public master sheet (App_Stats tab).
+const MASTER_DB_ID = '1pSvGDFTgcCkW6Fk9P2mZ5FSpROVClz7Vu0sW9JnPz9s'
+function useFamiliesCount() {
+  const [n, setN] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const url = `https://docs.google.com/spreadsheets/d/${MASTER_DB_ID}/gviz/tq?tqx=out:json&sheet=App_Stats&headers=1&tq=${encodeURIComponent('select A')}`
+    fetch(url).then((r) => r.text()).then((t) => {
+      const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
+      const v = Number(j?.table?.rows?.[0]?.c?.[0]?.v)
+      if (alive && Number.isFinite(v) && v > 0) setN(v)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  return n
+}
+function CountUp({ to }) {
+  const [v, setV] = useState(0)
+  useEffect(() => {
+    let raf, t0
+    const step = (t) => { t0 = t0 || t; const p = Math.min(1, (t - t0) / 1200); setV(Math.round(to * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(step) }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [to])
+  return v.toLocaleString('en-IN')
+}
+function LiveFamilies() {
+  const n = useFamiliesCount()
+  if (!n) return null
+  return (
+    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
+      <style>{`@keyframes cfPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.55)}70%{box-shadow:0 0 0 9px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}`}</style>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '7px 16px', borderRadius: 999, background: '#0f172a', color: '#fff', fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 600 }}>
+        <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22c55e', animation: 'cfPulse 1.8s infinite' }} />
+        <span><span style={{ color: '#4ade80', fontSize: 16 }}><CountUp to={n} /></span> families track their money here</span>
+      </span>
+    </div>
+  )
+}
 
 // Hero trust chips: appear one by one, the tick draws in, then a soft green glow walks across them.
 const TRUST_ITEMS = ['Free forever', 'Open source', 'No bank credentials', 'Data stays in your Google Drive']
@@ -627,6 +682,7 @@ export default function LandingPage() {
           Sign in with Google — it's free
         </button>
         <TrustChips isMobile={isMobile} />
+        <LiveFamilies />
       </section>
 
       {/* ─── ABOUT (collapsed): purpose of the app + how it uses Google data.
@@ -869,6 +925,46 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ─── FOLLOW ─── */}
+      <section style={{ background: '#fff', borderTop: '1px solid #e2e8f0', padding: isMobile ? '28px 16px' : '36px 24px' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 20 : 24, fontWeight: 700, color: '#0f172a', margin: '0 0 6px', letterSpacing: '-.02em' }}>
+            Learn simple, honest money planning
+          </h2>
+          <p style={{ fontSize: 13.5, color: '#64748b', margin: '0 auto 18px', maxWidth: 560, lineHeight: 1.6 }}>
+            I share how I plan my own family's money — retirement, kids' goals, mutual funds — and how to use this app. No tips, no selling.
+          </p>
+          <style>{`.cf-soc{position:relative;overflow:hidden;transition:transform .2s}.cf-soc:hover{transform:translateY(-2px) scale(1.03)}.cf-soc::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.4),transparent);transform:skewX(-20deg);animation:cfSocShine 4s ease-in-out infinite}.cf-soc.ig::after{animation-delay:2s}.cf-soc.yt{animation:cfSocBob 3s ease-in-out infinite}.cf-soc.ig{animation:cfSocBob 3s ease-in-out infinite 1.5s}@keyframes cfSocShine{0%,55%{left:-60%}100%{left:130%}}@keyframes cfSocBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}@media (prefers-reduced-motion:reduce){.cf-soc,.cf-soc::after{animation:none}}`}</style>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a className="cf-soc yt" href={YOUTUBE_URL} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 22px', borderRadius: 12, background: '#ff0000', color: '#fff', fontWeight: 700, fontSize: 14.5, textDecoration: 'none', boxShadow: '0 6px 18px rgba(255,0,0,.25)' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8z"/><path fill="#ff0000" d="M9.6 15.6 15.8 12 9.6 8.4z"/></svg>
+              Subscribe on YouTube
+            </a>
+            <a className="cf-soc ig" href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 22px', borderRadius: 12, background: 'linear-gradient(45deg,#f58529,#dd2a7b 50%,#8134af)', color: '#fff', fontWeight: 700, fontSize: 14.5, textDecoration: 'none', boxShadow: '0 6px 18px rgba(221,42,123,.25)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#fff"/></svg>
+              Follow on Instagram
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FAQ (also helps people find the app on Google) ─── */}
+      <section id="faq" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: isMobile ? '28px 16px' : '36px 24px' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto' }}>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 20 : 24, fontWeight: 700, color: '#0f172a', margin: '0 0 14px', textAlign: 'center', letterSpacing: '-.02em' }}>
+            Questions people ask
+          </h2>
+          {LANDING_FAQ.map(([q, a]) => (
+            <details key={q} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14.5, color: '#0f172a' }}><h3 style={{ display: 'inline', fontSize: 'inherit', fontWeight: 'inherit', margin: 0 }}>{q}</h3></summary>
+              <p style={{ fontSize: 13.5, color: '#475569', lineHeight: 1.65, margin: '8px 0 0' }}>{a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
       {/* ─── CTA + FOOTER ─── */}
       <section style={{ background: '#080d1a', borderTop: '1px solid rgba(255,255,255,.06)', padding: '28px 24px 0', textAlign: 'center' }}>
         <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 20 }}>
@@ -906,7 +1002,9 @@ export default function LandingPage() {
               <span style={{ color: '#334155' }}>Free &amp; open source</span>
             </div>
             <div>
-              <a href="https://www.youtube.com/@capitalfriendsin" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>YouTube</a>
+              <a href={YOUTUBE_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>YouTube</a>
+              <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Instagram</a>
               <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>
               <a href="https://capitalfriends.in/privacy" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Privacy Policy</a>
               <span style={{ color: '#1e293b', fontSize: 12 }}>·</span>

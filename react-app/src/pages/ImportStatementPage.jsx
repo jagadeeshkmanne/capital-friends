@@ -5,7 +5,8 @@ import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import * as api from '../services/api'
 import { readCasPdf, statementForServer } from '../utils/cas/casPdf'
-import ImportHelp from './ImportHelp'
+import ImportHelp, { HowToStrip } from './ImportHelp'
+import Modal from '../components/Modal'
 import FollowCard from '../components/FollowCard'
 
 // Import a CAMS consolidated statement (beta). Steps: choose PDF -> Check (nothing is written) -> Import.
@@ -71,7 +72,7 @@ export default function ImportStatementPage() {
   const draft = useMemo(loadDraft, [])
 
   const [enabled, setEnabled] = useState(null)
-  const [showHelp, setShowHelp] = useState(null) // null = decide automatically (open for first-timers)
+  const [showHelp, setShowHelp] = useState(false) // step-by-step guide, in a dialog
   const [status, setStatus] = useState(null)
   const [statusErr, setStatusErr] = useState('')
 
@@ -234,7 +235,7 @@ export default function ImportStatementPage() {
   }
   const blockedFunds = (preview?.funds || []).filter((f) => f.blocked)
   const mustFix = preview && (preview.missingMembers.length > 0 || preview.unknownFunds.length > 0 || preview.needsBank)
-  const helpOpen = showHelp === null ? (!parsed && !(status?.history?.length)) : showHelp
+  const helpOpen = showHelp
   const canImport = preview && !preview.blocked && !saving && !checking
   const step = !parsed ? 1 : !preview ? 2 : 3
 
@@ -247,8 +248,8 @@ export default function ImportStatementPage() {
           <h1 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
             Import from CAMS statement <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">NEW</span>
           </h1>
-          <button onClick={() => setShowHelp(!helpOpen)} className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]">
-            <HelpCircle size={13} /> {helpOpen ? 'Hide help' : 'How to get it'}
+          <button onClick={() => setShowHelp(true)} className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]">
+            <HelpCircle size={13} /> How to get it
           </button>
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-1">Adds every mutual fund purchase, SIP, switch and sale from your statement to your portfolios. Nothing is saved until you press <b>Import</b>, and you can undo it.</p>
@@ -265,19 +266,19 @@ export default function ImportStatementPage() {
       )}
       {result && <FollowCard />}
 
-      {helpOpen && (
-        <Card className="p-4">
-          <ImportHelp />
-        </Card>
-      )}
+      <Modal open={helpOpen} onClose={() => setShowHelp(false)} title="How to get your CAMS statement" maxWidth="max-w-5xl" maxHeight="max-h-[92vh]">
+        <ImportHelp />
+      </Modal>
 
       {/* STEP 1 */}
       <Step step={step} n={1} title="Choose your statement PDF" active={step === 1}>
         {!parsed && (
-          <p className="text-xs text-[var(--text-dim)]">
-            The <b>Detailed</b> CAMS + KFintech statement (CAS) PDF, from <b>01-Jan-2000</b>, <b>with zero balance folios</b>.{' '}
-            {!helpOpen && <button onClick={() => setShowHelp(true)} className="underline text-violet-400">Don&apos;t have it? See how to get it</button>}
-          </p>
+          <>
+            <p className="text-xs text-[var(--text-dim)]">
+              The <b>Detailed</b> CAMS + KFintech statement (CAS) PDF, from <b>01-Jan-2000</b>, <b>with zero balance folios</b>. Don&apos;t have it yet? It&apos;s free and takes 2 minutes:
+            </p>
+            <HowToStrip onOpenGuide={() => setShowHelp(true)} />
+          </>
         )}
         {parsed ? (
           <div className="flex items-center justify-between gap-2">
