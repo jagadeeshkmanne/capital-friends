@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Users, LockKeyhole, HardDrive, CodeXml } from 'lucide-react'
+import HeaderSocial from '../components/HeaderSocial'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
 
@@ -618,6 +619,8 @@ export default function LandingPage() {
   const timerRef = useRef(null)
   const N = 5
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  // phones under 430px: logo only in the header, so the YouTube/Instagram buttons and Sign In fit on one line
+  const narrowPhone = isMobile && typeof window !== 'undefined' && window.innerWidth < 430
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', h)
@@ -654,19 +657,22 @@ export default function LandingPage() {
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#f8fafc', color: '#0f172a', WebkitFontSmoothing: 'antialiased' }}>
       {/* ─── HEADER ─── */}
       <header style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(10,15,31,0.98)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 56 }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 14px' : '0 20px', height: 56 }}>
           <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
             <img src={LOGO_ICON} alt="" style={{ height: 44, width: 'auto' }}
               onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
             <div style={{ display: 'none', width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 12, color: '#fff', flexShrink: 0 }}>CF</div>
-            <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px' }}>
+            <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px', whiteSpace: 'nowrap', display: narrowPhone ? 'none' : 'inline' }}>
               <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b> <em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
             </span>
           </a>
-          <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 8, background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
+          <HeaderSocial fixedDark />
+          <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: isMobile ? '8px 12px' : '8px 18px', borderRadius: 8, whiteSpace: 'nowrap', background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
             <GI s={14} />
             Sign In
           </button>
+          </div>
         </div>
       </header>
 

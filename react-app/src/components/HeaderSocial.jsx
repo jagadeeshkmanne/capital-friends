@@ -4,11 +4,14 @@ import { YOUTUBE_URL, INSTAGRAM_URL } from './FollowCard'
 // YouTube + Instagram in the top bar.
 // Phones: two brand-coloured round buttons with a soft glow.
 // Desktop: one quiet segmented chip (brand-coloured icons, neutral text) with a small live dot on YouTube.
-export default function HeaderSocial() {
+// fixedDark: for pages without the app theme (landing page) — pins the dark-theme colours.
+const DARK_VARS = { '--bg-inset': '#141d38', '--border': 'rgba(255,255,255,0.08)', '--text-muted': '#94a3b8', '--text-primary': '#e2e8f0', display: 'contents' }
+
+export default function HeaderSocial({ fixedDark = false }) {
   const circle = 'hs-btn relative flex items-center justify-center h-8 w-8 rounded-full text-white no-underline active:scale-95 transition-transform'
   const seg = 'group flex items-center gap-1.5 h-7 px-3 rounded-full text-[12.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors no-underline'
   return (
-    <>
+    <div style={fixedDark ? DARK_VARS : { display: 'contents' }}>
       <style>{`
         .hs-btn{overflow:hidden;isolation:isolate}
         .hs-btn::after{content:'';position:absolute;inset:0 auto 0 -70%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-20deg);animation:hsShine 5s ease-in-out infinite;z-index:-1}
@@ -54,6 +57,6 @@ export default function HeaderSocial() {
           Instagram
         </a>
       </div>
-    </>
+    </div>
   )
 }
