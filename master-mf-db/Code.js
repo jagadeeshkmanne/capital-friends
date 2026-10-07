@@ -229,13 +229,26 @@ function refreshMutualFundData() {
     }
 
     // Convert map back to array and write
-    const mergedData = Object.values(existingMap);
+    let mergedData = Object.values(existingMap);
+
+    // ISIN columns I-J (for CAMS/NSDL/CDSL statement import). They are written in the SAME row
+    // array as A-H, so they can never drift onto another fund. If anything goes wrong here, the
+    // refresh falls back to exactly the old 8-column write.
+    let width = 8;
+    try {
+      const withIsin = addIsinColumns_(sheet, existingRows, mergedData);
+      if (withIsin) { mergedData = withIsin; width = 10; }
+    } catch (e) {
+      Logger.log('ISIN columns skipped (A-H refresh continues as before): ' + e.message);
+      // An empty ISIN is safe; a stale one next to a re-ordered row would not be
+      try { if (existingRows > 0 && sheet.getMaxColumns() >= 10) sheet.getRange(2, 9, existingRows, 2).clearContent(); } catch (e2) {}
+    }
 
     // Clear old data and write merged data
     if (existingRows > 0) {
-      sheet.getRange(2, 1, existingRows, 8).clearContent();
+      sheet.getRange(2, 1, existingRows, Math.min(width, sheet.getMaxColumns())).clearContent();
     }
-    sheet.getRange(2, 1, mergedData.length, 8).setValues(mergedData);
+    sheet.getRange(2, 1, mergedData.length, width).setValues(mergedData);
 
     // Update metadata
     updateMetadata(mergedData.length, null);
@@ -251,6 +264,64 @@ function refreshMutualFundData() {
     sendErrorEmail(error);
     throw error;
   }
+}
+
+/**
+ * ISIN for every scheme, from AMFI's official NAVAll.txt (Scheme Code;ISIN Div Payout/ISIN Growth;
+ * ISIN Div Reinvestment;Scheme Name;NAV;Date). Returns rows with columns I (ISIN payout/growth) and
+ * J (ISIN reinvestment) appended, or null to keep the old 8-column write.
+ * If AMFI's file can't be downloaded, the ISINs already in the sheet are carried forward by fund code.
+ */
+function addIsinColumns_(sheet, existingRows, rows) {
+  // ISINs already in the sheet (carried forward if today's download fails)
+  const oldIsin = {};
+  if (existingRows > 0 && sheet.getLastColumn() >= 10) {
+    const codes = sheet.getRange(2, 1, existingRows, 1).getValues();
+    const isins = sheet.getRange(2, 9, existingRows, 2).getValues();
+    for (let i = 0; i < codes.length; i++) {
+      if (codes[i][0] && (isins[i][0] || isins[i][1])) oldIsin[String(codes[i][0])] = [isins[i][0], isins[i][1]];
+    }
+  }
+
+  const fresh = {};
+  let freshCount = 0;
+  try {
+    const res = UrlFetchApp.fetch('https://www.amfiindia.com/spages/NAVAll.txt', { muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) {
+      res.getContentText().split('\n').forEach(function (line) {
+        const p = line.split(';');
+        if (p.length < 6) return;
+        const code = p[0].trim();
+        if (!/^\d+$/.test(code)) return;
+        const a = (p[1] || '').trim(), b = (p[2] || '').trim();
+        const i1 = /^INF[A-Z0-9]{9}$/.test(a) ? a : '', i2 = /^INF[A-Z0-9]{9}$/.test(b) ? b : '';
+        if (i1 || i2) { fresh[code] = [i1, i2]; freshCount++; }
+      });
+    } else {
+      Logger.log('NAVAll.txt HTTP ' + res.getResponseCode() + ' - keeping existing ISINs');
+    }
+  } catch (e) {
+    Logger.log('NAVAll.txt download failed - keeping existing ISINs: ' + e.message);
+  }
+  // A partial/garbled download must not wipe good ISINs: trust it only if it looks complete
+  const useFresh = freshCount >= 5000;
+  if (!useFresh && !Object.keys(oldIsin).length) return null; // nothing to add yet: old behaviour
+
+  if (sheet.getMaxColumns() < 10) sheet.insertColumnsAfter(sheet.getMaxColumns(), 10 - sheet.getMaxColumns());
+  if (!sheet.getRange(1, 9).getValue()) {
+    sheet.getRange(1, 9, 1, 2).setValues([['ISIN (Payout/Growth)', 'ISIN (Reinvestment)']])
+      .setFontWeight('bold').setBackground('#1a202c').setFontColor('#ffffff');
+  }
+
+  let filled = 0;
+  const out = rows.map(function (r) {
+    const code = String(r[0]);
+    const isin = (useFresh && fresh[code]) || oldIsin[code] || ['', ''];
+    if (isin[0] || isin[1]) filled++;
+    return r.slice(0, 8).concat(isin);
+  });
+  Logger.log('ISIN columns: ' + filled + ' of ' + out.length + ' schemes have an ISIN (' + (useFresh ? 'fresh from AMFI' : 'carried forward') + ')');
+  return out;
 }
 
 /**
