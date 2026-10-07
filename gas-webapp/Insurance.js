@@ -163,9 +163,7 @@ function addInsurancePolicy(policyData) {
     if (!policyData.company) {
       return { success: false, error: 'Insurance company is required' };
     }
-    if (!policyData.policyNumber) {
-      return { success: false, error: 'Policy number is required' };
-    }
+    policyData.policyNumber = policyData.policyNumber || ''; // optional (privacy)
     if (!policyData.policyName) {
       return { success: false, error: 'Policy name is required' };
     }

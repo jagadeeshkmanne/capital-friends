@@ -39,6 +39,10 @@ function _fmtCur(amount) { return formatEmailCurrency(amount); }
 function _plColor(v) { return v >= 0 ? '#059669' : '#dc2626'; }
 function _plSign(v) { return v >= 0 ? '+' : ''; }
 
+// Emails can be forwarded or read on shared devices: never print full PAN / mobile.
+function _maskPan(p) { p = String(p || '').trim(); return p.length >= 6 ? p.slice(0, 2) + 'XXXXX' + p.slice(-3) : (p ? 'XXXX' : '-'); }
+function _maskMobile(m) { m = String(m || '').replace(/\D/g, ''); return m.length >= 4 ? 'XXXXXX' + m.slice(-4) : '-'; }
+
 function _maskAadhar(a) {
   if (!a) return '-';
   var s = String(a).replace(/\D/g, '');
@@ -523,9 +527,9 @@ function buildDashboardPDFHTML(data) {
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
     h += '<td style="width:50%;vertical-align:top;padding-right:8px">';
     h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Email</div><div style="font-size:13px;color:#1e293b;font-weight:600;word-break:break-all">' + _escHtml(mem.email || '-') + '</div></div>';
-    h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">PAN</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _escHtml(mem.pan || '-') + '</div></div>';
+    h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">PAN</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _escHtml(_maskPan(mem.pan)) + '</div></div>';
     h += '</td><td style="width:50%;vertical-align:top;padding-left:8px">';
-    h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Mobile</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _escHtml(mem.mobile || '-') + '</div></div>';
+    h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Mobile</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _escHtml(_maskMobile(mem.mobile)) + '</div></div>';
     h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Aadhar</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _maskAadhar(mem.aadhar) + '</div></div>';
     h += '</td></tr></tbody></table></td>';
     h += '</tr></tbody></table></td></tr></tbody></table></div>';

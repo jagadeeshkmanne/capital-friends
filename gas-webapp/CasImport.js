@@ -336,10 +336,8 @@ function casBuildPlan_(statement, data, mapping) {
     g.accounts = data.accounts.filter(function (a) { return a.memberId === g.memberId && a.status !== 'Inactive'; }).map(function (a) { return { accountId: a.accountId, name: a.accountName, platform: a.platformBroker, match: casAccountMatchesPlatform_(a, g.platform) }; });
     plan.groups.push(g);
   });
-  // a new portfolio needs an investment account, and a new account needs a bank account (app rule)
-  var hasBank = (data.banks || []).some(function (b) { return b.status !== 'Inactive'; });
-  plan.needsBank = !hasBank && plan.groups.some(function (g) { return g.target === 'new' && !g.accounts.some(function (a) { return a.match; }); });
-  if (plan.needsBank) plan.blocked = true;
+  // a new portfolio gets an investment account; a bank account is no longer needed (it is optional)
+  plan.needsBank = false;
   plan.groups.sort(function (a, b) { return a.memberName < b.memberName ? -1 : a.memberName > b.memberName ? 1 : (a.platform < b.platform ? -1 : 1); });
 
   // ---- 4. route every folio to a portfolio, collect per (portfolio, fund)
@@ -675,12 +673,11 @@ function casImportSave_(params) {
       if (!acctId) {
         var member = data.members.filter(function (m) { return m.memberId === g.memberId; })[0] || {};
         var bank = data.banks.filter(function (b) { return b.memberId === g.memberId && b.status !== 'Inactive'; })[0] || data.banks.filter(function (b) { return b.status !== 'Inactive'; })[0];
-        if (!bank) throw new Error('Add a bank account first (needed to create the investment account for ' + g.memberName + ').');
         var email = member.email || st.meta.email || Session.getActiveUser().getEmail();
         var res = addInvestmentAccount({
-          accountName: g.newName, memberId: g.memberId, bankAccountId: bank.accountId,
+          accountName: g.newName, memberId: g.memberId, bankAccountId: bank ? bank.accountId : '',
           accountType: g.demat ? 'Demat' : 'Mutual Fund', platformBroker: g.platform.replace(/^Distributor\s+/, 'Agent '),
-          accountClientId: '', registeredEmail: email, registeredPhone: member.mobile || 'Not given'
+          accountClientId: '', registeredEmail: email, registeredPhone: member.mobile || ''
         });
         if (!res || !res.success) throw new Error('Could not create the investment account for ' + g.memberName + ': ' + (res && res.message));
         acctId = res.accountId;

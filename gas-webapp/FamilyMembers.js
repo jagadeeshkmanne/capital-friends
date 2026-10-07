@@ -14,22 +14,23 @@ function addFamilyMember(data) {
     // Validate required fields
     isRequired(data.memberName, 'Member Name');
     isRequired(data.relationship, 'Relationship');
-    isRequired(data.pan, 'PAN');
-    isRequired(data.aadhar, 'Aadhar');
     isRequired(data.email, 'Email');
-    isRequired(data.mobile, 'Mobile');
+    // PAN, Aadhaar and mobile are optional (privacy): checked only when given
+    data.pan = String(data.pan || '').trim().toUpperCase();
+    data.aadhar = String(data.aadhar || '').replace(/\D/g, '');
+    data.mobile = String(data.mobile || '').trim();
 
     // Validate formats
-    if (!isValidPAN(data.pan)) {
+    if (data.pan && !isValidPAN(data.pan)) {
       throw new Error('Invalid PAN format. Expected: ABCDE1234F');
     }
-    if (!isValidAadhar(data.aadhar)) {
+    if (data.aadhar && !isValidAadhar(data.aadhar)) {
       throw new Error('Invalid Aadhar format. Expected: 12 digits');
     }
     if (!isValidEmail(data.email)) {
       throw new Error('Invalid email format');
     }
-    if (!isValidPhone(data.mobile)) {
+    if (data.mobile && !isValidPhone(data.mobile)) {
       throw new Error('Invalid mobile format. Expected: 10 digits');
     }
 
@@ -42,10 +43,10 @@ function addFamilyMember(data) {
     // Check for duplicate PAN/Aadhar
     const existingData = sheet.getRange(3, 1, Math.max(1, sheet.getLastRow() - 2), 12).getValues();
     for (let i = 0; i < existingData.length; i++) {
-      if (existingData[i][3] && existingData[i][3].toString().toUpperCase() === data.pan.toUpperCase()) {
+      if (data.pan && existingData[i][3] && existingData[i][3].toString().toUpperCase() === data.pan) {
         throw new Error('PAN already exists for another member');
       }
-      if (existingData[i][4] && existingData[i][4].toString() === data.aadhar.toString()) {
+      if (data.aadhar && existingData[i][4] && existingData[i][4].toString() === data.aadhar) {
         throw new Error('Aadhar already exists for another member');
       }
     }
@@ -65,7 +66,7 @@ function addFamilyMember(data) {
       memberId,            // Column A: Member ID
       data.memberName,     // Column B: Member Name
       data.relationship,   // Column C: Relationship
-      data.pan.toUpperCase(), // Column D: PAN
+      data.pan, // Column D: PAN
       data.aadhar,         // Column E: Aadhar
       data.email,          // Column F: Email
       data.mobile,         // Column G: Mobile
@@ -219,22 +220,23 @@ function updateFamilyMember(data) {
     isRequired(data.memberId, 'Member ID');
     isRequired(data.memberName, 'Member Name');
     isRequired(data.relationship, 'Relationship');
-    isRequired(data.pan, 'PAN');
-    isRequired(data.aadhar, 'Aadhar');
     isRequired(data.email, 'Email');
-    isRequired(data.mobile, 'Mobile');
+    // PAN, Aadhaar and mobile are optional (privacy): checked only when given
+    data.pan = String(data.pan || '').trim().toUpperCase();
+    data.aadhar = String(data.aadhar || '').replace(/\D/g, '');
+    data.mobile = String(data.mobile || '').trim();
 
     // Validate formats
-    if (!isValidPAN(data.pan)) {
+    if (data.pan && !isValidPAN(data.pan)) {
       throw new Error('Invalid PAN format. Expected: ABCDE1234F');
     }
-    if (!isValidAadhar(data.aadhar)) {
+    if (data.aadhar && !isValidAadhar(data.aadhar)) {
       throw new Error('Invalid Aadhar format. Expected: 12 digits');
     }
     if (!isValidEmail(data.email)) {
       throw new Error('Invalid email format');
     }
-    if (!isValidPhone(data.mobile)) {
+    if (data.mobile && !isValidPhone(data.mobile)) {
       throw new Error('Invalid mobile format. Expected: 10 digits');
     }
 
@@ -264,10 +266,10 @@ function updateFamilyMember(data) {
     const existingData = sheet.getRange(3, 1, lastRow - 2, 12).getValues();
     for (let i = 0; i < existingData.length; i++) {
       if (existingData[i][0] !== data.memberId) { // Column A is Member ID
-        if (existingData[i][3] && existingData[i][3].toString().toUpperCase() === data.pan.toUpperCase()) { // Column D is PAN
+        if (data.pan && existingData[i][3] && existingData[i][3].toString().toUpperCase() === data.pan) { // Column D is PAN
           throw new Error('PAN already exists for another member');
         }
-        if (existingData[i][4] && existingData[i][4].toString() === data.aadhar.toString()) { // Column E is Aadhar
+        if (data.aadhar && existingData[i][4] && existingData[i][4].toString() === data.aadhar) { // Column E is Aadhar
           throw new Error('Aadhar already exists for another member');
         }
       }
@@ -284,7 +286,7 @@ function updateFamilyMember(data) {
       data.memberId,           // Column A: Member ID
       data.memberName,         // Column B: Member Name
       data.relationship,       // Column C: Relationship
-      data.pan.toUpperCase(),  // Column D: PAN
+      data.pan,  // Column D: PAN
       data.aadhar,             // Column E: Aadhar
       data.email,              // Column F: Email
       data.mobile,             // Column G: Mobile

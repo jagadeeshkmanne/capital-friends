@@ -51,7 +51,6 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
     const e = {}
     if (!form.policyType) e.policyType = 'Required'
     if (!form.company.trim()) e.company = 'Required'
-    if (!form.policyNumber.trim()) e.policyNumber = 'Required'
     if (!form.policyName.trim()) e.policyName = 'Required'
     if (activeMembers.length > 0 && !form.memberId) e.memberId = 'Required'
     if (!form.sumAssured || Number(form.sumAssured) <= 0) e.sumAssured = 'Must be > 0'
@@ -79,13 +78,14 @@ export default function InsuranceForm({ initial, onSave, onDelete, onCancel }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Policy Number" required error={errors.policyNumber}>
+        <FormField label="Policy Number (optional)" error={errors.policyNumber}>
           <FormInput sensitive value={form.policyNumber} onChange={(v) => set('policyNumber', v)} placeholder="e.g., HL-2024-78901" />
         </FormField>
         <FormField label="Policy Name" required error={errors.policyName}>
           <FormInput value={form.policyName} onChange={(v) => set('policyName', v)} placeholder="e.g., Click 2 Protect Life" />
         </FormField>
       </div>
+      <p className="-mt-2 text-[11px] text-[var(--text-dim)]">Policy number is optional, but it makes a claim much faster for your family if something happens to you. It stays only in your own Google Sheet.</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Insured Member" required={activeMembers.length > 0} error={errors.memberId}>

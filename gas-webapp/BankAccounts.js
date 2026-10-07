@@ -15,9 +15,10 @@ function addBankAccount(data) {
     isRequired(data.accountName, 'Account Name');
     isRequired(data.memberId, 'Family Member');
     isRequired(data.bankName, 'Bank Name');
-    isRequired(data.accountNumber, 'Account Number');
-    isRequired(data.ifscCode, 'IFSC Code');
-    isRequired(data.branchName, 'Branch Name');
+    // Account number, IFSC and branch are optional (privacy)
+    data.accountNumber = String(data.accountNumber || '').trim();
+    data.ifscCode = String(data.ifscCode || '').trim().toUpperCase();
+    data.branchName = String(data.branchName || '').trim();
     isRequired(data.accountType, 'Account Type');
 
     // Get sheet
@@ -29,7 +30,7 @@ function addBankAccount(data) {
     // Check for duplicate account number
     const existingData = sheet.getRange(3, 1, Math.max(1, sheet.getLastRow() - 2), 12).getValues();
     for (let i = 0; i < existingData.length; i++) {
-      if (existingData[i][5] && existingData[i][5].toString() === data.accountNumber.toString()) {
+      if (data.accountNumber.length > 4 && existingData[i][5] && existingData[i][5].toString() === data.accountNumber) {
         throw new Error('Account Number already exists');
       }
     }
@@ -169,9 +170,10 @@ function updateBankAccount(data) {
     isRequired(data.accountName, 'Account Name');
     isRequired(data.memberId, 'Family Member');
     isRequired(data.bankName, 'Bank Name');
-    isRequired(data.accountNumber, 'Account Number');
-    isRequired(data.ifscCode, 'IFSC Code');
-    isRequired(data.branchName, 'Branch Name');
+    // Account number, IFSC and branch are optional (privacy)
+    data.accountNumber = String(data.accountNumber || '').trim();
+    data.ifscCode = String(data.ifscCode || '').trim().toUpperCase();
+    data.branchName = String(data.branchName || '').trim();
     isRequired(data.accountType, 'Account Type');
 
     // Get sheet
@@ -200,7 +202,7 @@ function updateBankAccount(data) {
     const existingData = sheet.getRange(3, 1, lastRow - 2, 12).getValues();
     for (let i = 0; i < existingData.length; i++) {
       if (existingData[i][0] !== data.accountId) { // Column A is Record ID
-        if (existingData[i][5] && existingData[i][5].toString() === data.accountNumber.toString()) { // Column F is Account Number
+        if (data.accountNumber.length > 4 && existingData[i][5] && existingData[i][5].toString() === data.accountNumber) { // Column F is Account Number
           throw new Error('Account Number already exists for another account');
         }
       }

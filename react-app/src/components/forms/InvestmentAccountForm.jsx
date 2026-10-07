@@ -41,12 +41,10 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     const e = {}
     if (!form.accountName.trim()) e.accountName = 'Required'
     if (!form.memberId) e.memberId = 'Required'
-    if (!form.bankAccountId) e.bankAccountId = 'Required'
     if (!form.accountType) e.accountType = 'Required'
     if (!form.platformBroker.trim()) e.platformBroker = 'Required'
     // Client ID is optional (e.g., broker accounts may not have one)
     if (!form.registeredEmail.trim()) e.registeredEmail = 'Required'
-    if (!form.registeredPhone.trim()) e.registeredPhone = 'Required'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -77,8 +75,8 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Linked Bank Account" required error={errors.bankAccountId}>
-          <FormSelect value={form.bankAccountId} onChange={(v) => set('bankAccountId', v)} options={memberBanks} placeholder={form.memberId ? (memberBanks.length ? 'Select bank account...' : 'No bank accounts for this member') : 'Select member first...'} />
+        <FormField label="Linked Bank Account (optional)" error={errors.bankAccountId}>
+          <FormSelect value={form.bankAccountId} onChange={(v) => set('bankAccountId', v)} options={memberBanks} placeholder={form.memberId ? (memberBanks.length ? 'None (optional)' : 'None – not needed') : 'Select member first...'} />
         </FormField>
         <FormField label="Account Type" required error={errors.accountType}>
           <FormSelect value={form.accountType} onChange={(v) => set('accountType', v)} options={ACCOUNT_TYPES} placeholder="Select type..." />
@@ -102,7 +100,7 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
         <FormField label="Registered Email" required error={errors.registeredEmail}>
           <FormInput sensitive type="email" value={form.registeredEmail} onChange={(v) => set('registeredEmail', v)} placeholder="email@example.com" />
         </FormField>
-        <FormField label="Registered Phone" required error={errors.registeredPhone}>
+        <FormField label="Registered Phone (optional)" error={errors.registeredPhone}>
           <FormInput sensitive value={form.registeredPhone} onChange={(v) => set('registeredPhone', v)} placeholder="9876543210" />
         </FormField>
       </div>

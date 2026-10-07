@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../../context/DataContext'
+import FamilySafetyNote from './FamilySafetyNote'
 import { FormField, FormInput, FormSelect, FormActions, DeleteButton } from '../Modal'
 import { useMask } from '../../context/MaskContext'
 
@@ -35,9 +36,6 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
     if (!form.accountName.trim()) e.accountName = 'Required'
     if (!form.memberId) e.memberId = 'Required'
     if (!form.bankName.trim()) e.bankName = 'Required'
-    if (!String(form.accountNumber || '').trim()) e.accountNumber = 'Required'
-    if (!form.ifscCode.trim()) e.ifscCode = 'Required'
-    if (!form.branchName.trim()) e.branchName = 'Required'
     if (!form.accountType) e.accountType = 'Required'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -46,7 +44,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
   async function handleSubmit() {
     if (!validate()) return
     setSaving(true)
-    try { await onSave({ ...form, ifscCode: form.ifscCode.toUpperCase() }) } finally { setSaving(false) }
+    try { await onSave({ ...form, ifscCode: String(form.ifscCode || '').toUpperCase() }) } finally { setSaving(false) }
   }
 
   const memberOptions = activeMembers.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
@@ -71,16 +69,18 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
         </FormField>
       </div>
 
+      <FamilySafetyNote kind="bank" />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Account Number" required error={errors.accountNumber}>
-          <FormInput sensitive value={form.accountNumber} onChange={(v) => set('accountNumber', v)} placeholder="e.g., 1234567890" />
+        <FormField label="Account Number (optional)" error={errors.accountNumber}>
+          <FormInput sensitive value={form.accountNumber} onChange={(v) => set('accountNumber', v)} placeholder="Last 4 digits are enough" />
         </FormField>
-        <FormField label="IFSC Code" required error={errors.ifscCode}>
+        <FormField label="IFSC Code (optional)" error={errors.ifscCode}>
           <FormInput value={form.ifscCode} onChange={(v) => set('ifscCode', v.toUpperCase())} placeholder="e.g., HDFC0001234" maxLength={11} />
         </FormField>
       </div>
 
-      <FormField label="Branch Name" required error={errors.branchName}>
+      <FormField label="Branch Name (optional)" error={errors.branchName}>
         <FormInput value={form.branchName} onChange={(v) => set('branchName', v)} placeholder="e.g., Hyderabad - Kondapur" />
       </FormField>
 

@@ -15,12 +15,12 @@ function addInvestmentAccount(data) {
     // Validate required fields
     isRequired(data.accountName, 'Account Name');
     isRequired(data.memberId, 'Family Member');
-    isRequired(data.bankAccountId, 'Bank Account');
+    data.bankAccountId = data.bankAccountId || ''; // optional
     isRequired(data.accountType, 'Account Type');
     isRequired(data.platformBroker, 'Platform/Broker');
     // accountClientId is optional (broker accounts may not have one)
     isRequired(data.registeredEmail, 'Registered Email');
-    isRequired(data.registeredPhone, 'Registered Phone');
+    data.registeredPhone = data.registeredPhone || ''; // optional
 
     // Validate email format
     if (!isValidEmail(data.registeredEmail)) {
@@ -202,12 +202,12 @@ function updateInvestmentAccount(data) {
     isRequired(data.accountId, 'Record ID');
     isRequired(data.accountName, 'Account Name');
     isRequired(data.memberId, 'Family Member');
-    isRequired(data.bankAccountId, 'Bank Account');
+    data.bankAccountId = data.bankAccountId || ''; // optional
     isRequired(data.accountType, 'Account Type');
     isRequired(data.platformBroker, 'Platform/Broker');
     // accountClientId is optional (broker accounts may not have one)
     isRequired(data.registeredEmail, 'Registered Email');
-    isRequired(data.registeredPhone, 'Registered Phone');
+    data.registeredPhone = data.registeredPhone || ''; // optional
 
     // Validate email format
     if (!isValidEmail(data.registeredEmail)) {

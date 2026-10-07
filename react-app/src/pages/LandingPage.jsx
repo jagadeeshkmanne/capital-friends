@@ -545,11 +545,14 @@ function useFamiliesCount() {
   const [n, setN] = useState(null)
   useEffect(() => {
     let alive = true
-    const url = `https://docs.google.com/spreadsheets/d/${MASTER_DB_ID}/gviz/tq?tqx=out:json&sheet=App_Stats&headers=1&tq=${encodeURIComponent('select A')}`
+    // 'limit 1' keeps the reply tiny; the header check makes sure we read the App_Stats tab
+    const url = `https://docs.google.com/spreadsheets/d/${MASTER_DB_ID}/gviz/tq?tqx=out:json&sheet=App_Stats&headers=1&tq=${encodeURIComponent('select A, B limit 1')}`
     fetch(url).then((r) => r.text()).then((t) => {
       const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
-      const v = Number(j?.table?.rows?.[0]?.c?.[0]?.v)
-      if (alive && Number.isFinite(v) && v > 0) setN(v)
+      if (String(j?.table?.cols?.[0]?.label || '').toLowerCase() !== 'families') return
+      const c = j?.table?.rows?.[0]?.c || []
+      const families = Number(c[0]?.v), users = Number(c[1]?.v)
+      if (alive && Number.isFinite(families) && families > 0) setN({ families, users: Number.isFinite(users) ? users : 0 })
     }).catch(() => {})
     return () => { alive = false }
   }, [])
@@ -559,22 +562,44 @@ function CountUp({ to }) {
   const [v, setV] = useState(0)
   useEffect(() => {
     let raf, t0
-    const step = (t) => { t0 = t0 || t; const p = Math.min(1, (t - t0) / 1200); setV(Math.round(to * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(step) }
+    const step = (t) => { t0 = t0 || t; const p = Math.min(1, (t - t0) / 1400); setV(Math.round(to * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(step) }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
   }, [to])
   return v.toLocaleString('en-IN')
 }
-function LiveFamilies() {
+// Big "LIVE" usage badge in the hero: pulsing dot, counting-up numbers, a soft glowing border.
+function LiveFamilies({ isMobile }) {
   const n = useFamiliesCount()
   if (!n) return null
+  const big = { fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 26 : 30, fontWeight: 800, color: '#16a34a', lineHeight: 1 }
+  const small = { fontSize: 12, color: '#475569', fontWeight: 600, marginTop: 4 }
   return (
-    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
-      <style>{`@keyframes cfPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.55)}70%{box-shadow:0 0 0 9px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}`}</style>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '7px 16px', borderRadius: 999, background: '#0f172a', color: '#fff', fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 600 }}>
-        <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22c55e', animation: 'cfPulse 1.8s infinite' }} />
-        <span><span style={{ color: '#4ade80', fontSize: 16 }}><CountUp to={n} /></span> families track their money here</span>
-      </span>
+    <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
+      <style>{`
+        @keyframes cfPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.6)}70%{box-shadow:0 0 0 10px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+        @keyframes cfLiveGlow{0%,100%{box-shadow:0 0 0 1px rgba(22,163,74,.25),0 6px 24px -8px rgba(22,163,74,.35)}50%{box-shadow:0 0 0 1px rgba(22,163,74,.55),0 8px 32px -6px rgba(22,163,74,.55)}}
+        @keyframes cfLiveIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+        @media (prefers-reduced-motion:reduce){.cf-live,.cf-live *{animation:none!important}}
+      `}</style>
+      <div className="cf-live" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 22, padding: isMobile ? '12px 16px' : '14px 26px', borderRadius: 16, background: 'linear-gradient(135deg,#f0fdf4 0%,#ecfeff 100%)', animation: 'cfLiveIn .6s ease-out both, cfLiveGlow 3s ease-in-out .6s infinite', textAlign: 'left' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '.08em' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', animation: 'cfPulse 1.6s infinite' }} /> LIVE
+        </span>
+        <div>
+          <div style={big}><CountUp to={n.families} /></div>
+          <div style={small}>families use it</div>
+        </div>
+        {n.users > n.families && (
+          <>
+            <span style={{ width: 1, alignSelf: 'stretch', background: '#bbf7d0' }} />
+            <div>
+              <div style={{ ...big, color: '#0891b2' }}><CountUp to={n.users} /></div>
+              <div style={small}>people signed in</div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -682,7 +707,7 @@ export default function LandingPage() {
           Sign in with Google — it's free
         </button>
         <TrustChips isMobile={isMobile} />
-        <LiveFamilies />
+        <LiveFamilies isMobile={isMobile} />
       </section>
 
       {/* ─── ABOUT (collapsed): purpose of the app + how it uses Google data.

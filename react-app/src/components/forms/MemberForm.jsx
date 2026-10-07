@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import FamilySafetyNote from './FamilySafetyNote'
 import { FormField, FormInput, FormDateInput, FormSelect, FormCheckbox, FormActions, DeleteButton } from '../Modal'
 
 const RELATIONSHIPS = [
@@ -57,11 +58,12 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
     const e = {}
     if (!form.memberName.trim()) e.memberName = 'Required'
     if (!form.relationship) e.relationship = 'Required'
-    if (!form.dob) e.dob = 'Required'
-    if (!VALIDATORS.pan.test(form.pan.toUpperCase())) e.pan = 'Format: ABCDE1234F'
-    if (!VALIDATORS.aadhar.test(form.aadhar)) e.aadhar = '12 digits required'
+    // Only name, relationship and email are needed. PAN, Aadhaar, mobile and DOB are optional;
+    // their format is checked only when something is typed.
+    if (form.pan.trim() && !VALIDATORS.pan.test(form.pan.trim().toUpperCase())) e.pan = 'Format: ABCDE1234F'
+    if (form.aadhar && !VALIDATORS.aadhar.test(form.aadhar)) e.aadhar = '12 digits, or leave empty'
     if (!VALIDATORS.email.test(form.email)) e.email = 'Invalid email'
-    if (!VALIDATORS.mobile.test(form.mobile)) e.mobile = '10 digits required'
+    if (form.mobile && !VALIDATORS.mobile.test(form.mobile)) e.mobile = '10 digits, or leave empty'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -90,7 +92,7 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
     })
     setSaving(true)
     try {
-      await onSave({ ...form, pan: form.pan.toUpperCase(), dynamicFields: dfObj })
+      await onSave({ ...form, pan: form.pan.trim().toUpperCase(), dynamicFields: dfObj })
     } finally {
       setSaving(false)
     }
@@ -107,15 +109,17 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
         </FormField>
       </div>
 
-      <FormField label="Date of Birth" required error={errors.dob}>
+      <FormField label="Date of Birth (optional)" error={errors.dob}>
         <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
       </FormField>
 
+      <FamilySafetyNote kind="member" />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="PAN" required error={errors.pan}>
+        <FormField label="PAN (optional)" error={errors.pan}>
           <FormInput sensitive value={form.pan} onChange={(v) => set('pan', v.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} />
         </FormField>
-        <FormField label="Aadhar" required error={errors.aadhar}>
+        <FormField label="Aadhaar (optional)" error={errors.aadhar}>
           <FormInput sensitive value={form.aadhar} onChange={(v) => set('aadhar', v.replace(/\D/g, ''))} placeholder="123456789012" maxLength={12} />
         </FormField>
       </div>
@@ -124,7 +128,7 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
         <FormField label="Email" required error={errors.email}>
           <FormInput sensitive type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="email@example.com" />
         </FormField>
-        <FormField label="Mobile" required error={errors.mobile}>
+        <FormField label="Mobile (optional)" error={errors.mobile}>
           <FormInput sensitive value={form.mobile} onChange={(v) => set('mobile', v.replace(/\D/g, ''))} placeholder="9876543210" maxLength={10} />
         </FormField>
       </div>
