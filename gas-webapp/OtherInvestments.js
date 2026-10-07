@@ -67,7 +67,7 @@ function getAllInvestments() {
     const data = dataRange.getValues();
 
     const investments = [];
-    const liveGoldPrice24K = typeof getLiveGoldPrice === 'function' ? getLiveGoldPrice() : 0;
+    var metalPrices = null; // fetched only if someone holds gold / silver by weight
 
     data.forEach((row, index) => {
       // Skip empty rows
@@ -89,15 +89,11 @@ function getAllInvestments() {
       let currentValue = row[8] || 0;
       const investmentType = row[1];
       
-      // Override current value with live gold price if weight is provided
-      if (dynamicFields && dynamicFields.weightGrams) {
-        const isGold = ['Physical Gold', 'Digital Gold', 'Sovereign Gold Bond'].indexOf(investmentType) !== -1;
-        if (isGold && liveGoldPrice24K > 0) {
-          const purity = dynamicFields.purity;
-          const pricePerGram = (purity === '22' || purity === '22K' || purity === '22 Karat') ? 
-                               (liveGoldPrice24K * (22/24)) : liveGoldPrice24K;
-          currentValue = Math.round(dynamicFields.weightGrams * pricePerGram);
-        }
+      // Gold / silver held by weight: value at today's live price
+      if (dynamicFields && Number(dynamicFields.weightGrams) > 0) {
+        if (!metalPrices) { try { metalPrices = getLiveMetalPrices(); } catch (e) { metalPrices = {}; } }
+        const live = metalLiveValue_(investmentType, dynamicFields, metalPrices);
+        if (live > 0) currentValue = live;
       }
 
       investments.push({

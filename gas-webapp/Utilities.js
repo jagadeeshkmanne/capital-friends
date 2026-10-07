@@ -643,45 +643,75 @@ function escapeHtml(text) {
 // ============================================================================
 
 /**
- * Get live gold price (24K INR per gram)
- * Caches the result in ScriptProperties for 4 hours to avoid rate limits
+ * LIVE GOLD & SILVER PRICES (₹ per gram, Indian retail)
+ *
+ * International spot from api.gold-api.com (XAU/INR, XAG/INR, per troy ounce), converted to grams
+ * and lifted to Indian retail level (import duty + GST + local premium). Calibrated 7 Oct 2026:
+ * 24K India ₹14,957/g (Goodreturns) vs spot ₹12,730/g -> 1.175. Silver uses duty + GST (~1.10).
+ * Shared cache 30 minutes; the last good price is kept, so a failed download never shows a made-up rate.
  */
+var METAL_PREMIUM_ = { gold: 1.175, silver: 1.10 };
+var GRAMS_PER_TROY_OZ_ = 31.1034768;
+
+function getLiveMetalPrices() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get('LIVE_METALS_V2');
+  if (hit) { try { return JSON.parse(hit); } catch (e) { } }
+  var props = PropertiesService.getScriptProperties();
+  var last = null;
+  try { last = JSON.parse(props.getProperty('LIVE_METALS_LAST') || 'null'); } catch (e) { last = null; }
+  function spot(sym) {
+    var r = UrlFetchApp.fetch('https://api.gold-api.com/price/' + sym + '/INR', { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return 0;
+    var j = JSON.parse(r.getContentText());
+    return j && j.price > 0 ? j.price / GRAMS_PER_TROY_OZ_ : 0;
+  }
+  var gold = 0, silver = 0;
+  try { gold = spot('XAU'); } catch (e) { Logger.log('gold price fetch failed: ' + e.message); }
+  try { silver = spot('XAG'); } catch (e) { Logger.log('silver price fetch failed: ' + e.message); }
+  var out = {
+    gold24: gold ? Math.round(gold * METAL_PREMIUM_.gold) : (last && last.gold24) || 0,
+    silver999: silver ? Math.round(silver * METAL_PREMIUM_.silver * 100) / 100 : (last && last.silver999) || 0,
+    asOf: new Date().toISOString(),
+    stale: !(gold && silver)
+  };
+  if (gold && silver) {
+    props.setProperty('LIVE_METALS_LAST', JSON.stringify(out));
+    cache.put('LIVE_METALS_V2', JSON.stringify(out), 30 * 60);
+  } else if (last) {
+    out.asOf = last.asOf;
+    cache.put('LIVE_METALS_V2', JSON.stringify(out), 5 * 60); // try again soon
+  }
+  return out;
+}
+
+/** 24K gold, ₹ per gram (kept for older callers). */
 function getLiveGoldPrice() {
-  const cacheKey = 'LIVE_GOLD_PRICE_24K';
-  const props = PropertiesService.getScriptProperties();
-  const cached = props.getProperty(cacheKey);
-  
-  if (cached) {
-    const data = JSON.parse(cached);
-    // Cache for 4 hours
-    if (Date.now() - data.timestamp < 4 * 60 * 60 * 1000) {
-      return data.price;
-    }
+  return getLiveMetalPrices().gold24 || 0;
+}
+
+/**
+ * Live value of a gold / silver holding from its weight and purity. Returns 0 when it can't be
+ * calculated (not a metal, no weight, or no price yet) - callers then keep the saved value.
+ */
+function metalLiveValue_(investmentType, dynamicFields, prices) {
+  var w = dynamicFields && Number(dynamicFields.weightGrams);
+  if (!(w > 0)) return 0;
+  var type = String(investmentType || '');
+  var purity = String((dynamicFields && dynamicFields.purity) || '').toUpperCase().replace(/\s|KARAT|CARAT/g, '');
+  var isGold = ['Physical Gold', 'Digital Gold', 'Sovereign Gold Bond'].indexOf(type) !== -1;
+  var isSilver = /silver/i.test(type);
+  if (isGold) {
+    if (!prices.gold24) return 0;
+    var gf = { '24K': 1, '24': 1, '999': 1, '995': 0.995, '22K': 0.9166, '22': 0.9166, '916': 0.9166, '18K': 0.75, '18': 0.75, '750': 0.75, '14K': 0.585, '14': 0.585 }[purity] || 1;
+    // Sovereign Gold Bonds are valued at the IBJA 999 rate, which has no GST
+    var per = type === 'Sovereign Gold Bond' ? prices.gold24 / 1.03 : prices.gold24 * gf;
+    return Math.round(w * per);
   }
-  
-  try {
-    const url = 'https://api.gold-api.com/price/XAU/INR';
-    const response = UrlFetchApp.fetch(url, {muteHttpExceptions: true});
-    if (response.getResponseCode() === 200) {
-      const json = JSON.parse(response.getContentText());
-      if (json && json.price) {
-        // Price is for 1 Troy Ounce (31.1034768 grams) of Spot Gold
-        const troyOunceToGrams = 31.1034768;
-        const spotPricePerGram = json.price / troyOunceToGrams;
-        // Indian physical retail gold includes 15% customs + 3% GST (1.18x premium)
-        const indianRetail24K = spotPricePerGram * 1.18;
-        
-        props.setProperty(cacheKey, JSON.stringify({
-          price: indianRetail24K,
-          timestamp: Date.now()
-        }));
-        return indianRetail24K;
-      }
-    }
-  } catch (e) {
-    Logger.log('Error fetching gold price: ' + e.message);
+  if (isSilver) {
+    if (!prices.silver999) return 0;
+    var sf = { '999': 1, '925': 0.925, '900': 0.9, '800': 0.8 }[purity] || 1;
+    return Math.round(w * prices.silver999 * sf);
   }
-  
-  // Fallback to a hardcoded safe rough estimate if API fails
-  return 8500; 
+  return 0;
 }

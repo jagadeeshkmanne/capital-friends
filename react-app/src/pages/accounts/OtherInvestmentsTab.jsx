@@ -8,6 +8,7 @@ import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
 import Modal from '../../components/Modal'
 import OtherInvestmentForm from '../../components/forms/OtherInvestmentForm'
+import { useMetalPrices, metalLiveValue } from '../../utils/metals'
 import PageLoading from '../../components/PageLoading'
 
 const catBadge = {
@@ -26,13 +27,20 @@ export default function OtherInvestmentsTab() {
   const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
+  const metalPrices = useMetalPrices() // live gold / silver rate
 
   if (otherInvList === null) return <PageLoading title="Loading investments" cards={5} />
 
   const filtered = useMemo(() => {
-    const active = otherInvList.filter((i) => i.status !== 'Inactive')
+    const active = otherInvList.filter((i) => i.status !== 'Inactive').map((i) => {
+      // gold / silver held by weight: today's value at the live rate
+      const df = typeof i.dynamicFields === 'string' ? (() => { try { return JSON.parse(i.dynamicFields) } catch { return {} } })() : (i.dynamicFields || {})
+      const live = metalLiveValue(i.investmentType, df, metalPrices)
+      return live > 0 ? { ...i, currentValue: live, _live: true } : i
+    })
     return selectedMember === 'all' ? active : active.filter((i) => i.familyMemberId === selectedMember)
-  }, [otherInvList, selectedMember])
+  }, [otherInvList, selectedMember, metalPrices])
+  const hasMetal = filtered.some((i) => i._live)
 
   const totalInvested = filtered.reduce((s, i) => s + (Number(i.investedAmount) > 1 ? Number(i.investedAmount) : Number(i.currentValue || 0)), 0)
   const totalCurrent = filtered.reduce((s, i) => s + (i.currentValue || 0), 0)
@@ -90,6 +98,16 @@ export default function OtherInvestmentsTab() {
         </div>
       ) : (
         <>
+          {hasMetal && metalPrices?.gold24 > 0 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-amber-400"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live rates</span>
+              <span className="text-[var(--text-primary)]">Gold 24K <b className="tabular-nums">₹{Math.round(metalPrices.gold24).toLocaleString('en-IN')}</b>/g</span>
+              <span className="text-[var(--text-primary)]">22K <b className="tabular-nums">₹{Math.round(metalPrices.gold24 * 0.9166).toLocaleString('en-IN')}</b>/g</span>
+              {metalPrices.silver999 > 0 && <span className="text-[var(--text-primary)]">Silver <b className="tabular-nums">₹{Math.round(metalPrices.silver999).toLocaleString('en-IN')}</b>/g</span>}
+              <span className="text-[var(--text-dim)]">Gold & silver entered by weight are valued at today&apos;s rate{metalPrices.stale ? ' (last known rate)' : ''}</span>
+            </div>
+          )}
+
           {/* Stat Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Invested" value={formatINR(totalInvested)} />

@@ -305,7 +305,7 @@ function getMemberOtherInvestments(memberId) {
   const headers = data[1]; // Row 2 is headers
   const investments = [];
 
-  const liveGoldPrice24K = getLiveGoldPrice(); // Fetch once per run
+  var metalPrices = null; // fetched only when needed
 
   for (let i = 3; i <= sheet.getLastRow(); i++) { // Data starts from row 3
     const row = data[i - 1];
@@ -316,19 +316,14 @@ function getMemberOtherInvestments(memberId) {
       let currentValue = row[8] || 0;
       const investmentType = row[1];
       
-      // Parse dynamic fields to check for live gold calculation
+      // Gold / silver held by weight: value at today's live price
       try {
         if (row[10]) {
           const dynamicFields = JSON.parse(decodeHtmlEntities(row[10]));
-          if (dynamicFields && dynamicFields.weightGrams) {
-            const isGold = ['Physical Gold', 'Digital Gold', 'Sovereign Gold Bond'].indexOf(investmentType) !== -1;
-            if (isGold) {
-              const purity = dynamicFields.purity;
-              // 24K price, adjust for 22K if specified
-              const pricePerGram = (purity === '22' || purity === '22K' || purity === '22 Karat') ? 
-                                   (liveGoldPrice24K * (22/24)) : liveGoldPrice24K;
-              currentValue = Math.round(dynamicFields.weightGrams * pricePerGram);
-            }
+          if (dynamicFields && Number(dynamicFields.weightGrams) > 0) {
+            if (!metalPrices) metalPrices = getLiveMetalPrices();
+            const live = metalLiveValue_(investmentType, dynamicFields, metalPrices);
+            if (live > 0) currentValue = live;
           }
         }
       } catch (e) {

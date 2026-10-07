@@ -36,13 +36,15 @@ const STATUS_OPTIONS = [
 ]
 
 // Gold/Silver purity factors
+// factor = share of the 24K / 999 market rate (the live rate is already for 24K / 999)
 const GOLD_PURITY = [
-  { value: '24K', label: '24K (99.9%)', factor: 0.999 },
-  { value: '22K', label: '22K (91.6%)', factor: 0.916 },
-  { value: '18K', label: '18K (75.0%)', factor: 0.750 },
+  { value: '24K', label: '24K (99.9%)', factor: 1 },
+  { value: '22K', label: '22K (91.6%)', factor: 0.9166 },
+  { value: '18K', label: '18K (75.0%)', factor: 0.75 },
+  { value: '14K', label: '14K (58.5%)', factor: 0.585 },
 ]
 const SILVER_PURITY = [
-  { value: '999', label: '999 Fine (99.9%)', factor: 0.999 },
+  { value: '999', label: '999 Fine (99.9%)', factor: 1 },
   { value: '925', label: '925 Sterling (92.5%)', factor: 0.925 },
 ]
 
@@ -121,7 +123,8 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     const purityEntry = purities.find((p) => p.value === purity)
     const factor = purityEntry ? purityEntry.factor : 1
 
-    setCalculatedValue(Math.round(Number(weightGrams) * marketRate * factor))
+    const sgb = form.investmentType === 'Sovereign Gold Bond' ? 1 / 1.03 : 1 // SGB: IBJA rate, no GST
+    setCalculatedValue(Math.round(Number(weightGrams) * marketRate * factor * sgb))
   }, [form.investmentType, weightGrams, purity])
 
   const [errors, setErrors] = useState({})

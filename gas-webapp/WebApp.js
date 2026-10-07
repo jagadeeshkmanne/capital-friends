@@ -442,14 +442,16 @@ function routeAction(action, params, userRecord) {
     case 'triggers:status':      // are this user's daily update / email jobs switched on?
       return getMyDailyJobsStatus();
 
-    case 'data:market':
+    case 'data:market': {
+      var mp = getLiveMetalPrices();
       return {
-        metals: [{
-          name: 'Gold (24K/1g)',
-          price: typeof getLiveGoldPrice === 'function' ? getLiveGoldPrice() : 0,
-          changePct: 0
-        }]
+        metals: [
+          { name: 'Gold (24K/1g)', price: mp.gold24, changePct: 0 },
+          { name: 'Silver (999/1g)', price: mp.silver999, changePct: 0 }
+        ],
+        asOf: mp.asOf, stale: !!mp.stale
       };
+    }
 
     // ── Bulk Data (for targeted refresh) ──
     case 'mf-holdings:list':
