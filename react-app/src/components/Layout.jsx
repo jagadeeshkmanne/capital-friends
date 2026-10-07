@@ -6,7 +6,7 @@ import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
 import DailyUpdatesBanner from './DailyUpdatesBanner'
 import { useData } from '../context/DataContext'
-import { Heart, X, Youtube, Instagram } from 'lucide-react'
+import { Heart, X } from 'lucide-react'
 
 export default function Layout() {
   const { loading, error } = useData()
@@ -73,16 +73,6 @@ export default function Layout() {
             </div>
             {/* Links */}
             <div className="flex items-center gap-3">
-              <a href="https://www.youtube.com/@capitalfriendsin" target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-1 text-xs text-[var(--text-dim)] hover:text-red-400 transition-colors no-underline">
-                <Youtube size={13} />
-                <span>YouTube</span>
-              </a>
-              <a href="https://www.instagram.com/jags.manne/" target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-1 text-xs text-[var(--text-dim)] hover:text-pink-400 transition-colors no-underline">
-                <Instagram size={13} />
-                <span>Instagram</span>
-              </a>
               <Link to="/privacy" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Privacy</Link>
               <Link to="/terms" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Terms</Link>
               <button onClick={() => { setShowDonate(true); dismissBanner() }}

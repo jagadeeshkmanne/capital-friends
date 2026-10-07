@@ -13,6 +13,7 @@ import { useMask } from '../context/MaskContext'
 import useAlerts from '../hooks/useAlerts'
 import MFBuyOpportunities from './forms/MFBuyOpportunities'
 import MFRebalanceDialog from './forms/MFRebalanceDialog'
+import HeaderSocial from './HeaderSocial'
 import * as api from '../services/api'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
@@ -306,6 +307,9 @@ export default function Header() {
 
           {/* Right: icon buttons + avatar */}
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* YouTube + Instagram — eye-catching pills */}
+            <HeaderSocial />
+
             {/* Buy Opportunities — icon button with count badge */}
             {buyOppCount > 0 && (
               <button
