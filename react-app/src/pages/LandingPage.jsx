@@ -524,6 +524,35 @@ const SMART_CARDS = [
   { color: '#2563eb', title: 'Your Data, Your Drive', desc: 'Everything stored in a Google Spreadsheet in YOUR Google Drive. No servers, no database. Auto monthly email reports to your whole family.' },
 ]
 
+// Hero trust chips: appear one by one, the tick draws in, then a soft green glow walks across them.
+const TRUST_ITEMS = ['Free forever', 'Open source', 'No bank credentials', 'Data stays in your Google Drive']
+function TrustChips({ isMobile }) {
+  return (
+    <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: isMobile ? 8 : 12, justifyContent: 'center' }}>
+      <style>{`
+        .cf-trust{display:inline-flex;align-items:center;gap:10px;padding:8px 18px 8px 8px;border-radius:999px;border:1.5px solid rgba(22,163,74,.25);background:linear-gradient(180deg,#f0fdf4,#ffffff);color:#0f172a;font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;box-shadow:0 1px 2px rgba(15,23,42,.06);opacity:0;transform:translateY(10px);animation:cfTrustIn .6s cubic-bezier(.2,.8,.2,1) forwards, cfTrustGlow 8s ease-in-out infinite}
+        .cf-trust .cf-badge{width:26px;height:26px;border-radius:50%;background:#16a34a;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 4px rgba(22,163,74,.14)}
+        .cf-trust .cf-badge path{stroke-dasharray:24;stroke-dashoffset:24;animation:cfTick .5s ease-out forwards}
+        @keyframes cfTrustIn{to{opacity:1;transform:none}}
+        @keyframes cfTick{to{stroke-dashoffset:0}}
+        @keyframes cfTrustGlow{0%,22%,100%{border-color:rgba(22,163,74,.25);box-shadow:0 1px 2px rgba(15,23,42,.06);transform:none}8%{border-color:rgba(22,163,74,.85);box-shadow:0 6px 20px rgba(22,163,74,.28);transform:translateY(-2px)}}
+        @media (max-width:600px){.cf-trust{font-size:13px;padding:6px 14px 6px 6px}.cf-trust .cf-badge{width:22px;height:22px}}
+        @media (prefers-reduced-motion:reduce){.cf-trust{animation:none;opacity:1;transform:none}.cf-trust .cf-badge path{animation:none;stroke-dashoffset:0}}
+      `}</style>
+      {TRUST_ITEMS.map((t, i) => (
+        <span key={t} className="cf-trust" style={{ animationDelay: `${0.3 + i * 0.25}s, ${1.8 + i * 2}s` }}>
+          <span className="cf-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12l5 5L20 7" style={{ animationDelay: `${0.6 + i * 0.25}s` }} />
+            </svg>
+          </span>
+          {t}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function LandingPage() {
   const { isAuthenticated, loading, signIn } = useAuth()
   const navigate = useNavigate()
@@ -597,14 +626,17 @@ export default function LandingPage() {
           <GI s={14} />
           Sign in with Google — it's free
         </button>
-        <div style={{ marginTop: 10, fontSize: 11.5, color: '#94a3b8' }}>
-          Free · Open source · No bank credentials · Data stays in your Google Drive
-        </div>
+        <TrustChips isMobile={isMobile} />
       </section>
 
-      {/* ─── ABOUT: purpose of the app + how it uses Google data (needed for Google OAuth verification) ─── */}
-      <section id="about" style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '24px 16px' : '28px 24px' }}>
-        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      {/* ─── ABOUT (collapsed): purpose of the app + how it uses Google data.
+           Kept on the home page for Google OAuth verification, but folded away so the page stays clean. ─── */}
+      <section id="about" style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '10px 16px' : '10px 24px' }}>
+        <details style={{ maxWidth: 960, margin: '0 auto' }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#475569', textAlign: 'center', padding: '6px 0', listStyle: 'none' }}>
+            What is Capital Friends and how it uses your Google account <span style={{ color: '#16a34a' }}>▾</span>
+          </summary>
+          <div style={{ paddingTop: 14 }}>
           <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>What is Capital Friends?</h2>
           <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.7, marginBottom: 18 }}>Capital Friends is a free, open-source web app that helps Indian families keep track of their money in one place: mutual funds, stocks, fixed deposits, gold, bank and investment accounts, insurance policies, loans and financial goals, for every family member. Its main purpose is family awareness: the app sends a regular email summary to the family members you choose, so your spouse or parents always know what you own and where, even if something happens to you. It also shows each fund's current value and distance from its all-time high, suggests rebalancing amounts when a portfolio drifts from its target split, and tracks goals such as retirement and children's education.</p>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>How Capital Friends uses your Google account</h3>
@@ -629,7 +661,8 @@ export default function LandingPage() {
           <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, marginTop: 14 }}>
             There is no Capital Friends server or database. Your data stays in your own Google Drive, and the app never asks for bank passwords. Capital Friends is a tracking tool, not investment advice. Read the <a href="https://capitalfriends.in/privacy" style={{ color: '#0891b2' }}>Privacy Policy</a> and <a href="https://capitalfriends.in/terms" style={{ color: '#0891b2' }}>Terms &amp; Conditions</a>.
           </p>
-        </div>
+          </div>
+        </details>
       </section>
 
       {/* ─── SHOWCASE ─── */}
