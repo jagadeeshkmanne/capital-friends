@@ -396,5 +396,72 @@ function dailyUserSync() {
 }
 
 // ============================================================================
+// SAFETY NET: refresh on app open when this user's copy is older than the master
+// ============================================================================
+
+/**
+ * Called by the app in the background after the dashboard loads ('data:sync-if-stale').
+ * Refreshes this user's MutualFundData / MF_ATH_Data / StockMasterData only if the master DB has
+ * been refreshed since this user's last copy. Covers users whose background triggers did not run.
+ * @returns {Object} { refreshed: boolean, reason, ...refreshAllMasterData() result when refreshed }
+ */
+function syncMasterDataIfStale() {
+  var lastSync = getMasterDataLastSync_();
+  var masterUpdated = null;
+  try { masterUpdated = getMasterLastUpdated_(); } catch (e) { log('syncMasterDataIfStale: master time unavailable: ' + e.message); }
+
+  var stale, reason;
+  if (!lastSync) { stale = true; reason = 'never synced'; }
+  else if (masterUpdated) { stale = masterUpdated.getTime() > lastSync.getTime(); reason = stale ? 'master updated ' + masterUpdated.toISOString() : 'up to date'; }
+  else { stale = (Date.now() - lastSync.getTime()) > 8 * 3600 * 1000; reason = stale ? 'older than 8h' : 'recent'; } // master time unknown
+  if (!stale) return { refreshed: false, reason: reason };
+
+  // One refresh at a time per user (two open tabs must not both copy 15,000 rows)
+  var lock = LockService.getUserLock();
+  if (!lock.tryLock(1000)) return { refreshed: false, reason: 'refresh already running' };
+  try {
+    var result = refreshAllMasterData();
+    result.refreshed = true;
+    result.reason = reason;
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** This user's last master-data copy time (Settings 'masterDataLastSync'), or null. */
+function getMasterDataLastSync_() {
+  try {
+    var sheet = getSheet(CONFIG.settingsSheet);
+    if (!sheet || sheet.getLastRow() < 2) return null;
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === 'masterDataLastSync') {
+        var d = new Date(data[i][1]);
+        return isNaN(d.getTime()) ? null : d;
+      }
+    }
+  } catch (e) { log('getMasterDataLastSync_: ' + e.message); }
+  return null;
+}
+
+/** When the master DB last refreshed its MF data (MF_Metadata 'Last Updated'). Cached 10 min for all users. */
+function getMasterLastUpdated_() {
+  var cache = CacheService.getScriptCache(), key = 'masterLastUpdated_v1';
+  var hit = cache.get(key);
+  if (hit) return new Date(+hit);
+  var rows = masterRows_('MF_Metadata', 2);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === 'Last Updated') {
+      var d = rows[i][1] instanceof Date ? rows[i][1] : new Date(rows[i][1]);
+      if (isNaN(d.getTime())) return null;
+      cache.put(key, String(d.getTime()), 600);
+      return d;
+    }
+  }
+  return null;
+}
+
+// ============================================================================
 // END OF MASTERDATASYNC.JS
 // ============================================================================

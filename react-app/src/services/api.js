@@ -300,6 +300,8 @@ export const saveSettings = (data) => callAPI('settings:update', data)
 // Master Data Refresh
 export const refreshMasterData = () => callAPI('data:refresh-master')
 export const checkDataFreshness = () => callAPI('data:check-freshness')
+// Background safety net: refreshes NAV/master data only if the master DB is newer than this user's copy
+export const syncMasterIfStale = () => callAPI('data:sync-if-stale')
 
 // Email Reports
 export const sendDashboardEmail = () => callAPI('email:send-report-now')

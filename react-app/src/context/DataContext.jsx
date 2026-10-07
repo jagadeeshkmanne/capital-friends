@@ -357,6 +357,18 @@ export function DataProvider({ children }) {
         setLoading(false)
         setIsRefreshing(false)
       }
+
+      // Step 4: safety net for NAVs — if this user's copy of the fund data is older than the
+      // master DB (e.g. their background sync didn't run), refresh it and reload quietly.
+      // Non-blocking: any failure here leaves the screen exactly as it is.
+      api.syncMasterIfStale()
+        .then(async (r) => {
+          if (!r?.refreshed) return
+          const fresh = await api.loadAllData()
+          hydrateState(fresh)
+          persistToIDB(fresh)
+        })
+        .catch(() => {})
     }
 
     init()

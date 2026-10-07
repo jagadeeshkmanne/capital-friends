@@ -191,6 +191,14 @@ function sendScheduledDailyEmail() {
     _currentUserSpreadsheetId = userRecord.spreadsheetId;
     Logger.log('Spreadsheet context set for: ' + email + ' (' + userRecord.spreadsheetId + ')');
 
+    // Make sure the email uses today's NAVs, even if this user's sync trigger did not run
+    try {
+      var sync = syncMasterDataIfStale();
+      Logger.log('Pre-email NAV check: ' + (sync.refreshed ? 'refreshed (' + sync.reason + ')' : sync.reason));
+    } catch (syncErr) {
+      Logger.log('Pre-email NAV refresh skipped: ' + syncErr.toString());
+    }
+
     // Use the unified dashboard email report (same as manual send from React Settings)
     const result = sendDashboardEmailReport('daily', true);
 

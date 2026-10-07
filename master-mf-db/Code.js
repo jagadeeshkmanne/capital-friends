@@ -34,8 +34,11 @@ const CONFIG = {
   apiSource: 'amfi', // Use 'amfi' for ALL schemes (40,000+) - much faster and complete
   amfiNavUrl: 'https://www.amfiindia.com/api/nav-history?query_type=all_for_date&from_date=', // Official AMFI JSON API (8500+ active schemes)
 
-  // Trigger settings — 3x daily: 9 AM, 12 PM, 3 PM
-  refreshHours: [9, 12, 15],
+  // Trigger settings (IST), 3 runs a day. AMFI publishes most NAVs by ~11 PM the same day and
+  // fund-of-funds by ~10 AM next day: 11 PM catches today's NAVs, 7 AM has everything ready before
+  // morning emails, 11 AM picks up FoFs. (Was 9, 12, 15 - a 9 AM email could go out before the first refresh.)
+  // After changing, run setupDailyTrigger() once (it replaces only the refreshMutualFundData triggers).
+  refreshHours: [7, 11, 23],
 
   // Data columns (matching your structure)
   columns: {
@@ -168,7 +171,7 @@ function createMetadataSheet() {
     ['Total Schemes', ''],
     ['API Source', 'AMFI India (Official)'],
     ['Status', 'Active'],
-    ['Refresh Schedule', '3x daily at ' + CONFIG.refreshHours.join(', ') + ' hrs'],
+    ['Refresh Schedule', CONFIG.refreshHours.length + 'x daily at ' + CONFIG.refreshHours.join(', ') + ' hrs'],
     ['Last Error', '']
   ];
 
@@ -571,7 +574,7 @@ function setupDailyTrigger() {
       .create();
   });
 
-  Logger.log('Triggers set to run 3x daily at ' + CONFIG.refreshHours.join(', ') + ' hrs');
+  Logger.log('Triggers set to run ' + CONFIG.refreshHours.length + 'x daily at ' + CONFIG.refreshHours.join(', ') + ' hrs');
 }
 
 /**
