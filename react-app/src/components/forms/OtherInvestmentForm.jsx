@@ -3,8 +3,7 @@ import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 import { useMask } from '../../context/MaskContext'
-
-const MARKET_CACHE_KEY = 'cf_market_data'
+import { useMetalPrices, metalLiveValue } from '../../utils/metals'
 
 const INVESTMENT_TYPES = [
   { value: 'Fixed Deposit', category: 'Debt' },
@@ -58,18 +57,6 @@ function isMetalType(type) {
   return isGoldType(type) || isSilverType(type)
 }
 
-function getMarketMetalPrice(metalType) {
-  try {
-    const cached = sessionStorage.getItem(MARKET_CACHE_KEY)
-    if (!cached) return null
-    const data = JSON.parse(cached)
-    if (!data.metals) return null
-    const name = metalType === 'gold' ? 'Gold' : 'Silver'
-    const metal = data.metals.find((m) => m.name.toLowerCase().includes(name.toLowerCase()))
-    return metal ? metal.price : null
-  } catch { return null }
-}
-
 // dynamicFields may arrive as an object, a JSON string, or (older rows) a JSON string inside a JSON string
 function parseDynamic(v) {
   try {
@@ -119,23 +106,16 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     emiAmount: '',
     interestRate: '',
   })
-  // Auto-calculate metal value from weight × purity × market rate
+  // Auto-calculate metal value from weight × purity × today's live rate (same rule as the list and the server)
+  const metalPrices = useMetalPrices()
   useEffect(() => {
     if (!isMetalType(form.investmentType) || !weightGrams || Number(weightGrams) <= 0) {
       setCalculatedValue(null)
       return
     }
-    const metalType = isGoldType(form.investmentType) ? 'gold' : 'silver'
-    const marketRate = getMarketMetalPrice(metalType)
-    if (!marketRate) { setCalculatedValue(null); return }
-
-    const purities = metalType === 'gold' ? GOLD_PURITY : SILVER_PURITY
-    const purityEntry = purities.find((p) => p.value === purity)
-    const factor = purityEntry ? purityEntry.factor : 1
-
-    const sgb = form.investmentType === 'Sovereign Gold Bond' ? 1 / 1.03 : 1 // SGB: IBJA rate, no GST
-    setCalculatedValue(Math.round(Number(weightGrams) * marketRate * factor * sgb))
-  }, [form.investmentType, weightGrams, purity])
+    const v = metalLiveValue(form.investmentType, { weightGrams: Number(weightGrams), purity }, metalPrices)
+    setCalculatedValue(v > 0 ? v : null)
+  }, [form.investmentType, weightGrams, purity, metalPrices])
 
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
