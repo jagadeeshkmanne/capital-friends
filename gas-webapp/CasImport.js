@@ -167,7 +167,7 @@ function casFundIndex_(isins) {
   isins.forEach(function (x) { if (/^INF[A-Z0-9]{9}$/.test(x) && list.indexOf(x) < 0) list.push(x); });
   var out = {};
   // Shared cache (all users, 6 hours): repeat checks and other users' imports of the same funds need no download
-  var cache = null, CK = 'casisin1:';
+  var cache = null, CK = 'casisin2:'; // v2: SIF funds added to the master list (forget cached "not found")
   try { cache = CacheService.getScriptCache(); } catch (e) { cache = null; }
   if (cache) {
     var hit = cache.getAll(list.map(function (x) { return CK + x; })) || {};

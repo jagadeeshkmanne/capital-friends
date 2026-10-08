@@ -369,11 +369,25 @@ function dailyATHUpdate() {
   }
 
   const newCodes = [];
+  const sifRows = []; // SIFs: no history on mfapi.in, so their ATH starts at today's NAV and rises from there
   for (let i = 0; i < mfData.length; i++) {
     const code = String(mfData[i][0]).trim();
     if (code && !existingATHCodes[code]) {
-      newCodes.push(code);
+      if (isSifCode_(code)) {
+        const nav = parseFloat(mfData[i][3]) || 0;
+        if (nav > 0) sifRows.push([code, String(mfData[i][1]), nav, Utilities.formatDate(today, Session.getScriptTimeZone(), 'dd-MM-yyyy'), today]);
+      } else {
+        newCodes.push(code);
+      }
     }
+  }
+  if (sifRows.length > 0) {
+    const colA = athSheet.getRange(2, 1, Math.max(1, athSheet.getLastRow() - 1), 1).getValues();
+    let last = 1;
+    for (let r = colA.length - 1; r >= 0; r--) { if (String(colA[r][0]).trim()) { last = r + 2; break; } }
+    athSheet.getRange(last + 1, 1, sifRows.length, 5).setValues(sifRows);
+    SpreadsheetApp.flush();
+    Logger.log('Added ' + sifRows.length + ' SIF schemes to MF_ATH (ATH = current NAV)');
   }
 
   if (newCodes.length > 0) {
@@ -573,7 +587,7 @@ function initializeATHForAllFunds() {
   Logger.log('Already in MF_ATH: ' + Object.keys(existingCodes).length);
 
   // Find codes that need ATH
-  const pendingCodes = allCodes.filter(function(code) { return !existingCodes[code]; });
+  const pendingCodes = allCodes.filter(function(code) { return !existingCodes[code] && !isSifCode_(code); }); // SIFs are added by the daily update
   Logger.log('Pending ATH fetch: ' + pendingCodes.length);
 
   if (pendingCodes.length === 0) {

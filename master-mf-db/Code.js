@@ -33,6 +33,11 @@ const CONFIG = {
   // API configuration
   apiSource: 'amfi', // Use 'amfi' for ALL schemes (40,000+) - much faster and complete
   amfiNavUrl: 'https://www.amfiindia.com/api/nav-history?query_type=all_for_date&from_date=', // Official AMFI JSON API (8500+ active schemes)
+  // Specialised Investment Funds (SIF) are not in the mutual fund API: AMFI publishes them separately.
+  // AMFI gives them ids like 'SIF-120'. To keep column A all-numeric (the app reads it as a number),
+  // a SIF gets the code 900000000 + its number (SIF-120 -> 900000120). Real AMFI scheme codes are 6 digits.
+  sifNavUrl: 'https://www.amfiindia.com/api/sif-latest-nav',
+  sifCodeBase: 900000000,
 
   // Trigger settings (IST), 3 runs a day. AMFI publishes most NAVs by ~11 PM the same day and
   // fund-of-funds by ~10 AM next day: 11 PM catches today's NAVs, 7 AM has everything ready before
@@ -193,12 +198,22 @@ function refreshMutualFundData() {
 
   try {
     // Fetch all MF data from AMFI India
-    const mfData = fetchFromAMFI();
+    let mfData = fetchFromAMFI();
 
     if (mfData.length === 0) {
       Logger.log('⚠️ No data fetched, keeping existing data intact.');
       updateMetadata(0, 'No data fetched, existing data retained');
       return;
+    }
+
+    // SIF schemes (separate AMFI feed). Any problem here only skips SIFs: the mutual fund refresh goes on as before.
+    let sifIsin = {};
+    try {
+      const sif = fetchSIF_(typeof mfData[0][0]);
+      if (sif.rows.length) { mfData = mfData.concat(sif.rows); sifIsin = sif.isin; }
+      Logger.log('SIF: ' + sif.rows.length + ' schemes');
+    } catch (e) {
+      Logger.log('SIF skipped (mutual funds refresh continues): ' + e.message);
     }
 
     // Upsert: update funds that have new data, insert new ones, never delete
@@ -239,7 +254,7 @@ function refreshMutualFundData() {
     // refresh falls back to exactly the old 8-column write.
     let width = 8;
     try {
-      const withIsin = addIsinColumns_(sheet, existingRows, mergedData);
+      const withIsin = addIsinColumns_(sheet, existingRows, mergedData, sifIsin);
       if (withIsin) { mergedData = withIsin; width = 10; }
     } catch (e) {
       Logger.log('ISIN columns skipped (A-H refresh continues as before): ' + e.message);
@@ -275,7 +290,8 @@ function refreshMutualFundData() {
  * J (ISIN reinvestment) appended, or null to keep the old 8-column write.
  * If AMFI's file can't be downloaded, the ISINs already in the sheet are carried forward by fund code.
  */
-function addIsinColumns_(sheet, existingRows, rows) {
+function addIsinColumns_(sheet, existingRows, rows, extraIsin) {
+  extraIsin = extraIsin || {}; // ISINs from the SIF feed (NAVAll.txt does not list SIFs)
   // ISINs already in the sheet (carried forward if today's download fails)
   const oldIsin = {};
   if (existingRows > 0 && sheet.getLastColumn() >= 10) {
@@ -319,13 +335,60 @@ function addIsinColumns_(sheet, existingRows, rows) {
   let filled = 0;
   const out = rows.map(function (r) {
     const code = String(r[0]);
-    const isin = (useFresh && fresh[code]) || oldIsin[code] || ['', ''];
+    const isin = (useFresh && fresh[code]) || extraIsin[code] || oldIsin[code] || ['', ''];
     if (isin[0] || isin[1]) filled++;
     return r.slice(0, 8).concat(isin);
   });
   Logger.log('ISIN columns: ' + filled + ' of ' + out.length + ' schemes have an ISIN (' + (useFresh ? 'fresh from AMFI' : 'carried forward') + ')');
   return out;
 }
+
+/**
+ * Specialised Investment Funds from AMFI's SIF feed, as MF_Data rows (same 8 columns, same types).
+ * Feed: data[].categories[].groups[].schemes[] = { Sd_Id: 'SIF-120', ISINPO, ISINRI, NavName, Date: '29-Sep-2026',
+ * NetAssetValue, SIFName, category, ... }. Returns { rows, isin: { code: [isinGrowth/Payout, isinReinvest] } }.
+ * codeType = typeof the mutual fund codes, so SIF codes are written exactly like them.
+ */
+function fetchSIF_(codeType) {
+  const out = { rows: [], isin: {} };
+  const res = UrlFetchApp.fetch(CONFIG.sifNavUrl, { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) { Logger.log('SIF feed HTTP ' + res.getResponseCode()); return out; }
+  const json = JSON.parse(res.getContentText());
+  const seen = {};
+  const okIsin = function (x) { x = String(x || '').trim(); return /^INF[A-Z0-9]{9}$/.test(x) ? x : ''; };
+  (json.data || []).forEach(function (t) {
+    (t.categories || []).forEach(function (c) {
+      (c.groups || []).forEach(function (g) {
+        (g.schemes || []).forEach(function (s) {
+          const m = /^SIF-(\d+)$/.exec(String(s.Sd_Id || '').trim());
+          const nav = parseFloat(s.NetAssetValue);
+          const name = String(s.NavName || '').trim();
+          if (!m || !(nav > 0) || !name) return;
+          const num = CONFIG.sifCodeBase + Number(m[1]);
+          if (seen[num]) return;
+          seen[num] = true;
+          out.rows.push([codeType === 'number' ? num : String(num), name, sifCategory_(s.category || c.category, name),
+            nav, String(s.Date || '').trim(), String(s.SIFName || g.SIFName || '').trim(), getSchemeType(name), 'Active']);
+          const po = okIsin(s.ISINPO), ri = okIsin(s.ISINRI);
+          if (po || ri) out.isin[String(num)] = [po, ri];
+        });
+      });
+    });
+  });
+  return out;
+}
+
+/** 'Equity Oriented Investment Strategies - ...' -> Equity, 'Hybrid Investment Strategies - ...' -> Hybrid, debt -> Debt */
+function sifCategory_(category, name) {
+  const c = String(category || '').toLowerCase();
+  if (c.indexOf('equity') === 0) return 'Equity';
+  if (c.indexOf('debt') === 0) return 'Debt';
+  if (c.indexOf('hybrid') === 0) return 'Hybrid';
+  return categorizeScheme(name);
+}
+
+/** True for the codes given to SIF schemes (no NAV history on mfapi.in). */
+function isSifCode_(code) { return Number(code) >= CONFIG.sifCodeBase; }
 
 /**
  * Build the AMFI JSON API URL for a given date

@@ -27,7 +27,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 /** { times: [UTC day seconds ascending], navs: [number] } or null */
 export async function getNavHistory(code) {
   code = String(code || '').trim()
-  if (!/^\d+$/.test(code)) return null
+  if (!/^\d+$/.test(code) || Number(code) >= 900000000) return null // SIF codes: no history on mfapi.in
   const cached = await idbGet(code)
   if (cached && cached.day === today()) return cached
   try {
