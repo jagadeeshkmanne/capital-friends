@@ -619,7 +619,7 @@ export default function LandingPage() {
   const timerRef = useRef(null)
   const N = 5
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
-  // phones under 430px: logo only in the header, so the YouTube/Instagram buttons and Sign In fit on one line
+  // phones under 430px: logo only in the header, so YouTube/Instagram and Sign In fit on one line
   const narrowPhone = isMobile && typeof window !== 'undefined' && window.innerWidth < 430
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
@@ -662,12 +662,12 @@ export default function LandingPage() {
             <img src={LOGO_ICON} alt="" style={{ height: 44, width: 'auto' }}
               onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
             <div style={{ display: 'none', width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 12, color: '#fff', flexShrink: 0 }}>CF</div>
-            <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px', whiteSpace: 'nowrap', display: narrowPhone ? 'none' : 'inline' }}>
+            <span style={{ display: narrowPhone ? 'none' : 'inline', fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
               <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b> <em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
             </span>
           </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
-          <HeaderSocial fixedDark />
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+          <HeaderSocial outline />
           <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: isMobile ? '8px 12px' : '8px 18px', borderRadius: 8, whiteSpace: 'nowrap', background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
             <GI s={14} />
             Sign In
@@ -722,6 +722,7 @@ export default function LandingPage() {
           </div>
           {/* product preview */}
           <div className="cf-in" style={{ position: 'relative', minWidth: 0, animationDelay: '.15s', padding: isMobile ? '6px 0 0' : 0 }}>
+            <div style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', inset: '8% 6%', background: 'radial-gradient(closest-side, rgba(124,58,237,.45), transparent)', filter: 'blur(30px)' }} />
             <div className="cf-shot" style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)', boxShadow: '0 40px 80px -20px rgba(0,0,0,.8)', display: 'flex', flexDirection: 'column', height: isMobile ? 330 : 430, pointerEvents: 'none', userSelect: 'none' }}>
               <WinBar url="capitalfriends.in/dashboard" />
@@ -734,6 +735,7 @@ export default function LandingPage() {
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Stored in your Google Sheet</div>
                 <div style={{ fontSize: 11.5, color: '#94a3b8' }}>in your own Google Drive</div>
               </div>
+            </div>
             </div>
           </div>
         </div>
