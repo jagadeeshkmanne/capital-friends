@@ -234,7 +234,7 @@ export default function ImportStatementPage() {
     return nameOf(k)
   }
   const blockedFunds = (preview?.funds || []).filter((f) => f.blocked)
-  const mustFix = preview && (preview.missingMembers.length > 0 || preview.unknownFunds.length > 0 || preview.needsBank)
+  const mustFix = preview && (preview.missingMembers.length > 0 || preview.needsBank)
   const helpOpen = showHelp
   const canImport = preview && !preview.blocked && !saving && !checking
   const step = !parsed ? 1 : !preview ? 2 : 3
@@ -324,8 +324,16 @@ export default function ImportStatementPage() {
                   {preview.missingMembers.map((m) => (
                     <p key={m.holder}>• Add <b>{m.holder}</b> in <Link to="/family" className="underline">Family</Link> (same name as the statement), then come back.</p>
                   ))}
-                  {preview.unknownFunds.map((f) => <p key={f.folio + f.isin}>• “{f.scheme}” is not in our fund list yet. Tell us and we&apos;ll add it.</p>)}
                   {preview.needsBank && <p>• Add a bank account in <Link to="/accounts/bank" className="underline">Bank Accounts</Link> first – a new investment account needs one. Or pick one of your existing portfolios below.</p>}
+                </Note>
+              )}
+
+              {preview.unknownFunds.length > 0 && (
+                <Note tone="warn">
+                  <p className="font-semibold">{preview.unknownFunds.length === 1 ? 'This fund' : `These ${preview.unknownFunds.length} funds`} will be left out for now</p>
+                  <p>They are not in AMFI&apos;s fund list yet, so we can&apos;t get their price. Everything else will import.</p>
+                  {preview.unknownFunds.map((f) => <p key={f.folio + f.isin}>• {f.scheme} <span className="text-[var(--text-dim)]">({f.isin} · folio {f.folio})</span></p>)}
+                  <p>Import this statement again in a few days; they will be added once AMFI lists them. If one stays missing, write to us with its name.</p>
                 </Note>
               )}
 

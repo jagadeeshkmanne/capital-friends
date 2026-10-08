@@ -350,8 +350,9 @@ function casBuildPlan_(statement, data, mapping) {
         return;
       }
       if (f.close > 0) {
+        // Not in AMFI's lists yet (e.g. a new kind of fund). Leave just this one out and import the rest:
+        // it is listed in the preview, and importing the same statement later adds it once it is listed.
         plan.unknownFunds.push({ folio: f.folio, isin: f.isin, scheme: f.scheme, units: f.close });
-        plan.blocked = true;
       } else plan.skipped.push({ folio: f.folio, scheme: f.scheme, reason: 'Old fund that is no longer listed (fully sold). Skipped.' });
       return;
     }
