@@ -29,9 +29,8 @@ export default function OtherInvestmentsTab() {
   const [modal, setModal] = useState(null)
   const metalPrices = useMetalPrices() // live gold / silver rate
 
-  if (otherInvList === null) return <PageLoading title="Loading investments" cards={5} />
-
   const filtered = useMemo(() => {
+    if (!otherInvList) return []
     const active = otherInvList.filter((i) => i.status !== 'Inactive').map((i) => {
       // gold / silver held by weight: today's value at the live rate
       const df = (() => { try { let d = i.dynamicFields || {}; if (typeof d === 'string') d = JSON.parse(d); if (typeof d === 'string') d = JSON.parse(d); return d || {} } catch { return {} } })()
@@ -42,15 +41,17 @@ export default function OtherInvestmentsTab() {
   }, [otherInvList, selectedMember, metalPrices])
   const hasMetal = filtered.some((i) => i._live)
 
+
   const totalInvested = filtered.reduce((s, i) => s + (Number(i.investedAmount) > 1 ? Number(i.investedAmount) : Number(i.currentValue || 0)), 0)
   const totalCurrent = filtered.reduce((s, i) => s + (i.currentValue || 0), 0)
 
   // Lookup linked liabilities
   const liabilityMap = useMemo(() => {
     const map = {}
-    liabilityList.forEach((l) => { map[l.liabilityId] = l })
+    ;(liabilityList || []).forEach((l) => { map[l.liabilityId] = l })
     return map
   }, [liabilityList])
+  if (otherInvList === null) return <PageLoading title="Loading investments" cards={5} />
   const linkedLoanTotal = filtered.reduce((s, i) => {
     if (!i.linkedLiabilityId) return s
     const ids = i.linkedLiabilityId.split(',').map(x => x.trim()).filter(Boolean)
