@@ -677,7 +677,7 @@ function getLiveMetalPrices() {
   };
   if (gold && silver) {
     props.setProperty('LIVE_METALS_LAST', JSON.stringify(out));
-    cache.put('LIVE_METALS_V2', JSON.stringify(out), 30 * 60);
+    cache.put('LIVE_METALS_V2', JSON.stringify(out), 6 * 60 * 60); // gold moves slowly: refresh every 6 h
   } else if (last) {
     out.asOf = last.asOf;
     cache.put('LIVE_METALS_V2', JSON.stringify(out), 5 * 60); // try again soon

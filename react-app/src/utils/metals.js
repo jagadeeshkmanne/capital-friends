@@ -35,13 +35,13 @@ function cached() {
   try { const d = JSON.parse(sessionStorage.getItem(KEY) || 'null'); return d ? { ...fromMarket(d), _ts: d._ts || 0 } : null } catch { return null }
 }
 
-/** Today's gold / silver price; refreshed from the server when older than 30 minutes. */
+/** Today's gold / silver price; refreshed from the server when older than 6 hours. */
 export function useMetalPrices() {
   const [prices, setPrices] = useState(() => cached())
   useEffect(() => {
     let alive = true
     const c = cached()
-    if (c && c.gold24 && Date.now() - c._ts < 30 * 60 * 1000) return
+    if (c && c.gold24 && Date.now() - c._ts < 6 * 60 * 60 * 1000) return
     api.getMarketData().then((d) => {
       if (!alive || !d) return
       const merged = { ...d, _ts: Date.now() }
