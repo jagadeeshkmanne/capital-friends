@@ -242,6 +242,12 @@ export default function MutualFundsPage() {
     'opening-balance': 'Some holdings were added with a recent date instead of the real purchase date.',
     'too-new': 'Less than three months of history.',
     'funds-unreliable': 'Some funds here have incomplete purchase history, so this is hidden. Import your statement to fix it.',
+    'nav-missing': 'Today\'s NAV is missing for a fund here (it shows "Fund not found"), so this is hidden until the fund list refreshes.',
+  }
+  const returnsWhy = (r) => {
+    const base = RETURNS_WHY[r?.returnsReason] || 'Not enough history yet'
+    const names = r?.unreliableFunds || []
+    return names.length ? `${base} Funds: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3} more` : ''}` : base
   }
   const ratePct = (v) => (v == null || !Number.isFinite(v) ? 'N/A' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`)
 
@@ -878,7 +884,7 @@ export default function MutualFundsPage() {
           </>)}
 
           {/* ── Invite to import the CAMS statement (hidden once imported with full history) ── */}
-          <ImportNudge transactions={mfTransactions} returnsReason={returns?.returnsReason} />
+          <ImportNudge transactions={mfTransactions} returnsReason={returns?.returnsReason} funds={returns?.unreliableFunds} />
 
           {/* ── Stat Cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -908,14 +914,14 @@ export default function MutualFundsPage() {
               value={ratePct(returns?.xirr)}
               positive={returns?.xirr == null ? undefined : returns.xirr >= 0}
               sub={returns?.xirr == null ? <button onClick={() => navigate('/import')} className="underline">Import statement</button> : undefined}
-              title={returns?.xirr == null ? (RETURNS_WHY[returns?.returnsReason] || 'Not enough history yet') : 'Yearly return, counting the date and amount of every purchase and sale'}
+              title={returns?.xirr == null ? returnsWhy(returns) : 'Yearly return, counting the date and amount of every purchase and sale'}
             />
             <StatCard
               label="CAGR"
               value={ratePct(returns?.cagr)}
               positive={returns?.cagr == null ? undefined : returns.cagr >= 0}
               sub={returns?.cagr == null ? <button onClick={() => navigate('/import')} className="underline">Import statement</button> : undefined}
-              title={returns?.cagr == null ? (RETURNS_WHY[returns?.returnsReason] || 'Not enough history yet') : 'Average yearly growth of the money invested'}
+              title={returns?.cagr == null ? returnsWhy(returns) : 'Average yearly growth of the money invested'}
             />
             <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
           </div>

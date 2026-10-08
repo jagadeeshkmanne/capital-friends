@@ -217,6 +217,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
       cagr: reason ? null : computeCAGR(f.invested, f.currentValue, weightedInflowDate(flows), today),
       cagrSince: weightedInflowDate(flows),
       returnsReason: reason,
+      navMissing: false,
       openingDate: flows.filter((cf) => cf.opening).map((cf) => cf.date).sort((a, b) => b - a)[0] || null,
       since,
       weight: totalValue > 0 ? (f.currentValue / totalValue) * 100 : 0,
@@ -233,9 +234,15 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
   const totalPL = totalValue - totalInvested
   const allFlows = applyInitialInvestment(toFlows(txns), portfolios)
   const firstDate = earliest(allFlows)
-  const unreliable = funds.filter((f) => f.returnsReason)
-  // Every fund has already validated its own history; at portfolio level only the aggregate verdict matters
-  const totalsReason = unreliable.length > 0 ? 'funds-unreliable' : (allFlows.length ? null : 'no-history')
+  // A fund bought recently ('too-new') has complete history: it cannot be annualised on its own, but it
+  // does not make the combined figure wrong. Only missing history, a setup-date opening balance or a
+  // missing NAV (value shows as 0) would distort the totals.
+  funds.forEach((f) => { if (f.units > 0 && !(f.currentNav > 0)) f.navMissing = true })
+  const unreliable = funds.filter((f) => f.navMissing || (f.returnsReason && f.returnsReason !== 'too-new'))
+  const totalsReason = unreliable.length > 0
+    ? (unreliable.every((f) => f.navMissing) ? 'nav-missing' : 'funds-unreliable')
+    : !allFlows.length ? 'no-history'
+    : (today - firstDate) / DAY < MIN_HISTORY_DAYS ? 'too-new' : null
   // Money actually put in (switch legs cancel), and the gain on it including what was realised along the way
   // Same rule as the sheet's Total Investment formula, computed here so it does not depend on that
   // cell being intact: (initial investment if stated, else opening balances) + SIP + lumpsum
@@ -266,6 +273,7 @@ export function buildFundsModel({ portfolios, holdings, transactions, today = ne
     cagrSince,
     returnsReason: totalsReason,
     unreliableCount: unreliable.length,
+    unreliableFunds: unreliable.map((f) => f.fundName || f.schemeCode),
     unreliableByReason: unreliable.reduce((acc, f) => { acc[f.returnsReason] = (acc[f.returnsReason] || 0) + 1; return acc }, {}),
     since: firstDate,
     fundCount: funds.length,

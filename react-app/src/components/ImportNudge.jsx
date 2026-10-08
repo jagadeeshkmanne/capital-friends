@@ -10,11 +10,11 @@ const KEY = 'cf_import_nudge_snooze'
 
 function snoozedUntil() { try { return +localStorage.getItem(KEY) || 0 } catch { return 0 } }
 
-export default function ImportNudge({ transactions, returnsReason }) {
+export default function ImportNudge({ transactions, returnsReason, funds }) {
   const navigate = useNavigate()
   const [hidden, setHidden] = useState(() => snoozedUntil() > Date.now())
   const imported = (transactions || []).some((t) => /^CAMS · folio/.test(String(t.notes || '')))
-  const incomplete = !!returnsReason && returnsReason !== 'too-new'
+  const incomplete = returnsReason === 'funds-unreliable' || returnsReason === 'no-history'
   if (hidden || (imported && !incomplete)) return null
 
   function snooze(days) {
@@ -26,7 +26,7 @@ export default function ImportNudge({ transactions, returnsReason }) {
     return (
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-center gap-3">
         <AlertTriangle size={18} className="text-amber-400 shrink-0" />
-        <p className="flex-1 text-xs text-[var(--text-primary)]">Some funds don&apos;t have their full purchase history, so XIRR and CAGR are hidden. Import the latest CAMS statement of that family member to fix it.</p>
+        <p className="flex-1 text-xs text-[var(--text-primary)]">Some funds don&apos;t have their full purchase history, so XIRR and CAGR are hidden. Import the latest CAMS statement of that family member to fix it.{funds?.length ? <span className="block mt-0.5 text-[var(--text-muted)]">Missing: {funds.slice(0, 3).join(', ')}{funds.length > 3 ? ` +${funds.length - 3} more` : ''}</span> : null}</p>
         <button onClick={() => navigate('/import')} className="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-400 text-black">Import</button>
         <button onClick={() => snooze(7)} aria-label="Not now" className="shrink-0 p-1 rounded hover:bg-[var(--bg-hover)]"><X size={14} className="text-[var(--text-dim)]" /></button>
       </div>

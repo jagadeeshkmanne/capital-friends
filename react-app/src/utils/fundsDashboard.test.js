@@ -221,3 +221,37 @@ test('breakdown rows add up to the totals', () => {
   assert.ok(Math.abs(m.breakdown.byPortfolio.reduce((s, r) => s + r.weight, 0) - 100) < 1e-6)
   m.breakdown.byMember.forEach((r) => assert.ok(r.portfolioCount >= 1))
 })
+
+test('a recently bought fund does not hide the combined XIRR / CAGR', () => {
+  const today = new Date(2026, 9, 8)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active' }]
+  const holdings = [
+    { portfolioId: 'P1', schemeCode: 'A', fundName: 'Old Fund', units: 100, avgNav: 100, investment: 10000, currentNav: 150, currentValue: 15000 },
+    { portfolioId: 'P1', schemeCode: '900000120', fundName: 'New SIF', units: 1000, avgNav: 10, investment: 10000, currentNav: 10.5, currentValue: 10500 },
+  ]
+  const transactions = [
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Old Fund', type: 'BUY', transactionType: 'SIP', date: '2023-01-05', units: 100, price: 100, totalAmount: 10000 },
+    { portfolioId: 'P1', fundCode: '900000120', fundName: 'New SIF', type: 'BUY', transactionType: 'LUMPSUM', date: '2026-09-01', units: 1000, price: 10, totalAmount: 10000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.funds.find((f) => f.schemeCode === '900000120').returnsReason, 'too-new')
+  assert.equal(m.totals.returnsReason, null)
+  assert.ok(m.totals.xirr > 0 && m.totals.cagr > 0)
+})
+
+test('a fund with no NAV (Fund not found) hides the totals with its own reason and name', () => {
+  const today = new Date(2026, 9, 8)
+  const portfolios = [{ portfolioId: 'P1', portfolioName: 'P1', ownerId: 'M1', ownerName: 'Self', status: 'Active' }]
+  const holdings = [
+    { portfolioId: 'P1', schemeCode: 'A', fundName: 'Old Fund', units: 100, avgNav: 100, investment: 10000, currentNav: 150, currentValue: 15000 },
+    { portfolioId: 'P1', schemeCode: '900000120', fundName: 'Fund not found', units: 1000, avgNav: 10, investment: 10000, currentNav: 0, currentValue: 0 },
+  ]
+  const transactions = [
+    { portfolioId: 'P1', fundCode: 'A', fundName: 'Old Fund', type: 'BUY', transactionType: 'SIP', date: '2023-01-05', units: 100, price: 100, totalAmount: 10000 },
+    { portfolioId: 'P1', fundCode: '900000120', fundName: 'Altiva SIF', type: 'BUY', transactionType: 'LUMPSUM', date: '2025-01-05', units: 1000, price: 10, totalAmount: 10000 },
+  ]
+  const m = buildFundsModel({ portfolios, holdings, transactions, today })
+  assert.equal(m.totals.returnsReason, 'nav-missing')
+  assert.equal(m.totals.xirr, null)
+  assert.deepEqual(m.totals.unreliableFunds, ['Fund not found'])
+})

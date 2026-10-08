@@ -43,6 +43,7 @@ const REASON_TEXT = {
   'opening-balance': { short: 'set purchase date', long: 'This holding was added as an opening balance dated less than a year ago, so annualising it would be misleading. Edit that transaction and set the real purchase date to get XIRR and CAGR.' },
   'too-new': { short: 'under 3 months', long: 'Held for less than three months. Annualised returns are not meaningful yet.' },
   'funds-unreliable': { short: '', long: 'One or more funds in this selection cannot be annualised, so the combined XIRR and CAGR are hidden.' },
+  'nav-missing': { short: 'no NAV', long: 'Today\'s NAV is missing for a fund in this selection (it shows "Fund not found"), so the combined XIRR and CAGR are hidden until the fund list refreshes.' },
 }
 function reasonLong(r) { return r ? REASON_TEXT[r]?.long || '' : undefined }
 
