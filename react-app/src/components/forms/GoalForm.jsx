@@ -57,6 +57,20 @@ function getMemberDOB(member) {
   return isNaN(d.getTime()) ? null : d
 }
 
+// Age instead of date of birth: a whole age is saved as 1 January of the birth year (current year - age),
+// so retirement falls on 1 January of the retirement year. A date of birth saved earlier is kept as it is.
+const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
+function ageToApproxDob(age) {
+  const a = Math.floor(Number(age))
+  if (!(a > 0 && a < 110)) return ''
+  return `${new Date().getFullYear() - a}-01-01`
+}
+function dobToAge(dob) {
+  if (!dob) return ''
+  const d = new Date(dob)
+  return isNaN(d.getTime()) ? '' : String(Math.floor((Date.now() - d.getTime()) / YEAR_MS))
+}
+
 function toDateInputValue(value) {
   if (!value) return ''
   const text = String(value)
@@ -156,6 +170,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         // Retirement age
         retirementAge: (storedRetirementAge || initial.retirementAge || '').toString(),
         dob: toDateInputValue(initial.dob) || editDob,
+        currentAge: dobToAge(toDateInputValue(initial.dob) || editDob) || (initial.retirementAge && initial.targetDate
+          ? String(Math.max(0, Math.round(Number(initial.retirementAge) - Math.max(0, (new Date(initial.targetDate) - new Date()) / YEAR_MS))))
+          : ''),
       }
     }
 
@@ -175,6 +192,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       emergencyMonths: '6',
       retirementAge: '60',
       dob: '',
+      currentAge: '',
     }
   })
   const [errors, setErrors] = useState({})
@@ -183,6 +201,12 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
     setErrors((e) => ({ ...e, [key]: undefined }))
+  }
+
+  // "Your age today": keeps an approximate date of birth in step, so everything else works as before
+  function setAge(val) {
+    setForm((f) => ({ ...f, currentAge: val, dob: ageToApproxDob(val) }))
+    setErrors((e) => ({ ...e, currentAge: undefined, targetDate: undefined }))
   }
 
   // Auto-set inflation & CAGR when goal type changes (only for new goals)
@@ -218,6 +242,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       }
       if (!next.dob && resolvedDob) {
         next.dob = resolvedDob
+        if (!next.currentAge) next.currentAge = dobToAge(resolvedDob)
         changed = true
       }
       if (resolvedAge && next.retirementAge !== resolvedAge) {
@@ -351,6 +376,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     }
     if (s === 1) {
       if (!form.targetDate) e.targetDate = 'Required'
+      if (isRetirement && !memberDOB && !form.dob && !form.targetDate) e.currentAge = 'Enter your age'
       if (isRetirement) {
         if (!form.retirementAge || Number(form.retirementAge) <= 0) e.retirementAge = 'Required'
         if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
@@ -369,6 +395,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     if (!form.goalType) e.goalType = 'Required'
     if (!form.goalName.trim()) e.goalName = 'Required'
     if (!form.targetDate) e.targetDate = 'Required'
+    if (isRetirement && !memberDOB && !form.dob && !form.targetDate) e.currentAge = 'Enter your age'
     if (isRetirement) {
       if (!form.retirementAge || Number(form.retirementAge) <= 0) e.retirementAge = 'Required'
       if (!form.monthlyExpenses || Number(form.monthlyExpenses) <= 0) e.monthlyExpenses = 'Required'
@@ -461,8 +488,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
                     <p className="text-xs text-[var(--text-muted)]">Age {memberCurrentAge} · Retiring in {Math.round(calc.yearsToGo)} yrs</p>
                   </div>
                 ) : (
-                  <FormField label="Date of Birth">
-                    <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
+                  <FormField label="Your Age Today" required error={errors.currentAge}>
+                    <FormInput type="number" value={form.currentAge} onChange={setAge} placeholder="e.g., 40" />
+                    {form.currentAge && calc.yearsToGo > 0 && <p className="text-xs text-[var(--text-muted)] mt-1">Retiring in about {Math.round(calc.yearsToGo)} yrs</p>}
                   </FormField>
                 )}
               </>
@@ -617,8 +645,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
                       <p className="text-xs text-[var(--text-muted)]">Currently {memberCurrentAge} yrs · Retiring in {Math.round(calc.yearsToGo)} yrs</p>
                     </div>
                   ) : (
-                    <FormField label="Date of Birth">
-                      <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
+                    <FormField label="Your Age Today" required error={errors.currentAge}>
+                      <FormInput type="number" value={form.currentAge} onChange={setAge} placeholder="e.g., 40" />
+                      {form.currentAge && calc.yearsToGo > 0 && <p className="text-xs text-[var(--text-muted)] mt-1">Retiring in about {Math.round(calc.yearsToGo)} yrs</p>}
                     </FormField>
                   )}
                   <FormField label="Target Date (auto-calculated)" error={errors.targetDate}>
