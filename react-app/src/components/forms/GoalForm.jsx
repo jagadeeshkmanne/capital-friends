@@ -502,6 +502,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         {/* SIP projection + Glide Path (edit mode) */}
         {calc.hasTarget && calc.months > 0 ? (
           <ProjectionPanel calc={calc} lumpsum={form.lumpsum} compact />
+        ) : isRetirement && calc.hasTarget ? (
+          <RetireNowPanel calc={calc} lumpsum={form.lumpsum} />
         ) : (
           <MissingFieldsHint form={form} isRetirement={isRetirement} isEmergency={isEmergency} calc={calc} />
         )}
@@ -674,6 +676,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           {/* Required SIP Panel */}
           {calc.hasTarget && calc.months > 0 ? (
             <ProjectionPanel calc={calc} lumpsum={form.lumpsum} />
+          ) : isRetirement && calc.hasTarget ? (
+            <RetireNowPanel calc={calc} lumpsum={form.lumpsum} />
           ) : (
             <MissingFieldsHint form={form} isRetirement={isRetirement} isEmergency={isEmergency} calc={calc} />
           )}
@@ -722,7 +726,11 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
             <div className="border-t border-[var(--border-light)] pt-3 space-y-2">
               <ReviewRow label="Lumpsum" value={formatINR(Number(form.lumpsum) || 0)} />
-              <ReviewRow label="Required SIP" value={`${formatINR(calc.requiredSIP)}/mo`} color="emerald" />
+              {isRetirement && calc.months === 0 ? (
+                <ReviewRow label="Needed now" value={formatINR(calc.requiredLumpsum)} color="emerald" />
+              ) : (
+                <ReviewRow label="Required SIP" value={`${formatINR(calc.requiredSIP)}/mo`} color="emerald" />
+              )}
               <ReviewRow label="Target Date" value={form.targetDate} />
               <ReviewRow label="Time Remaining" value={calc.yearsToGo > 0 ? `${calc.yearsToGo.toFixed(1)} years` : '—'} />
             </div>
@@ -731,6 +739,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           {/* Projection summary */}
           {calc.hasTarget && calc.months > 0 && (
             <ProjectionPanel calc={calc} lumpsum={form.lumpsum} compact />
+          )}
+          {isRetirement && calc.hasTarget && calc.months === 0 && (
+            <RetireNowPanel calc={calc} lumpsum={form.lumpsum} />
           )}
 
           {/* Glide Path on review */}
@@ -817,7 +828,7 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
         {/* Corpus calc */}
         <div className="border-t border-violet-500/15 pt-2.5 space-y-2">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">Corpus needed at retirement</p>
+            <p className="text-xs font-semibold text-[var(--text-primary)]">{isRetireNow ? 'Corpus needed now' : 'Corpus needed at retirement'}</p>
             <span className="text-sm font-bold text-violet-400 tabular-nums shrink-0">{formatINR(calc.inflatedTarget)}</span>
           </div>
           <div className="rounded-lg bg-violet-500/10 border border-violet-500/20 p-3 space-y-2">
@@ -872,6 +883,35 @@ function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
         <p className="text-sm font-semibold text-violet-400 uppercase tracking-wider">Future Value</p>
         <p className="text-xs font-bold text-[var(--text-primary)]">{formatINR(calc.inflatedTarget)}</p>
       </div>
+    </div>
+  )
+}
+
+// Retiring now (retirement age = current age): there is no time left for a SIP,
+// so show what the corpus should be today, what is already there, and the gap.
+function RetireNowPanel({ calc, lumpsum }) {
+  const have = Math.max(calc.linkedCurrentValue || 0, Number(lumpsum) || 0)
+  const gap = Math.max(0, calc.inflatedTarget - have)
+  return (
+    <div className="rounded-lg border p-3 space-y-2 bg-violet-500/5 border-violet-500/15">
+      <p className="text-sm font-bold uppercase tracking-wider text-violet-400">Retiring now</p>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[var(--text-dim)]">Corpus needed today</span>
+        <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatINR(calc.inflatedTarget)}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[var(--text-dim)]">{calc.linkedCurrentValue > 0 ? 'Linked investments' : 'Lumpsum you have'}</span>
+        <span className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(have)}</span>
+      </div>
+      {gap > 0 ? (
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 flex items-center justify-between gap-2">
+          <p className="text-xs text-amber-300">Still needed now (no time left for a SIP)</p>
+          <p className="text-sm font-bold text-amber-400 tabular-nums shrink-0">{formatINR(gap)}</p>
+        </div>
+      ) : (
+        <p className="text-sm font-bold text-emerald-400">What you have covers this goal</p>
+      )}
+      <p className="text-xs text-[var(--text-dim)]">Link your investments to this goal, then use the Retirement Buckets page for the monthly income plan.</p>
     </div>
   )
 }

@@ -541,7 +541,7 @@ export default function GoalsPage() {
     if (!g.targetDate) return null
     const diff = new Date(g.targetDate) - new Date()
     const years = diff / (365.25 * 24 * 60 * 60 * 1000)
-    return years > 0 ? years.toFixed(1) : '0'
+    return years >= 0.05 ? years.toFixed(1) : '0'
   }
 
   return (
@@ -748,7 +748,7 @@ export default function GoalsPage() {
               // Money already saved won't reach the target alone, but a monthly SIP can: say so plainly
               // instead of a bare "Behind" (the app doesn't yet know the SIP the user is already doing).
               const needsSip = !isPastDue && _cardGap > 0 && actual > 0 && !trackStatus && (h?.liveSIP || 0) > 0
-              const statusText = _cardGap === 0 ? 'Funded' : isPastDue ? 'Overdue' : (actual === 0 && _cardGap > 0) ? 'Not started' : trackStatus ? 'On track'
+              const statusText = _cardGap === 0 ? 'Funded' : isPastDue ? (g.goalType === 'Retirement' ? 'Short now' : 'Overdue') : (actual === 0 && _cardGap > 0) ? 'Not started' : trackStatus ? 'On track'
                 : needsSip ? `On track if you invest ${formatINR(h.liveSIP)}/mo` : 'Behind'
 
               // SIP/Lumpsum: live (portfolio-based) > stored plan
@@ -774,7 +774,7 @@ export default function GoalsPage() {
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                           <p className="text-sm font-bold text-[var(--text-primary)]">{g.goalName}</p>
                           {isPastDue ? (
-                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-[var(--accent-rose)]">Overdue</span>
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-[var(--accent-rose)]">{g.goalType === 'Retirement' ? 'Retired' : 'Overdue'}</span>
                           ) : (
                             <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${priorityBadge[g.priority] || ''}`}>{g.priority}</span>
                           )}
@@ -829,7 +829,7 @@ export default function GoalsPage() {
                   {isPastDue && _cardGap > 0 && g.status !== 'Achieved' && (
                     <div className="px-4 pb-3">
                       <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-3 py-2.5 flex items-center justify-between gap-2">
-                        <p className="text-xs text-rose-300">Goal overdue — invest now to fund it</p>
+                        <p className="text-xs text-rose-300">{g.goalType === 'Retirement' ? 'Retirement has started: corpus still needed now' : 'Goal overdue — invest now to fund it'}</p>
                         <p className="text-sm font-bold text-rose-400 tabular-nums shrink-0">{formatINR(_cardGap)}</p>
                       </div>
                     </div>
