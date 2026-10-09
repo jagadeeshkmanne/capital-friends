@@ -674,3 +674,21 @@ export default function StocksPage() {
   )
 }
 
+
+/* ── Stat card (same markup as the Mutual Funds page) ── */
+function StatCard({ label, value, sub, positive, bold, title }) {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3" title={title}>
+      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">{label}</p>
+      <p className={`text-sm tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${
+        positive === undefined ? 'text-[var(--text-primary)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
+      }`}>
+        {value}
+      </p>
+      {sub && (
+        <p className={`text-xs font-semibold tabular-nums mt-0.5 ${positive === undefined ? 'text-[var(--text-dim)]' : positive ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+          {sub}
+        </p>
+      )}
+    </div>
+  )
