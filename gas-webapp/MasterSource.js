@@ -113,7 +113,11 @@ var USER_MASTER_TABS_ = { MutualFundData: ['MF_Data', 8], MF_ATH_Data: ['MF_ATH'
 function userMasterTabSource_(userTab) {
   var m = USER_MASTER_TABS_[userTab];
   if (!m) return null;
-  var key = 'mtab_v1:' + m[0], cache = CacheService.getScriptCache();
+  var cache = CacheService.getScriptCache();
+  // The stock list grows when the master DB adds stocks or ETFs: key its copy by the master row count
+  // (checked at most every 10 minutes), so new rows show up within minutes instead of after the 1-hour cache.
+  var ver = m[0] === 'Stock_Data' ? masterRowCount_(m[0], cache) : '';
+  var key = 'mtab_v1:' + m[0] + (ver ? ':' + ver : '');
   var n = +cache.get(key + ':n');
   if (n) {
     var keys = []; for (var i = 0; i < n; i++) keys.push(key + ':' + i);
@@ -130,4 +134,24 @@ function userMasterTabSource_(userTab) {
     cache.putAll(put, 3600);
   } catch (e) { Logger.log('master tab cache put failed: ' + e); }
   return rows;
+}
+
+/** Master tab row count, cached 10 minutes ('' when it can't be read: then the plain 1-hour cache is used). */
+function masterRowCount_(tabName, cache) {
+  var k = 'mtab_cnt:' + tabName, hit = cache.get(k);
+  if (hit) return hit;
+  try {
+    var json = gvizFetch_(tabName, 'select count(A)');
+    var n = String((((json.table.rows || [])[0] || {}).c || [])[0] ? json.table.rows[0].c[0].v : '');
+    if (n) cache.put(k, n, 600);
+    return n;
+  } catch (e) { return ''; }
+}
+
+/** Drop the shared copies of the master tabs (Settings → Refresh Now), so the next read downloads them fresh. */
+function clearMasterTabCache_() {
+  var cache = CacheService.getScriptCache(), keys = [];
+  Object.keys(USER_MASTER_TABS_).forEach(function (u) { var t = USER_MASTER_TABS_[u][0]; keys.push('mtab_v1:' + t + ':n', 'mtab_cnt:' + t); });
+  var cnt = cache.get('mtab_cnt:Stock_Data'); if (cnt) keys.push('mtab_v1:Stock_Data:' + cnt + ':n');
+  cache.removeAll(keys);
 }

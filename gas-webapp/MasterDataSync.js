@@ -234,6 +234,7 @@ function refreshStockData() {
  */
 function refreshAllMasterData() {
   var startTime = Date.now();
+  try { clearMasterTabCache_(); } catch (e) { log('clearMasterTabCache_ failed: ' + e.message); }
   log('Starting full master data refresh...');
 
   var results = {
