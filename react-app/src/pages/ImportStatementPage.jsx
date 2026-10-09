@@ -435,7 +435,7 @@ export default function ImportStatementPage() {
               )}
               {preview.skipped.length > 0 && (
                 <details className="text-xs text-[var(--text-dim)]">
-                  <summary className="cursor-pointer">{preview.skipped.length} left out (sold-out accounts you skipped, unclaimed money)</summary>
+                  <summary className="cursor-pointer">{preview.skipped.length} left out (sold-out accounts, ones you skipped, unclaimed money, SIFs)</summary>
                   <div className="mt-1 space-y-0.5">{preview.skipped.map((x) => <p key={x.folio + x.scheme}>• {x.scheme}</p>)}</div>
                 </details>
               )}

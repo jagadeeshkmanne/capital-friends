@@ -263,6 +263,15 @@ function casBuildPlan_(statement, data, mapping) {
     return cands[0].shared > cands[1].shared ? cands[0].m : null;
   }
 
+  // Specialised Investment Funds (SIF) are left out of the import for now: AMFI lists them separately and
+  // they have no NAV history yet, so the app can't value or track them properly.
+  folios = folios.filter(function (f) {
+    var fund = funds[f.isin];
+    var isSif = (fund && Number(fund.code) >= 900000000) || /\bSIF\b|specialised investment fund/i.test(String(f.scheme || ''));
+    if (isSif) plan.skipped.push({ folio: f.folio, scheme: f.scheme, reason: 'Specialised Investment Fund (SIF): not imported, the app does not track SIFs yet. Skipped.' });
+    return !isSif;
+  });
+
   var missing = {};
   folios.forEach(function (f) {
     var m = matchMember(f);
