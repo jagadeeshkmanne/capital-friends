@@ -82,12 +82,11 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
     } finally { setSaving(false) }
   }
 
+  // Excel template served from /public: Holdings sheet (Symbol, Quantity, Avg Price) + a "How to fill" sheet
   function downloadSample() {
-    const csv = 'Symbol,Quantity,Avg Price\nRELIANCE,10,2450.50\nINFY,25,1520\n'
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = 'stock-holdings-sample.csv'; a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    a.href = `${import.meta.env.BASE_URL || '/'}stock-holdings-sample.xlsx`
+    a.download = 'stock-holdings-template.xlsx'; a.click()
   }
 
   const portfolioOptions = activePortfolios.map((p) => {
@@ -134,7 +133,7 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
             <Upload size={14} /> {reading ? 'Reading…' : fileName ? 'Choose another file' : 'Choose Excel or CSV file'}
           </button>
           {fileName && <span className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]"><FileSpreadsheet size={14} /> {fileName}</span>}
-          <button type="button" onClick={downloadSample} className="ml-auto flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"><Download size={12} /> Sample file</button>
+          <button type="button" onClick={downloadSample} className="ml-auto flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"><Download size={12} /> Download Excel template</button>
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-2">Needs 3 columns: <strong>Symbol</strong> (or Instrument), <strong>Quantity</strong> and <strong>Avg price</strong>. Zerodha, Groww and most broker holdings downloads work as they are (.xlsx or .csv).</p>
         <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
