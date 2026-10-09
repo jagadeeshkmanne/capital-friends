@@ -692,3 +692,4 @@ function StatCard({ label, value, sub, positive, bold, title }) {
       )}
     </div>
   )
+}
