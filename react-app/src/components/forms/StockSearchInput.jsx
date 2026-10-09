@@ -17,12 +17,24 @@ function isFreshToday(updatedAt) {
     cached.getDate() === now.getDate()
 }
 
+let _forceFetch = false
+
+// After Settings → Refresh Now: drop the cached list so the next search/import loads the new one
+// (e.g. newly added ETFs) instead of waiting for tomorrow's cache expiry.
+export function clearStocksCache() {
+  _stocksCache = null
+  _stocksPromise = null
+  _forceFetch = true
+}
+
 export function loadStocks() {
   if (_stocksCache) return Promise.resolve(_stocksCache)
   if (_stocksPromise) return _stocksPromise
+  const force = _forceFetch
+  _forceFetch = false
   _stocksPromise = getWithMeta('stocksList')
     .then((record) => {
-      if (record && Array.isArray(record.data) && isFreshToday(record.updatedAt)) {
+      if (!force && record && Array.isArray(record.data) && isFreshToday(record.updatedAt)) {
         _stocksCache = record.data
         return _stocksCache
       }

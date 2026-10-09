@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMask } from '../context/MaskContext'
 import { useToast } from '../context/ToastContext'
 import * as api from '../services/api'
+import { clearStocksCache } from '../components/forms/StockSearchInput'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -79,6 +80,7 @@ export default function SettingsPage() {
     setRefreshResult(null)
     try {
       const result = await api.refreshMasterData()
+      clearStocksCache() // stock search and import pick up the refreshed list (new stocks and ETFs)
       setRefreshResult(result)
     } catch (err) {
       setRefreshResult({ error: err.message })
@@ -190,7 +192,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-[var(--text-primary)]">Refresh Market Data</p>
-                <p className="text-xs text-[var(--text-dim)] mt-0.5">Update MF NAVs, ATH & Stock prices</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">Update MF NAVs, ATH, stock prices and the stock & ETF list</p>
               </div>
               <button
                 onClick={handleRefresh}
