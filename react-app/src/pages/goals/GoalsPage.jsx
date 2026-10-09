@@ -13,6 +13,8 @@ import GoalWithdrawalPlan from '../../components/forms/GoalWithdrawalPlan'
 import GlidepathRebalancePlan from '../../components/forms/GlidepathRebalancePlan'
 import PageLoading from '../../components/PageLoading'
 import { calculateGoalFundingProjection } from '../../utils/goalProjection'
+import { suggestGoalLinks, linkedSummary } from '../../utils/goalLinkSuggest'
+import { classifyOtherInvestment } from '../../utils/retirementBuckets'
 
 const statusBadge = {
   'On Track': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -57,56 +59,6 @@ function classifyPortfolio(portfolioId, holdings, allocMap) {
   return total > 0 ? Math.round((equity / total) * 100) : null
 }
 
-function findBestPortfolios(recommendedEquity, portfolios, holdings, mappings, excludeGoalId, allocMap) {
-  const usedByOthers = {}
-  for (const m of (mappings || [])) {
-    if (m.goalId === excludeGoalId) continue
-    usedByOthers[m.portfolioId] = (usedByOthers[m.portfolioId] || 0) + m.allocationPct
-  }
-
-  // Classify all available portfolios
-  const classified = []
-  for (const p of portfolios) {
-    const eq = classifyPortfolio(p.portfolioId, holdings, allocMap)
-    if (eq === null) continue
-    const available = 100 - (usedByOthers[p.portfolioId] || 0)
-    if (available <= 0) continue
-    classified.push({ portfolioId: p.portfolioId, equityPct: eq, available })
-  }
-  if (classified.length === 0) return []
-
-  // Try equity+debt combo: find best high-equity + best low-equity pair
-  const recEq = recommendedEquity
-  const recDebt = 100 - recommendedEquity
-  if (classified.length >= 2 && recEq > 0 && recDebt > 0) {
-    const eqPortfolios = classified.filter(p => p.equityPct >= 70).sort((a, b) => b.equityPct - a.equityPct)
-    const debtPortfolios = classified.filter(p => p.equityPct <= 30).sort((a, b) => a.equityPct - b.equityPct)
-    if (eqPortfolios.length > 0 && debtPortfolios.length > 0) {
-      const eqP = eqPortfolios[0]
-      const debtP = debtPortfolios[0]
-      if (eqP.portfolioId !== debtP.portfolioId) {
-        // Split: equity portfolio gets recEq%, debt portfolio gets recDebt%
-        const eqAlloc = Math.min(recEq, eqP.available)
-        const debtAlloc = Math.min(recDebt, debtP.available)
-        if (eqAlloc > 0 && debtAlloc > 0) {
-          return [
-            { portfolioId: eqP.portfolioId, availablePct: eqAlloc },
-            { portfolioId: debtP.portfolioId, availablePct: debtAlloc },
-          ]
-        }
-      }
-    }
-  }
-
-  // Fallback: single best-fit portfolio (closest equity % to recommended)
-  let best = classified[0], bestDiff = Math.abs(classified[0].equityPct - recEq)
-  for (let i = 1; i < classified.length; i++) {
-    const diff = Math.abs(classified[i].equityPct - recEq)
-    if (diff < bestDiff) { bestDiff = diff; best = classified[i] }
-  }
-  return [{ portfolioId: best.portfolioId, availablePct: best.available }]
-}
-
 export default function GoalsPage() {
   const navigate = useNavigate()
   const { selectedMember, member } = useFamily()
@@ -125,6 +77,7 @@ export default function GoalsPage() {
   const [localMappings, setLocalMappings] = useState([])
   const [goalDirty, setGoalDirty] = useState(false)
   const [goalSaving, setGoalSaving] = useState(false)
+  const [suggestReasons, setSuggestReasons] = useState({})
 
   const allActiveGoals = useMemo(() => (goalList || []).filter(g => g.isActive !== false), [goalList])
 
@@ -376,28 +329,49 @@ export default function GoalsPage() {
 
   const goalIsValid = overAllocated.length === 0
 
+  // === "Suggest for me": all family investments, glide-path equity for this goal ===
+  const suggestItems = useMemo(() => allInvestments.map((it) => {
+    if (it.type === 'MF') return { ...it, equityPct: classifyPortfolio(it.id, mfHoldings || [], goalAllocMap) }
+    if (it.type === 'Stock') return { ...it, equityPct: 100 }
+    const inv = (otherInvList || []).find((i) => i.investmentId === it.id)
+    return { ...it, equityPct: classifyOtherInvestment(inv).equity, otherType: inv?.investmentType || '' }
+  }), [allInvestments, mfHoldings, goalAllocMap, otherInvList])
+  function goalTargetEquity(goal) {
+    const yearsLeft = Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000))
+    return getRecommendedAllocation(goal.goalType, yearsLeft).equity
+  }
+  function buildSuggestion(goalId, goalObj) {
+    const goal = goalObj || (goalList || []).find((g) => g.goalId === goalId)
+    if (!goal) return { rows: [] }
+    const usedByOthers = {}
+    ;(goalPortfolioMappings || []).forEach((m) => { if (m.goalId !== goalId) usedByOthers[m.portfolioId] = (usedByOthers[m.portfolioId] || 0) + m.allocationPct })
+    return suggestGoalLinks({ goal, items: suggestItems, usedByOthers, targetEquity: goalTargetEquity(goal) })
+  }
+  function applySuggestion() {
+    const sug = buildSuggestion(linkingGoalId)
+    if (!sug.rows.length) { showToast('Nothing to suggest: no free investments with a known equity mix', 'error'); return }
+    setLocalMappings(sug.rows.map(({ portfolioId, allocationPct, investmentType }) => ({ portfolioId, allocationPct, investmentType })))
+    setSuggestReasons(Object.fromEntries(sug.rows.map((r) => [r.portfolioId, { pct: r.allocationPct, reason: r.reason }])))
+    setGoalDirty(true)
+  }
+
   // === Allocation actions ===
   function startLinking(goalId) {
     const existing = (goalPortfolioMappings || []).filter((m) => m.goalId === goalId).map((m) => ({
       portfolioId: m.portfolioId, allocationPct: m.allocationPct, investmentType: m.investmentType || inferType(m.portfolioId),
     }))
-    // Auto-suggest best portfolio if no existing mappings and portfolios exist
-    if (existing.length === 0 && activeMFPortfolios.length > 0 && mfHoldings?.length) {
-      const goal = (goalList || []).find(g => g.goalId === goalId)
-      if (goal) {
-        const yearsLeft = (new Date(goal.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000)
-        if (yearsLeft > 0) {
-          const rec = getRecommendedAllocation(goal.goalType, yearsLeft)
-          const suggestions = findBestPortfolios(rec.equity, activeMFPortfolios, mfHoldings, goalPortfolioMappings, goalId, goalAllocMap)
-          if (suggestions.length > 0) {
-            setLocalMappings(suggestions.map(s => ({ portfolioId: s.portfolioId, allocationPct: s.availablePct, investmentType: 'MF' })))
-            setLinkingGoalId(goalId)
-            setGoalDirty(true)
-            return
-          }
-        }
+    // Nothing linked yet: start with the suggestion (the person can change or remove every row)
+    if (existing.length === 0) {
+      const sug = buildSuggestion(goalId)
+      if (sug.rows.length > 0) {
+        setLocalMappings(sug.rows.map(({ portfolioId, allocationPct, investmentType }) => ({ portfolioId, allocationPct, investmentType })))
+        setSuggestReasons(Object.fromEntries(sug.rows.map((r) => [r.portfolioId, { pct: r.allocationPct, reason: r.reason }])))
+        setLinkingGoalId(goalId)
+        setGoalDirty(true)
+        return
       }
     }
+    setSuggestReasons({})
     setLocalMappings(existing)
     setLinkingGoalId(goalId)
     setGoalDirty(false)
@@ -469,18 +443,15 @@ export default function GoalsPage() {
       } else {
         const result = await addGoal(data)
         showToast('Goal added')
-        // Auto-suggest best-fit portfolio for new goal
+        // New goal: open linking with the suggestion already filled in (the person reviews and saves)
         const newGoalId = result?.goalId
-        if (newGoalId && activeMFPortfolios.length > 0 && mfHoldings?.length) {
-          const yearsLeft = (new Date(data.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000)
-          if (yearsLeft > 0) {
-            const rec = getRecommendedAllocation(data.goalType, yearsLeft)
-            const suggestions = findBestPortfolios(rec.equity, activeMFPortfolios, mfHoldings, goalPortfolioMappings, newGoalId, goalAllocMap)
-            if (suggestions.length > 0) {
-              setLocalMappings(suggestions.map(s => ({ portfolioId: s.portfolioId, allocationPct: s.availablePct, investmentType: 'MF' })))
-              setLinkingGoalId(newGoalId)
-              setGoalDirty(true)
-            }
+        if (newGoalId) {
+          const sug = buildSuggestion(newGoalId, { ...data, goalId: newGoalId })
+          if (sug.rows.length > 0) {
+            setLocalMappings(sug.rows.map(({ portfolioId, allocationPct, investmentType }) => ({ portfolioId, allocationPct, investmentType })))
+            setSuggestReasons(Object.fromEntries(sug.rows.map((r) => [r.portfolioId, { pct: r.allocationPct, reason: r.reason }])))
+            setLinkingGoalId(newGoalId)
+            setGoalDirty(true)
           }
         }
       }
@@ -1042,7 +1013,15 @@ export default function GoalsPage() {
                   <div className="flex items-center gap-2">
                     <Link2 size={12} className="text-violet-400" />
                     <span className="text-xs font-semibold text-violet-400">Link Investments</span>
+                    {allInvestments.length > 0 && (
+                      <button onClick={applySuggestion} className="ml-auto px-2.5 py-1 text-xs font-semibold text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors">
+                        ✨ Suggest for me
+                      </button>
+                    )}
                   </div>
+                  {allInvestments.length > 0 && (
+                    <p className="text-xs text-[var(--text-dim)] -mt-1">Picks from all family investments so the linked money is near this goal's recommended equity. You can change anything before saving.</p>
+                  )}
 
                   {/* Empty state — no investments exist */}
                   {allInvestments.length === 0 && localMappings.length === 0 && (
@@ -1129,9 +1108,24 @@ export default function GoalsPage() {
                           </div>
                           {item && <p className="text-xs text-[var(--text-dim)]">Contributes {formatINR((item.value * m.allocationPct) / 100)}</p>}
                         </div>
+                        {suggestReasons[m.portfolioId] && Number(suggestReasons[m.portfolioId].pct) === Number(m.allocationPct) && (
+                          <p className="text-xs text-violet-400">Suggested: {suggestReasons[m.portfolioId].reason}</p>
+                        )}
                       </div>
                     )
                   })}
+
+                  {/* Linked total vs the goal's recommended equity */}
+                  {localMappings.length > 0 && (() => {
+                    const lg = (goalList || []).find((g) => g.goalId === linkingGoalId)
+                    const sm = linkedSummary(localMappings, suggestItems, lg ? goalTargetEquity(lg) : null)
+                    const off = sm.equityPct !== null && sm.targetEquity !== null && Math.abs(sm.equityPct - sm.targetEquity) > 5
+                    return (
+                      <p className={`text-xs font-semibold ${off ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        Linked {formatINR(sm.linkedValue)}{sm.equityPct !== null ? ` · equity ${sm.equityPct}%` : ''}{sm.targetEquity !== null ? ` · recommended now ${sm.targetEquity}%` : ''}
+                      </p>
+                    )
+                  })()}
 
                   {/* Over-allocation warnings */}
                   {overAllocated.length > 0 && (
