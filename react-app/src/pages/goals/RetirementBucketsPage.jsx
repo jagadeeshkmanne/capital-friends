@@ -565,8 +565,20 @@ function YearsExplainer({ plan }) {
 /* ── What is in each bucket: fund, amount for this goal, share of the bucket ── */
 function BucketFunds({ plan }) {
   const [open, setOpen] = useState(true)
-  const keys = ['b1', 'b2', 'b3'].filter(k => (plan.byBucket[k] || []).length)
-  if (!keys.length) return null
+  if (!['b1', 'b2', 'b3'].some(k => (plan.byBucket[k] || []).length)) return null
+  const keys = ['b1', 'b2', 'b3']
+  // What to tell the user when a bucket has nothing in it yet
+  const rd = plan.schedule?.retirementDate
+  const yearsToRetire = rd ? (rd - new Date()) / (365.25 * 864e5) : 0
+  const emptyNote = {
+    b1: rd && yearsToRetire > 2
+      ? `Empty for now, and that's fine. From ${rd.getFullYear() - 2}, money moves here from Stability, so that 2 years of expenses sit in liquid or short-term debt funds when retirement starts.`
+      : 'Empty. This should hold 2 years of expenses in liquid or short-term debt funds. Move money here from Stability, using the steps above.',
+    b2: rd && yearsToRetire > 5
+      ? `Empty for now. From ${rd.getFullYear() - 5}, money moves here from Growth, a little each quarter.`
+      : 'Empty. This should hold about 5 years of expenses in debt or hybrid funds. Move money here from Growth, using the steps above.',
+    b3: 'No equity funds linked yet. Link equity funds to this goal so the money keeps growing for the later years.',
+  }
   const grand = keys.reduce((sum, k) => sum + (plan.totals[k] || 0), 0)
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
@@ -591,6 +603,9 @@ function BucketFunds({ plan }) {
                   <span className={`flex items-center gap-1.5 text-xs font-bold ${b.text}`}><Icon size={13} /> {b.name}</span>
                   <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(total)}{grand > 0 && <span className="font-normal text-[var(--text-dim)]"> · {Math.round((total / grand) * 100)}% of goal</span>}</span>
                 </div>
+                {!funds.length && (
+                  <p className="px-3 py-3 border-t border-[var(--border-row)] text-xs text-[var(--text-muted)] leading-relaxed">{emptyNote[k]}</p>
+                )}
                 {funds.map(f => {
                   const pct = total > 0 ? (f.goalValue / total) * 100 : 0
                   return (
