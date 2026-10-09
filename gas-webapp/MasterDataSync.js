@@ -115,6 +115,7 @@ function copyMFDataFromMasterDB(targetSheet) {
 
   // Write to user's sheet (starting at row 2, after headers)
   if (data.length > 0) {
+    ensureRows_(targetSheet, data.length + 1);
     targetSheet.getRange(2, 1, data.length, lastCol).setValues(data);
   }
 
@@ -135,6 +136,7 @@ function copyATHDataFromMasterDB(targetSheet) {
 
   // Write to user's sheet (all 7 columns as plain values)
   if (data.length > 0) {
+    ensureRows_(targetSheet, data.length + 1);
     targetSheet.getRange(2, 1, data.length, data[0].length).setValues(data);
   }
 
@@ -155,10 +157,35 @@ function copyStockDataFromMasterDB(targetSheet) {
 
   // Write to user's sheet
   if (data.length > 0) {
+    ensureRows_(targetSheet, data.length + 1);
     targetSheet.getRange(2, 1, data.length, lastCol).setValues(data);
   }
 
   log('Copied ' + data.length + ' stock records from master DB');
+  return data.length;
+}
+
+/**
+ * Replace a user's reference tab with fresh master rows WITHOUT emptying it first:
+ * download → overwrite from row 2 → clear only the rows left over below. If the download fails or
+ * comes back empty, the old data stays (a half-finished refresh can never leave NAVs blank).
+ */
+/** Grow a tab to at least `rows` rows (the values API can't write past the grid). */
+function ensureRows_(sheet, rows) {
+  var need = rows - sheet.getMaxRows();
+  if (need > 0) sheet.insertRowsAfter(sheet.getMaxRows(), need + 100);
+}
+
+function replaceTabFromMaster_(sheet, masterTab, numCols, label) {
+  var data = masterRows_(masterTab, numCols);
+  if (!data || !data.length) { log('Master ' + masterTab + ' empty or unreadable: kept existing ' + label); return 0; }
+  var cols = data[0].length;
+  // The master grows (new funds, new stocks and ETFs): make room first, or the write fails past the grid
+  ensureRows_(sheet, data.length + 1);
+  sheet.getRange(2, 1, data.length, cols).setValues(data);
+  var extra = sheet.getMaxRows() - (data.length + 1);
+  if (extra > 0) sheet.getRange(data.length + 2, 1, extra, Math.min(cols, sheet.getMaxColumns())).clearContent();
+  log('Refreshed ' + data.length + ' ' + label + ' rows from master DB');
   return data.length;
 }
 
@@ -176,15 +203,8 @@ function refreshMutualFundData() {
   if (!sheet) {
     throw new Error('MutualFundData sheet not found');
   }
-
-  // Clear existing data below the header (no need to read the big tab first)
-  if (sheet.getMaxRows() > 1) {
-    sheet.getRange(2, 1, sheet.getMaxRows() - 1, Math.min(8, sheet.getMaxColumns())).clearContent(); // data columns only
-  }
-
-  // Re-copy from master DB
-  var count = copyMFDataFromMasterDB(sheet) || 0;
-  return { success: true, count: count };
+  var count = replaceTabFromMaster_(sheet, CONFIG.masterMFDataSheet, 8, 'MF') || 0;
+  return { success: count > 0, count: count };
 }
 
 /**
@@ -196,15 +216,8 @@ function refreshATHData() {
   if (!sheet) {
     throw new Error('MF_ATH_Data sheet not found');
   }
-
-  // Clear existing data below the header (no need to read the big tab first)
-  if (sheet.getMaxRows() > 1) {
-    sheet.getRange(2, 1, sheet.getMaxRows() - 1, Math.min(7, sheet.getMaxColumns())).clearContent(); // data columns only
-  }
-
-  // Re-copy from master DB
-  var count = copyATHDataFromMasterDB(sheet) || 0;
-  return { success: true, count: count };
+  var count = replaceTabFromMaster_(sheet, CONFIG.masterATHSheet, 7, 'ATH') || 0;
+  return { success: count > 0, count: count };
 }
 
 /**
@@ -216,15 +229,8 @@ function refreshStockData() {
   if (!sheet) {
     throw new Error('StockMasterData sheet not found');
   }
-
-  // Clear existing data below the header (no need to read the big tab first)
-  if (sheet.getMaxRows() > 1) {
-    sheet.getRange(2, 1, sheet.getMaxRows() - 1, Math.min(10, sheet.getMaxColumns())).clearContent(); // data columns only
-  }
-
-  // Re-copy from master DB
-  var count = copyStockDataFromMasterDB(sheet) || 0;
-  return { success: true, count: count };
+  var count = replaceTabFromMaster_(sheet, CONFIG.masterStockDataSheet, 10, 'stock') || 0;
+  return { success: count > 0, count: count };
 }
 
 /**
