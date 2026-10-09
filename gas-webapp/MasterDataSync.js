@@ -412,6 +412,36 @@ function dailyUserSync() {
  * been refreshed since this user's last copy. Covers users whose background triggers did not run.
  * @returns {Object} { refreshed: boolean, reason, ...refreshAllMasterData() result when refreshed }
  */
+/**
+ * Which of this user's reference tabs is missing rows compared with the master DB ('' when all complete).
+ * Cheap: the master row counts are cached 10 minutes; then one read of the last expected cell per tab.
+ */
+function userMasterTabsIncomplete_() {
+  try {
+    var cache = CacheService.getScriptCache(), ranges = [], names = [], missing = [];
+    var meta = Sheets.Spreadsheets.get(_currentUserSpreadsheetId, { fields: 'sheets(properties(title,gridProperties(rowCount)))' });
+    var gridRows = {};
+    (meta.sheets || []).forEach(function (sh) { gridRows[sh.properties.title] = (sh.properties.gridProperties || {}).rowCount || 0; });
+    Object.keys(USER_MASTER_TABS_).forEach(function (userTab) {
+      if (!(userTab in gridRows)) return;                       // tab not set up for this user: nothing to heal here
+      var n = +masterRowCount_(USER_MASTER_TABS_[userTab][0], cache);
+      if (!(n > 0)) return;
+      if (gridRows[userTab] < n + 1) { missing.push(userTab); return; } // tab too small to hold the master rows
+      ranges.push("'" + userTab + "'!A" + (n + 1)); names.push(userTab);
+    });
+    if (!ranges.length) return missing.join(', ');
+    var res = Sheets.Spreadsheets.Values.batchGet(_currentUserSpreadsheetId, { ranges: ranges, valueRenderOption: 'UNFORMATTED_VALUE' });
+    (res.valueRanges || []).forEach(function (vr, i) {
+      var v = vr && vr.values && vr.values[0] && vr.values[0][0];
+      if (v === undefined || v === null || v === '') missing.push(names[i]);
+    });
+    return missing.join(', ');
+  } catch (e) {
+    log('userMasterTabsIncomplete_: ' + e.message);
+    return '';
+  }
+}
+
 function syncMasterDataIfStale() {
   var lastSync = getMasterDataLastSync_();
   var masterUpdated = null;
@@ -421,6 +451,9 @@ function syncMasterDataIfStale() {
   if (!lastSync) { stale = true; reason = 'never synced'; }
   else if (masterUpdated) { stale = masterUpdated.getTime() > lastSync.getTime(); reason = stale ? 'master updated ' + masterUpdated.toISOString() : 'up to date'; }
   else { stale = (Date.now() - lastSync.getTime()) > 8 * 3600 * 1000; reason = stale ? 'older than 8h' : 'recent'; } // master time unknown
+  // Self-heal: a user's copy that is empty or shorter than the master (a refresh that failed half-way,
+  // or the master gained funds / stocks / ETFs) is refreshed even when the timestamps say "up to date".
+  if (!stale) { var gap = userMasterTabsIncomplete_(); if (gap) { stale = true; reason = 'incomplete: ' + gap; } }
   if (!stale) return { refreshed: false, reason: reason };
 
   // One refresh at a time per user (two open tabs must not both copy 15,000 rows)
