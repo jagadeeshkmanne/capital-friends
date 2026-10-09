@@ -25,7 +25,12 @@ export function clearStocksCache() {
   _stocksCache = null
   _stocksPromise = null
   _forceFetch = true
+  _fromIdb = false
+  put('stocksList', null).catch(() => {})
 }
+// true when the list in memory came from today's browser cache (it may miss stocks/ETFs added since)
+let _fromIdb = false
+export const stocksFromCache = () => _fromIdb
 
 export function loadStocks() {
   if (_stocksCache) return Promise.resolve(_stocksCache)
@@ -34,8 +39,9 @@ export function loadStocks() {
   _forceFetch = false
   _stocksPromise = getWithMeta('stocksList')
     .then((record) => {
-      if (!force && record && Array.isArray(record.data) && isFreshToday(record.updatedAt)) {
+      if (!force && record && Array.isArray(record.data) && record.data.length && isFreshToday(record.updatedAt)) {
         _stocksCache = record.data
+        _fromIdb = true
         return _stocksCache
       }
       return getAllStocks().then((data) => {
@@ -92,6 +98,16 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
     if (!fuse || query.length < 1) return []
     return fuse.search(query).slice(0, 50).map((r) => r.item)
   }, [fuse, query])
+
+  // Nothing found and the list is from the browser cache: it may be older than the sheet (e.g. ETFs
+  // added today). Reload it from the server once, quietly.
+  const refetched = useRef(false)
+  useEffect(() => {
+    if (results.length || query.length < 3 || refetched.current || !stocksFromCache()) return
+    refetched.current = true
+    clearStocksCache()
+    loadStocks().then((data) => { if (data?.length) setStocks(data) })
+  }, [results.length, query])
 
   function handleSearch(q) {
     setQuery(q)

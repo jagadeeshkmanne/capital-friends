@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import * as api from '../services/api'
 import * as idb from '../services/idb'
+import { clearStocksCache } from '../components/forms/StockSearchInput'
 import { useAuth } from './AuthContext'
 
 const DataContext = createContext()
@@ -364,6 +365,7 @@ export function DataProvider({ children }) {
       api.syncMasterIfStale()
         .then(async (r) => {
           if (!r?.refreshed) return
+          clearStocksCache()   // the stock & ETF list was refreshed too
           const fresh = await api.loadAllData()
           hydrateState(fresh)
           persistToIDB(fresh)

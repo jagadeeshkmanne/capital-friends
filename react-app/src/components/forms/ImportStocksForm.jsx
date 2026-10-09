@@ -5,7 +5,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormDateInput, FormSelect, FormActions } from '../Modal'
-import StockSearchInput, { loadStocks } from './StockSearchInput'
+import StockSearchInput, { loadStocks, clearStocksCache, stocksFromCache } from './StockSearchInput'
 import { readTableFile, extractHoldings, buildStockIndex, matchStock } from '../../utils/holdingsImport'
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -40,6 +40,7 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
     if (!file) return
     setError(''); setRows(null); setInvalid([]); setResult(null); setFileName(file.name); setReading(true)
     try {
+      if (stocksFromCache()) clearStocksCache()   // import: always match against the latest list (new stocks, ETFs)
       const [table, stocks] = await Promise.all([readTableFile(file), loadStocks()])
       const ex = extractHoldings(table)
       if (ex.error) { setError(ex.error); return }
