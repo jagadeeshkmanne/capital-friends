@@ -10,6 +10,7 @@ import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
+import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-red-400' }
@@ -114,6 +115,15 @@ export default function Dashboard() {
   // ── Filter helper ──
   const filterOwner = (items, ownerKey) =>
     selectedMember === 'all' ? items : items.filter((i) => i[ownerKey] === selectedMember)
+
+  // Which part of each shared investment belongs to which goal (whole family: links cross members).
+  // Near goals get the debt first, so a shared portfolio never gets a false "de-risk" alert.
+  const goalAttribution = useMemo(() => {
+    const allocMap = {}
+    for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
+    return attributeFamilyGoals({ goals: (goalList || []).filter(g => g.isActive !== false), mappings: goalPortfolioMappings,
+      mfHoldings, stockHoldings, otherInvList, allocMap })
+  }, [goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations])
 
   // ── Core data computation ──
   const data = useMemo(() => {
@@ -407,14 +417,6 @@ export default function Dashboard() {
       .slice(0, 5) // Limit to top 5 closest to peak to avoid dashboard clutter
 
     // ── Goal Allocation Health (for dashboard goals section) ──
-    // Build fund breakdown lookup for accurate equity/debt split
-    const goalAllocMap = {}
-    if (assetAllocations) {
-      for (const a of assetAllocations) {
-        if (a.assetAllocation) goalAllocMap[a.fundCode] = a.assetAllocation
-      }
-    }
-    const EQUITY_CATS_G = new Set(['Equity', 'ELSS', 'Index'])
     const nowGH = new Date()
     const dashGoalHealth = {}
     activeGoals.forEach(g => {
@@ -425,19 +427,8 @@ export default function Dashboard() {
         ? { equity: 0, debt: 100, label: 'Safety' }
         : getRecommendedAllocation(g.goalType, yearsLeft)
       const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
-      let totalVal = 0, eqVal = 0
-      for (const m of maps) {
-        for (const h of activeMFHoldings.filter(h => h.portfolioId === m.portfolioId)) {
-          const v = h.currentValue * (m.allocationPct / 100)
-          totalVal += v
-          const detailed = goalAllocMap[h.schemeCode || h.fundCode]
-          if (detailed) {
-            eqVal += v * ((detailed.Equity || 0) / 100)
-          } else if (EQUITY_CATS_G.has(h.category)) eqVal += v
-          else if (h.category === 'Hybrid') eqVal += v * 0.65
-          else if (h.category === 'Multi-Asset') eqVal += v * 0.50
-        }
-      }
+      const att = goalAttribution[g.goalId] || { total: 0, equity: 0 }
+      const totalVal = att.total, eqVal = att.equity
       const actualEq = totalVal > 0 ? Math.round((eqVal / totalVal) * 100) : null
       const mismatch = maps.length > 0 && actualEq !== null ? Math.round(actualEq - rec.equity) : null
       // Live SIP/lumpsum
@@ -473,7 +464,7 @@ export default function Dashboard() {
       totalMonthlySIP, activeSIPCount,
       nearATHFunds, dashGoalHealth,
     }
-  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, goalPortfolioMappings, reminderList, assetAllocations, activeMembers])
+  }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, goalPortfolioMappings, reminderList, assetAllocations, activeMembers, goalAttribution])
 
   // ── Action Items (computed from real data) ──
   const actionItems = useMemo(() => {
@@ -589,13 +580,6 @@ export default function Dashboard() {
     })
 
     // Goal allocation mismatches (de-risk alerts)
-    const goalAllocMap = {}
-    if (assetAllocations) {
-      for (const a of assetAllocations) {
-        if (a.assetAllocation) goalAllocMap[a.fundCode] = a.assetAllocation
-      }
-    }
-    const EQUITY_CATS_DASH = new Set(['Equity', 'ELSS', 'Index'])
     const nowD = new Date()
     filterOwner((goalList || []).filter(g => g.isActive !== false), 'familyMemberId').forEach(g => {
       if (g.status === 'Achieved') return
@@ -609,19 +593,8 @@ export default function Dashboard() {
         : yearsLeft <= 7 ? 65 : yearsLeft <= 10 ? 75 : 85
       const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
       if (!maps.length) return
-      let total = 0, eq = 0
-      for (const m of maps) {
-        for (const h of (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)) {
-          const v = h.currentValue * (m.allocationPct / 100)
-          total += v
-          const detailed = goalAllocMap[h.schemeCode || h.fundCode]
-          if (detailed) {
-            eq += v * ((detailed.Equity || 0) / 100)
-          } else if (EQUITY_CATS_DASH.has(h.category)) eq += v
-          else if (h.category === 'Hybrid') eq += v * 0.65
-          else if (h.category === 'Multi-Asset') eq += v * 0.50
-        }
-      }
+      const att = goalAttribution[g.goalId] || { total: 0, equity: 0 }
+      const total = att.total, eq = att.equity
       const actual = total > 0 ? Math.round((eq / total) * 100) : null
       if (actual !== null && actual - rec > 15) {
         items.push({
@@ -633,7 +606,7 @@ export default function Dashboard() {
     })
 
     return items.slice(0, 6)
-  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, mfHoldings, healthCheckCompleted, healthCheckAnswers])
+  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, goalAttribution, healthCheckCompleted, healthCheckAnswers])
 
   // ── Upcoming Reminders (sorted by due date) ──
   const upcomingReminders = useMemo(() => {

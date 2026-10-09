@@ -3,23 +3,13 @@ import { AlertTriangle, ArrowRightLeft } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import FundSearchInput from './FundSearchInput'
 
-const EQUITY_CATS = new Set(['Equity', 'ELSS', 'Index'])
 const DEBT_CATS = new Set([
   'Debt', 'Liquid', 'Gilt', 'Low Duration', 'Ultra Short Duration', 'Overnight',
   'Money Market', 'Short Duration', 'Medium Duration', 'Long Duration',
   'Corporate Bond', 'Banking & PSU', 'Credit Risk', 'Floater',
 ])
 
-function equityWeight(h, allocMap) {
-  const detailed = allocMap?.[h.schemeCode || h.fundCode]
-  if (detailed) return (detailed.Equity || 0) / 100
-  if (EQUITY_CATS.has(h.category)) return 1
-  if (h.category === 'Hybrid') return 0.65
-  if (h.category === 'Multi-Asset') return 0.50
-  return 0
-}
-
-export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMappings, mfHoldings, mfPortfolios, stockHoldings, stockPortfolios, otherInvList, assetAllocations, onClose, onConfirmRebalance }) {
+export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMappings, mfHoldings, mfPortfolios, stockPortfolios, otherInvList, attribution, onClose, onConfirmRebalance }) {
   const today = new Date().toISOString().split('T')[0]
   const [rebalanceDate, setRebalanceDate] = useState(today)
   const [sellNavs, setSellNavs] = useState({})          // schemeCode → navString
@@ -32,93 +22,78 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
     [goalPortfolioMappings, goal.goalId]
   )
 
-  // Build fund breakdown lookup
-  const allocMap = useMemo(() => {
-    const m = {}
-    if (assetAllocations) {
-      for (const a of assetAllocations) {
-        if (a.assetAllocation) m[a.fundCode] = a.assetAllocation
-      }
-    }
-    return m
-  }, [assetAllocations])
-
+  // The goal's own part of each linked investment (see utils/goalAttribution.js): in a shared portfolio
+  // the near goal already owns the debt, so only the equity the GOAL really holds above its target is sold.
   const plan = useMemo(() => {
     if (!mappings.length) return null
     const targetShare = (health.recommendedEquity || 0) / 100
+    const att = attribution || { total: 0, equity: 0, items: [] }
+    let remaining = Math.max(0, att.equity - targetShare * att.total)   // equity value to move out, goal level
+
+    // sell the most equity-heavy parts first, larger ones first
+    const sellPlan = {}                                   // key -> { sellValue, reduced }
+    for (const it of [...att.items].filter(x => x.eq > 0).sort((x, y) => (y.eq - x.eq) || (y.value - x.value))) {
+      if (remaining <= 0.5) break
+      if (it.kind === 'other') continue                   // the app can't sell these for you
+      const reduce = Math.min(it.value * it.eq, remaining)
+      sellPlan[it.key] = { sellValue: reduce / it.eq, reduced: reduce }
+      remaining -= reduce
+    }
+
     const portfolioDetails = mappings.map(m => {
+      const items = att.items.filter(x => x.portfolioId === m.portfolioId)
+      const totalGoalValue = items.reduce((s2, x) => s2 + x.value, 0)
+      const equityGoalValue = items.reduce((s2, x) => s2 + x.value * x.eq, 0)
       const portfolio = (mfPortfolios || []).find(p => p.portfolioId === m.portfolioId)
       if (!portfolio) {
         // Stock portfolio linked to the goal: all of it is equity. The app can't switch stocks into a
         // debt fund, so the plan says how much of which stocks to sell; the user records the sell + buy.
         const stockPf = (stockPortfolios || []).find(p => p.portfolioId === m.portfolioId)
         if (stockPf) {
-          const goalShare = m.allocationPct / 100
-          const holdings = (stockHoldings || []).filter(h => h.portfolioId === m.portfolioId && Number(h.quantity) > 0)
-          const totalGoalValue = holdings.reduce((s, h) => s + (Number(h.currentValue) || 0) * goalShare, 0)
-          const excessEquityValue = Math.max(0, totalGoalValue * (1 - targetShare))
           const stockSells = []
-          let remaining = excessEquityValue
-          for (const h of [...holdings].sort((a, b) => (Number(b.currentValue) || 0) - (Number(a.currentValue) || 0))) {
-            if (remaining <= 0) break
+          let excessEquityValue = 0
+          for (const it of items) {
+            const sp = sellPlan[it.key]
+            if (!sp) continue
+            const h = it.holding
             const price = Number(h.currentPrice) || ((Number(h.currentValue) || 0) / Number(h.quantity)) || 0
             if (price <= 0) continue
-            const want = Math.min((Number(h.currentValue) || 0) * goalShare, remaining)
-            const qty = Math.min(Math.ceil(want / price), Math.floor(Number(h.quantity) * goalShare) || Number(h.quantity))
-            if (qty > 0) { stockSells.push({ symbol: h.symbol, companyName: h.companyName, qty, price, amount: qty * price }); remaining -= qty * price }
+            const qty = Math.min(Math.ceil(sp.sellValue / price), Math.floor(Number(h.quantity) * it.fraction) || Number(h.quantity))
+            if (qty > 0) { stockSells.push({ symbol: h.symbol, companyName: h.companyName, qty, price, amount: qty * price }); excessEquityValue += qty * price }
           }
           return {
             kind: 'stock', portfolioId: m.portfolioId,
             portfolioName: stockPf.portfolioName?.replace(/^PFL-/, '') || stockPf.portfolioName,
-            allocationPct: m.allocationPct, totalGoalValue, equityGoalValue: totalGoalValue, excessEquityValue,
+            allocationPct: m.allocationPct, totalGoalValue, equityGoalValue, excessEquityValue,
             debtFunds: [], suggestedSells: [], stockSells,
           }
         }
         // Other investment (EPF, PPF, FD, gold...): only an Equity-category one adds equity
         const inv = (otherInvList || []).find(i => i.investmentId === m.portfolioId)
         if (inv) {
-          const totalGoalValue = (Number(inv.currentValue) || 0) * (m.allocationPct / 100)
-          const isEquity = inv.investmentCategory === 'Equity'
           return {
             kind: 'other', portfolioId: m.portfolioId, portfolioName: inv.investmentName,
-            allocationPct: m.allocationPct, totalGoalValue, equityGoalValue: isEquity ? totalGoalValue : 0,
-            excessEquityValue: isEquity ? Math.max(0, totalGoalValue * (1 - targetShare)) : 0,
+            allocationPct: m.allocationPct, totalGoalValue, equityGoalValue,
+            excessEquityValue: 0,
             debtFunds: [], suggestedSells: [], stockSells: [],
           }
         }
         return null
       }
       const holdings = (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)
-      const goalShare = m.allocationPct / 100
-
-      let totalGoalValue = 0, equityGoalValue = 0
-      for (const h of holdings) {
-        const v = h.currentValue * goalShare
-        totalGoalValue += v
-        equityGoalValue += v * equityWeight(h, allocMap)
-      }
-
-      const targetEquityValue = (health.recommendedEquity / 100) * totalGoalValue
-      const excessEquityValue = Math.max(0, equityGoalValue - targetEquityValue)
-
-      // Equity funds sorted by value desc (sell candidates)
-      const equityFunds = holdings
-        .filter(h => equityWeight(h, allocMap) > 0)
-        .sort((a, b) => b.currentValue - a.currentValue)
-
       // Debt/liquid funds (switch-into candidates)
       const debtFunds = holdings.filter(h => DEBT_CATS.has(h.category))
 
-      // Greedy: suggest units to sell per equity fund
       const suggestedSells = []
-      let remaining = excessEquityValue
-      for (const h of equityFunds) {
-        if (remaining <= 0) break
-        const sellValue = Math.min(h.currentValue * goalShare, remaining)
-        const suggestedUnits = Math.min(sellValue / h.currentNav, h.units)
+      let excessEquityValue = 0
+      for (const it of items.slice().sort((x, y) => (y.value * y.eq) - (x.value * x.eq))) {
+        const sp = sellPlan[it.key]
+        if (!sp) continue
+        const h = it.holding
+        const suggestedUnits = Math.min(sp.sellValue / h.currentNav, h.units)
         if (suggestedUnits > 0.0001) {
-          suggestedSells.push({ ...h, suggestedUnits, sellValue })
-          remaining -= sellValue
+          suggestedSells.push({ ...h, suggestedUnits, sellValue: sp.sellValue })
+          excessEquityValue += sp.reduced
         }
       }
 
@@ -136,7 +111,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
     }).filter(Boolean)
 
     return { portfolioDetails }
-  }, [mappings, mfHoldings, mfPortfolios, stockHoldings, stockPortfolios, otherInvList, health, allocMap])
+  }, [mappings, mfHoldings, mfPortfolios, stockPortfolios, otherInvList, health, attribution])
 
   // Initialize toFundChoices for portfolios with debt funds (first-time only)
   useEffect(() => {

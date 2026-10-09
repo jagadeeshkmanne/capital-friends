@@ -357,6 +357,14 @@ export function allocateBucketWithdrawal(bucketFunds, requestedAmount) {
   )
 }
 
+// The goal's part of one holding: from the goal attribution when given (shared portfolios: the near
+// goal owns the debt first, see utils/goalAttribution.js), else the plain link %.
+function goalPart(attribution, key, linkShare) {
+  if (!attribution) return linkShare
+  const item = (attribution.items || []).find(i => i.key === key)
+  return item ? item.fraction : 0
+}
+
 export function buildRetirementBucketPlan({
   goal,
   mappings,
@@ -368,6 +376,7 @@ export function buildRetirementBucketPlan({
   b2TargetMonths = 60,
   planDate = new Date(),
   otherInvestments = [],
+  attribution = null,
 }) {
   const goalMappings = (mappings || []).filter(mapping => mapping.goalId === goal?.goalId)
   if (!goalMappings.length) return null
@@ -386,7 +395,7 @@ export function buildRetirementBucketPlan({
     if (!portfolio) {
       const investment = (otherInvestments || []).find(item => item.investmentId === mapping.portfolioId && item.status !== 'Inactive')
       if (!investment) continue
-      const share = Math.max(0, Number(mapping.allocationPct) || 0) / 100
+      const share = goalPart(attribution, `${mapping.portfolioId}::other`, Math.max(0, Number(mapping.allocationPct) || 0) / 100)
       const value = (Number(investment.currentValue) || 0) * share
       if (!(value > 0)) continue
       const classification = classifyOtherInvestment(investment)
@@ -412,13 +421,14 @@ export function buildRetirementBucketPlan({
       })
       continue
     }
-    const goalShare = Math.max(0, Number(mapping.allocationPct) || 0) / 100
+    const linkShare = Math.max(0, Number(mapping.allocationPct) || 0) / 100
     const portfolioName = portfolio.portfolioName?.replace(/^PFL-/, '') || portfolio.portfolioName
 
     for (const holding of (holdings || []).filter(item => item.portfolioId === mapping.portfolioId && item.units > 0)) {
       const schemeCode = String(holding.schemeCode || holding.fundCode || '')
       const classification = classifyRetirementHolding(holding, allocationMap[schemeCode])
       const currentNav = Number(holding.currentNav) || 0
+      const goalShare = goalPart(attribution, `${mapping.portfolioId}::${schemeCode}`, linkShare)
       const goalUnits = (Number(holding.units) || 0) * goalShare
       const holdingValue = Number(holding.currentValue)
       const goalValue = Number.isFinite(holdingValue) && holdingValue > 0

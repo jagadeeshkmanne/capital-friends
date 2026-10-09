@@ -3,21 +3,31 @@ import { ArrowDownCircle, AlertTriangle } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { buildGoalWithdrawalPlan } from '../../utils/goalWithdrawal'
+import { attributeFamilyGoals } from '../../utils/goalAttribution'
 
 export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal }) {
-  const { goalPortfolioMappings, mfPortfolios, mfHoldings } = useData()
+  const { goalPortfolioMappings, mfPortfolios, mfHoldings, stockHoldings, otherInvList, goalList, assetAllocations } = useData()
   const today = new Date().toISOString().split('T')[0]
   const [redeemDate, setRedeemDate] = useState(today)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [actualNavs, setActualNavs] = useState({})
   const [actualUnits, setActualUnits] = useState({})
 
+  // Take the money from the goal's own part: in a shared portfolio the near goal owns the debt funds
+  const attribution = useMemo(() => {
+    const allocMap = {}
+    for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
+    return attributeFamilyGoals({ goals: (goalList || []).filter(g => g.isActive !== false), mappings: goalPortfolioMappings,
+      mfHoldings, stockHoldings, otherInvList, allocMap })[goal.goalId]
+  }, [goal.goalId, goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations])
+
   const basePlan = useMemo(() => buildGoalWithdrawalPlan({
     goal,
     mappings: goalPortfolioMappings,
     portfolios: mfPortfolios,
     holdings: mfHoldings,
-  }), [goal, goalPortfolioMappings, mfPortfolios, mfHoldings])
+    attribution,
+  }), [goal, goalPortfolioMappings, mfPortfolios, mfHoldings, attribution])
 
   useEffect(() => {
     if (basePlan && withdrawAmount === '') setWithdrawAmount(String(Math.round(basePlan.defaultAmount)))
@@ -29,7 +39,8 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
     portfolios: mfPortfolios,
     holdings: mfHoldings,
     requestedAmount: withdrawAmount === '' ? undefined : withdrawAmount,
-  }), [goal, goalPortfolioMappings, mfPortfolios, mfHoldings, withdrawAmount])
+    attribution,
+  }), [goal, goalPortfolioMappings, mfPortfolios, mfHoldings, withdrawAmount, attribution])
 
   if (!plan) {
     return (

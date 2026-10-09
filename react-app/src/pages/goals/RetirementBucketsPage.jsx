@@ -17,6 +17,7 @@ import MFRedeemForm from '../../components/forms/MFRedeemForm'
 import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 import { allocateBucketWithdrawal, buildTargetAwareBucketPreview } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
+import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { DEMO_SCENARIOS, buildDemoData, applyDemoSwitch, applyDemoRedeem } from '../../data/bucketDemo'
 
 const BUCKET = {
@@ -125,6 +126,15 @@ export default function RetirementBucketsPage() {
     .filter(g => demo || selectedMember === 'all' || g.familyMemberId === selectedMember), [goalList, selectedMember, demo])
   const goal = goals.find(g => g.goalId === params.get('goal')) || goals[0]
 
+  // The goal's part of each shared portfolio: nearer goals own the debt first (utils/goalAttribution.js)
+  const stockHoldingsAll = demo ? null : liveData.stockHoldings
+  const goalAttribution = useMemo(() => {
+    const allocMap = {}
+    for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
+    return attributeFamilyGoals({ goals: (goalList || []).filter(g => g.isActive !== false), mappings: goalPortfolioMappings,
+      mfHoldings, stockHoldings: stockHoldingsAll, otherInvList: (otherInvList || []).filter(i => i.status !== 'Inactive'), allocMap })
+  }, [goalList, goalPortfolioMappings, mfHoldings, stockHoldingsAll, otherInvList, assetAllocations])
+
   const plan = useMemo(() => {
     if (!goal) return null
     const yearsLeft = goal.targetDate ? Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 864e5)) : 0
@@ -137,8 +147,9 @@ export default function RetirementBucketsPage() {
       targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity,
       lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
       otherInvestments: otherInvList || [],
+      attribution: goalAttribution[goal.goalId],
     })
-  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList])
+  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution])
 
   if (goalList === null || (demoKey && !demo)) return <PageLoading title="Loading retirement buckets" cards={4} />
 

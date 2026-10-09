@@ -15,6 +15,7 @@ import PageLoading from '../../components/PageLoading'
 import { calculateGoalFundingProjection } from '../../utils/goalProjection'
 import { suggestGoalLinks, linkedSummary } from '../../utils/goalLinkSuggest'
 import { classifyOtherInvestment } from '../../utils/retirementBuckets'
+import { attributeFamilyGoals } from '../../utils/goalAttribution'
 
 const statusBadge = {
   'On Track': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -151,6 +152,12 @@ export default function GoalsPage() {
     return m
   }, [assetAllocations])
 
+  // Which part of each shared investment belongs to which goal: near goals get the debt first
+  // (see utils/goalAttribution.js), so a shared portfolio never gets a false "move to debt".
+  const goalAttribution = useMemo(() => attributeFamilyGoals({ goals: allActiveGoals, mappings: goalPortfolioMappings,
+    mfHoldings, stockHoldings, otherInvList, allocMap: goalAllocMap }),
+  [allActiveGoals, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, goalAllocMap])
+
   const allocationHealth = useMemo(() => {
     if (!allActiveGoals.length) return {}
     const now = new Date()
@@ -162,34 +169,8 @@ export default function GoalsPage() {
       if (yearsLeft <= 0) continue
       const recommended = getRecommendedAllocation(g.goalType, yearsLeft)
       const mappings = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
-      let totalValue = 0, equityValue = 0
-      for (const m of mappings) {
-        const holdings = (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)
-        for (const h of holdings) {
-          const val = h.currentValue * (m.allocationPct / 100)
-          totalValue += val
-          const detailed = goalAllocMap[h.schemeCode || h.fundCode]
-          if (detailed) {
-            equityValue += val * ((detailed.Equity || 0) / 100)
-          } else if (EQUITY_CATS.has(h.category)) equityValue += val
-          else if (h.category === 'Hybrid') equityValue += val * 0.65
-          else if (h.category === 'Multi-Asset') equityValue += val * 0.50
-        }
-        // Stock portfolios linked to the goal: all equity
-        for (const sh of (stockHoldings || []).filter(x => x.portfolioId === m.portfolioId)) {
-          const val = (Number(sh.currentValue) || 0) * (m.allocationPct / 100)
-          totalValue += val
-          equityValue += val
-        }
-        // Other investments linked to the goal (EPF, PPF, FD, gold, ...): count them in the total;
-        // only those whose category is Equity add to equity. EPF/PPF/FD are debt, so they lower the equity %.
-        const inv = (otherInvList || []).find(i => i.investmentId === m.portfolioId)
-        if (inv) {
-          const val = (Number(inv.currentValue) || 0) * (m.allocationPct / 100)
-          totalValue += val
-          if (inv.investmentCategory === 'Equity') equityValue += val
-        }
-      }
+      const att = goalAttribution[g.goalId] || { total: 0, equity: 0 }
+      const totalValue = att.total, equityValue = att.equity
       const actualEquity = totalValue > 0 ? Math.round((equityValue / totalValue) * 100) : null
       const isMapped = mappings.length > 0
       const mismatch = isMapped && actualEquity !== null ? Math.round(actualEquity - recommended.equity) : null
@@ -211,7 +192,7 @@ export default function GoalsPage() {
       health[g.goalId] = { yearsLeft, label: recommended.label, recommendedEquity: recommended.equity, recommendedDebt: recommended.debt, actualEquity, isMapped, mismatch, needsAttention, liveLumpsum, liveSIP }
     }
     return health
-  }, [allActiveGoals, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, goalAllocMap])
+  }, [allActiveGoals, goalPortfolioMappings, goalAttribution])
 
   // Live totals from allocationHealth — always from all goals
   const liveTotalSIP = allActiveGoals.reduce((s, g) => s + (allocationHealth[g.goalId]?.liveSIP || 0), 0)
@@ -1185,12 +1166,11 @@ export default function GoalsPage() {
             goalPortfolioMappings={goalPortfolioMappings}
             mfHoldings={mfHoldings}
             mfPortfolios={mfPortfolios}
-            stockHoldings={stockHoldings}
             stockPortfolios={stockPortfolios}
             otherInvList={otherInvList}
-            assetAllocations={assetAllocations}
             onClose={() => setRebalanceGoal(null)}
             onConfirmRebalance={handleConfirmRebalance}
+            attribution={goalAttribution[rebalanceGoal.goalId]}
           />
         )}
       </Modal>

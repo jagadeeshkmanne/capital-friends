@@ -148,6 +148,7 @@ export function buildBucketRefillPlan({
   lastBucketMoveDate = null,
   rules: customRules,
   otherInvestments = [],
+  attribution = null,
 }) {
   const rules = { ...REFILL_RULES, ...(customRules || {}) }
   const base = buildRetirementBucketPlan({
@@ -161,6 +162,7 @@ export function buildBucketRefillPlan({
     b2TargetMonths: rules.stabilityMonths,
     planDate,
     otherInvestments,
+    attribution,
   })
   if (!base || base.noExpenses) return base
 

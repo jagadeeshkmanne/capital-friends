@@ -1,4 +1,12 @@
-export function buildGoalWithdrawalPlan({ goal, mappings, portfolios, holdings, requestedAmount }) {
+// The goal's part of one holding: from the goal attribution when given (shared portfolios: the near
+// goal owns the debt first, see utils/goalAttribution.js), else the plain link %.
+function goalPart(attribution, key, linkShare) {
+  if (!attribution) return linkShare
+  const item = (attribution.items || []).find(i => i.key === key)
+  return item ? item.fraction : 0
+}
+
+export function buildGoalWithdrawalPlan({ goal, mappings, portfolios, holdings, requestedAmount, attribution }) {
   const goalMappings = (mappings || []).filter(mapping => mapping.goalId === goal?.goalId)
   if (!goalMappings.length) return null
 
@@ -8,11 +16,12 @@ export function buildGoalWithdrawalPlan({ goal, mappings, portfolios, holdings, 
     if (!portfolio) continue
     const portfolioHoldings = (holdings || []).filter(item => item.portfolioId === mapping.portfolioId && item.units > 0)
     const portfolioValue = portfolioHoldings.reduce((sum, item) => sum + (Number(item.currentValue) || 0), 0)
-    const goalShare = Math.max(0, Number(mapping.allocationPct) || 0) / 100
+    const linkShare = Math.max(0, Number(mapping.allocationPct) || 0) / 100
 
     for (const holding of portfolioHoldings) {
       const schemeCode = String(holding.schemeCode || holding.fundCode || '')
       const currentNav = Number(holding.currentNav) || 0
+      const goalShare = goalPart(attribution, `${mapping.portfolioId}::${schemeCode}`, linkShare)
       const availableUnits = (Number(holding.units) || 0) * goalShare
       const holdingValue = Number(holding.currentValue)
       const availableValue = Number.isFinite(holdingValue) && holdingValue > 0
