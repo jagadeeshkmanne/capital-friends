@@ -58,7 +58,7 @@ function initialStockImport() {
     }
 
     const allData = json.data;
-    const stocks = allData.filter(item => item.type === 'stock'); // Skip ETFs
+    const stocks = allData.filter(item => item.type === 'stock' || item.type === 'etf'); // Stocks + ETFs (GOLDBEES, NIFTYBEES...)
 
     Logger.log(`Found ${stocks.length} stocks in Tickertape API`);
 
@@ -113,7 +113,7 @@ function initialStockImport() {
         'NSE',             // D: Exchange
         gfNSE,             // E: Google Finance NSE
         '',                // F: Google Finance BSE (blank)
-        '',                // G: Sector (blank)
+        stock.type === 'etf' ? 'ETF' : '', // G: Sector (ETF for ETFs, blank for stocks)
         '',                // H: Industry (blank)
         'Active',          // I: Status
         isin               // J: ISIN
@@ -197,7 +197,7 @@ function addNewStocksDaily() {
     }
 
     const allData = json.data;
-    const stocks = allData.filter(item => item.type === 'stock');
+    const stocks = allData.filter(item => item.type === 'stock' || item.type === 'etf'); // Stocks + ETFs
 
     Logger.log(`Found ${stocks.length} stocks in API`);
 
@@ -223,7 +223,7 @@ function addNewStocksDaily() {
         'NSE',             // D: Exchange
         gfNSE,             // E: Google Finance NSE
         '',                // F: Google Finance BSE
-        '',                // G: Sector
+        stock.type === 'etf' ? 'ETF' : '', // G: Sector (ETF for ETFs, blank for stocks)
         '',                // H: Industry
         'Active',          // I: Status
         isin               // J: ISIN
