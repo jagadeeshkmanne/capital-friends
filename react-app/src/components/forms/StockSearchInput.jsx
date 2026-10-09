@@ -17,7 +17,7 @@ function isFreshToday(updatedAt) {
     cached.getDate() === now.getDate()
 }
 
-function loadStocks() {
+export function loadStocks() {
   if (_stocksCache) return Promise.resolve(_stocksCache)
   if (_stocksPromise) return _stocksPromise
   _stocksPromise = getWithMeta('stocksList')

@@ -225,7 +225,10 @@ function generateId(prefix, existingIds) {
   for (let i = 0; i < existingIds.length; i++) {
     const id = existingIds[i];
     if (id && id.toString().startsWith(prefix + '-')) {
-      const num = parseInt(id.split('-')[1]);
+      // The number is everything after "<prefix>-" (prefixes like 'TXN-STK' contain a dash themselves).
+      // Only a pure number counts, so 'TXN' never picks up 'TXN-STK-…' ids.
+      const rest = id.toString().slice(prefix.length + 1);
+      const num = /^\d+$/.test(rest) ? parseInt(rest, 10) : NaN;
       if (!isNaN(num) && num > maxId) {
         maxId = num;
       }

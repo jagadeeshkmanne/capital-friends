@@ -263,6 +263,7 @@ export const getStockPrice = (symbol) => callAPI('stock:price', { symbol })
 
 // Stock Transactions
 export const buyStock = (data) => callAPI('stock:buy', data)
+export const importStocks = (data) => callAPI('stock:import', data)
 export const sellStock = (data) => callAPI('stock:sell', data)
 export const getStockHoldings = (portfolioId) => callAPI('stock:holdings', { portfolioId })
 export const getStockTransactions = (portfolioId) => callAPI('stock:transactions', { portfolioId })

@@ -782,6 +782,78 @@ function deleteStockTransaction(transactionId) {
 // ============================================================================
 
 /**
+ * Bulk import holdings from a broker file (Symbol, Quantity, Avg Price), e.g. a Zerodha holdings export.
+ * Each row becomes one BUY transaction on `date` (note "Imported"), then holdings are recalculated.
+ * Never throws for a bad row: unknown symbols / bad numbers are returned in `skipped`.
+ * @param {Object} params { portfolioId, date, rows: [{ symbol, quantity, avgPrice, sourceSymbol }] }
+ * @returns {Object} { success, imported: [{symbol, quantity, avgPrice}], skipped: [{symbol, reason}] }
+ */
+function importStockHoldings(params) {
+  try {
+    var portfolioId = params && params.portfolioId;
+    var rows = (params && params.rows) || [];
+    if (!portfolioId) throw new Error('Portfolio ID is required');
+    if (!rows.length) throw new Error('No rows to import');
+    if (rows.length > 500) throw new Error('Too many rows (max 500 per import)');
+    var txnDate = params.date ? new Date(params.date) : new Date();
+    if (isNaN(txnDate.getTime())) txnDate = new Date();
+
+    var portfolio = getAllStockPortfolios().find(function (p) { return p.portfolioId === portfolioId; });
+    if (!portfolio) throw new Error('Portfolio not found: ' + portfolioId);
+
+    // Master data, read once
+    var master = getSheet(CONFIG.stockMasterDataSheet);
+    if (!master) throw new Error('StockMasterData sheet not found');
+    var mLast = master.getLastRow();
+    var mData = mLast > 2 ? master.getRange(3, 1, mLast - 2, 10).getValues() : [];
+    var bySymbol = {};
+    mData.forEach(function (r) { if (r[0]) bySymbol[r[0].toString().toUpperCase()] = r; });
+
+    var txSheet = getSheet(CONFIG.stockTransactionsSheet);
+    if (!txSheet) throw new Error('StockTransactions sheet not found');
+    var tLast = txSheet.getLastRow();
+    var existingIds = tLast > 2 ? txSheet.getRange(3, 1, tLast - 2, 1).getValues().flat() : [];
+
+    var imported = [], skipped = [], newRows = [], symbols = {};
+    rows.forEach(function (row) {
+      var label = (row && (row.sourceSymbol || row.symbol)) || '(blank)';
+      try {
+        var sym = (row.symbol || '').toString().trim().toUpperCase();
+        var qty = parseFloat(row.quantity);
+        var price = parseFloat(row.avgPrice);
+        var m = bySymbol[sym];
+        if (!m) { skipped.push({ symbol: label, reason: 'Not found in the stock list' }); return; }
+        if (!(qty > 0)) { skipped.push({ symbol: label, reason: 'Quantity is missing or zero' }); return; }
+        if (!(price > 0)) { skipped.push({ symbol: label, reason: 'Average price is missing or zero' }); return; }
+        var id = generateId('TXN-STK', existingIds);
+        existingIds.push(id);
+        var gf = m[4] || m[5] || '';
+        var total = qty * price;
+        newRows.push([id, portfolioId, portfolio.portfolioName, m[0], m[2], m[3], gf, 'BUY', txnDate, qty, price, total, 0, total, 'Imported from holdings file', '']);
+        symbols[m[0]] = true;
+        imported.push({ symbol: m[0], quantity: qty, avgPrice: price });
+      } catch (e) {
+        skipped.push({ symbol: label, reason: e.message || 'Could not read this row' });
+      }
+    });
+
+    if (newRows.length) {
+      txSheet.getRange(txSheet.getLastRow() + 1, 1, newRows.length, 16).setValues(newRows);
+      flushSheets_();
+      Object.keys(symbols).forEach(function (s) {
+        try { recalculateStockHoldings(portfolioId, s); }
+        catch (e) { log('importStockHoldings: recalc failed for ' + s + ': ' + e); }
+      });
+    }
+    log('Stock import: ' + imported.length + ' imported, ' + skipped.length + ' skipped into ' + portfolioId);
+    return { success: true, imported: imported, skipped: skipped };
+  } catch (error) {
+    log('Error importing stocks: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Recalculate stock holdings for a specific portfolio and stock
  * Called after each BUY or SELL transaction
  */

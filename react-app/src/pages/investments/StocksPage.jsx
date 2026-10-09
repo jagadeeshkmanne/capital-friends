@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, ChevronDown, MoreVertical, Trash2,
-  RefreshCw, X, Check, Loader2
+  RefreshCw, X, Check, Loader2, Upload
 } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -13,6 +13,7 @@ import { useMask } from '../../context/MaskContext'
 import Modal, { FormDateInput } from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
 import BuyStockForm from '../../components/forms/BuyStockForm'
+import ImportStocksForm from '../../components/forms/ImportStocksForm'
 import SellStockForm from '../../components/forms/SellStockForm'
 import EditStockTxnForm from '../../components/forms/EditStockTxnForm'
 import PageLoading from '../../components/PageLoading'
@@ -24,7 +25,7 @@ export default function StocksPage() {
     stockPortfolios, stockHoldings, stockTransactions,
     activeInvestmentAccounts, activeMembers,
     addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
-    buyStock, sellStock, editStockTransaction, deleteStockTransaction,
+    buyStock, importStocks, sellStock, editStockTransaction, deleteStockTransaction,
     refreshStocks,
   } = useData()
 
@@ -364,6 +365,13 @@ export default function StocksPage() {
               >
                 <TrendingDown size={14} /> Sell
               </button>
+              <button
+                onClick={() => setModal({ importFile: selectedPortfolioId !== 'all' ? selectedPortfolioId : '' })}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-colors border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                title="Import holdings from an Excel / CSV file (Symbol, Quantity, Avg price)"
+              >
+                <Upload size={14} /> Import
+              </button>
             </div>
           </div>
 
@@ -649,6 +657,16 @@ export default function StocksPage() {
           onSave={handleBuy}
           onCancel={() => setModal(null)}
         />
+      </Modal>
+
+      <Modal open={!!modal && typeof modal === 'object' && 'importFile' in modal} onClose={() => setModal(null)} title="Import Stocks from Excel / CSV" wide>
+        {modal && typeof modal === 'object' && 'importFile' in modal && (
+          <ImportStocksForm
+            portfolioId={modal.importFile || undefined}
+            onImport={(data) => importStocks(data)}
+            onCancel={() => setModal(null)}
+          />
+        )}
       </Modal>
 
       <Modal open={!!modal?.sell} onClose={() => setModal(null)} title="Sell Stock" wide>
