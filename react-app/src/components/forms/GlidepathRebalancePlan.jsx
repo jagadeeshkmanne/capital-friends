@@ -19,7 +19,7 @@ function equityWeight(h, allocMap) {
   return 0
 }
 
-export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMappings, mfHoldings, mfPortfolios, assetAllocations, onClose, onConfirmRebalance }) {
+export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMappings, mfHoldings, mfPortfolios, stockHoldings, stockPortfolios, otherInvList, assetAllocations, onClose, onConfirmRebalance }) {
   const today = new Date().toISOString().split('T')[0]
   const [rebalanceDate, setRebalanceDate] = useState(today)
   const [sellNavs, setSellNavs] = useState({})          // schemeCode → navString
@@ -45,9 +45,49 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
 
   const plan = useMemo(() => {
     if (!mappings.length) return null
+    const targetShare = (health.recommendedEquity || 0) / 100
     const portfolioDetails = mappings.map(m => {
-      const portfolio = mfPortfolios.find(p => p.portfolioId === m.portfolioId)
-      if (!portfolio) return null
+      const portfolio = (mfPortfolios || []).find(p => p.portfolioId === m.portfolioId)
+      if (!portfolio) {
+        // Stock portfolio linked to the goal: all of it is equity. The app can't switch stocks into a
+        // debt fund, so the plan says how much of which stocks to sell; the user records the sell + buy.
+        const stockPf = (stockPortfolios || []).find(p => p.portfolioId === m.portfolioId)
+        if (stockPf) {
+          const goalShare = m.allocationPct / 100
+          const holdings = (stockHoldings || []).filter(h => h.portfolioId === m.portfolioId && Number(h.quantity) > 0)
+          const totalGoalValue = holdings.reduce((s, h) => s + (Number(h.currentValue) || 0) * goalShare, 0)
+          const excessEquityValue = Math.max(0, totalGoalValue * (1 - targetShare))
+          const stockSells = []
+          let remaining = excessEquityValue
+          for (const h of [...holdings].sort((a, b) => (Number(b.currentValue) || 0) - (Number(a.currentValue) || 0))) {
+            if (remaining <= 0) break
+            const price = Number(h.currentPrice) || ((Number(h.currentValue) || 0) / Number(h.quantity)) || 0
+            if (price <= 0) continue
+            const want = Math.min((Number(h.currentValue) || 0) * goalShare, remaining)
+            const qty = Math.min(Math.ceil(want / price), Math.floor(Number(h.quantity) * goalShare) || Number(h.quantity))
+            if (qty > 0) { stockSells.push({ symbol: h.symbol, companyName: h.companyName, qty, price, amount: qty * price }); remaining -= qty * price }
+          }
+          return {
+            kind: 'stock', portfolioId: m.portfolioId,
+            portfolioName: stockPf.portfolioName?.replace(/^PFL-/, '') || stockPf.portfolioName,
+            allocationPct: m.allocationPct, totalGoalValue, equityGoalValue: totalGoalValue, excessEquityValue,
+            debtFunds: [], suggestedSells: [], stockSells,
+          }
+        }
+        // Other investment (EPF, PPF, FD, gold...): only an Equity-category one adds equity
+        const inv = (otherInvList || []).find(i => i.investmentId === m.portfolioId)
+        if (inv) {
+          const totalGoalValue = (Number(inv.currentValue) || 0) * (m.allocationPct / 100)
+          const isEquity = inv.investmentCategory === 'Equity'
+          return {
+            kind: 'other', portfolioId: m.portfolioId, portfolioName: inv.investmentName,
+            allocationPct: m.allocationPct, totalGoalValue, equityGoalValue: isEquity ? totalGoalValue : 0,
+            excessEquityValue: isEquity ? Math.max(0, totalGoalValue * (1 - targetShare)) : 0,
+            debtFunds: [], suggestedSells: [], stockSells: [],
+          }
+        }
+        return null
+      }
       const holdings = (mfHoldings || []).filter(h => h.portfolioId === m.portfolioId && h.units > 0)
       const goalShare = m.allocationPct / 100
 
@@ -83,6 +123,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
       }
 
       return {
+        kind: 'mf',
         portfolioId: m.portfolioId,
         portfolioName: portfolio.portfolioName?.replace(/^PFL-/, '') || portfolio.portfolioName,
         allocationPct: m.allocationPct,
@@ -95,7 +136,7 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
     }).filter(Boolean)
 
     return { portfolioDetails }
-  }, [mappings, mfHoldings, mfPortfolios, health, allocMap])
+  }, [mappings, mfHoldings, mfPortfolios, stockHoldings, stockPortfolios, otherInvList, health, allocMap])
 
   // Initialize toFundChoices for portfolios with debt funds (first-time only)
   useEffect(() => {
@@ -124,7 +165,8 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
   }
 
   const totalExcess = plan.portfolioDetails.reduce((s, pd) => s + pd.excessEquityValue, 0)
-  const allAligned = totalExcess === 0
+  const allAligned = totalExcess < 1
+  const hasMFSwitches = plan.portfolioDetails.some(pd => pd.kind === 'mf' && pd.suggestedSells.length > 0)
 
   function getSellNav(schemeCode, currentNav) {
     const v = sellNavs[schemeCode]
@@ -221,6 +263,51 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
         </div>
       ) : (
         plan.portfolioDetails.map(pd => {
+          if (pd.kind === 'stock') {
+            if (pd.excessEquityValue < 1) return null
+            return (
+              <div key={pd.portfolioId} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)]">
+                <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">{pd.portfolioName} <span className="font-normal text-[var(--text-dim)]">· Stocks</span></p>
+                    <p className="text-xs text-[var(--text-dim)]">{pd.allocationPct}% linked to goal · {formatINR(pd.totalGoalValue)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-[var(--text-dim)]">Move to debt</p>
+                    <p className="text-xs font-bold text-amber-400">{formatINR(pd.excessEquityValue)} ({Math.round((pd.excessEquityValue / (pd.totalGoalValue || 1)) * 100)}%)</p>
+                  </div>
+                </div>
+                <div className="px-4 py-3 space-y-2">
+                  <p className="text-sm font-bold text-[var(--text-dim)] uppercase tracking-wider">Sell (Stocks)</p>
+                  {pd.stockSells.map(s => (
+                    <div key={s.symbol} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs text-[var(--text-secondary)] truncate">{s.symbol} <span className="text-[var(--text-dim)]">— {s.companyName}</span></p>
+                        <p className="text-xs text-[var(--text-dim)] tabular-nums">{s.qty} shares × ₹{s.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(s.amount)}</p>
+                    </div>
+                  ))}
+                  <p className="text-xs text-violet-300 bg-violet-500/10 rounded px-2 py-1.5">
+                    Sell these in your broker, then put the money in a debt or liquid fund. Record the sell in Stocks and the buy in Mutual Funds, and link that fund to this goal.
+                  </p>
+                </div>
+              </div>
+            )
+          }
+          if (pd.kind === 'other') {
+            if (pd.excessEquityValue < 1) return null
+            return (
+              <div key={pd.portfolioId} className="bg-[var(--bg-inset)] rounded-lg border border-[var(--border-light)] px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">{pd.portfolioName} <span className="font-normal text-[var(--text-dim)]">· Other investment</span></p>
+                  <p className="text-xs text-[var(--text-dim)]">Redeem this part and move it to a debt or liquid fund</p>
+                </div>
+                <p className="text-xs font-bold text-amber-400 tabular-nums shrink-0">{formatINR(pd.excessEquityValue)}</p>
+              </div>
+            )
+          }
+          if (pd.suggestedSells.length === 0) return null
           const toFund = toFundChoices[pd.portfolioId]
           const buyNav = getBuyNav(pd.portfolioId, toFund?.currentNav)
           const totalSwitchValue = pd.suggestedSells.reduce((s, sell) => s + getSellUnits(sell.schemeCode, sell.suggestedUnits, sell.units) * getSellNav(sell.schemeCode, sell.currentNav), 0)
@@ -360,15 +447,15 @@ export default function GlidepathRebalancePlan({ goal, health, goalPortfolioMapp
         })
       )}
 
-      <p className="text-xs text-[var(--text-dim)] px-1">
+      {hasMFSwitches && <p className="text-xs text-[var(--text-dim)] px-1">
         Units and NAVs are pre-filled based on your goal allocation — edit both to match what you actually executed in your AMC/broker. Each equity fund becomes a separate switch transaction.
-      </p>
+      </p>}
 
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-light)]">
         <button onClick={onClose} className="px-5 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
           Close
         </button>
-        {!allAligned && onConfirmRebalance && (
+        {!allAligned && hasMFSwitches && onConfirmRebalance && (
           <button
             onClick={() => onConfirmRebalance(buildSwitches())}
             disabled={!canConfirm}

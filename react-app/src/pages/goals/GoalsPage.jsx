@@ -156,7 +156,8 @@ export default function GoalsPage() {
     const now = new Date()
     const health = {}
     for (const g of allActiveGoals) {
-      if (g.status === 'Achieved') continue
+      // Achieved goals still get checked while their date is ahead: money that is already there and
+      // needed soon must move out of equity even more than money that is still being built.
       const yearsLeft = (new Date(g.targetDate) - now) / (365.25 * 24 * 60 * 60 * 1000)
       if (yearsLeft <= 0) continue
       const recommended = getRecommendedAllocation(g.goalType, yearsLeft)
@@ -225,7 +226,7 @@ export default function GoalsPage() {
       })
       .map(g => {
         const h = allocationHealth[g.goalId]
-        return { goalId: g.goalId, goalName: g.goalName, yearsLeft: h.yearsLeft.toFixed(1), equityPct: h.actualEquity, maxEquity: h.recommendedEquity, excessPct: h.mismatch }
+        return { goalId: g.goalId, goalName: g.goalName, achieved: g.status === 'Achieved', yearsLeft: h.yearsLeft.toFixed(1), equityPct: h.actualEquity, maxEquity: h.recommendedEquity, excessPct: h.mismatch }
       })
   }, [filtered, allocationHealth])
 
@@ -635,7 +636,7 @@ export default function GoalsPage() {
                   <div key={a.goalId} className="flex items-center justify-between bg-amber-500/5 rounded-lg px-3 py-2 gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-[var(--text-primary)]">{a.goalName}</p>
-                      <p className="text-xs text-[var(--text-dim)]">{a.yearsLeft} yrs left</p>
+                      <p className="text-xs text-[var(--text-dim)]">{a.achieved ? `Goal reached · ${a.yearsLeft} yrs left — protect it` : `${a.yearsLeft} yrs left`}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-amber-400">{a.equityPct}% equity</p>
@@ -874,11 +875,19 @@ export default function GoalsPage() {
                         </span>
                       </div>
                       {h.needsAttention && h.mismatch > 0 && (
-                        <p className="text-xs text-amber-400">
-                          {g.goalType === 'Retirement'
-                            ? `Review ${h.mismatch}% excess equity against the retirement buckets`
-                            : `${h.mismatch}% over equity — consider shifting to debt`}
-                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-amber-400">
+                            {g.goalType === 'Retirement'
+                              ? `Review ${h.mismatch}% excess equity against the retirement buckets`
+                              : `${h.mismatch}% over equity — consider shifting to debt`}
+                          </p>
+                          {g.goalType !== 'Retirement' && (
+                            <button onClick={(e) => { e.stopPropagation(); setRebalanceGoal(g) }}
+                              className="shrink-0 px-2.5 py-1 text-xs font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors">
+                              Rebalance
+                            </button>
+                          )}
+                        </div>
                       )}
                       {h.needsAttention && h.mismatch < 0 && (
                         <p className="text-xs text-blue-400">ℹ {Math.abs(h.mismatch)}% under equity — room for growth</p>
@@ -1176,6 +1185,9 @@ export default function GoalsPage() {
             goalPortfolioMappings={goalPortfolioMappings}
             mfHoldings={mfHoldings}
             mfPortfolios={mfPortfolios}
+            stockHoldings={stockHoldings}
+            stockPortfolios={stockPortfolios}
+            otherInvList={otherInvList}
             assetAllocations={assetAllocations}
             onClose={() => setRebalanceGoal(null)}
             onConfirmRebalance={handleConfirmRebalance}

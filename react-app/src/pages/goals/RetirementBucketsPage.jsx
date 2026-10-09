@@ -244,6 +244,7 @@ export default function RetirementBucketsPage() {
       {demoBar}
       <StatusHero plan={plan} goal={goal} equity={equity} previewCount={previewOps?.length || 0} forceShow={forceShow} onForce={() => setForceShow(true)} />
       {early ? <EarlyBuckets plan={plan} /> : <BucketCards plan={plan} showAfter={showSteps} />}
+      <BucketFunds plan={plan} />
       {!early && <MarketCheck plan={plan} />}
       <Warnings plan={plan} />
       {showSteps && (
@@ -547,6 +548,59 @@ function YearsExplainer({ plan }) {
       Years = money in the bucket ÷ <b className="text-[var(--text-muted)]">{formatINR(e.monthlyExpense)} a month</b>, your spending {when}.
       {withInflation && <> That is the {formatINR(e.todayExpense)} in your goal plus {Math.round(e.inflation * 100)}% yearly inflation.</>}
     </p>
+  )
+}
+
+/* ── What is in each bucket: fund, amount for this goal, share of the bucket ── */
+function BucketFunds({ plan }) {
+  const [open, setOpen] = useState(true)
+  const keys = ['b1', 'b2', 'b3'].filter(k => (plan.byBucket[k] || []).length)
+  if (!keys.length) return null
+  const grand = keys.reduce((sum, k) => sum + (plan.totals[k] || 0), 0)
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+        <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"><Wallet size={17} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wide">What is in each bucket</p>
+          <p className="text-sm text-[var(--text-primary)] mt-0.5">Every fund linked to this goal, its amount and its share of the bucket.</p>
+        </div>
+        <ChevronDown size={16} className={`text-[var(--text-dim)] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {keys.map(k => {
+            const b = BUCKET[k]
+            const Icon = b.icon
+            const total = plan.totals[k] || 0
+            const funds = [...plan.byBucket[k]].sort((x, y) => y.goalValue - x.goalValue)
+            return (
+              <div key={k} className={`border ${b.border} rounded-lg overflow-hidden min-w-0`}>
+                <div className={`flex items-center justify-between gap-2 px-3 py-2 ${b.soft}`}>
+                  <span className={`flex items-center gap-1.5 text-xs font-bold ${b.text}`}><Icon size={13} /> {b.name}</span>
+                  <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(total)}{grand > 0 && <span className="font-normal text-[var(--text-dim)]"> · {Math.round((total / grand) * 100)}% of goal</span>}</span>
+                </div>
+                {funds.map(f => {
+                  const pct = total > 0 ? (f.goalValue / total) * 100 : 0
+                  return (
+                    <div key={f.key} className="px-3 py-2 border-t border-[var(--border-row)]">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-[var(--text-secondary)] font-medium truncate" title={f.fundName}>{splitFundName(f.fundName || '').main}</span>
+                        <span className="tabular-nums text-[var(--text-primary)] font-semibold shrink-0">{formatINR(f.goalValue)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1 h-1 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className={`h-full ${b.bar}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
+                        <span className="text-[11px] tabular-nums text-[var(--text-dim)] w-11 text-right shrink-0">{pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
