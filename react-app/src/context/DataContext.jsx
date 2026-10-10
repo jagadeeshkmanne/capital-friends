@@ -387,8 +387,11 @@ export function DataProvider({ children }) {
   // ── Family Members CRUD ──
   const addMember = useCallback(async (data) => {
     const result = await api.createMember(data)
-    // Auto-invite: register in Script Properties + share sheet so they can log in
-    if (data.email) {
+    // Auto-invite: register in Script Properties + share sheet so they can log in.
+    // Skip it for yourself: your own email already owns the sheet.
+    const email = (data.email || '').trim().toLowerCase()
+    const isOwnEmail = email && email === (user?.email || '').trim().toLowerCase()
+    if (email && !isOwnEmail && data.relationship !== 'Self') {
       try {
         await api.inviteFamilyMember(data.email, data.memberName)
       } catch (e) {
@@ -399,7 +402,7 @@ export function DataProvider({ children }) {
     }
     await refreshMembers()
     return result
-  }, [refreshMembers])
+  }, [refreshMembers, user])
 
   const updateMember = useCallback(async (id, data) => {
     await api.updateMember({ memberId: id, ...data })
