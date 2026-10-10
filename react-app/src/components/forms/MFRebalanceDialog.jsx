@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { Repeat, IndianRupee, ArrowUpDown } from 'lucide-react'
 import { FormField, FormInput } from '../Modal'
+import { useMaskText } from '../../hooks/useMaskText'
 
 const modes = [
   { key: 'sip', label: 'Adjust SIP', icon: Repeat, color: 'text-blue-400', dimColor: 'text-blue-400/60 hover:text-blue-400', activeBg: 'bg-blue-500/20 border border-blue-500/40' },
@@ -588,6 +589,7 @@ function PortfolioBuySellSection({ portfolio, holdings, totalValue }) {
    Main Rebalance Dialog
    ────────────────────────────────────────────── */
 export default function MFRebalanceDialog({ filterPortfolioId }) {
+  const mt = useMaskText()
   const { mfHoldings, mfPortfolios } = useData()
   const [mode, setMode] = useState('buysell')
 
@@ -671,7 +673,7 @@ export default function MFRebalanceDialog({ filterPortfolioId }) {
             <div className="hidden sm:flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center">{i + 1}</span>
-                <p className="text-sm font-bold text-[var(--text-primary)]">{p.portfolioName}</p>
+                <p className="text-sm font-bold text-[var(--text-primary)]">{mt(p.portfolioName)}</p>
                 <span className="text-xs text-[var(--text-muted)]">{p.ownerName}</span>
                 {p.driftedCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
                 {p.exitCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
@@ -687,7 +689,7 @@ export default function MFRebalanceDialog({ filterPortfolioId }) {
             <div className="sm:hidden space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center shrink-0">{i + 1}</span>
-                <p className="text-sm font-bold text-[var(--text-primary)] flex-1 min-w-0 truncate">{p.portfolioName}</p>
+                <p className="text-sm font-bold text-[var(--text-primary)] flex-1 min-w-0 truncate">{mt(p.portfolioName)}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap pl-7">
                 <span className="text-xs font-semibold text-[var(--text-secondary)] tabular-nums">{formatINR(p.totalValue)}</span>

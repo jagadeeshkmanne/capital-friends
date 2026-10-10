@@ -9,6 +9,7 @@ import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useMask } from '../../context/MaskContext'
+import { useMaskText } from '../../hooks/useMaskText'
 import Modal, { FormDateInput } from '../../components/Modal'
 import MFPortfolioForm from '../../components/forms/MFPortfolioForm'
 import MFInvestForm from '../../components/forms/MFInvestForm'
@@ -176,6 +177,8 @@ export default function MutualFundsPage() {
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
+  const mt = useMaskText()
+  const dn = (n) => mt(displayName(n))
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
@@ -584,7 +587,7 @@ export default function MutualFundsPage() {
 
   const dropdownLabel = selectedPortfolioId === 'all'
     ? `All Portfolios (${portfolios.length})`
-    : `${displayName(selectedPortfolio?.portfolioName)} — ${mv(selectedPortfolio?.ownerName, 'name')}`
+    : `${dn(selectedPortfolio?.portfolioName)} — ${mv(selectedPortfolio?.ownerName, 'name')}`
 
   // Handlers
   async function handleSavePortfolio(data) {
@@ -739,7 +742,7 @@ export default function MutualFundsPage() {
 
   async function handleDeleteFund(portfolioId, fundCode, fundName) {
     const portfolio = portfolioData.find(p => p.portfolioId === portfolioId)
-    const portfolioName = portfolio ? displayName(portfolio.portfolioName) : portfolioId
+    const portfolioName = portfolio ? dn(portfolio.portfolioName) : portfolioId
     const ok = await confirm(
       `Delete "${splitFundName(fundName).main}" from ${portfolioName}?\n\nThis will permanently remove the fund and all its transactions from this portfolio. This cannot be undone.`,
       {
@@ -825,7 +828,7 @@ export default function MutualFundsPage() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <p className={`text-sm ${selectedPortfolioId === p.portfolioId ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
-                                  {displayName(p.portfolioName)}
+                                  {dn(p.portfolioName)}
                                 </p>
                                 {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
@@ -1022,7 +1025,7 @@ export default function MutualFundsPage() {
                               onClick={() => { setSelectedPortfolioId(p.portfolioId); setSubTab('holdings') }}>
                             <td className="py-2.5 px-3">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-semibold text-[var(--text-primary)]">{displayName(p.portfolioName)}</span>
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">{dn(p.portfolioName)}</span>
                                 {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
@@ -1079,7 +1082,7 @@ export default function MutualFundsPage() {
                            onClick={() => { setSelectedPortfolioId(p.portfolioId); setSubTab('holdings') }}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{displayName(p.portfolioName)}</p>
+                            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{dn(p.portfolioName)}</p>
                             {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
                             {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
                             <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
@@ -1147,7 +1150,7 @@ export default function MutualFundsPage() {
                   {pData && (
                     <div className="text-right shrink-0 mt-0.5">
                       <p className="text-xs font-semibold text-[var(--text-secondary)]">{mv(pData.ownerName, 'name')}</p>
-                      <p className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded mt-0.5 inline-block">{displayName(pData.portfolioName)} · {pData.platform}</p>
+                      <p className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded mt-0.5 inline-block">{dn(pData.portfolioName)} · {pData.platform}</p>
                     </div>
                   )}
                 </div>
@@ -1475,7 +1478,7 @@ export default function MutualFundsPage() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-bold text-[var(--text-primary)]">{displayName(groupPortfolio.portfolioName)}</p>
+                          <p className="text-sm font-bold text-[var(--text-primary)]">{dn(groupPortfolio.portfolioName)}</p>
                           <ChevronRight size={14} className="text-[var(--text-dim)]" />
                         </div>
                         <div className="flex items-center gap-3 text-xs tabular-nums">
@@ -2011,7 +2014,7 @@ export default function MutualFundsPage() {
                                   <p className="text-xs text-[var(--text-primary)] truncate">{splitFundName(t.fundName).main}</p>
                                   {splitFundName(t.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(t.fundName).plan}</p>}
                                 </div>
-                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{displayName(portfolio.portfolioName)}</p>}
+                                {portfolio && <p className="text-xs text-[var(--text-dim)]">{dn(portfolio.portfolioName)}</p>}
                               </td>
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-secondary)] tabular-nums">{t.units.toFixed(2)}</td>
                               <td className="py-2.5 px-3 text-right text-xs text-[var(--text-muted)] tabular-nums">₹{t.price.toFixed(2)}</td>

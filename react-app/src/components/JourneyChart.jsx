@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNavHistories, valueOnDays } from '../utils/navHistory'
 import { createChart, AreaSeries, LineSeries, LineType, LineStyle, CrosshairMode, ColorType, TickMarkType, createSeriesMarkers } from 'lightweight-charts'
+import { useMaskText } from '../hooks/useMaskText'
 
 // Investment Journey chart, in the style of broker apps (Groww / Kite):
 //   big number on top that follows your finger / mouse, a clean line, range tabs underneath.
@@ -28,6 +29,7 @@ function cssVar(name, fallback) {
 }
 
 export default function JourneyChart({ data, txns, height = 240, formatMoney = (v) => `₹${Math.round(v).toLocaleString('en-IN')}` }) {
+  const mt = useMaskText()
   // value over time: NAV history of every fund in these transactions (loaded once a day, cached)
   const [navMap, setNavMap] = useState(null)
   const codesSig = [...new Set((txns || []).map((t) => String(t.fundCode || '')).filter(Boolean))].sort().join(',')
@@ -288,7 +290,7 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
                       </div>
                       <p className="ml-4 mt-0.5 text-[11px] text-[var(--text-dim)]">
                         <span className={`font-semibold ${col}`}>{sw ? (t.isBuy ? 'Switch in' : 'Switch out') : t.isBuy ? (t.txnType === 'SIP' ? 'SIP' : 'Bought') : 'Sold'}</span>
-                        {t.portfolioName ? ` · ${t.portfolioName}` : ''}{t.units ? ` · ${t.units.toLocaleString('en-IN')} units` : ''}
+                        {t.portfolioName ? ` · ${mt(t.portfolioName)}` : ''}{t.units ? ` · ${t.units.toLocaleString('en-IN')} units` : ''}
                       </p>
                     </div>
                   )

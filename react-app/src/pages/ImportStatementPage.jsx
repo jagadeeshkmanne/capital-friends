@@ -25,6 +25,11 @@ const fmtDate = (iso) => {
   return isNaN(d) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function casUniqBy(list, key) {
+  const seen = new Set()
+  return list.filter((x) => { const k = key(x); if (seen.has(k)) return false; seen.add(k); return true })
+}
+
 function loadDraft() {
   try { const s = sessionStorage.getItem(SAVED_KEY); return s ? JSON.parse(s) : null } catch { return null }
 }
@@ -150,12 +155,21 @@ export default function ImportStatementPage() {
       if (seq !== checkSeq.current) return // a newer check was started: ignore this older answer
       setPreview(p)
       const m = {}
+      Object.keys(nextMapping).forEach((k) => { if (k.startsWith('fund:')) m[k] = nextMapping[k] }) // funds the user skipped
       p.groups.forEach((g) => { m[g.key] = g.target })
       setMapping(m)
     } catch (e) { if (seq === checkSeq.current) setCheckErr(e.message) }
     finally { if (seq === checkSeq.current) setChecking(false) }
   }
   useEffect(() => { if (parsed && enabled && !preview && !checking && !result) check() }, [parsed, enabled]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // leave one fund out of the import (or add it back)
+  function toggleFund(fundKey, skip) {
+    const m = { ...mapping }
+    if (skip) m[fundKey] = 'skip'; else delete m[fundKey]
+    setMapping(m)
+    check(m)
+  }
 
   function changeGroup(key, value) {
     const m = { ...mapping, [key]: value }
@@ -401,7 +415,12 @@ export default function ImportStatementPage() {
                                 <p className="text-[var(--text-primary)] truncate">{f.fundName}</p>
                                 <p className="text-[var(--text-dim)]">{f.after.units > 0.0005 ? `${units(f.after.units)} units` : 'sold'} · {f.newRows} transactions{f.manualReplaced ? ` · replaces ${f.manualReplaced} you typed` : ''}</p>
                               </div>
-                              <p className="shrink-0 text-[var(--text-muted)]">{inr(f.valueBefore)} → <b className="text-[var(--text-primary)]">{inr(f.valueAfter)}</b></p>
+                              <div className="shrink-0 flex items-center gap-2">
+                                <p className="text-[var(--text-muted)]">{inr(f.valueBefore)} → <b className="text-[var(--text-primary)]">{inr(f.valueAfter)}</b></p>
+                                <button onClick={() => toggleFund('fund:' + f.groupKey + '|' + f.code, true)} disabled={checking}
+                                  title="Leave this fund out of the import"
+                                  className="px-2 py-1 text-[11px] font-semibold rounded-md border border-[var(--border-light)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50">Skip</button>
+                              </div>
                             </div>
                           ))}
                           {list.some((f) => f.after.units <= 0.0005) && (
@@ -431,6 +450,18 @@ export default function ImportStatementPage() {
                     </>
                   )}
                   {blockedFunds.map((f) => <p key={f.code + f.portfolioId}>• <b>{f.fundName}</b> will not be imported: {f.problems[0]}</p>)}
+                </div>
+              )}
+              {preview.skipped.some((x) => x.fundKey) && (
+                <div className="rounded-lg border border-[var(--border-light)] p-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">Funds you skipped</p>
+                  {casUniqBy(preview.skipped.filter((x) => x.fundKey), (x) => x.fundKey).map((x) => (
+                    <div key={x.fundKey} className="flex items-center justify-between gap-2 text-xs">
+                      <p className="text-[var(--text-muted)] truncate">{x.scheme}</p>
+                      <button onClick={() => toggleFund(x.fundKey, false)} disabled={checking}
+                        className="shrink-0 px-2 py-1 text-[11px] font-semibold rounded-md border border-[var(--border-light)] text-violet-400 hover:bg-[var(--bg-hover)] disabled:opacity-50">Add back</button>
+                    </div>
+                  ))}
                 </div>
               )}
               {preview.skipped.length > 0 && (

@@ -366,6 +366,9 @@ function casBuildPlan_(statement, data, mapping) {
       return;
     }
     var g = groups[f._member.memberId + '|' + (f.platform || 'Unknown')];
+    // One fund left out by the user (step 3 "Skip"): mapping['fund:<group>|<code>'] = 'skip'
+    var fundKey = 'fund:' + g.key + '|' + f._code;
+    if (mapping[fundKey] === 'skip') { plan.skipped.push({ folio: f.folio, scheme: f.scheme, fundKey: fundKey, reason: 'Not imported (you chose to skip this fund).' }); return; }
     var pid = currentPlace(f) || g.target;
     if (pid === 'skip') { plan.skipped.push({ folio: f.folio, scheme: f.scheme, reason: 'Not imported (you chose "Don\'t import" for ' + g.memberName + ' · ' + g.platform + ').' }); return; }
     var key = (pid === 'new' ? 'new:' + g.key : pid) + '|' + f._code;
