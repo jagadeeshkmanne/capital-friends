@@ -79,15 +79,16 @@ function processAddPortfolio(formData) {
     const totalPLAmountFormula = `=I${rowNum}-E${rowNum}`;
     const totalPLPercentFormula = `=IF(E${rowNum}=0,0,N${rowNum}/E${rowNum})`;
 
-    // Realized P&L — profit booked on every sale: redemptions AND switch-outs / STPs
-    // (a switch is a sale of one fund and a purchase of another, so its profit is booked too).
-    const realizedPLAmountFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL")`;
+    // Unrealized P&L = current value - what the funds held today cost (portfolio tab: F = Investment)
+    // Realized P&L  = Total P&L - Unrealized = holdings cost - your money in: every profit already
+    //   booked (sells, switches, STPs), whether it went to your bank or was put back into funds.
+    // Both always add up to Total P&L, and Unrealized matches the P&L on each holding.
+    const realizedPLAmountFormula = `=N${rowNum}-J${rowNum}`;
 
     // Realized P&L % = Realized P&L / Total Investment
     const realizedPLPercentFormula = `=IF(E${rowNum}=0,0,L${rowNum}/E${rowNum})`;
 
-    // Unrealized P&L ₹ = Total P&L - Realized P&L = profit on the funds held today
-    const unrealizedPLAmountFormula = `=N${rowNum}-L${rowNum}`;
+    const unrealizedPLAmountFormula = `=I${rowNum}-SUM('${portfolioId}'!$F$4:$F$1000)`;
 
     // Unrealized P&L % = Unrealized P&L / Total Investment
     const unrealizedPLPercentFormula = `=IF(E${rowNum}=0,0,J${rowNum}/E${rowNum})`;
@@ -1445,6 +1446,33 @@ function activatePortfolioSheet(portfolioId) {
  * every SELL. Runs once per spreadsheet (flag in user properties), touches only the old formula.
  */
 function migratePortfolioRealizedFormula_() {
+  // v3: Unrealized = current value - holdings cost; Realized = Total - Unrealized (see processAddPortfolio)
+  var id = typeof _currentUserSpreadsheetId !== 'undefined' ? _currentUserSpreadsheetId : '';
+  if (!id) return;
+  var props = PropertiesService.getUserProperties();
+  var key = 'cf_mig_realized_v3_' + id;
+  if (props.getProperty(key)) return;
+  var sheet = getSheet(CONFIG.portfolioMetadataSheet);
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  var changed = 0;
+  if (lastRow > 3) {
+    var ids = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      var pid = String(ids[i][0] || '');
+      if (!pid) continue;
+      var r = 4 + i;
+      sheet.getRange(r, 10).setFormula("=I" + r + "-SUM('" + pid.replace(/'/g, "''") + "'!$F$4:$F$1000)");
+      sheet.getRange(r, 12).setFormula('=N' + r + '-J' + r);
+      changed++;
+    }
+    if (changed) flushSheets_();
+  }
+  log('P&L formulas (v3) set on ' + changed + ' portfolio(s)');
+  props.setProperty(key, new Date().toISOString());
+}
+
+function migratePortfolioRealizedFormulaV2_old_() {
   var id = typeof _currentUserSpreadsheetId !== 'undefined' ? _currentUserSpreadsheetId : '';
   if (!id) return;
   var props = PropertiesService.getUserProperties();
