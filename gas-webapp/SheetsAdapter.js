@@ -106,7 +106,7 @@ var SheetsAdapter = (function () {
         title: r.properties.title, timeZone: r.properties.timeZone || Session.getScriptTimeZone(), locale: r.properties.locale,
         sheets: (r.sheets || []).map(function (s) {
           var p = s.properties, g = p.gridProperties || {};
-          return { title: p.title, sheetId: p.sheetId, index: p.index, hidden: !!p.hidden, rowCount: g.rowCount || 1000, columnCount: g.columnCount || 26, cfCount: (s.conditionalFormats || []).length };
+          return { title: p.title, sheetId: p.sheetId, index: p.index, hidden: !!p.hidden, rowCount: g.rowCount || 1000, columnCount: g.columnCount || 26, frozenRows: g.frozenRowCount || 0, cfCount: (s.conditionalFormats || []).length };
         })
       };
     }
@@ -439,6 +439,9 @@ var SheetsAdapter = (function () {
   Sheet.prototype.insertColumnsAfter = function (col, n) { return this._insertDim('COLUMNS', col, n); };
   Sheet.prototype.deleteRow = function (row) { return this.deleteRows(row, 1); };
   Sheet.prototype.deleteRows = function (row, n) {
+    // Google refuses to delete every row below the frozen ones: keep one empty row at the end.
+    var sm0 = this.book._sheetMeta(this.title);
+    if (sm0.rowCount - n <= Math.max(sm0.frozenRows || 0, 1)) { this.book._req({ appendDimension: { sheetId: this.getSheetId(), dimension: 'ROWS', length: 1 } }); sm0.rowCount += 1; }
     this.book._req({ deleteDimension: { range: { sheetId: this.getSheetId(), dimension: 'ROWS', startIndex: row - 1, endIndex: row - 1 + n } } });
     var sm = this.book._sheetMeta(this.title), t = this.book._tabs[this.title];
     sm.rowCount -= n;

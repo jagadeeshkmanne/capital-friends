@@ -659,9 +659,12 @@ function casRowData_(vals) {
   }
   return { values: cells };
 }
-function casDeleteRequests_(sheetId, rowNumbers) {
+function casDeleteRequests_(sheetId, rowNumbers, rowCount) {
   var rows = rowNumbers.slice().sort(function (a, b) { return b - a; });
   var req = [], i = 0;
+  // Google refuses to delete every row below the frozen header ("not possible to delete all
+  // non-frozen rows"), e.g. when undoing the only import. Add one empty row at the end first.
+  if (rows.length && rowCount && rowCount - rows.length <= 3) req.push({ appendDimension: { sheetId: sheetId, dimension: 'ROWS', length: 1 } });
   while (i < rows.length) {
     var end = rows[i], start = end;
     while (i + 1 < rows.length && rows[i + 1] === start - 1) { i++; start = rows[i]; }
@@ -773,7 +776,7 @@ function casImportSave_(params) {
     var req = [];
     if ((txMeta.gridProperties.columnCount || 0) < 16) req.push({ appendDimension: { sheetId: txMeta.sheetId, dimension: 'COLUMNS', length: 16 - txMeta.gridProperties.columnCount } });
     req.push({ updateCells: { range: { sheetId: txMeta.sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 14, endColumnIndex: 16 }, rows: [{ values: [casCell_('Folio'), casCell_('Import ID')] }], fields: 'userEnteredValue' } });
-    req = req.concat(casDeleteRequests_(txMeta.sheetId, replaced.map(function (r) { return r.row; })));
+    req = req.concat(casDeleteRequests_(txMeta.sheetId, replaced.map(function (r) { return r.row; }), (txMeta.gridProperties || {}).rowCount));
     var maxId = 0;
     data.rows.forEach(function (r) { var m = /^TXN-(\d+)$/.exec(r.txnId); if (m && +m[1] > maxId) maxId = +m[1]; });
     var nowSerial = casNowSerial_(data.tz), seq = 0, newRowData = [];
@@ -904,7 +907,7 @@ function casRollback_(id, importId, finalStatus) {
   var present = {}; // extra guard: never add a row whose transaction ID is still in the sheet
   data.rows.forEach(function (r) { if (r.txnId) present[r.txnId] = true; });
   var restore = back.filter(function (b) { return !(b.vals[13] && present[String(b.vals[13])]); });
-  var req = casDeleteRequests_(txMeta.sheetId, mine.map(function (r) { return r.row; }));
+  var req = casDeleteRequests_(txMeta.sheetId, mine.map(function (r) { return r.row; }), (txMeta.gridProperties || {}).rowCount);
   if (restore.length) req.push({ appendCells: { sheetId: txMeta.sheetId, rows: restore.map(function (b) { return casRowData_(b.vals); }), fields: 'userEnteredValue,userEnteredFormat.numberFormat' } });
   var reset = details.resetInitial || [];
   if (reset.length) {
