@@ -473,6 +473,20 @@ export default function MutualFundsPage() {
     return Object.values(map).sort((a, b) => a.fundName.localeCompare(b.fundName))
   }, [holdings])
 
+  // "Classify funds" placeholders: open the Fund Breakdown tab (in All view, the first portfolio with a fund not yet classified)
+  const goBreakdown = () => {
+    let pid = selectedPortfolioId
+    if (pid === 'all') {
+      const done = new Set((assetAllocations || []).map((a) => String(a.fundCode)))
+      const h = (mfHoldings || []).find((x) => x.units > 0 && !done.has(String(x.fundCode || x.schemeCode)) && portfolioData.some((p) => p.portfolioId === x.portfolioId))
+      pid = h?.portfolioId || portfolioData[0]?.portfolioId
+      if (!pid) return
+      setSelectedPortfolioId(pid)
+    }
+    setSubTab('breakdown')
+    setTimeout(() => document.getElementById('mf-subtabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+  }
+
   // Portfolio insights — XIRR, ATH drawdown, top/bottom performers, concentration
   const insights = useMemo(() => {
     if (!holdings.length) return null
@@ -945,19 +959,19 @@ export default function MutualFundsPage() {
                       <DonutCard title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
                       {breakdown.capList.length > 0
                         ? <DonutCard title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
-                        : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
-                            <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown</p>
-                          </div>
+                        : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                            <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
+                          </button>
                       }
                       {breakdown.geoList?.length > 0
                         ? <DonutCard title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
-                        : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
-                            <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown</p>
-                          </div>
+                        : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                            <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
+                          </button>
                       }
                     </div>
                     {!breakdown.hasDetailedAlloc && (
-                      <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. Go to Fund Breakdown tab to add detailed data from Morningstar.</p>
+                      <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. <button onClick={goBreakdown} className="underline hover:text-violet-400">Go to Fund Breakdown</button> to add detailed data from Morningstar.</p>
                     )}
                     {breakdown.hasDetailedAlloc && breakdown.configuredCount < breakdown.totalFunds && (
                       <p className="text-xs text-amber-400/70 mt-2 text-center">
@@ -1363,19 +1377,19 @@ export default function MutualFundsPage() {
                     <DonutCard title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
                     {breakdown.capList.length > 0
                       ? <DonutCard title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
-                      : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
-                          <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown</p>
-                        </div>
+                      : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                          <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
+                        </button>
                     }
                     {breakdown.geoList?.length > 0
                       ? <DonutCard title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
-                      : <div className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-4">
-                          <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown</p>
-                        </div>
+                      : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                          <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
+                        </button>
                     }
                   </div>
                   {!breakdown.hasDetailedAlloc && (
-                    <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. Go to Fund Breakdown tab to add detailed data from Morningstar.</p>
+                    <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. <button onClick={goBreakdown} className="underline hover:text-violet-400">Go to Fund Breakdown</button> to add detailed data from Morningstar.</p>
                   )}
                   {breakdown.hasDetailedAlloc && breakdown.configuredCount < breakdown.totalFunds && (
                     <p className="text-xs text-amber-400/70 mt-2 text-center">
@@ -1397,7 +1411,7 @@ export default function MutualFundsPage() {
 
           {/* ── Sub-tabs + Action Buttons (only for individual portfolio) ── */}
           {selectedPortfolioId !== 'all' && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <div id="mf-subtabs" className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-mt-28">
             <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 shrink-0">
               <button
                 onClick={() => setSubTab('holdings')}
