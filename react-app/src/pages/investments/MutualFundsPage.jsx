@@ -272,7 +272,10 @@ export default function MutualFundsPage() {
     const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
     const funds = new Set(relevantHoldings.map((h) => h.fundCode)).size
     const sipFunds = relevantHoldings.filter((h) => (h.ongoingSIP || 0) > 0).length
-    return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP, sipFunds }
+    // what the funds held today cost (includes profit booked earlier and put back in, e.g. via switches)
+    const holdingsCost = relevantHoldings.filter((h) => (h.units || 0) > 0).reduce((s, h) => s + (Number(h.investment) || 0), 0)
+    const unrealizedOnCostPct = holdingsCost > 0 ? (unrealizedPL / holdingsCost) * 100 : unrealizedPLPct
+    return { invested, current, unrealizedPL, unrealizedPLPct: unrealizedOnCostPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP, sipFunds, holdingsCost }
   }, [portfolioData, selectedPortfolioId, mfHoldings])
 
   // Holdings & transactions for selected view
@@ -906,7 +909,12 @@ export default function MutualFundsPage() {
 
           {/* ── Stat Cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
-            <StatCard label="Invested" value={formatINR(stats.invested)} />
+            <StatCard
+              label="Your Money In"
+              value={formatINR(stats.invested)}
+              sub={stats.holdingsCost > 0 ? `Holdings cost ${formatINR(stats.holdingsCost)}` : undefined}
+              title={'Your money in: every purchase and SIP minus what you took out to your bank.\nHoldings cost: what the funds you hold today cost. It is higher when profit you booked (switches, STPs, sells) was put back in – that is not new money.'}
+            />
             <StatCard label="Current Value" value={formatINR(stats.current)} bold />
             <StatCard
               label="Unrealized P&L"
@@ -1016,7 +1024,7 @@ export default function MutualFundsPage() {
                       <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                         <th className="text-left py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Portfolio</th>
                         <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Funds</th>
-                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Invested</th>
+                        <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider" title="Your money in: purchases and SIPs minus withdrawals to your bank">Money In</th>
                         <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Current</th>
                         <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Unrealized P&L</th>
                         <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Realized P&L</th>
@@ -1529,7 +1537,7 @@ export default function MutualFundsPage() {
                           </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>Amount</div>
-                            <div className="text-xs font-medium text-[var(--text-dim)]">Current / Invested</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]" title="Invested = what the units you hold today cost">Current / Cost</div>
                           </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>P&L</div>
