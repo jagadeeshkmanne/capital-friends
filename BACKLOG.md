@@ -18,3 +18,15 @@ The Apps Script API (scripts.run) cannot create triggers (Google docs), so it ca
 3. Keep polling `triggers:status`; turn green ("Daily email is on") when it works.
 
 Files: react-app/src/services/api.js (installUserTriggers), components/DailyUpdatesBanner.jsx, pages/SettingsPage.jsx.
+
+## First sign-in: show a proper "creating your sheet" step for brand-new users (found 10 Oct 2026)
+
+**What happens:** a brand-new user only sees "Connecting to Google" for 1–2 minutes while the server creates
+their sheet and all tabs. It looks stuck. (Only the "my sheet is deleted – start a new one" path shows the
+"Creating your new sheet… about 1–2 minutes" card.)
+
+**Plan:** for a new registration, show the same card: "Setting up your Capital Friends sheet in your own
+Google Drive. First time only, about 1–2 minutes. The app opens by itself." Ideally with 3 ticks
+(Sheet created → Tabs ready → Loading your dashboard).
+
+Files: react-app/src/context/AuthContext.jsx (init / data:init), the sheet-picker card component.
