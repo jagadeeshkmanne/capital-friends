@@ -440,7 +440,11 @@ function casBuildPlan_(statement, data, mapping) {
     b.folios.forEach(function (f, fi) { f.txns.forEach(function (t, ti) { if (Math.abs(+t.units || 0) > 0) tx.push({ f: f, t: t, o: fi * 100000 + ti }); }); });
     tx.sort(function (x, y) { return x.t.date < y.t.date ? -1 : x.t.date > y.t.date ? 1 : x.o - y.o; });
     var buyAmt = 0, buyUnits = 0;
-    keep.forEach(function (r) { if (r.type === 'BUY') { buyAmt += r.amount; buyUnits += r.units; } }); // other folios' buys are part of the app's average too
+    // Other folios' rows count too. Average cost resets on each sale: a SELL takes units out at the current average.
+    keep.slice().sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; }).forEach(function (r) {
+      if (r.type === 'BUY') { buyAmt += r.amount; buyUnits += r.units; }
+      else if (r.type === 'SELL' && buyUnits > 0) { var a0 = buyAmt / buyUnits, u0 = Math.min(r.units, buyUnits); buyAmt -= a0 * u0; buyUnits -= u0; }
+    });
     var newRows = tx.map(function (x) {
       var t = x.t, units = Math.abs(+t.units), amt = Math.abs(+t.amount);
       var isIn = t.units > 0, row;
@@ -455,6 +459,8 @@ function casBuildPlan_(statement, data, mapping) {
         var tt2 = (t.kind === 'SWITCH_OUT') ? 'SWITCH' : 'WITHDRAWAL';
         var price = units ? net / units : 0, avg = buyUnits ? buyAmt / buyUnits : 0;
         row = { date: t.date, type: 'SELL', ttype: tt2, units: casR4_(units), price: price, amount: net, gain: casR2_((price - avg) * units) };
+        var take = Math.min(units, buyUnits); buyAmt -= avg * take; buyUnits -= take;
+        if (buyUnits < 0.0001) { buyUnits = 0; buyAmt = 0; }
       }
       row.folio = x.f.folio;
       row.notes = (meta.source || 'CAMS') + ' · folio ' + x.f.folio + ' · ' + String(t.desc || '').slice(0, 80);

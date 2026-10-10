@@ -577,6 +577,13 @@ function loadAllData() {
     log('Realized P&L migration (non-blocking): ' + e.message);
   }
 
+  // Sale profit uses the average cost of units still held (one-time recompute of past sales)
+  try {
+    migrateSellGainRunningAvg_();
+  } catch (e) {
+    log('Sale profit migration (non-blocking): ' + e.message);
+  }
+
   // Ongoing SIP respects "SIP restricted" funds (one-time formula upgrade)
   try {
     migrateOngoingSipFormula_();

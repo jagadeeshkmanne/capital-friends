@@ -265,7 +265,7 @@ function processRedeem(formData) {
       if (rowFundCode && rowFundCode.toString() === fundCode.toString()) {
         fundExists = true;
         availableUnits = parseFloat(portfolioData[i][2]) || 0;  // Column C = current units
-        avgBuyPrice = parseFloat(portfolioData[i][3]) || 0;  // Column D (index 3) = Avg NAV ₹
+        avgBuyPrice = runningAvgCost_(portfolioId, fundCode) || parseFloat(portfolioData[i][3]) || 0;  // cost of units still held (falls back to column D)
         log(`Found fund ${baseFundName} in portfolio. Avg Buy Price: ₹${avgBuyPrice}`);
         break;
       }
@@ -455,7 +455,7 @@ function processSwitchFunds(formData) {
       if (rowFundCode && rowFundCode.toString() === fromFundCode.toString()) {
         fromFundExists = true;
         availableFromUnits = parseFloat(fromPortfolioData[i][2]) || 0;
-        avgBuyPrice = parseFloat(fromPortfolioData[i][3]) || 0;
+        avgBuyPrice = runningAvgCost_(fromPortfolioId, fromFundCode) || parseFloat(fromPortfolioData[i][3]) || 0;
         log(`Found from fund ${baseFromFundName}. Avg Buy Price: ₹${avgBuyPrice}`);
       }
     }
@@ -1718,3 +1718,98 @@ function deleteFundFromPortfolio(params) {
 // ============================================================================
 // END OF MUTUALFUNDS.GS
 // ============================================================================
+
+// ============================================================================
+// Average cost that resets on sales (standard average-cost method)
+// ============================================================================
+
+/**
+ * Walk one fund's TransactionHistory rows in date order. A BUY adds its amount and units;
+ * a SELL takes units out at the average cost at that moment, so later sales use the cost
+ * of the units still held (not the average of every purchase ever made).
+ * rows: [{ t: sortable time, idx: row order, type, units, amount, price }]
+ * Returns { avg, gains: { idx: gain } } where gains are for SELL rows.
+ */
+function runningAvgWalk_(rows) {
+  rows.sort(function (a, b) { return a.t - b.t || a.idx - b.idx; });
+  var amt = 0, units = 0, gains = {};
+  rows.forEach(function (r) {
+    var u = Math.abs(+r.units || 0);
+    if (r.type === 'BUY') {
+      amt += Math.abs(+r.amount || 0); units += u;
+    } else if (r.type === 'SELL') {
+      var avg = units > 0 ? amt / units : 0;
+      var price = +r.price || (u ? Math.abs(+r.amount || 0) / u : 0);
+      gains[r.idx] = Math.round((price - avg) * u * 100) / 100;
+      var take = Math.min(u, units);
+      amt -= avg * take; units -= take;
+      if (units < 0.0001) { units = 0; amt = 0; }
+    }
+  });
+  return { avg: units > 0 ? amt / units : 0, gains: gains };
+}
+
+function txTime_(v) {
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number') return (v - 25569) * 86400000; // sheet serial
+  var d = new Date(v); return isNaN(d) ? 0 : d.getTime();
+}
+
+/** Average cost of the units currently held for one fund in one portfolio (0 if none / not found). */
+function runningAvgCost_(portfolioId, fundCode) {
+  try {
+    var sh = getSheet(CONFIG.transactionHistorySheet);
+    if (!sh) return 0;
+    var last = sh.getLastRow();
+    if (last < 3) return 0;
+    var vals = sh.getRange(3, 1, last - 2, 13).getValues();
+    var rows = [];
+    for (var i = 0; i < vals.length; i++) {
+      var v = vals[i];
+      if (String(v[1]) !== String(portfolioId) || String(v[3]) !== String(fundCode)) continue;
+      rows.push({ t: txTime_(v[0]), idx: i, type: String(v[5]).toUpperCase(), units: v[7], price: v[8], amount: v[9] });
+    }
+    return runningAvgWalk_(rows).avg;
+  } catch (e) {
+    log('runningAvgCost_ failed: ' + e.message);
+    return 0;
+  }
+}
+
+/**
+ * One-time fix (v5): sale profit used the average of every purchase ever made, which is wrong
+ * after a fund was sold and bought again. Recomputes column M (Gain/Loss) of every SELL row.
+ * Only column M changes; summary cards (money in, holdings cost, realized) are not affected.
+ */
+function migrateSellGainRunningAvg_() {
+  var id = typeof _currentUserSpreadsheetId !== 'undefined' ? _currentUserSpreadsheetId : '';
+  if (!id) return;
+  var props = PropertiesService.getUserProperties();
+  var key = 'cf_mig_gain_v5_' + id;
+  if (props.getProperty(key)) return;
+  var sh = getSheet(CONFIG.transactionHistorySheet);
+  if (!sh) { props.setProperty(key, new Date().toISOString()); return; }
+  var last = sh.getLastRow();
+  if (last < 3) { props.setProperty(key, new Date().toISOString()); return; }
+  var vals = sh.getRange(3, 1, last - 2, 13).getValues();
+  var groups = {};
+  for (var i = 0; i < vals.length; i++) {
+    var v = vals[i];
+    var type = String(v[5]).toUpperCase();
+    if (!v[1] || !v[3] || (type !== 'BUY' && type !== 'SELL')) continue;
+    var k = v[1] + '|' + v[3];
+    (groups[k] = groups[k] || []).push({ t: txTime_(v[0]), idx: i, type: type, units: v[7], price: v[8], amount: v[9] });
+  }
+  var col = vals.map(function (v) { return [v[12]]; });
+  var changed = 0;
+  Object.keys(groups).forEach(function (k) {
+    var g = runningAvgWalk_(groups[k]).gains;
+    Object.keys(g).forEach(function (idx) {
+      var old = +col[idx][0] || 0;
+      if (Math.abs(old - g[idx]) >= 0.01) { col[idx][0] = g[idx]; changed++; }
+    });
+  });
+  if (changed) { sh.getRange(3, 13, col.length, 1).setValues(col); flushSheets_(); }
+  log('Sale profit (v5) recomputed on ' + changed + ' row(s)');
+  props.setProperty(key, new Date().toISOString());
+}
