@@ -62,7 +62,7 @@ export default function MFBuyOpportunities() {
           {/* Portfolio header */}
           <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-inset)]">
             <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 w-5 h-5 rounded flex items-center justify-center">{i + 1}</span>
-            <p className="text-sm font-bold text-[var(--text-primary)]">{mt(p.portfolioName)}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">{mt(String(p.portfolioName || '').replace(/^PFL-/, ''))}</p>
             <span className="text-xs text-[var(--text-muted)]">{p.ownerName}</span>
             <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{p.opportunities.length} funds</span>
           </div>
