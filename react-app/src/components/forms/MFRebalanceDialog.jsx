@@ -74,6 +74,8 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   if (!hasTargets) return <NoTargetsMessage exitOnly={hasExitCandidates} />
   if (sipTarget <= 0) return <p className="text-xs text-[var(--text-dim)] py-2">No SIP target set for this portfolio</p>
 
+  // SIP-restricted funds get no SIP: the whole SIP is shared by the other funds, by their targets
+  const activeTargetSum = holdings.filter((h) => h.targetAllocationPct > 0 && !h.sipRestricted).reduce((s, h) => s + h.targetAllocationPct, 0)
   const allFunds = holdings
     .filter((h) => h.targetAllocationPct > 0)
     .map((h) => {
@@ -83,8 +85,9 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
       const drifted = drift > threshold
       const targetValue = (effectiveTarget / 100) * totalValue
       const gap = targetValue - h.currentValue
-      const normalSIP = (effectiveTarget / 100) * sipTarget
-      return { ...h, currentPct, effectiveTarget, drift, drifted, gap, normalSIP }
+      const normalSIP = h.sipRestricted ? 0 : activeTargetSum > 0 ? (effectiveTarget / activeTargetSum) * sipTarget : 0
+      const blockedShare = (effectiveTarget / 100) * sipTarget
+      return { ...h, currentPct, effectiveTarget, drift, drifted, gap, normalSIP, blockedShare }
     })
 
   const driftedUnderweight = allFunds.filter((h) => h.drifted && h.gap > 0 && !h.sipRestricted)
@@ -104,7 +107,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
   if (!hasDrift) return <p className="text-xs text-[var(--text-dim)] py-2">SIPs are balanced (within {threshold.toFixed(0)}% threshold)</p>
 
   const blockedFunds = allFunds.filter((h) => h.sipRestricted)
-  const blockedSIPAmount = blockedFunds.reduce((s, h) => s + h.normalSIP, 0)
+  const blockedSIPAmount = blockedFunds.reduce((s, h) => s + h.blockedShare, 0)
 
   return (
     <div className="space-y-2">
@@ -114,7 +117,7 @@ function PortfolioSIPSection({ portfolio, holdings, totalValue }) {
       {blockedFunds.length > 0 && (
         <div className="px-2.5 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 space-y-0.5">
           <p className="text-xs text-amber-400">
-            {blockedFunds.length} fund{blockedFunds.length > 1 ? 's' : ''} blocked from SIP ({formatINR(blockedSIPAmount)}/mo excluded)
+            {blockedFunds.length} fund{blockedFunds.length > 1 ? 's' : ''} blocked from SIP: their {formatINR(blockedSIPAmount)}/mo goes to the other funds
           </p>
         </div>
       )}
