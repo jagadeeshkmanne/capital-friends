@@ -3,9 +3,12 @@ import { useData } from '../../context/DataContext'
 import { FormField, FormInput, FormSelect } from '../Modal'
 import { AlertTriangle } from 'lucide-react'
 import { useMask } from '../../context/MaskContext'
+import { useMaskText } from '../../hooks/useMaskText'
 
 export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel }) {
   const { mv } = useMask()
+  const mt = useMaskText()
+  const [nameFocus, setNameFocus] = useState(false)
   const { activeMembers, activeInvestmentAccounts } = useData()
   const isEdit = !!initial
 
@@ -71,7 +74,7 @@ export default function MFPortfolioForm({ initial, onSave, onDelete, onCancel })
   return (
     <div className="space-y-5">
       <FormField label="Portfolio Name" required error={errors.portfolioName}>
-        <FormInput value={form.portfolioName} onChange={(v) => set('portfolioName', v)} placeholder="e.g., Long Term Wealth" />
+        <FormInput value={nameFocus ? form.portfolioName : mt(form.portfolioName)} onFocus={() => setNameFocus(true)} onBlur={() => setNameFocus(false)} onChange={(v) => set('portfolioName', v)} placeholder="e.g., Long Term Wealth" />
       </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

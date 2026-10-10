@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
+import { useMaskText } from '../../hooks/useMaskText'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { yearsBetween } from '../../utils/mfMetrics'
 import { CATEGORY_COLORS } from '../../utils/fundCategory'
@@ -106,14 +107,15 @@ export default function FundsDashboardPage() {
     : { stat: 'text-sm', row: 'py-2.5', cell: 'text-sm', num: 'text-xs', name: 'text-sm' }
 
   const amt = (v) => (hideAmounts ? '₹ ••••' : formatINR(v || 0))
+  const mt = useMaskText()
   const memberLabels = useMemo(() => buildMemberLabels(familyMembers || []), [familyMembers])
   const labelFor = (memberId, fallback) => memberLabels[memberId] || fallback || 'Member'
 
   // Portfolios with owners resolved, then labelled by relationship
   const enrichedPortfolios = useMemo(
     () => resolvePortfolioOwners(mfPortfolios, activeInvestmentAccounts, activeMembers)
-      .map((p) => ({ ...p, ownerName: memberLabels[p.ownerId] || p.ownerName || 'Member' })),
-    [mfPortfolios, activeInvestmentAccounts, activeMembers, memberLabels],
+      .map((p) => ({ ...p, portfolioName: mt(String(p.portfolioName || '').replace(/^PFL-/, '')), ownerName: memberLabels[p.ownerId] || p.ownerName || 'Member' })),
+    [mfPortfolios, activeInvestmentAccounts, activeMembers, memberLabels, mt],
   )
 
   const memberPortfolios = useMemo(
