@@ -8,6 +8,7 @@ import Modal from '../../components/Modal'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
+import { useMaskText } from '../../hooks/useMaskText'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
@@ -98,6 +99,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { selectedMember, familyMembers } = useFamily()
   const { masked, mv } = useMask()
+  const mt = useMaskText()
   const {
     mfPortfolios, mfHoldings,
     stockPortfolios, stockHoldings,
@@ -131,7 +133,9 @@ export default function Dashboard() {
     const activeMFPortfolios = filterOwner((mfPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')
     const mfPortfolioIds = new Set(activeMFPortfolios.map((p) => p.portfolioId))
     const activeMFHoldings = (mfHoldings || []).filter((h) => mfPortfolioIds.has(h.portfolioId) && h.units > 0)
-    const mfInvested = activeMFHoldings.reduce((s, h) => s + (Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)), 0)
+    // Your money in (same as the Mutual Funds page): purchases and SIPs minus withdrawals, per portfolio
+    const mfInvested = activeMFPortfolios.reduce((s, p) => s + (Number(p.totalInvestment) || 0), 0)
+      || activeMFHoldings.reduce((s, h) => s + (Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)), 0)
     const mfCurrentValue = activeMFHoldings.reduce((s, h) => s + (Number(h.currentValue) || 0), 0)
     const mfPL = mfCurrentValue - mfInvested
 
@@ -750,7 +754,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="rounded-lg px-3 py-2.5 text-center" style={{ backgroundColor: 'rgba(16,185,129,0.08)' }}>
-                      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Invested</p>
+                      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider">Money In</p>
                       <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(data.totalInvested)}</p>
                       {data.totalInvested > 0 && (
                         <p className="text-xs tabular-nums mt-0.5" style={{ color: data.totalPL >= 0 ? '#34d399' : '#f87171' }}>
@@ -920,7 +924,7 @@ export default function Dashboard() {
                     <button className="w-full flex items-center justify-between px-3 py-2.5 bg-[var(--bg-inset)] hover:bg-[var(--bg-inset-hover)] transition-colors"
                             onClick={(e) => { e.stopPropagation(); setOpenRebalance(prev => ({ ...prev, [pIdx]: !prev[pIdx] })) }}>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-violet-400">{portfolio.portfolioName}</span>
+                        <span className="text-xs font-semibold text-violet-400">{mt(String(portfolio.portfolioName || '').replace(/^PFL-/, ''))}</span>
                         <span className="text-[10px] tabular-nums text-[var(--text-dim)] bg-violet-500/10 px-1.5 py-0.5 rounded">{portfolio.items.length} funds</span>
                       </div>
                       <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -997,7 +1001,7 @@ export default function Dashboard() {
                       <div className="text-[13px] text-[var(--text-primary)] font-medium break-words leading-snug">{f.fundName}</div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {f.portfolios.map(p => (
-                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
+                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{mt(p)}</span>
                         ))}
                         <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
                       </div>
@@ -1024,7 +1028,7 @@ export default function Dashboard() {
                       <div className="text-[13px] text-[var(--text-primary)] font-medium break-words leading-snug">{f.fundName}</div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {f.portfolios.map(p => (
-                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{p}</span>
+                          <span key={p} onClick={() => navigate('/investments/mutual-funds')} className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer transition-colors">{mt(p)}</span>
                         ))}
                         <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(f.investment)}</span>
                       </div>
@@ -1073,9 +1077,9 @@ export default function Dashboard() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{p.portfolioName}</div>
+                            <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{mt(p.portfolioName)}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              {p.ownerName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
+                              {p.ownerName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{mv(p.ownerName, 'name')}</span>}
                               <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
                             </div>
                           </div>
@@ -1105,9 +1109,9 @@ export default function Dashboard() {
                           {idx + 1}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{p.portfolioName}</div>
+                          <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{mt(p.portfolioName)}</div>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            {p.ownerName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{p.ownerName}</span>}
+                            {p.ownerName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-inset)] text-[var(--text-dim)]">{mv(p.ownerName, 'name')}</span>}
                             <span className="text-xs text-[var(--text-dim)] tabular-nums">{formatINR(p.invested)}</span>
                           </div>
                         </div>
