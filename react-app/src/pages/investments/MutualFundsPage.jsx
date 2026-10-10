@@ -1008,7 +1008,9 @@ export default function MutualFundsPage() {
                     </thead>
                     <tbody>
                       {portfolioData.map(p => {
-                        const unrealPL = p.currentValue - p.totalInvestment
+                        // Invested is net money in (buys − withdrawals), so current − invested is the TOTAL P&L.
+                        // Unrealized = total − realized (the sheet's own column), same as the summary cards above.
+                        const unrealPL = p.unrealizedPL ?? ((p.currentValue - p.totalInvestment) - (p.realizedPL || 0))
                         const unrealUp = unrealPL >= 0
                         const unrealPct = p.totalInvestment > 0 ? (unrealPL / p.totalInvestment) * 100 : 0
                         const realPL = p.realizedPL || 0
