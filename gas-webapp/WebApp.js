@@ -577,6 +577,13 @@ function loadAllData() {
     log('Realized P&L migration (non-blocking): ' + e.message);
   }
 
+  // Ongoing SIP respects "SIP restricted" funds (one-time formula upgrade)
+  try {
+    migrateOngoingSipFormula_();
+  } catch (e) {
+    log('Ongoing SIP migration (non-blocking): ' + e.message);
+  }
+
   // Migrate GoalPortfolioMapping to 7-column format if needed (transparent)
   try {
     migrateGoalMappingSheet();

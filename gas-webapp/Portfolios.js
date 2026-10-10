@@ -1260,7 +1260,7 @@ function addFundRowToPortfolio(sheet, row, portfolioId, schemeCode, targetPercen
   // Columns K-P: SIP, Lumpsum, Rebalance formulas
   // Column K: Ongoing SIP ₹ (formula - from portfolio metadata)
   sheet.getRange(row, 11).setFormula(
-    `=IF(I${row}=0,"",I${row}/100*IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,6,FALSE),0))`
+    `=IF(I${row}=0,"",IF(U${row}=TRUE,0,IFERROR(I${row}/(SUM($I$4:$I$1000)-SUMIF($U$4:$U$1000,TRUE,$I$4:$I$1000)),0)*IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,6,FALSE),0)))`
   );
 
   // Column L: Rebalance SIP ₹ (gap-based — matches React logic)
@@ -1494,5 +1494,36 @@ function migratePortfolioRealizedFormulaV2_old_() {
     if (changed) flushSheets_();
     log('Realized P&L formula upgraded on ' + changed + ' portfolio(s)');
   }
+  props.setProperty(key, new Date().toISOString());
+}
+
+
+/**
+ * One-time upgrade (v4): Ongoing SIP (column K of each portfolio tab) skips funds whose SIP is
+ * restricted and shares the portfolio SIP among the other funds by their targets.
+ * Example: SIP 20K, targets 50/30/20, SIP restricted on the first two -> the third gets the full 20K.
+ */
+function migrateOngoingSipFormula_() {
+  var id = typeof _currentUserSpreadsheetId !== 'undefined' ? _currentUserSpreadsheetId : '';
+  if (!id) return;
+  var props = PropertiesService.getUserProperties();
+  var key = 'cf_mig_sip_v4_' + id;
+  if (props.getProperty(key)) return;
+  var n = 0;
+  getAllPortfolios().forEach(function (p) {
+    var sh = getSheet(p.portfolioId);
+    if (!sh) return;
+    var last = sh.getLastRow();
+    if (last < 4) return;
+    var codes = sh.getRange(4, 1, last - 3, 1).getValues();
+    for (var i = 0; i < codes.length; i++) {
+      if (!codes[i][0]) continue;
+      var r = 4 + i;
+      sh.getRange(r, 11).setFormula('=IF(I' + r + '=0,"",IF(U' + r + '=TRUE,0,IFERROR(I' + r + '/(SUM($I$4:$I$1000)-SUMIF($U$4:$U$1000,TRUE,$I$4:$I$1000)),0)*IFERROR(VLOOKUP($Q$1,AllPortfolios!$A:$G,6,FALSE),0)))');
+      n++;
+    }
+  });
+  if (n) flushSheets_();
+  log('Ongoing SIP formula (v4) set on ' + n + ' fund row(s)');
   props.setProperty(key, new Date().toISOString());
 }

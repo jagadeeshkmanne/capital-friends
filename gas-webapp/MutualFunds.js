@@ -882,7 +882,7 @@ function addFundToPortfolioSheet(portfolioSheet, portfolioId, portfolioName, fun
 
     // K: Ongoing SIP ₹ (formula - normal SIP based on target allocation)
     portfolioSheet.getRange(newRow, 11).setFormula(
-      `=IF(OR(A${newRow}="",I${newRow}=""),"",I${newRow}/100*${sipFormula})`
+      `=IF(OR(A${newRow}="",I${newRow}=""),"",IF(U${newRow}=TRUE,0,IFERROR(I${newRow}/(SUM($I$4:$I$1000)-SUMIF($U$4:$U$1000,TRUE,$I$4:$I$1000)),0)*${sipFormula}))`
     );
 
     // L: Rebalance SIP ₹ (gap-based — matches React logic)
