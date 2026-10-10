@@ -395,9 +395,11 @@ export function DataProvider({ children }) {
       try {
         await api.inviteFamilyMember(data.email, data.memberName)
       } catch (e) {
-        // Refresh members first because they were successfully added to the sheet
+        // The member IS saved in the sheet; only sharing the sheet failed
+        // (e.g. this email already uses Capital Friends with another family).
+        // Don't treat it as a failed save: return a warning for the page to show.
         await refreshMembers()
-        throw new Error(`Member added to list, but auto-invite failed: ${e.message}`)
+        return { ...result, inviteWarning: e.message }
       }
     }
     await refreshMembers()

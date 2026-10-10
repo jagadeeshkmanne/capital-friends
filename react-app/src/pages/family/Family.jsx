@@ -39,9 +39,14 @@ export default function Family() {
   async function handleSave(data) {
     showBlockUI('Saving member...')
     try {
-      if (modal?.edit) await updateMember(modal.edit.memberId, data)
-      else await addMember(data)
-      showToast(modal?.edit ? 'Member updated' : 'Member added')
+      if (modal?.edit) {
+        await updateMember(modal.edit.memberId, data)
+        showToast('Member updated')
+      } else {
+        const res = await addMember(data)
+        if (res?.inviteWarning) showToast(`Member added. The sheet was not shared with this email: ${res.inviteWarning}`, 'warning', 6000)
+        else showToast('Member added')
+      }
       setModal(null)
     } catch (err) {
       showToast(err.message || 'Failed to save member', 'error')
