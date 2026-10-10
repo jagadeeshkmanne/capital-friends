@@ -123,7 +123,7 @@ export default function InvestmentAccountsPage() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] tabular-nums">{mv(a.accountClientId, 'clientId')}</td>
-                      <td className="py-2.5 px-3 text-xs text-[var(--text-dim)]">{a.bankAccountName}</td>
+                      <td className="py-2.5 px-3 text-xs text-[var(--text-dim)]">{mv(a.bankAccountName, 'name')}</td>
                       <td className="py-2.5 px-2">
                         <button onClick={() => setModal({ edit: a })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
                           <Pencil size={12} />
@@ -148,7 +148,7 @@ export default function InvestmentAccountsPage() {
                   <p className="text-xs text-[var(--text-muted)]">{a.platformBroker}{!member ? ` · ${mv(a.memberName, 'name')}` : ''}</p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-[var(--text-dim)]">Client: {mv(a.accountClientId, 'clientId')}</p>
-                    <p className="text-xs text-[var(--text-dim)]">{a.bankAccountName}</p>
+                    <p className="text-xs text-[var(--text-dim)]">{mv(a.bankAccountName, 'name')}</p>
                   </div>
                 </div>
               ))}
