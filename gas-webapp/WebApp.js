@@ -570,6 +570,13 @@ function loadAllData() {
     log('Goal retirement-field migration (non-blocking): ' + e.message);
   }
 
+  // Realized P&L counts switch / STP profit too (one-time formula upgrade)
+  try {
+    migratePortfolioRealizedFormula_();
+  } catch (e) {
+    log('Realized P&L migration (non-blocking): ' + e.message);
+  }
+
   // Migrate GoalPortfolioMapping to 7-column format if needed (transparent)
   try {
     migrateGoalMappingSheet();

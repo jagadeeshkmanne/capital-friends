@@ -419,7 +419,7 @@ function dailyUserSync() {
 function userMasterTabsIncomplete_() {
   try {
     var cache = CacheService.getScriptCache(), ranges = [], names = [], missing = [];
-    var meta = Sheets.Spreadsheets.get(_currentUserSpreadsheetId, { fields: 'sheets(properties(title,gridProperties(rowCount)))' });
+    var meta = casRetry_(function () { return Sheets.Spreadsheets.get(_currentUserSpreadsheetId, { fields: 'sheets(properties(title,gridProperties(rowCount)))' }); });
     var gridRows = {};
     (meta.sheets || []).forEach(function (sh) { gridRows[sh.properties.title] = (sh.properties.gridProperties || {}).rowCount || 0; });
     Object.keys(USER_MASTER_TABS_).forEach(function (userTab) {
@@ -430,7 +430,7 @@ function userMasterTabsIncomplete_() {
       ranges.push("'" + userTab + "'!A" + (n + 1)); names.push(userTab);
     });
     if (!ranges.length) return missing.join(', ');
-    var res = Sheets.Spreadsheets.Values.batchGet(_currentUserSpreadsheetId, { ranges: ranges, valueRenderOption: 'UNFORMATTED_VALUE' });
+    var res = casRetry_(function () { return Sheets.Spreadsheets.Values.batchGet(_currentUserSpreadsheetId, { ranges: ranges, valueRenderOption: 'UNFORMATTED_VALUE' }); });
     (res.valueRanges || []).forEach(function (vr, i) {
       var v = vr && vr.values && vr.values[0] && vr.values[0][0];
       if (v === undefined || v === null || v === '') missing.push(names[i]);

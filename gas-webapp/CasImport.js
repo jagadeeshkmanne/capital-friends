@@ -43,6 +43,35 @@ var CASIMP_ = {
 // On for everyone. Emergency off: Script Property IMPORT_ENABLED = off (the app owner keeps it,
 // so it can still be tested). IMPORT_BETA_EMAILS (comma-separated) keeps working while it is off.
 // ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Sheets API with a wait-and-retry on Google's per-minute limit ("Quota exceeded" / 429).
+// A big import and the page refresh right after it can hit the read limit; waiting
+// 1+2+4+8+16 s (about half a minute) is enough, so the user no longer sees the error.
+// Only quota / rate-limit errors are retried (the request was not carried out), so writes are safe.
+// ----------------------------------------------------------------------------
+function casRetry_(fn) {
+  var wait = 1000;
+  for (var i = 0; ; i++) {
+    try { return fn(); }
+    catch (e) {
+      var msg = String(e && e.message || e);
+      if (i < 5 && /429|Quota exceeded|Rate Limit|rateLimitExceeded/i.test(msg)) { Utilities.sleep(wait + Math.floor(Math.random() * 400)); wait *= 2; continue; }
+      throw e;
+    }
+  }
+}
+var CAS_SHEETS_ = {
+  get: function (a, b) { return casRetry_(function () { return Sheets.Spreadsheets.get(a, b); }); },
+  batchUpdate: function (a, b) { return casRetry_(function () { return Sheets.Spreadsheets.batchUpdate(a, b); }); },
+  Values: {
+    get: function (a, b, c) { return casRetry_(function () { return Sheets.Spreadsheets.Values.get(a, b, c); }); },
+    batchGet: function (a, b) { return casRetry_(function () { return Sheets.Spreadsheets.Values.batchGet(a, b); }); },
+    batchUpdate: function (a, b) { return casRetry_(function () { return Sheets.Spreadsheets.Values.batchUpdate(a, b); }); },
+    update: function (a, b, c, d) { return casRetry_(function () { return Sheets.Spreadsheets.Values.update(a, b, c, d); }); },
+    append: function (a, b, c, d) { return casRetry_(function () { return Sheets.Spreadsheets.Values.append(a, b, c, d); }); }
+  }
+};
+
 var CASIMP_OWNERS_ = ['jagadeesh.k.manne@gmail.com'];
 
 function casImportEnabled_() {
@@ -120,14 +149,14 @@ function casDisplayPortfolioName_(n) { return String(n || '').replace(/^PFL-/, '
 function casLoad_(isins) {
   flushSheets_(); // anything queued earlier in this request goes out first
   var id = _currentUserSpreadsheetId;
-  var meta = Sheets.Spreadsheets.get(id, { fields: 'properties(timeZone),sheets(properties(title,sheetId,gridProperties(rowCount,columnCount)))' });
+  var meta = CAS_SHEETS_.get(id, { fields: 'properties(timeZone),sheets(properties(title,sheetId,gridProperties(rowCount,columnCount)))' });
   var sheets = {};
   (meta.sheets || []).forEach(function (s) { sheets[s.properties.title] = s.properties; });
   if (!sheets[CASIMP_.txSheet]) throw new Error('TransactionHistory sheet not found');
 
   // never ask for columns past the sheet's edge (the API refuses the whole read)
   var colA1 = function (title, want) { var n = Math.min(want, (sheets[title].gridProperties || {}).columnCount || want); return String.fromCharCode(64 + n); };
-  var raw = (Sheets.Spreadsheets.Values.get(id, casQ_(CASIMP_.txSheet) + '!A3:' + colA1(CASIMP_.txSheet, 16), { valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }).values) || [];
+  var raw = (CAS_SHEETS_.Values.get(id, casQ_(CASIMP_.txSheet) + '!A3:' + colA1(CASIMP_.txSheet, 16), { valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }).values) || [];
   var rows = [];
   raw.forEach(function (r, i) {
     if (!r || !r.length || (r[0] === '' && r[1] === '' && r[3] === '')) return;
@@ -143,7 +172,7 @@ function casLoad_(isins) {
   var pRows = {};
   var active = portfolios.filter(function (p) { return p.status !== 'Inactive' && sheets[p.portfolioId]; });
   if (active.length) {
-    var vr = Sheets.Spreadsheets.Values.batchGet(id, { ranges: active.map(function (p) { return casQ_(p.portfolioId) + '!A4:' + colA1(p.portfolioId, 21); }), valueRenderOption: 'UNFORMATTED_VALUE' }).valueRanges || [];
+    var vr = CAS_SHEETS_.Values.batchGet(id, { ranges: active.map(function (p) { return casQ_(p.portfolioId) + '!A4:' + colA1(p.portfolioId, 21); }), valueRenderOption: 'UNFORMATTED_VALUE' }).valueRanges || [];
     active.forEach(function (p, i) {
       pRows[p.portfolioId] = ((vr[i] && vr[i].values) || []).map(function (r, k) {
         return { row: k + 4, code: String(r[0] || ''), units: +r[2] || 0, target: r[8] === undefined ? '' : r[8], lr: r[19] === undefined ? '' : r[19], sr: r[20] === undefined ? '' : r[20] };
@@ -563,16 +592,16 @@ function casEnsureTabs_(data) {
   if (!data.sheets[CASIMP_.logSheet]) req.push({ addSheet: { properties: { title: CASIMP_.logSheet, hidden: true, gridProperties: { rowCount: 200, columnCount: 12 } } } });
   if (!data.sheets[CASIMP_.backupSheet]) req.push({ addSheet: { properties: { title: CASIMP_.backupSheet, hidden: true, gridProperties: { rowCount: 1000, columnCount: 4 } } } });
   if (!req.length) return;
-  Sheets.Spreadsheets.batchUpdate({ requests: req }, data.id);
+  CAS_SHEETS_.batchUpdate({ requests: req }, data.id);
   var hdr = [];
   if (!data.sheets[CASIMP_.logSheet]) hdr.push({ range: casQ_(CASIMP_.logSheet) + '!A1:F1', values: [['Import ID', 'Started', 'Status', 'Statement', 'Summary', 'Details (JSON)']] });
   if (!data.sheets[CASIMP_.backupSheet]) hdr.push({ range: casQ_(CASIMP_.backupSheet) + '!A1:C1', values: [['Import ID', 'Row (JSON)', 'Old row number']] });
-  Sheets.Spreadsheets.Values.batchUpdate({ valueInputOption: 'RAW', data: hdr }, data.id);
+  CAS_SHEETS_.Values.batchUpdate({ valueInputOption: 'RAW', data: hdr }, data.id);
 }
 
 function casLogRead_(id) {
   var v = [];
-  try { v = Sheets.Spreadsheets.Values.get(id, casQ_(CASIMP_.logSheet) + '!A2:L', { valueRenderOption: 'UNFORMATTED_VALUE' }).values || []; } catch (e) { return []; }
+  try { v = CAS_SHEETS_.Values.get(id, casQ_(CASIMP_.logSheet) + '!A2:L', { valueRenderOption: 'UNFORMATTED_VALUE' }).values || []; } catch (e) { return []; }
   return v.map(function (r, i) {
     var json = r.slice(5).join('');
     var details = {};
@@ -585,7 +614,7 @@ function casLogWrite_(id, importId, fields) {
   var log = casLogRead_(id).filter(function (x) { return x.importId === importId; })[0];
   var row = log ? log.row : null;
   if (!row) {
-    var res = Sheets.Spreadsheets.Values.append({ values: [[importId]] }, id, casQ_(CASIMP_.logSheet) + '!A:A', { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' });
+    var res = CAS_SHEETS_.Values.append({ values: [[importId]] }, id, casQ_(CASIMP_.logSheet) + '!A:A', { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' });
     var m = /![A-Z]+(\d+)/.exec(res.updates.updatedRange);
     row = +m[1];
   }
@@ -598,7 +627,7 @@ function casLogWrite_(id, importId, fields) {
   if (chunks.length > 7) throw new Error('Import details too large to record');
   var vals = [importId, fields.started !== undefined ? fields.started : cur.started, fields.status !== undefined ? fields.status : cur.status,
     fields.statement !== undefined ? fields.statement : cur.statement, fields.summary !== undefined ? fields.summary : cur.summary].concat(chunks);
-  Sheets.Spreadsheets.Values.update({ values: [vals] }, id, casQ_(CASIMP_.logSheet) + '!A' + row + ':L' + row, { valueInputOption: 'RAW' });
+  CAS_SHEETS_.Values.update({ values: [vals] }, id, casQ_(CASIMP_.logSheet) + '!A' + row + ':L' + row, { valueInputOption: 'RAW' });
 }
 
 // ----------------------------------------------------------------------------
@@ -729,7 +758,7 @@ function casImportSave_(params) {
     if (replaced.length) {
       var bvals = replaced.map(function (r) { var v = r.raw.slice(0, 16); while (v.length < 16) v.push(''); return [importId, JSON.stringify(v), r.row]; });
       for (var i = 0; i < bvals.length; i += 2000) {
-        Sheets.Spreadsheets.Values.append({ values: bvals.slice(i, i + 2000) }, id, casQ_(CASIMP_.backupSheet) + '!A:C', { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' });
+        CAS_SHEETS_.Values.append({ values: bvals.slice(i, i + 2000) }, id, casQ_(CASIMP_.backupSheet) + '!A:C', { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' });
       }
       var back = casBackupRows_(id, importId);
       if (back.length !== replaced.length) throw new Error('Backup could not be confirmed (' + back.length + ' of ' + replaced.length + ' rows).');
@@ -764,7 +793,7 @@ function casImportSave_(params) {
     if (newRowData.length) req.push({ appendCells: { sheetId: txMeta.sheetId, rows: newRowData, fields: 'userEnteredValue,userEnteredFormat.numberFormat' } });
     var apMeta = data.sheets[CONFIG.portfolioMetadataSheet];
     if (plan.resetInitial.length) {
-      var apIds = (Sheets.Spreadsheets.Values.get(id, casQ_(CONFIG.portfolioMetadataSheet) + '!A1:A', { valueRenderOption: 'UNFORMATTED_VALUE' }).values) || [];
+      var apIds = (CAS_SHEETS_.Values.get(id, casQ_(CONFIG.portfolioMetadataSheet) + '!A1:A', { valueRenderOption: 'UNFORMATTED_VALUE' }).values) || [];
       plan.resetInitial.forEach(function (x) {
         var idx = -1;
         for (var k = 3; k < apIds.length; k++) if (String(apIds[k][0]) === x.portfolioId) { idx = k; break; }
@@ -772,7 +801,7 @@ function casImportSave_(params) {
         req.push({ updateCells: { range: { sheetId: apMeta.sheetId, startRowIndex: idx, endRowIndex: idx + 1, startColumnIndex: 3, endColumnIndex: 4 }, rows: [{ values: [casCell_(0)] }], fields: 'userEnteredValue' } });
       });
     }
-    Sheets.Spreadsheets.batchUpdate({ requests: req }, id);
+    CAS_SHEETS_.batchUpdate({ requests: req }, id);
     casResetAdapter_();
     casLogWrite_(id, importId, { status: 'WRITTEN' });
 
@@ -852,7 +881,7 @@ function casVerify_(id, buckets) {
 
 function casBackupRows_(id, importId) {
   var v = [];
-  try { v = Sheets.Spreadsheets.Values.get(id, casQ_(CASIMP_.backupSheet) + '!A2:C', { valueRenderOption: 'UNFORMATTED_VALUE' }).values || []; } catch (e) { return []; }
+  try { v = CAS_SHEETS_.Values.get(id, casQ_(CASIMP_.backupSheet) + '!A2:C', { valueRenderOption: 'UNFORMATTED_VALUE' }).values || []; } catch (e) { return []; }
   return v.filter(function (r) { return String(r[0]) === importId; }).map(function (r) { return { vals: JSON.parse(r[1]), oldRow: +r[2] }; });
 }
 
@@ -880,7 +909,7 @@ function casRollback_(id, importId, finalStatus) {
   var reset = details.resetInitial || [];
   if (reset.length) {
     var apMeta = data.sheets[CONFIG.portfolioMetadataSheet];
-    var apIds = (Sheets.Spreadsheets.Values.get(id, casQ_(CONFIG.portfolioMetadataSheet) + '!A1:D', { valueRenderOption: 'UNFORMATTED_VALUE' }).values) || [];
+    var apIds = (CAS_SHEETS_.Values.get(id, casQ_(CONFIG.portfolioMetadataSheet) + '!A1:D', { valueRenderOption: 'UNFORMATTED_VALUE' }).values) || [];
     reset.forEach(function (x) {
       for (var k = 3; k < apIds.length; k++) {
         if (String(apIds[k][0]) === x.portfolioId) {
@@ -890,7 +919,7 @@ function casRollback_(id, importId, finalStatus) {
       }
     });
   }
-  if (req.length) Sheets.Spreadsheets.batchUpdate({ requests: req }, id);
+  if (req.length) CAS_SHEETS_.batchUpdate({ requests: req }, id);
   casResetAdapter_();
 
   // 2. portfolio tabs: rows back the way they were
@@ -1050,7 +1079,7 @@ function casImportMoveFund_(params) {
         }
       });
     });
-    Sheets.Spreadsheets.batchUpdate({ requests: req }, data.id);
+    CAS_SHEETS_.batchUpdate({ requests: req }, data.id);
     casResetAdapter_();
     var details = { addedRows: [], removedRows: [] };
     casSyncPortfolioRows_([{ portfolioId: from, code: code }, { portfolioId: to, code: code }], details);

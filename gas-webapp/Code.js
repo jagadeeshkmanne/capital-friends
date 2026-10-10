@@ -155,7 +155,7 @@ function openSpreadsheetById_(id) {
  */
 function spreadsheetAccess_(id) {
   try {
-    if (useSheetsApi_()) Sheets.Spreadsheets.get(id, { fields: 'spreadsheetId' });
+    if (useSheetsApi_()) casRetry_(function () { return Sheets.Spreadsheets.get(id, { fields: 'spreadsheetId' }); });
     else SpreadsheetApp.openById(id);
     return 'ok';
   } catch (e) {

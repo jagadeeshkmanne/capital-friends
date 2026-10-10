@@ -79,14 +79,14 @@ function processAddPortfolio(formData) {
     const totalPLAmountFormula = `=I${rowNum}-E${rowNum}`;
     const totalPLPercentFormula = `=IF(E${rowNum}=0,0,N${rowNum}/E${rowNum})`;
 
-    // Realized P&L — matches on TransactionHistory column B (portfolioId)
-    const realizedPLAmountFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL",TransactionHistory!$G:$G,"WITHDRAWAL")`;
+    // Realized P&L — profit booked on every sale: redemptions AND switch-outs / STPs
+    // (a switch is a sale of one fund and a purchase of another, so its profit is booked too).
+    const realizedPLAmountFormula = `=SUMIFS(TransactionHistory!$M:$M,TransactionHistory!$B:$B,A${rowNum},TransactionHistory!$F:$F,"SELL")`;
 
     // Realized P&L % = Realized P&L / Total Investment
     const realizedPLPercentFormula = `=IF(E${rowNum}=0,0,L${rowNum}/E${rowNum})`;
 
-    // Unrealized P&L ₹ = Total P&L - Realized P&L
-    // This gives us the P&L from current holdings + any SWITCH gains
+    // Unrealized P&L ₹ = Total P&L - Realized P&L = profit on the funds held today
     const unrealizedPLAmountFormula = `=N${rowNum}-L${rowNum}`;
 
     // Unrealized P&L % = Unrealized P&L / Total Investment
@@ -1437,3 +1437,34 @@ function activatePortfolioSheet(portfolioId) {
 // ============================================================================
 // END OF PORTFOLIOS.GS
 // ============================================================================
+
+
+/**
+ * One-time upgrade of existing portfolios: Realized P&L used to count only redemptions
+ * (switch / STP profit showed up as "unrealized"). Rewrites column L of AllPortfolios to count
+ * every SELL. Runs once per spreadsheet (flag in user properties), touches only the old formula.
+ */
+function migratePortfolioRealizedFormula_() {
+  var id = typeof _currentUserSpreadsheetId !== 'undefined' ? _currentUserSpreadsheetId : '';
+  if (!id) return;
+  var props = PropertiesService.getUserProperties();
+  var key = 'cf_mig_realized_v2_' + id;
+  if (props.getProperty(key)) return;
+  var sheet = getSheet(CONFIG.portfolioMetadataSheet);
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 3) {
+    var f = sheet.getRange(4, 12, lastRow - 3, 1).getFormulas();
+    var changed = 0;
+    for (var i = 0; i < f.length; i++) {
+      var old = String(f[i][0] || '');
+      if (old.indexOf('=SUMIFS(TransactionHistory!$M:$M') === 0 && old.indexOf(',TransactionHistory!$G:$G,"WITHDRAWAL")') > 0) {
+        sheet.getRange(4 + i, 12).setFormula(old.replace(',TransactionHistory!$G:$G,"WITHDRAWAL")', ')'));
+        changed++;
+      }
+    }
+    if (changed) flushSheets_();
+    log('Realized P&L formula upgraded on ' + changed + ' portfolio(s)');
+  }
+  props.setProperty(key, new Date().toISOString());
+}

@@ -271,7 +271,8 @@ export default function MutualFundsPage() {
       : mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
     const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
     const funds = new Set(relevantHoldings.map((h) => h.fundCode)).size
-    return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP }
+    const sipFunds = relevantHoldings.filter((h) => (h.ongoingSIP || 0) > 0).length
+    return { invested, current, unrealizedPL, unrealizedPLPct, realizedPL, realizedPLPct, totalPL, totalPLPct, funds, monthlySIP, sipFunds }
   }, [portfolioData, selectedPortfolioId, mfHoldings])
 
   // Holdings & transactions for selected view
@@ -940,7 +941,7 @@ export default function MutualFundsPage() {
               sub={returns?.cagr == null ? <button onClick={() => navigate('/import')} className="underline">Import statement</button> : undefined}
               title={returns?.cagr == null ? returnsWhy(returns) : 'Average yearly growth of the money invested'}
             />
-            <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={`${stats.funds} funds`} />
+            <StatCard label="Monthly SIP" value={formatINR(stats.monthlySIP)} sub={stats.sipFunds > 0 ? `${stats.sipFunds} fund${stats.sipFunds > 1 ? 's' : ''} with SIP` : 'No SIP set'} />
           </div>
 
           {/* ═══ ALL PORTFOLIOS — Breakdown + Table + Chart ═══ */}
@@ -956,15 +957,15 @@ export default function MutualFundsPage() {
                 {breakdownOpen && (
                   <div className="px-4 pb-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <DonutCard title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
+                      <DonutCard onClick={goBreakdown} title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
                       {breakdown.capList.length > 0
-                        ? <DonutCard title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
+                        ? <DonutCard onClick={goBreakdown} title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
                         : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                             <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                           </button>
                       }
                       {breakdown.geoList?.length > 0
-                        ? <DonutCard title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
+                        ? <DonutCard onClick={goBreakdown} title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
                         : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                             <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                           </button>
@@ -1374,15 +1375,15 @@ export default function MutualFundsPage() {
               {breakdownOpen && (
                 <div className="px-4 pb-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <DonutCard title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
+                    <DonutCard onClick={goBreakdown} title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
                     {breakdown.capList.length > 0
-                      ? <DonutCard title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
+                      ? <DonutCard onClick={goBreakdown} title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
                       : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                           <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                         </button>
                     }
                     {breakdown.geoList?.length > 0
-                      ? <DonutCard title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
+                      ? <DonutCard onClick={goBreakdown} title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
                       : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                           <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                         </button>
@@ -2551,9 +2552,10 @@ function FundAllocationRow({ fund, existing, onConfigure }) {
 }
 
 /* ── Donut Chart Card (Recharts) ── */
-function DonutCard({ title, data, bgMap }) {
+function DonutCard({ title, data, bgMap, onClick }) {
   return (
-    <div className="rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-3">
+    <div onClick={onClick} role={onClick ? 'button' : undefined} title={onClick ? 'Open Fund Breakdown to see or edit each fund' : undefined}
+      className={`rounded-lg bg-[var(--bg-inset)] border border-[var(--border-light)] p-3 ${onClick ? 'cursor-pointer hover:border-violet-500/50 transition-colors' : ''}`}>
       <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 text-center">{title}</p>
       <div className="w-full h-[120px]">
         <ResponsiveContainer width="100%" height="100%">
