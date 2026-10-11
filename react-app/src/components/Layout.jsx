@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useRef as useRefScroll, useLayoutEffect as useLayoutEffectScroll } from 'react'
+import { useScreenMask } from '../hooks/useScreenMask'
 import Header from './Header'
 import BottomNav from './BottomNav'
 import BrandedLoading from './BrandedLoading'
@@ -13,6 +14,7 @@ export default function Layout() {
   // pages scroll inside <main>, not the window: go back to the top whenever the page (path) changes
   const mainRef = useRefScroll(null)
   const { pathname } = useLocation()
+  useScreenMask()
   useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname])
 
   const { loading, error } = useData()
