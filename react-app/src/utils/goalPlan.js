@@ -93,9 +93,12 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
   const plans = (goals || []).filter((g) => g.targetDate).map((g) => {
     const years = Math.max(0, (new Date(g.targetDate) - now) / YEAR_MS)
     const r = Number(g.expectedCAGR) || 0.12
-    const sip = Number(g.monthlyInvestment) || 0
     const target = Number(g.targetAmount) || 0
     const att = attribution?.[g.goalId] || { total: 0, equity: 0, items: [] }
+    // SIP actually running today = the goal's share of the ongoing SIPs in its linked funds.
+    // (goal.monthlyInvestment is the SIP the plan NEEDS, not money that is really going in.)
+    const sip = Math.round((att.items || []).filter((it) => it.kind === 'mf').reduce((s2, it) => s2 + (Number(it.holding.ongoingSIP) || 0) * (it.fraction || 0), 0))
+    const plannedSip = Number(g.monthlyInvestment) || 0
     const has = att.total > 0 ? att.total : (Number(g.currentValue) || 0)
     const rec = years > 0 ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }
     const isRet = g.goalType === 'Retirement'
@@ -118,7 +121,7 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
       const sipFund = (att.items || []).filter((it) => it.kind === 'mf' && (wantEq ? it.eq >= EQ_MIN : it.eq <= SAFE_MAX)).sort((a, b) => b.value - a.value)[0]?.holding || null
       steps.push({ t: 'sip', amount: addSip, lump: -gap, sipFrom: sip, sipTo: sip + addSip, fund: sipFund, wantEq })
     }
-    return { goal: g, years, yearsLeft: Math.ceil(years - 1e-9), r, sip, target, has, need, gap, state, eqNow, eqTarget: rec.equity, bucketMode, isRet, steps, addSip, lumpToday: state === 'short' ? -gap : 0, att }
+    return { goal: g, plannedSip, years, yearsLeft: Math.ceil(years - 1e-9), r, sip, target, has, need, gap, state, eqNow, eqTarget: rec.equity, bucketMode, isRet, steps, addSip, lumpToday: state === 'short' ? -gap : 0, att }
   })
   // extra in one goal can pay for another goal's SIP: suggest moving SIP, never more than the goal's own SIP
   const donors = plans.filter((p) => p.state === 'extra' && p.sip > 0 && p.years > 0)

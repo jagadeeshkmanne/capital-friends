@@ -5,7 +5,7 @@ import { attributeGoals, equityFraction } from './goalAttribution'
 const NOW = new Date('2026-10-11T00:00:00Z')
 const inYears = (y) => new Date(NOW.getTime() + y * 365.25 * 24 * 3600 * 1000).toISOString()
 const eqOf = (h) => equityFraction(h, {})
-const mf = (pid, code, cat, value, nav = 100) => ({ portfolioId: pid, schemeCode: code, fundName: code, category: cat, units: value / nav, currentNav: nav, currentValue: value })
+const mf = (pid, code, cat, value, nav = 100, sip = 0) => ({ portfolioId: pid, schemeCode: code, fundName: code, category: cat, units: value / nav, currentNav: nav, currentValue: value, ongoingSIP: sip })
 
 describe('needToday / SIP math', () => {
   it('with no SIP it is the plain present value of the target', () => {
@@ -53,8 +53,8 @@ describe('switch steps', () => {
 })
 
 describe('buildGoalPlan', () => {
-  const H = [mf('P1', 'EQ', 'Equity', 460000, 84.2), mf('P1', 'LIQ', 'Debt', 640000, 3412.55),
-    mf('P2', 'FLEXI', 'Equity', 1000000), mf('P2', 'CONS', 'Debt', 300000)]
+  const H = [mf('P1', 'EQ', 'Equity', 460000, 84.2, 5000), mf('P1', 'LIQ', 'Debt', 640000, 3412.55),
+    mf('P2', 'FLEXI', 'Equity', 1000000, 100, 5000), mf('P2', 'CONS', 'Debt', 300000)]
   const goals = [
     { goalId: 'HOUSE', goalType: 'Home', targetDate: inYears(3), targetAmount: 2000000, monthlyInvestment: 5000, expectedCAGR: 0.1 },
     { goalId: 'KID', goalType: 'Education', targetDate: inYears(11), targetAmount: 1500000, monthlyInvestment: 5000, expectedCAGR: 0.12 },
@@ -81,6 +81,17 @@ describe('buildGoalPlan', () => {
   it('road: switches only when the glide path drops 5 points or more', () => {
     for (const st of house.road.filter((s) => s.k === 'safer')) expect(st.eq0 - st.eq).toBeGreaterThanOrEqual(BAND)
     expect(house.road[house.road.length - 1].k).toBe('goal')
+  })
+  it('SIP today comes from running SIPs in linked funds, not the goal\'s planned SIP', () => {
+    expect(house.sip).toBe(5000)
+    const g2 = [{ goalId: 'R', goalType: 'Retirement', targetDate: inYears(10), targetAmount: 28800000, monthlyInvestment: 79000, expectedCAGR: 0.12 }]
+    const H2 = [mf('PR', 'EQ', 'Equity', 4100000), mf('PR', 'D', 'Debt', 770000)]
+    const m2 = [{ goalId: 'R', portfolioId: 'PR', allocationPct: 100 }]
+    const a2 = attributeGoals({ goals: g2, targetOf: () => 0.84, mappings: m2, mfHoldings: H2, allocMap: {} })
+    const r = buildGoalPlan({ goals: g2, attribution: a2, mfHoldings: H2, mappings: m2, eqOf, now: NOW }).goals[0]
+    expect(r.sip).toBe(0); expect(r.plannedSip).toBe(79000)
+    expect(r.state).toBe('short')
+    const s = r.steps.find((x) => x.t === 'sip'); expect(s.amount).toBeGreaterThan(55000); expect(r.lumpToday).toBeGreaterThan(4000000)
   })
   it('portfolio view: one portfolio, its equity vs what its goals need together', () => {
     const p1 = plan.portfolios.find((p) => p.portfolioId === 'P1')
