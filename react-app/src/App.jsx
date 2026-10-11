@@ -16,6 +16,7 @@ import StocksPage from './pages/investments/StocksPage'
 import Family from './pages/family/Family'
 import GoalsPage from './pages/goals/GoalsPage'
 import RetirementBucketsPage from './pages/goals/RetirementBucketsPage'
+import GoalsPlanPage from './pages/goals/GoalsPlanPage'
 import MorePage from './pages/MorePage'
 import SettingsPage from './pages/SettingsPage'
 import RemindersPage from './pages/RemindersPage'
@@ -67,6 +68,8 @@ export default function App() {
 
           {/* Goals */}
           <Route path="goals" element={<GoalsPage />} />
+          <Route path="goals/plan" element={<GoalsPlanPage />} />
+          <Route path="goals/plan/:goalId" element={<GoalsPlanPage />} />
           <Route path="retirement-buckets" element={<RetirementBucketsPage />} />
 
           {/* Reports & Tools */}
