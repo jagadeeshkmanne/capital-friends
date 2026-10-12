@@ -10,7 +10,7 @@
  *         (retirement takes its EPF / PPF / NPS here, counted in full)
  *      B. equity: the goals with the most time first (a 10-year goal before a 4-year one)
  *      C. anything a goal still needs, from whatever is left (retirement first — there is no loan for retirement)
- *      D. money left over tops goals up to their full amount, each in its own timeline mix (glide path)
+ *      Money left over stays extra (not pushed into any goal), shown once for the family
  *    Every goal's mix follows its timeline, also when it is already fully covered.
  *    Each goal's "need" is what it should hold today for its amount and date (no SIP assumed).
  *    The result is written as ordinary goal links (goalId, portfolioId, allocationPct), so the buckets page,
@@ -73,12 +73,13 @@ const isEF = (g) => g.goalType === 'Emergency Fund'
 const isRet = (g) => g.goalType === 'Retirement'
 
 /** What a goal should hold today, and the equity share its glide path wants (0..1). */
-export function goalWant(g, now = new Date()) {
+export function goalWant(g, now = new Date(), sip = 0) {
   const years = Math.max(0, yearsTo(g, now) || 0)
   const target = Number(g.targetAmount) || 0
   const r = Number(g.expectedCAGR) || 0.12
   // the emergency fund must be there in full today (it is not invested to grow)
-  const want = years > 0 && !isEF(g) ? needToday({ target, years, annualReturn: r, sip: 0 }) : target
+  // what it should hold today so that this + its running SIP reaches the amount (the same "Need today" the goal shows)
+  const want = years > 0 && !isEF(g) ? needToday({ target, years, annualReturn: r, sip: Number(sip) || 0 }) : target
   const eq = isEF(g) || years <= 0 ? 0 : getRecommendedAllocation(g.goalType, years).equity / 100
   return { want, eq, years, target }
 }
@@ -88,12 +89,12 @@ export function goalWant(g, now = new Date()) {
  * @param items  poolItems(...) (only included ones are used)
  * @returns { mappings: [{ goalId, portfolioId, allocationPct, investmentType }], byGoal: { [goalId]: { want, got, eq } }, left: ₹ not used }
  */
-export function sharePool({ goals, items, now = new Date() }) {
+export function sharePool({ goals, items, now = new Date(), sipOf = {} }) {
   const live = (goals || []).filter((g) => g.isActive !== false && validDate(g.targetDate) && Number(g.targetAmount) > 0)
   const its = (items || []).filter((i) => i.included && i.value > 0).map((i) => ({ ...i, left: i.value }))
   const take = {} // goalId -> itemId -> ₹
   const meta = {}
-  for (const g of live) { meta[g.goalId] = { ...goalWant(g, now), got: 0, gotSafe: 0, gotEq: 0 }; take[g.goalId] = {} }
+  for (const g of live) { meta[g.goalId] = { ...goalWant(g, now, sipOf[g.goalId]), got: 0, gotSafe: 0, gotEq: 0 }; take[g.goalId] = {} }
   const give = (g, it, x) => {
     if (!(x > 0.5)) return 0
     const v = Math.min(x, it.left); if (!(v > 0.5)) return 0
@@ -134,16 +135,9 @@ export function sharePool({ goals, items, now = new Date() }) {
   ownOnly = false
   // C. whatever a goal still needs, from what is left (near goals prefer safe money)
   for (const g of retFirst) { const m = meta[g.goalId]; from(g, isEF(g) ? safeItems : m.eq < 0.5 ? [...safeItems, ...eqItems] : [...eqItems, ...safeItems], m.want - m.got) }
-  // D. money left over tops goals up to their full amount, nearest goal first, in each goal's own timeline mix
-  //    (its glide path at today's distance): the equity part from equity, the safe part from safe money, then
-  //    whatever is left. So a goal 1 year away is filled with safe money and one 10 years away with equity.
-  for (const g of byDate) {
-    if (isEF(g)) continue
-    const m = meta[g.goalId], mix = isEF(g) || m.years <= 0 ? 0 : getRecommendedAllocation(g.goalType, m.years).equity / 100
-    from(g, eqItems, m.target * mix - m.gotEq)
-    from(g, safeItems, m.target * (1 - mix) - m.gotSafe)
-    from(g, mix >= 0.5 ? [...eqItems, ...safeItems] : [...safeItems, ...eqItems], m.target - m.got)
-  }
+  // money left over is NOT pushed into goals: each goal holds what it needs today (with its SIP), and the rest is
+  // "extra" — shown once for the family (lower a SIP, or start a new goal). So no goal is ahead while another is
+  // short; only EPF / PPF / NPS (retirement only, never moved) can leave retirement ahead.
 
   const itemOf = Object.fromEntries((items || []).map((i) => [i.id, i]))
   const mappings = []
@@ -152,7 +146,8 @@ export function sharePool({ goals, items, now = new Date() }) {
     const pct = Math.round(v / it.value * 10000) / 100
     if (pct >= 0.01) mappings.push({ goalId: g.goalId, portfolioId: id, allocationPct: pct, investmentType: it.type })
   }
-  return { mappings, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0) }
+  const extra = its.filter((i) => i.kind !== 'retirement').reduce((t, i) => t + i.left, 0)
+  return { mappings, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra }
 }
 
 /** True when two sets of links differ enough to be worth saving (a new / dropped link, or a share 2+ points off). */

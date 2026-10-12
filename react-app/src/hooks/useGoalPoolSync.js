@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
-import { equityFraction } from '../utils/goalAttribution'
+import { equityFraction, attributeFamilyGoals } from '../utils/goalAttribution'
 import { poolItems, sharePool, linksChanged } from '../utils/goalPool'
 import { resolvePortfolioOwners } from '../utils/fundsDashboard'
 
@@ -26,7 +26,13 @@ export function useGoalPool() {
     const withGoal = new Set(goals.map((g) => String(g.familyMemberName || '').trim().toLowerCase()))
     const kidNames = people.filter((m) => /^(son|daughter)$/i.test(String(m.relationship || '').trim()) && !withGoal.has(String(m.memberName || '').trim().toLowerCase())).map((m) => m.memberName)
     const items = poolItems({ mfPortfolios: mfP, mfHoldings, stockPortfolios: stP, stockHoldings, otherInvList, eqOf, choice, kidNames })
-    const shared = sharePool({ goals, items })
+    // pass 1 without SIPs tells which funds (and so which running SIPs) each goal gets; pass 2 counts those SIPs,
+    // so a goal's share is what it needs today with its SIP (same "Need today" the goal shows). Both passes
+    // use today's data only, so the result is stable.
+    const first = sharePool({ goals, items })
+    const att = attributeFamilyGoals({ goals, mappings: first.mappings, mfHoldings, stockHoldings, otherInvList, allocMap })
+    const sipOf = Object.fromEntries(goals.map((g) => [g.goalId, ((att[g.goalId]?.items) || []).filter((it) => it.kind === 'mf').reduce((t, it) => t + (Number(it.holding?.ongoingSIP) || 0) * (it.fraction || 0), 0)]))
+    const shared = sharePool({ goals, items, sipOf })
     return { items, choice, eqOf, allocMap, ...shared }
   }, [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts])
 }

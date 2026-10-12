@@ -63,6 +63,7 @@ export default function GoalsPlanPage() {
     const efTake = new Set(goalPortfolioMappings.filter((m) => active.find((g) => g.goalId === m.goalId)?.goalType === 'Emergency Fund').map((m) => m.portfolioId))
     const cashItems = pool.items.filter((i) => i.included && i.type === 'Other' && /cash|saving/i.test(i.otherType || '') && !efTake.has(i.id))
     plan0.family = familyPlan({ plans: plan0.goals, mfHoldings, included, cashItems, eqOf, lockedIds: new Set(pool.items.filter((i) => i.locked).map((i) => i.id)) })
+    plan0.extra = pool.extra || 0
     return plan0
   }, [goalList, active, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap, pool.items])
   const [rebal, setRebal] = useState(null)
@@ -115,7 +116,7 @@ export default function GoalsPlanPage() {
 }
 
 /** Same header as the Goals page: net worth split, then target, have, gap, progress and SIP OR lump sum. */
-function GoalsHeader({ plans, netWorth }) {
+function GoalsHeader({ plans, netWorth, extra = 0 }) {
   const target = plans.reduce((t, p) => t + p.target, 0), has = plans.reduce((t, p) => t + p.has, 0)
   const short = plans.filter((p) => p.lumpToday > 0)
   const sipNeed = short.reduce((t, p) => t + (p.sipNeeded || 0), 0), lump = short.reduce((t, p) => t + p.lumpToday, 0)
@@ -127,7 +128,7 @@ function GoalsHeader({ plans, netWorth }) {
         <div><span className="gp-lbl">Total net worth</span><b className="gp-nwv">{L(nw)}</b></div>
         <div className="gp-nws">
           <div><span><i style={{ background: '#8b5cf6' }} />Allocated to goals</span><b style={{ color: 'var(--accent-violet)' }}>{L(has)} <small>({pc(has)}%)</small></b></div>
-          <div><span><i style={{ background: 'var(--border)' }} />Unallocated surplus</span><b>{L(free)} <small>({pc(free)}%)</small></b></div>
+          <div><span><i style={{ background: 'var(--border)' }} />Unallocated surplus</span><b>{L(free)} <small>({pc(free)}%)</small></b>{extra > 1000 && <small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>{L(extra)} of it is in Money for goals but not needed yet: you could lower a SIP or add a goal</small>}</div>
         </div>
       </div>
       <div className="gp-tiles">
@@ -154,7 +155,7 @@ function GoalList({ plans, all, ctx }) {
   if (!plans.length) return <div className="gp-panel"><p className="gp-hs">No goals yet. <a className="gp-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p></div>
   return (
     <>
-      <GoalsHeader plans={plans} netWorth={ctx.netWorth} />
+      <GoalsHeader plans={plans} netWorth={ctx.netWorth} extra={all.extra} />
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{(() => { const k = withSteps.reduce((s, p) => s + realSteps(p).length, 0); const fam = all.family?.status === 'steps' ? all.family.steps.filter((x) => ['sip-cut', 'sip-add', 'lump', 'sell', 'buy'].includes(x.t)).length : 0; const t = k + fam; return t ? `${t} step${t === 1 ? '' : 's'} this month${fam ? ' · family plan first' : ''} · based on today's fund values` : 'Nothing to do this month · based on today\'s fund values' })()}</span></div>

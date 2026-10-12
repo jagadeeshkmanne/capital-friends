@@ -43,11 +43,17 @@ describe('money for goals', () => {
     // no investment is shared out over 100%
     for (const id of ['CORE', 'SAFE', 'FD', 'EPF']) expect(r.mappings.filter((m) => m.portfolioId === id).reduce((t, m) => t + m.allocationPct, 0)).toBeLessThanOrEqual(100.01)
   })
-  it('a goal with more than its full amount available is topped up to its amount (can show as achieved)', () => {
+  it('money beyond what goals need today is extra (not pushed into a goal)', () => {
     const items = poolItems({ mfPortfolios: mfP, mfHoldings: mfH, otherInvList: other, eqOf })
     const small = { ...KID, targetAmount: 300000 }
     const r = sharePool({ goals: [small], items, now: NOW })
-    expect(r.byGoal.KID.got).toBeCloseTo(300000, -2)
+    expect(r.byGoal.KID.got).toBeCloseTo(r.byGoal.KID.want, -1)
+    expect(r.extra).toBeGreaterThan(0)
+  })
+  it('a running SIP lowers what a goal needs today (frees money for the others)', () => {
+    const items = [{ id: 'P', type: 'MF', value: 5000000, eq: 1, kind: 'pool', included: true }]
+    const a = sharePool({ goals: [KID], items, now: NOW }), b = sharePool({ goals: [KID], items, now: NOW, sipOf: { KID: 20000 } })
+    expect(b.byGoal.KID.want).toBeLessThan(a.byGoal.KID.want)
   })
   it('linksChanged ignores small drifts', () => {
     const a = [{ goalId: 'G', portfolioId: 'P', allocationPct: 50 }]
@@ -124,17 +130,17 @@ describe('money for goals', () => {
     const { goals: plans } = buildGoalPlan({ goals, attribution: { RET: att, KID: att }, mfHoldings: [], mappings: [], eqOf, now: NOW, pool: true })
     for (const p of plans) { expect(p.state).toBe('achieved'); expect(p.eqTarget).toBeGreaterThan(0); expect(p.steps.some((s) => s.t === 'protect')).toBe(false) }
   })
-  it('timeline: with plenty of money, a goal 1 year away gets safe money and one 10 years away gets equity', () => {
-    const items = [{ id: 'EQ', type: 'MF', value: 30000000, eq: 1, kind: 'pool', included: true }, { id: 'SAFE', type: 'Other', value: 30000000, eq: 0, kind: 'pool', included: true }]
-    const HOUSE = { goalId: 'HOUSE', goalType: 'House Purchase', targetDate: inY(1), targetAmount: 10000000, isActive: true }
+  it('timeline: a goal 1 year away gets safe money, one 10 years away gets equity; no goal ahead while another is short', () => {
+    const items = [{ id: 'EQ', type: 'MF', value: 9000000, eq: 1, kind: 'pool', included: true }, { id: 'SAFE', type: 'Other', value: 9000000, eq: 0, kind: 'pool', included: true }]
+    const HOUSE = { goalId: 'HOUSE', goalType: 'House Purchase', targetDate: inY(1), targetAmount: 8000000, isActive: true }
     const R4 = { ...RET, targetDate: inY(4), targetAmount: 20000000 }
     const EDU = { goalId: 'EDU', goalType: 'Education', targetDate: inY(10), targetAmount: 15000000, isActive: true }
     const r = sharePool({ goals: [EDU, R4, HOUSE], items, now: NOW })
     const eqShare = (id) => r.byGoal[id].gotEq / r.byGoal[id].got
-    expect(r.byGoal.HOUSE.got).toBeCloseTo(10000000, -2)
     expect(eqShare('HOUSE')).toBeLessThan(0.2)
     expect(eqShare('EDU')).toBeGreaterThan(0.5)
-    expect(eqShare('EDU')).toBeGreaterThan(eqShare('HOUSE'))
+    const states = Object.values(r.byGoal).map((m) => Math.sign(Math.round((m.got - m.want) / 1000)))
+    expect(states.includes(1) && states.includes(-1)).toBe(false)
   })
   it('pool mode: a goal past its date with money shows "ready"; the emergency fund needs its full amount', () => {
     const att = { total: 500000, equity: 0, items: [] }
@@ -167,13 +173,14 @@ describe('money for goals', () => {
     const r = sharePool({ goals: [RJ, RV, KID], items, now: NOW })
     expect(r.mappings.find((m) => m.portfolioId === 'CASH')?.goalId).toBe('RV')
   })
-  it('pool much more than all targets: every goal is filled to its amount, no "Protect it" step', () => {
+  it('pool much more than all needs: each goal gets what it needs, the rest is extra, no "Protect it" step', () => {
     const items = poolItems({ mfPortfolios: mfP, mfHoldings: mfH, otherInvList: other, eqOf })
     const goals = [{ ...RET, targetAmount: 1000000 }, { ...EF, targetAmount: 100000 }, { ...KID, targetAmount: 200000 },
       { goalId: 'CAR', goalType: 'Vehicle', targetDate: inY(8), targetAmount: 100000, expectedCAGR: 0.1, isActive: true }]
     const r = sharePool({ goals, items, now: NOW })
-    for (const g of ['EF', 'KID', 'CAR']) expect(r.byGoal[g].got).toBeCloseTo(r.byGoal[g].target, -1)
+    for (const g of ['EF', 'KID', 'CAR']) expect(r.byGoal[g].got).toBeCloseTo(r.byGoal[g].want, -1)
     expect(r.byGoal.EF.gotEq).toBeLessThan(1)
+    expect(r.extra).toBeGreaterThan(0)
     const att = attributeFamilyGoals({ goals, mappings: r.mappings, mfHoldings: mfH, otherInvList: other, now: NOW })
     const plans = buildGoalPlan({ goals, attribution: att, mfHoldings: mfH, mappings: r.mappings, eqOf, now: NOW, pool: true }).goals
     expect(plans.flatMap((p) => p.steps).some((s) => s.t === 'protect')).toBe(false)
@@ -181,8 +188,8 @@ describe('money for goals', () => {
   it('retirement 20 years out with an equity + debt pool: gets the equity first and keeps its glide path', () => {
     const items = [{ id: 'EQ', type: 'MF', value: 1500000, eq: 1, kind: 'pool', included: true }, { id: 'DB', type: 'MF', value: 2000000, eq: 0, kind: 'pool', included: true }]
     const r = sharePool({ goals: [{ ...RET, targetAmount: 3000000 }], items, now: NOW })
-    expect(r.byGoal.RET.gotEq).toBeCloseTo(1500000, -1) // all the equity there is
-    expect(r.byGoal.RET.got).toBeCloseTo(3000000, -1)
+    expect(r.byGoal.RET.gotEq).toBeGreaterThan(r.byGoal.RET.got * 0.5) // equity first for a far goal
+    expect(r.byGoal.RET.got).toBeCloseTo(r.byGoal.RET.want, -1)
   })
   it('random pools: no investment over 100%, no NaN, no non-retirement goal over its amount, same result twice (incl. step E)', () => {
     let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
