@@ -372,7 +372,7 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
  * One row on the retirement card: "How it works", plus "Refill now" when this year's refill / build step is due
  * (with Record switch) and "Income plan" after retirement (with Record redemption). Each opens in a window.
  */
-export function RetirementActions({ goal }) {
+export function RetirementActions({ goal, slot = 'alert' }) {
   const data = useData()
   const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF } = data
   const { showToast, showBlockUI, hideBlockUI } = useToast()
@@ -403,16 +403,19 @@ export function RetirementActions({ goal }) {
   const refillTotal = ops.reduce((t, op) => t + (op.fundedAmount || 0), 0)
   const monthly = plan?.expense?.monthlyExpense || 0
   // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
+  if (slot === 'alert' && !showRefill) return null
   return (
-    <div>
+    <>
       {/* link rows like the card's other rows; the refill row shows only when a refill is due, and draws the eye */}
-      <button type="button" className="g2-lrow" onClick={() => setOpen('how')}><span>How the buckets work</span><em>Open ›</em></button>
-      {showRefill && (
+      {slot === 'pills' && <>
+        <button type="button" className="g2-pill" onClick={() => setOpen('how')}><CircleHelp size={14} /> How buckets work</button>
+        {showIncome && <button type="button" className="g2-pill" onClick={() => setOpen('income')}><Wallet size={14} /> Monthly income · {formatINR(Math.round(monthly))}</button>}
+      </>}
+      {slot === 'alert' && showRefill && (
         <button type="button" className="g2-lrow due" onClick={() => setOpen('refill')}>
           <span><i className="g2-dot" />Refill plan · {formatINR(Math.round(refillTotal))} due<small>{ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ')}</small></span><em>Refill now ›</em>
         </button>
       )}
-      {showIncome && <button type="button" className="g2-lrow" onClick={() => setOpen('income')}><span>Monthly income · {formatINR(Math.round(monthly))}<small>from the Income bucket</small></span><em>Open ›</em></button>}
       {open === 'how' && createPortal(<Modal open onClose={() => setOpen(null)} title="How the 3 buckets work" maxWidth="max-w-2xl" maxHeight="max-h-[90vh]"><BucketHowItWorks /></Modal>, document.body)}
       {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
         <div className="space-y-3">
@@ -462,7 +465,7 @@ export function RetirementActions({ goal }) {
           )}
         </Modal>
       </>, document.body)}
-    </div>
+    </>
   )
 }
 

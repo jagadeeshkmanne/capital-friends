@@ -3,6 +3,7 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
+import { List, Layers } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { RetirementActions } from './RetirementBucketsPage'
 
@@ -201,6 +202,7 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
 }
 
 function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, closeGoal, navigate }) {
+  const [show, setShow] = useState(null)
   const g = p.goal
   const retired = p.isRet && p.years <= 0
   const due = p.state === 'due' && !p.isRet
@@ -231,15 +233,19 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
           note={protect ? `⚠ Too much equity for ${p.years < 1 ? 'a few months' : `${Math.round(p.years * 2) / 2} years`} left: see "Make it safer" at the top.` : mostlyRet ? `Mostly EPF / PPF / NPS (${L(retOnly)}), which count as debt and stay for retirement. Your equity is counted in your other goals' share.` : null} />
       })()}
       {due && ready && <ReadyStep s={ready} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />}
-      {items.length > 0 && (
-        <details><summary>Investments in this goal ({items.length})</summary>
-          {items.map((it, i) => { const t = tagOf(it); return (
-            <div key={i} className="g2-fd"><b>{it.kind === 'mf' ? fname(it.holding) : it.kind === 'stock' ? (it.holding.symbol || it.holding.stockName) : mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}<span className={`g2-tag ${t[0]}`}>{t[1]}</span></b><span className="v">{L(it.value)}</span>
-              <small>{it.kind === 'other' ? (/epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? 'retirement only · never sold' : 'other investments') : pname(it.portfolioId)}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% of it for this goal` : ''}</small></div>) })}
-        </details>
-      )}
-      {p.isRet && <div className="g2-ract"><RetirementActions goal={p.goal} /></div>}
-      {p.isRet && <details><summary>Your buckets today {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
+      {p.isRet && <RetirementActions goal={p.goal} slot="alert" />}
+      {/* one row of small buttons (like the app's other buttons); the lists open below */}
+      <div className="g2-pills">
+        {items.length > 0 && <button type="button" className="g2-pill" onClick={() => setShow('inv')}><List size={14} /> Investments ({items.length})</button>}
+        {p.isRet && <button type="button" className="g2-pill" onClick={() => setShow('bk')}><Layers size={14} /> Buckets today</button>}
+        {p.isRet && <RetirementActions goal={p.goal} slot="pills" />}
+      </div>
+      {show === 'inv' && createPortal(<Modal open onClose={() => setShow(null)} title={`${mt(g.goalName)} · investments (${items.length})`} wide maxHeight="max-h-[90vh]"><div className="g2 g2-dlg">
+        {items.map((it, i) => { const t = tagOf(it); return (
+          <div key={i} className="g2-fd"><b>{it.kind === 'mf' ? fname(it.holding) : it.kind === 'stock' ? (it.holding.symbol || it.holding.stockName) : mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}<span className={`g2-tag ${t[0]}`}>{t[1]}</span></b><span className="v">{L(it.value)}</span>
+            <small>{it.kind === 'other' ? (/epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? 'retirement only · never sold' : 'other investments') : pname(it.portfolioId)}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% of it for this goal` : ''}</small></div>) })}
+      </div></Modal>, document.body)}
+      {show === 'bk' && createPortal(<Modal open onClose={() => setShow(null)} title={`Your buckets today · ${retired ? 'living from them' : p.bucketMode ? 'filling now' : `filling starts in ${yearOf(g) - 5}`}`} wide maxHeight="max-h-[90vh]"><div className="g2 g2-dlg"><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} /></div></Modal>, document.body)}
     </div>
   )
 }
@@ -500,6 +506,11 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 @keyframes g2due{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--warn) 0%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--warn) 22%,transparent)}}
 @keyframes g2blink{0%,100%{opacity:1}50%{opacity:.25}}
 @media(prefers-reduced-motion:reduce){.g2-lrow.due,.g2-dot{animation:none}}
+.g2-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.g2-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;font-size:12px;font-weight:600;color:#a78bfa;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:color .15s,border-color .15s}[data-theme="light"] .g2-pill{color:#7c3aed}
+.g2-pill:hover{color:#c4b5fd}.g2-pill.on{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-pill .cv{transition:transform .2s;opacity:.7}.g2-pill.on .cv{transform:rotate(180deg)}
+.g2-open{margin-top:10px;padding:4px 12px 10px;border:1px solid var(--border);border-radius:12px;background:var(--bg-inset)}
+.g2-dlg{display:block;gap:0}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
