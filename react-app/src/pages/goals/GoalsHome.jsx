@@ -240,7 +240,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
       {due && ready && <ReadyStep s={ready} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />}
       {p.isRet && <RetirementActions goal={p.goal} slot="alert" />}
       {/* one row of small buttons (like the app's other buttons); the lists open below */}
-      {p.has < 1 && p.state === 'short' && <p className="g2-hint" style={{ marginTop: 10 }}>Nothing is set aside yet: goals with a higher priority use the money first. To share it with them, give this goal the same priority in Edit goals.</p>}
+      {p.has < 1 && p.state === 'short' && <p className="g2-hint" style={{ marginTop: 10 }}>Nothing set aside yet: your money isn't enough for every goal today, and goals with a higher priority get it first. Want this one funded too? Give it the same priority as them in Edit goals, and they'll share the money.</p>}
       {(items.length > 0 || p.isRet) && <div className="g2-pills">
         {items.length > 0 && <button type="button" className="g2-pill" onClick={() => setShow('inv')}><List size={14} /> Investments ({items.length})</button>}
         {p.isRet && <button type="button" className="g2-pill" onClick={() => setShow('bk')}><Layers size={14} /> Buckets today</button>}

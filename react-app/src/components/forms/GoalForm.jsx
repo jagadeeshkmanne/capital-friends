@@ -544,6 +544,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
         <FormField label="Priority">
           <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
+          <p className="text-[11px] text-[var(--text-dim)] mt-1">If your money can't cover all goals today: High goals get it first, then Medium, then Low. Goals with the same priority share it equally (the same % of what each needs). The emergency fund always comes first.</p>
         </FormField>
         <FormField label="Notes">
           <FormTextarea value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." rows={2} />
@@ -616,6 +617,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             </FormField>
             <FormField label="Priority">
               <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
+          <p className="text-[11px] text-[var(--text-dim)] mt-1">If your money can't cover all goals today: High goals get it first, then Medium, then Low. Goals with the same priority share it equally (the same % of what each needs). The emergency fund always comes first.</p>
             </FormField>
           </div>
         </div>
