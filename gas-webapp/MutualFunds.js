@@ -1053,9 +1053,12 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
     }
 
     // Portfolio sheet: Row 1=Watermark, Row 2=Group headers, Row 3=Column headers, Row 4+=Data
-    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH + T=Lumpsum Restricted + U=SIP Restricted = 21 cols max
-    var maxCol = Math.min(portfolioSheet.getLastColumn(), 21);
+    // A-P (16 cols) + Q=Portfolio ID (hidden) + R=ATH NAV + S=% Below ATH + T=Lumpsum Restricted + U=SIP Restricted
+    // + V=Original Target % (the user's own target, kept while a goal sets the targets) = 22 cols max
+    var maxCol = Math.min(portfolioSheet.getLastColumn(), 22);
     var data = portfolioSheet.getRange(4, 1, lastRow - 3, maxCol).getValues();
+    // column V is read only when it is ours (header "Original Target %"), never a column the user uses for notes
+    var hasOrig = maxCol >= 22 && /^original/i.test(String(portfolioSheet.getRange(3, 22).getValue() || ''));
 
     var funds = [];
     for (var i = 0; i < data.length; i++) {
@@ -1082,6 +1085,7 @@ function getPortfolioFunds(portfolioId, portfoliosList) {
           belowATHPct: maxCol >= 19 ? (parseFloat(row[18]) || 0) : 0,
           lumpsumRestricted: maxCol >= 20 ? (row[19] === true || row[19] === 'TRUE' || row[19] === 'true') : false,
           sipRestricted: maxCol >= 21 ? (row[20] === true || row[20] === 'TRUE' || row[20] === 'true') : false,
+          originalTargetPct: hasOrig && row[21] !== '' && row[21] !== null ? (parseFloat(row[21]) || 0) : null,
           navDate: '',
           portfolioId: portfolioId
         });

@@ -67,8 +67,10 @@ export default function App() {
           <Route path="liabilities" element={<LiabilitiesTab />} />
 
           {/* Goals */}
-          <Route path="goals" element={<GoalsPage />} />
-          <Route path="goals/plan" element={<GoalsPlanPage />} />
+          {/* the goals road is the main Goals page; the classic page stays for adding, editing and linking goals */}
+          <Route path="goals" element={<GoalsPlanPage />} />
+          <Route path="goals/classic" element={<GoalsPage />} />
+          <Route path="goals/plan" element={<Navigate to="/goals" replace />} />
           <Route path="goals/plan/:goalId" element={<GoalsPlanPage />} />
           <Route path="retirement-buckets" element={<RetirementBucketsPage />} />
 

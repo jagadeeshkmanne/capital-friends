@@ -1,7 +1,7 @@
-// New Goals view (beta, /goals/plan): one road for all goals, this month's steps from today's fund
+// Main Goals page (/goals, goal detail at /goals/plan/:goalId; the classic page is /goals/classic): one road for all goals, this month's steps from today's fund
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
 // All numbers come from utils/goalPlan.js (tested in goalPlan.test.js).
-import { useMemo, useRef, useLayoutEffect, useState } from 'react'
+import { useMemo, useRef, useLayoutEffect, useState, useId } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useData } from '../../context/DataContext'
@@ -10,6 +10,9 @@ import { useMaskText } from '../../hooks/useMaskText'
 import PageLoading from '../../components/PageLoading'
 import { attributeFamilyGoals, equityFraction } from '../../utils/goalAttribution'
 import { buildGoalPlan } from '../../utils/goalPlan'
+import { allPortfolioTargets, TARGET_BAND } from '../../utils/goalTargets'
+import Modal from '../../components/Modal'
+import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 
 const L = (v) => (v ? formatINR(Math.round(v)) : '—')
 const U = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -25,7 +28,15 @@ export default function GoalsPlanPage() {
   const navigate = useNavigate()
   const mt = useMaskText()
   const { selectedMember } = useFamily()
-  const { goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios } = useData()
+  const { goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList } = useData()
+  // net worth, worked out the same way as the Goals page header
+  const netWorth = useMemo(() => {
+    const act = (l) => (l || []).filter((x) => x.status === 'Active')
+    const mfIds = new Set(act(mfPortfolios).map((p) => p.portfolioId)), stIds = new Set(act(stockPortfolios).map((p) => p.portfolioId))
+    const sum = (l, k) => l.reduce((t, x) => t + (Number(x[k]) || 0), 0)
+    return sum((mfHoldings || []).filter((h) => mfIds.has(h.portfolioId) && h.units > 0), 'currentValue') + sum((stockHoldings || []).filter((h) => stIds.has(h.portfolioId)), 'currentValue')
+      + sum(act(otherInvList), 'currentValue') + sum(act(banks), 'balance') - sum(act(liabilityList), 'outstandingBalance')
+  }, [mfHoldings, stockHoldings, otherInvList, banks, liabilityList, mfPortfolios, stockPortfolios])
 
   const allocMap = useMemo(() => { const m = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) m[a.fundCode] = a.assetAllocation }); return m }, [assetAllocations])
   const active = useMemo(() => (goalList || []).filter((g) => g.isActive !== false), [goalList])
@@ -33,28 +44,82 @@ export default function GoalsPlanPage() {
     if (!goalList) return null
     // every active goal takes part, so shared portfolios are split the same way for all members
     const attribution = attributeFamilyGoals({ goals: active, mappings: goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap })
-    return buildGoalPlan({ goals: active, attribution, mfHoldings, mappings: goalPortfolioMappings, eqOf: (h) => equityFraction(h, allocMap) })
+    const eqOf = (h) => equityFraction(h, allocMap)
+    const plan0 = buildGoalPlan({ goals: active, attribution, mfHoldings, mappings: goalPortfolioMappings, eqOf })
+    // portfolios with fund targets: the glide path moves the targets, and ONE rebalance does the moves,
+    // so a goal shows "Rebalance <portfolio>" instead of its own fund-to-fund switches
+    const managed = {}
+    for (const x of allPortfolioTargets({ goals: active, mappings: goalPortfolioMappings, mfHoldings, eqOf, attribution })) {
+      if (!['ok', 'update'].includes(x.status)) continue
+      const hs = (mfHoldings || []).filter((h) => h.portfolioId === x.portfolioId && Number(h.units) > 0)
+      const v = hs.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
+      const actEq = v > 0 ? hs.reduce((t, h) => t + (Number(h.currentValue) || 0) * eqOf(h), 0) / v * 100 : null
+      managed[x.portfolioId] = { ...x, actEq, pending: actEq != null && Math.abs(actEq - x.needEq) >= TARGET_BAND }
+    }
+    for (const p of plan0.goals) {
+      const pids = new Set()
+      p.steps = p.steps.filter((st) => { if (st.t === 'switch' && managed[st.portfolioId]) { pids.add(st.portfolioId); return false } return true })
+      for (const it of p.att.items || []) if (managed[it.portfolioId]?.pending) pids.add(it.portfolioId)
+      for (const pid of pids) if (managed[pid]?.pending) p.steps.unshift({ t: 'rebalance', portfolioId: pid, needEq: managed[pid].needEq, actEq: managed[pid].actEq })
+    }
+    return plan0
   }, [goalList, active, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap])
+  const [rebal, setRebal] = useState(null)
 
   if (!plan) return <PageLoading title="Loading goals" />
   const shown = plan.goals.filter((p) => selectedMember === 'all' || p.goal.familyMemberId === selectedMember)
   const pname = (pid) => mt(((mfPortfolios || []).find((x) => x.portfolioId === pid)?.portfolioName || '').replace(/^PFL-/, ''))
-  const ctx = { mt, navigate, pname }
+  const ctx = { mt, navigate, pname, netWorth, openRebalance: setRebal }
   const sel = goalId ? plan.goals.find((p) => p.goal.goalId === goalId) : null
 
   return (
     <div className="gp space-y-4">
       <style>{CSS}</style>
+      <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
       <div className="gp-bar">
         <div>
-          <h1>{sel ? <a className="gp-back" onClick={() => navigate('/goals/plan')}>← All goals</a> : 'My goals'}</h1>
-          <p>Steps are worked out from your own funds and your glide path · <a className="gp-link" onClick={() => navigate('/goals')}>Old goals page</a></p>
+          <h1>{sel ? <a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a> : 'My goals'}</h1>
+          <p>Steps are worked out from your own funds and your glide path · <a className="gp-link" onClick={() => navigate('/goals/classic')}>Classic view</a></p>
         </div>
-        <span className="gp-beta">New view · beta</span>
+        <span className="gp-acts">
+          <button className="gp-btn gp-btn-s" onClick={() => navigate('/goals/classic')}>Edit &amp; link goals</button>
+          <button className="gp-btn gp-btn-s gp-btn-p" onClick={() => navigate('/goals/classic?add=1')}>+ Add goal</button>
+        </span>
       </div>
       {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalList plans={shown} all={plan} ctx={ctx} />}
       <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. A switch shows only when a goal is 5 points or more away from its target equity. No fund recommendations.</p>
     </div>
+  )
+}
+
+/** Same header as the Goals page: net worth split, then target, have, gap, progress and SIP OR lump sum. */
+function GoalsHeader({ plans, netWorth }) {
+  const target = plans.reduce((t, p) => t + p.target, 0), has = plans.reduce((t, p) => t + p.has, 0)
+  const short = plans.filter((p) => p.lumpToday > 0)
+  const sipNeed = short.reduce((t, p) => t + (p.sipNeeded || 0), 0), lump = short.reduce((t, p) => t + p.lumpToday, 0)
+  const nw = Math.max(netWorth || 0, 0), free = Math.max(0, nw - has), pc = (v) => (nw > 0 ? Math.round((v / nw) * 100) : 0)
+  const prog = target > 0 ? (has / target) * 100 : 0
+  return (
+    <>
+      <div className="gp-panel gp-nw">
+        <div><span className="gp-lbl">Total net worth</span><b className="gp-nwv">{L(nw)}</b></div>
+        <div className="gp-nws">
+          <div><span><i style={{ background: '#8b5cf6' }} />Allocated to goals</span><b style={{ color: 'var(--accent-violet)' }}>{L(has)} <small>({pc(has)}%)</small></b></div>
+          <div><span><i style={{ background: 'var(--border)' }} />Unallocated surplus</span><b>{L(free)} <small>({pc(free)}%)</small></b></div>
+        </div>
+      </div>
+      <div className="gp-tiles">
+        <div className="gp-tile"><span className="gp-lbl">Target</span><b>{L(target)}</b></div>
+        <div className="gp-tile"><span className="gp-lbl">Current value</span><b>{L(has)}</b></div>
+        <div className="gp-tile"><span className="gp-lbl">Gap</span><b style={{ color: 'var(--accent-amber)' }}>{L(Math.max(0, target - has))}</b></div>
+        <div className="gp-tile"><span className="gp-lbl">Progress</span><b style={{ color: 'var(--accent-amber)' }}>{prog.toFixed(1)}%</b><small>{plans.length} goal{plans.length > 1 ? 's' : ''}</small></div>
+        <div className="gp-tile gp-tile-or">
+          <div><span className="gp-lbl">SIP / month</span><b style={{ color: 'var(--accent-violet)' }}>{sipNeed ? L(sipNeed) : '—'}</b><small>{short.length ? `for ${short.length} short goal${short.length > 1 ? 's' : ''}` : 'all goals covered'}</small></div>
+          <em>OR</em>
+          <div style={{ textAlign: 'right' }}><span className="gp-lbl">Lump sum today</span><b style={{ color: 'var(--accent-amber)' }}>{lump ? L(lump) : '—'}</b><small>{short.length ? 'one time' : '\u00a0'}</small></div>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -64,18 +129,13 @@ function GoalList({ plans, all, ctx }) {
   const tot = plans.reduce((s, p) => s + p.has, 0), sip = plans.reduce((s, p) => s + p.sip, 0)
   const withSteps = plans.filter((p) => realSteps(p).length)
   let n = 0
-  if (!plans.length) return <div className="gp-panel"><p className="gp-hs">No goals yet. Create one on the <a className="gp-link" onClick={() => navigate('/goals')}>Goals page</a>.</p></div>
+  if (!plans.length) return <div className="gp-panel"><p className="gp-hs">No goals yet. <a className="gp-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p></div>
   return (
     <>
-      <div className="gp-panel gp-sum">
-        <div><span>Goals</span><b>{plans.length}</b></div>
-        <div><span>Saved for goals</span><b>{L(tot)}</b></div>
-        <div><span>SIP today</span><b>{L(sip)}/mo</b></div>
-        <div><span>Need a step</span><b>{withSteps.length} of {plans.length}</b></div>
-      </div>
+      <GoalsHeader plans={plans} netWorth={ctx.netWorth} />
 
       <div className="gp-panel">
-        <div className="gp-ph"><h2>This month · what to do</h2><span className="gp-hs">{withSteps.reduce((s, p) => s + realSteps(p).length, 0)} steps across {withSteps.length} goals · from today's fund values</span></div>
+        <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{(() => { const k = withSteps.reduce((s, p) => s + realSteps(p).length, 0); return `${k} step${k === 1 ? '' : 's'} for ${withSteps.length} goal${withSteps.length === 1 ? '' : 's'} this month · based on today's fund values` })()}</span></div>
         {withSteps.length ? <>
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
           {withSteps.map((p) => {
@@ -85,7 +145,7 @@ function GoalList({ plans, all, ctx }) {
                 <div className="gp-gh" onClick={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)}>
                   <span>{icon(p.goal)}</span><b>{mt(p.goal.goalName)}</b><Dot c={sc}>{stt}</Dot><span className="gp-go">Open ›</span>
                 </div>
-                {realSteps(p).map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} />)}
+                {realSteps(p).map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} />)}
               </div>
             )
           })}
@@ -118,24 +178,117 @@ function GoalList({ plans, all, ctx }) {
   )
 }
 
+const JAR_COL = { inc: '#10b981', stb: '#f59e0b', grw: '#8b5cf6' }
+/** A jar like the buckets page: the fill shows how big that bucket is next to the others. */
+function Jar({ cls, f }) {
+  const c = JAR_COL[cls], h = 92, top = 16, fh = Math.max(8, Math.min(1, f) * (h - top - 6))
+  const cid = 'jc' + useId().replace(/:/g, '')
+  return (
+    <svg className="gp-jar" width="64" height={h + 6} viewBox={`0 0 64 ${h + 6}`} aria-hidden="true">
+      <rect x="14" y="2" width="36" height="9" rx="3" fill={c} opacity=".85" />
+      <rect x="8" y={top - 4} width="48" height={h - top + 8} rx="12" fill="none" stroke={c} strokeOpacity=".55" strokeWidth="2" />
+      <clipPath id={cid}><rect x="10" y={top - 2} width="44" height={h - top + 4} rx="10" /></clipPath>
+      <rect x="10" y={h + 2 - fh} width="44" height={fh} fill={c} opacity=".85" clipPath={`url(#${cid})`} />
+      <rect x="16" y={h + 6 - fh} width="5" height={Math.max(0, fh - 12)} rx="2.5" fill="#fff" opacity=".25" />
+    </svg>
+  )
+}
+
+/** Retirement goals: the 3 buckets the money moves into in the last 5 years, and a way to open the full buckets page. */
+function BucketsPanel({ p, onOpen }) {
+  const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal')
+  const b = stop?.bucket
+  const start = p.bucketMode ? 'now' : stop?.y0 ? String(stop.y0) : null
+  const growth = b?.monthly ? Math.max(0, p.target - b.income - b.stability) : 0
+  const tot = b?.monthly ? b.income + b.stability + growth : 0
+  const fill = { inc: tot ? b.income / tot : 0.25, stb: tot ? b.stability / tot : 0.45, grw: tot ? growth / tot : 0.8 }
+  const box = (cls, name, sub, v) => <div className={`gp-bk ${cls}`}><Jar cls={cls} f={fill[cls]} /><span>{name}</span><b>{v ? L(v) : '—'}</b><small>{sub}</small></div>
+  return (
+    <div className="gp-panel">
+      <div className="gp-ph"><h2>Retirement buckets</h2><span className="gp-hs">{p.bucketMode ? 'You are in the last 5 years: your money now follows the 3 buckets.' : `Your money moves into 3 buckets from ${start || 'the last 5 years'}, 5 years before you retire. Until then it follows the road below.`}</span></div>
+      <div className="gp-bks">
+        {box('inc', 'Income', '2 years of expenses · safe', b?.income)}
+        {box('stb', 'Stability', '5 years of expenses · hybrid / debt', b?.stability)}
+        {box('grw', 'Growth', 'the rest · equity', growth)}
+      </div>
+      {b?.monthly ? <p className="gp-foot">Based on your monthly expense in retirement of about {L(b.monthly)}. Amounts are for the goal amount of {L(p.target)}.</p> : null}
+      <button className="gp-btn" onClick={onOpen}>{p.bucketMode ? 'Open retirement buckets ›' : 'Preview your buckets ›'}</button>
+    </div>
+  )
+}
+
+const pctSaved = (p) => (p.target > 0 ? Math.min(100, Math.round((p.has / p.target) * 100)) : 0)
+
+/** Small ring around the goal icon: how much of the goal amount is saved. */
+function Ring({ p, big }) {
+  const z = big ? 48 : 42, sw = 4, r = (z - sw) / 2, c = 2 * Math.PI * r, f = pctSaved(p) / 100
+  const col = p.state === 'short' ? 'var(--accent-amber)' : '#16a34a'
+  return (
+    <span className="gp-ring" style={{ width: z, height: z }} title={`${pctSaved(p)}% of the goal saved`}>
+      <svg width={z} height={z} viewBox={`0 0 ${z} ${z}`}>
+        <circle cx={z / 2} cy={z / 2} r={r} fill="none" stroke="var(--border)" strokeWidth={sw} />
+        <circle cx={z / 2} cy={z / 2} r={r} fill="none" stroke={col} strokeWidth={sw} strokeLinecap="round" strokeDasharray={`${c * f} ${c}`} transform={`rotate(-90 ${z / 2} ${z / 2})`} />
+      </svg>
+      <span className="gp-ring-v">{pctSaved(p)}%</span>
+    </span>
+  )
+}
+
+/** Equity / debt of the goal's money today vs what its glide path wants. */
+function MixRow({ p }) {
+  if (p.eqNow == null) return null
+  const off = Math.abs(p.eqNow - p.eqTarget) >= 5
+  return (
+    <div className="gp-mix">
+      <span><i style={{ background: '#8b5cf6' }} />Equity {p.eqNow}%</span>
+      <span><i style={{ background: '#38bdf8' }} />Debt {100 - p.eqNow}%</span>
+      <span className="gp-mix-t">Plan {p.eqTarget} : {100 - p.eqTarget} <b style={{ color: off ? 'var(--accent-amber)' : 'var(--accent-green)' }}>{off ? 'off by ' + Math.abs(p.eqNow - p.eqTarget) : '✓'}</b></span>
+    </div>
+  )
+}
+
+const goalCells = (p, gp) => [
+  ['Goal amount', L(p.target)], ['Have today', L(p.has)],
+  ['Should have today', L(p.need)], ['Gap', <span style={{ color: gp[1] }}>{gp[0]}</span>],
+]
+
+/** What the goal needs today: a monthly SIP, OR one lump sum. Shown only when the goal is short. */
+function NeedRow({ p }) {
+  const running = p.sip ? `${L(p.sip)}/mo` : 'none'
+  if (!(p.lumpToday > 0)) return <div className="gp-need-ok">✓ Covered{p.sip ? ` · keep your SIP ${L(p.sip)}/mo` : ''}</div>
+  return (
+    <div className="gp-need">
+      <div className="gp-nb sip"><span>SIP needed / month</span><b>{L(p.sipNeeded)}</b><small>Running now: {running}</small></div>
+      <em>OR</em>
+      <div className="gp-nb lump"><span>Lump sum today</span><b>{L(p.lumpToday)}</b><small>One time, instead</small></div>
+    </div>
+  )
+}
+
 function GoalCard({ p, mt, navigate }) {
   const [stt, sc] = STATUS[p.status], gp = gapTxt(p)
   const next = p.road.find((r) => r.k !== 'today' && r.k !== 'quiet')
   const nextTxt = next && ({ safer: 'Make safer', ease: 'Equity starts easing', bucket: 'Start retirement buckets', goal: p.isRet ? 'Retire' : 'Goal year', spend: 'Live from buckets' }[next.k])
   return (
     <div className="gp-vc" onClick={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)}>
-      <div className="gp-vh"><span className="gp-em">{icon(p.goal)}</span><div><b>{mt(p.goal.goalName)}</b><span>Due {new Date(p.goal.targetDate).getFullYear()} · {p.yearsLeft} yrs left</span></div><Dot c={sc}>{stt}</Dot></div>
-      <Grid cells={[['Goal amount', L(p.target)], ['Have today', L(p.has)], ['Should have today', L(p.need)], ['Gap', <span style={{ color: gp[1] }}>{gp[0]}</span>],
-        ['SIP today', <>{L(p.sip)}<small>/mo</small></>], ['Lump sum today', p.lumpToday ? L(p.lumpToday) : <small>not needed</small>]]} />
+      <div className="gp-vh"><Ring p={p} /><div><b>{icon(p.goal)} {mt(p.goal.goalName)}</b><span>Due {new Date(p.goal.targetDate).getFullYear()} · {p.yearsLeft} yrs left</span></div><Dot c={sc}>{stt}</Dot></div>
+      <Grid cells={goalCells(p, gp)} />
+      <MixRow p={p} />
+      <NeedRow p={p} />
       <div className="gp-vf"><span>{realSteps(p).length ? `${realSteps(p).length} step${realSteps(p).length > 1 ? 's' : ''} this month ↑` : p.bucketMode ? 'Follow your retirement buckets' : '✓ Nothing to do'}</span>{next && <span>Next · {next.y0 || next.y} {nextTxt}</span>}</div>
     </div>
   )
 }
 
 /* ───────── one step as a row: Action | From → To | Amount ───────── */
-function StepRow({ s, p, n, mt, pname }) {
-  let k, fr, to, am, amS
-  if (s.t === 'switch') {
+function StepRow({ s, p, n, mt, pname, onRebalance }) {
+  let k, fr, to, am, amS, extra = null
+  if (s.t === 'rebalance') {
+    k = 'Rebalance'
+    fr = [pname(s.portfolioId) || 'This portfolio', `Equity ${Math.round(s.actEq)}% today`]
+    to = ['Its new targets', `${Math.round(s.needEq)}% equity for its goals`]
+    am = <button className="gp-btn gp-btn-s" onClick={(e) => { e.stopPropagation(); onRebalance?.(s.portfolioId) }}>See moves ›</button>; amS = 'Adjust SIP, lumpsum or switch · import CAS after'
+  } else if (s.t === 'switch') {
     k = 'Switch'
     fr = [fname(s.from), s.units != null ? `Sell ${U(s.units)} units` : `Sell about ${L(s.sellValue)}`]
     to = [fname(s.to), 'Buy with the money']
@@ -145,22 +298,26 @@ function StepRow({ s, p, n, mt, pname }) {
     const from = (s.from || []).map((x) => `${L(x.amount)} from ${mt(x.goal.goalName)}`).join(' + ')
     const newMoney = s.amount - (s.from || []).reduce((a, x) => a + x.amount, 0)
     fr = [newMoney >= 500 ? 'Your bank' : 'Moved SIP', from ? (newMoney >= 500 ? `${from} + ${L(newMoney)} new` : from) : 'New monthly SIP']
-    to = [s.fund ? fname(s.fund) : (s.wantEq ? 'An equity fund in this goal' : 'A safe fund in this goal'), `Goal SIP ${L(s.sipFrom)} → ${L(s.sipTo)}`]
+    const many = (s.split || []).length > 1
+    to = [many ? `${s.split.length} funds in this goal` : s.fund ? fname(s.fund) : (s.wantEq ? 'An equity fund in this goal' : 'A safe fund in this goal'),
+      (s.sipFrom ? `Goal SIP ${L(s.sipFrom)} → ${L(s.sipTo)}/mo` : `New SIP ${L(s.sipTo)}/mo`) + (many ? ' · below-target funds first, then by target %' : '')]
+    extra = many ? s.split : null
     am = `+${L(s.amount)}`; amS = `per month · or ${L(s.lump)} once`
   } else {
     k = 'Move SIP'
-    fr = [mt(p.goal.goalName), `SIP ${L(s.sipFrom)} → ${L(s.sipTo)}`]
+    fr = [mt(p.goal.goalName), s.sipTo ? `SIP ${L(s.sipFrom)} → ${L(s.sipTo)}` : `Stop SIP ${L(s.sipFrom)}`]
     to = [mt(s.to.goalName), `SIP +${L(s.amount)}`]
     am = L(s.amount); amS = 'per month'
   }
   const cell = (c) => <div className="gp-cell"><b>{c[0]}</b><span>{c[1]}</span></div>
-  const [a1, a2] = amS.split(' · ')
+  const [a1, a2] = String(amS).split(' · ')
   return (
     <div className="gp-row">
       <span className="gp-num">{n}</span><span className="gp-k">{k}</span>
       {cell(fr)}<span className="gp-ar">→</span>{cell(to)}
       <div className="gp-am"><b>{am}</b><span>{a1}{a2 && <><br />{a2}</>}</span></div>
       <div className="gp-mflow">{cell(fr)}<span className="gp-ar2">↓</span>{cell(to)}</div>
+      {extra && <div className="gp-split">{extra.map((x) => <span key={(x.fund.schemeCode || x.fund.fundCode) + x.fund.portfolioId}><b>₹{Math.round(x.amount).toLocaleString('en-IN')}</b>/mo → {fname(x.fund)}</span>)}</div>}
     </div>
   )
 }
@@ -180,20 +337,22 @@ function GoalDetail({ p, ctx }) {
   return (
     <>
       <div className="gp-panel">
-        <div className="gp-vh gp-hero"><span className="gp-em">{icon(g)}</span><div><b>{mt(g.goalName)}</b><span>Due {new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · {p.yearsLeft} years left</span></div><Dot c={sc}>{stt}</Dot></div>
-        <Grid six cells={[['Goal amount', L(p.target)], ['Have today', L(p.has)], ['Should have today', L(p.need)], ['Gap', <span style={{ color: gp[1] }}>{gp[0]}</span>],
-          ['SIP today', p.sip ? `${L(p.sip)}/mo` : 'None'], ['Lump sum today', p.lumpToday ? L(p.lumpToday) : <small>not needed</small>]]} />
+        <div className="gp-vh gp-hero"><Ring p={p} big /><div><b>{icon(g)} {mt(g.goalName)}</b><span>Due {new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · {p.yearsLeft} years left</span></div><Dot c={sc}>{stt}</Dot></div>
+        <Grid six four cells={goalCells(p, gp)} />
+        <MixRow p={p} />
+        <NeedRow p={p} />
       </div>
 
       <div className="gp-panel">
-        <div className="gp-ph"><h2>Your plan's next step</h2><span className="gp-hs">{p.bucketMode ? 'In the last 5 years before retirement your money follows the retirement buckets.' : `Equity ${p.eqNow ?? '—'}%, your glide path says ${p.eqTarget}% · a switch shows only when it is 5 points or more off`}</span></div>
+        <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{p.bucketMode ? 'In the last 5 years before retirement your money follows the retirement buckets.' : `Equity ${p.eqNow ?? '—'}%, your glide path says ${p.eqTarget}% · a switch shows only when it is 5 points or more off`}</span></div>
         {st.length ? <>
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
-          <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} />)}</div>
+          <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} />)}</div>
           <p className="gp-foot">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p>
         </> : <div className="gp-ok">✓ Nothing to do now. Keep SIP {L(p.sip)}/month.</div>}
-        {p.bucketMode && <button className="gp-btn" onClick={() => navigate(`/retirement-buckets?goal=${encodeURIComponent(g.goalId)}`)}>Open retirement buckets ›</button>}
       </div>
+
+      {p.isRet && <BucketsPanel p={p} onOpen={() => navigate(`/retirement-buckets?goal=${encodeURIComponent(g.goalId)}`)} />}
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Funds in this goal</h2><span className="gp-hs">{p.att.items.length} holdings · {L(p.att.total)}{fundsEq !== null && ` · ${fundsEq}% equity, ${100 - fundsEq}% safe`}</span></div>
@@ -209,7 +368,7 @@ function GoalDetail({ p, ctx }) {
               </div>
             )
           })}
-        </div> : <div className="gp-ok">No investments linked yet. Link them on the <a className="gp-link" onClick={() => navigate('/goals')}>Goals page</a>.</div>}
+        </div> : <div className="gp-ok">No investments linked yet. Link them in <a className="gp-link" onClick={() => navigate('/goals/classic')}>Edit &amp; link goals</a>.</div>}
       </div>
 
       <div className="gp-panel">
@@ -244,7 +403,7 @@ function StopCard({ r, p }) {
 
 /* ───────── small pieces ───────── */
 const Dot = ({ c, children }) => <span className="gp-dot" style={{ '--c': c }}>{children}</span>
-const Grid = ({ cells, six }) => <div className={`gp-grid ${six ? 'six' : ''}`}>{cells.map(([k, v], i) => <div key={i}><span>{k}</span><b>{v}</b></div>)}</div>
+const Grid = ({ cells, six, four }) => <div className={`gp-grid ${six ? 'six' : ''} ${four ? 'four' : ''}`}>{cells.map(([k, v], i) => <div key={i}><span>{k}</span><b>{v}</b></div>)}</div>
 
 /** Vertical road: stops alternate left / right on wide screens, run down the left on phones. */
 function Road({ items }) {
@@ -289,6 +448,7 @@ const CSS = `
 .gp-bar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .gp-bar h1{font-size:22px;font-weight:800;color:var(--text-primary);margin:0}.gp-bar p{font-size:12.5px;color:var(--text-muted);margin:3px 0 0}
 .gp-back{font-size:14px;color:var(--accent-violet)}
+.gp-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gp-btn.gp-btn-p{background:var(--accent-violet);color:#fff;border-color:transparent}
 .gp-beta{font-size:11px;font-weight:700;color:var(--accent-violet);border:1px solid color-mix(in srgb,var(--accent-violet) 40%,transparent);border-radius:99px;padding:4px 10px;white-space:nowrap}
 .gp-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:20px 22px;box-shadow:var(--shadow-card)}
 .gp-panel h2{font-size:16.5px;font-weight:700;color:var(--text-primary);margin:0}
@@ -335,6 +495,31 @@ const CSS = `
 .gp-grid div:last-child:nth-child(odd){grid-column:1/-1;border-right:0}
 .gp-grid>div>span{display:block;font-size:11px;color:var(--text-muted)}.gp-grid b{display:block;font-size:15px;margin-top:2px;color:var(--text-primary);font-variant-numeric:tabular-nums;white-space:nowrap}.gp-grid b small{font-size:11px;color:var(--text-muted);font-weight:500}
 .gp-grid.six{grid-template-columns:repeat(6,1fr);background:var(--bg-inset)}.gp-grid.six div{border-top:0!important;border-right:0;border-left:1px solid var(--border)}.gp-grid.six div:first-child{border-left:0}
+.gp-need{display:flex;align-items:stretch;gap:10px;margin-top:10px}.gp-need>em{align-self:center;font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
+.gp-nb{flex:1;min-width:0;border-radius:12px;padding:10px 12px;text-align:center;display:flex;flex-direction:column;gap:2px;border:1px solid}
+.gp-nb span{font-size:11px;font-weight:600}.gp-nb b{font-size:17px;color:var(--text-primary)}.gp-nb small{font-size:10.5px;color:var(--text-muted)}
+.gp-nb.sip{background:color-mix(in srgb,#8b5cf6 10%,transparent);border-color:color-mix(in srgb,#8b5cf6 35%,transparent)}.gp-nb.sip span{color:var(--accent-violet)}
+.gp-nb.lump{background:color-mix(in srgb,#f59e0b 9%,transparent);border-color:color-mix(in srgb,#f59e0b 35%,transparent)}.gp-nb.lump span{color:var(--accent-amber)}
+.gp-ring{position:relative;flex-shrink:0;display:inline-block}.gp-ring>svg{position:absolute;inset:0}.gp-ring>span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-primary)}
+.gp-pct{color:var(--text-primary);font-weight:600}
+.gp-mix{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:10px;font-size:12px;color:var(--text-secondary,var(--text-muted))}.gp-mix i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.gp-mix-t{margin-left:auto;color:var(--text-muted)}
+.gp-lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.gp-nw{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.gp-nwv{display:block;font-size:26px;margin-top:4px;color:var(--text-primary)}
+.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
+.gp-tiles{display:grid;grid-template-columns:repeat(4,1fr) 2fr;gap:12px;margin-bottom:16px}
+.gp-tile{border:1px solid var(--border);background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}.gp-tile b{font-size:17px;color:var(--text-primary);font-variant-numeric:tabular-nums}.gp-tile small{font-size:12px;color:var(--text-muted)}
+.gp-tile-or{flex-direction:row;align-items:center;justify-content:space-between}.gp-tile-or>div{display:flex;flex-direction:column;gap:4px}.gp-tile-or>em{font-style:normal;font-size:12px;font-weight:700;color:var(--text-muted)}
+@media(max-width:900px){.gp-tiles{grid-template-columns:1fr 1fr}.gp-tile-or{grid-column:1/-1}}
+.gp-bks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.gp-bk{border-radius:12px;padding:12px 14px;border:1px solid;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.gp-jar{margin-bottom:6px}.gp-bk span{font-size:12px;font-weight:700}.gp-bk b{font-size:17px;color:var(--text-primary)}.gp-bk small{font-size:11px;color:var(--text-muted)}
+.gp-bk.inc{background:color-mix(in srgb,#10b981 9%,transparent);border-color:color-mix(in srgb,#10b981 35%,transparent)}.gp-bk.inc span{color:var(--accent-green)}
+.gp-bk.stb{background:color-mix(in srgb,#f59e0b 9%,transparent);border-color:color-mix(in srgb,#f59e0b 35%,transparent)}.gp-bk.stb span{color:var(--accent-amber)}
+.gp-bk.grw{background:color-mix(in srgb,#8b5cf6 10%,transparent);border-color:color-mix(in srgb,#8b5cf6 35%,transparent)}.gp-bk.grw span{color:var(--accent-violet)}
+@media(max-width:640px){.gp-bks{gap:6px}.gp-bk{padding:10px 6px}.gp-bk b{font-size:14px}}
+.gp-btn-s{margin-top:0;padding:5px 10px;font-size:12px}
+.gp-split{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 14px;padding:2px 0 4px 64px;font-size:12px;color:var(--text-muted)}.gp-split b{color:var(--text-primary)}
+@media(max-width:640px){.gp-split{padding-left:8px;flex-direction:column}}
+.gp-need-ok{margin-top:10px;font-size:12px;font-weight:600;color:var(--accent-green)}
+
 .gp-vf{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-muted)}
 .gp-rc.here{border-color:color-mix(in srgb,var(--accent-violet) 45%,transparent)}.gp-rc.fin{border-color:color-mix(in srgb,#22c55e 40%,transparent)}
 .gp-rh{display:flex;justify-content:space-between;align-items:flex-start}.gp-rh b{display:block;font-size:17px;color:var(--text-primary)}.gp-rh small{font-size:11.5px;color:var(--text-muted)}
@@ -362,7 +547,9 @@ const CSS = `
  .gp-stop,.gp-tick{grid-column:1;grid-row:1}.gp-stop{width:36px;height:36px;font-size:15px}.gp-yl{display:none}
  .gp-vc,.gp-rc{max-width:none}.gp-rw .gp-vc:before,.gp-rw .gp-rc:before{left:-13px!important;right:auto!important}
  .gp-grid.six{grid-template-columns:1fr 1fr}.gp-grid.six div{border-left:0!important}.gp-grid.six div:nth-child(even){border-left:1px solid var(--border)!important}.gp-grid.six div:nth-child(n+3){border-top:1px solid var(--border)!important}
- .gp-beta{display:none}
+ .gp-beta{display:none}.gp-acts{width:100%;justify-content:flex-start}
+.gp-grid.six.four{grid-template-columns:repeat(4,1fr)}
+@media(max-width:860px){.gp-grid.six.four{grid-template-columns:1fr 1fr}.gp-grid.six.four div{border-top:0!important;border-left:0!important}.gp-grid.six.four div:nth-child(even){border-left:1px solid var(--border)!important}.gp-grid.six.four div:nth-child(n+3){border-top:1px solid var(--border)!important}}
  .gp-vh{flex-wrap:wrap}.gp-vh .gp-dot{flex-basis:100%;padding-left:46px;margin-top:-2px}
 }
 `

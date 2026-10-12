@@ -162,6 +162,26 @@ function buildJourney(txns, currentValue) {
 }
 
 
+/** Goals a portfolio is linked to. Chips are spans (not buttons) because some rows are buttons themselves. */
+function GoalChips({ pid, big, goalLinks, navigate, mt }) {
+  const l = goalLinks[pid]
+  if (!l?.length) return big ? <span><span className="font-semibold">Goals:</span> not linked</span> : null
+  const open = (e, id) => { e.stopPropagation(); e.preventDefault(); navigate(`/goals/plan/${encodeURIComponent(id)}`) }
+  return (
+    <span className={`inline-flex flex-wrap items-center gap-1 ${big ? '' : 'mt-1'}`}>
+      {big && <span className="font-semibold">Goals:</span>}
+      {l.map((x) => (
+        <span key={x.goal.goalId} role="button" tabIndex={0} title="Open this goal"
+          onClick={(e) => open(e, x.goal.goalId)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') open(e, x.goal.goalId) }}
+          className="cursor-pointer text-[11px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 hover:bg-violet-500/20">
+          🎯 {mt(x.goal.goalName)} · {x.pct}%
+        </span>
+      ))}
+      {big && <span className="text-[11px] text-[var(--text-dim)]">· targets follow these goals</span>}
+    </span>
+  )
+}
+
 export default function MutualFundsPage() {
   const navigate = useNavigate()
   const { selectedMember } = useFamily()
@@ -171,7 +191,7 @@ export default function MutualFundsPage() {
     addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
     investMF, redeemMF, switchMF, updateHoldingAllocations, toggleLumpsumRestricted, toggleSipRestricted,
     deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
-    assetAllocations, updateAssetAllocation,
+    assetAllocations, updateAssetAllocation, goalList, goalPortfolioMappings,
   } = useData()
 
   const { showToast, showBlockUI, hideBlockUI } = useToast()
@@ -179,6 +199,15 @@ export default function MutualFundsPage() {
   const { mv } = useMask()
   const mt = useMaskText()
   const dn = (n) => mt(displayName(n))
+  // goals each portfolio is linked to (with the share), shown on the list and the portfolio page
+  const goalLinks = useMemo(() => {
+    const byId = Object.fromEntries((goalList || []).filter((g) => g.isActive !== false && g.status !== 'Achieved').map((g) => [g.goalId, g]))
+    const m = {}
+    ;(goalPortfolioMappings || []).forEach((x) => { const g = byId[x.goalId]; if (g && Number(x.allocationPct) > 0) (m[x.portfolioId] = m[x.portfolioId] || []).push({ goal: g, pct: Number(x.allocationPct) }) })
+    return m
+  }, [goalList, goalPortfolioMappings])
+  const chipProps = { goalLinks, navigate, mt }
+
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
@@ -852,6 +881,7 @@ export default function MutualFundsPage() {
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
                               <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
+                              <GoalChips pid={p.portfolioId} {...chipProps} />
                             </div>
                             <div className="text-right">
                               <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.currentValue)}</p>
@@ -900,6 +930,7 @@ export default function MutualFundsPage() {
               {selectedPortfolio.sipTarget >= 100 && <span><span className="font-semibold">SIP Target:</span> {formatINR(selectedPortfolio.sipTarget)}/mo</span>}
               {selectedPortfolio.lumpsumTarget >= 100 && <span><span className="font-semibold">Lumpsum Target:</span> {formatINR(selectedPortfolio.lumpsumTarget)}</span>}
               <span><span className="font-semibold">Rebalance Threshold:</span> {(selectedPortfolio.rebalanceThreshold * 100).toFixed(0)}%</span>
+              <GoalChips pid={selectedPortfolio.portfolioId} big {...chipProps} />
             </div>
           )}
           </>)}
@@ -1118,6 +1149,7 @@ export default function MutualFundsPage() {
                           </button>
                         </div>
                         <p className="text-xs text-[var(--text-dim)] mt-0.5">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
+                        <GoalChips pid={p.portfolioId} {...chipProps} />
                         <div className="flex items-center gap-4 mt-2 text-xs tabular-nums">
                           <div>
                             <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Invested</p>

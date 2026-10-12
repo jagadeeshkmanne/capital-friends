@@ -285,6 +285,9 @@ function routeAction(action, params, userRecord) {
       });
     }
 
+    case 'mf:original-targets':
+      return originalTargets(params.portfolioId, params.mode);
+
     case 'asset-allocation:save':
       return processAssetAllocation(params);
 

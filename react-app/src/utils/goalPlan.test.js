@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { needToday, sipForAmount, projectValue, switchSteps, buildGoalPlan, BAND } from './goalPlan'
+import { needToday, sipForAmount, projectValue, switchSteps, buildGoalPlan, BAND, splitSip } from './goalPlan'
 import { attributeGoals, equityFraction } from './goalAttribution'
 
 const NOW = new Date('2026-10-11T00:00:00Z')
@@ -93,8 +93,41 @@ describe('buildGoalPlan', () => {
     expect(r.state).toBe('short')
     const s = r.steps.find((x) => x.t === 'sip'); expect(s.amount).toBeGreaterThan(55000); expect(r.lumpToday).toBeGreaterThan(4000000)
   })
+  it('SIP needed: a short goal needs today\'s SIP plus the extra; a goal with extra needs less than it runs', () => {
+    if (house.state === 'short') expect(Math.abs(house.sipNeeded - (house.sip + house.addSip))).toBeLessThanOrEqual(500)
+    if (kid.state === 'extra') expect(kid.sipNeeded).toBeLessThan(kid.sip)
+    for (const p of plan.goals) expect(p.sipNeeded % 500).toBe(0)
+  })
   it('portfolio view: one portfolio, its equity vs what its goals need together', () => {
     const p1 = plan.portfolios.find((p) => p.portfolioId === 'P1')
     expect(p1.equityPct).toBe(42); expect(p1.targetPct).toBe(30)
+  })
+})
+
+describe('splitSip', () => {
+  it('on target: spreads the SIP by target %, adds up exactly, ₹100 steps', () => {
+    const H = [mf('P', 'PP', 'Equity', 400000), mf('P', 'B', 'Equity', 200000), mf('P', 'C', 'Equity', 200000), mf('P', 'D', 'Debt', 200000)]
+      .map((h, i) => ({ ...h, targetAllocationPct: [40, 20, 20, 20][i] }))
+    const att = { items: H.map((h) => ({ kind: 'mf', portfolioId: 'P', holding: h, value: h.currentValue })) }
+    const r = splitSip({ att, amount: 79000, mfHoldings: H })
+    expect(r).toHaveLength(4)
+    expect(r.reduce((t, x) => t + x.amount, 0)).toBe(79000)
+    expect(r.find((x) => x.fund.schemeCode === 'PP').amount).toBeGreaterThanOrEqual(31600)
+  })
+  it('no targets: by today\'s value; tiny shares under ₹500 are left out', () => {
+    const H = [mf('P', 'A', 'Equity', 990000), mf('P', 'Z', 'Equity', 10000)]
+    const att = { items: H.map((h) => ({ kind: 'mf', portfolioId: 'P', holding: h, value: h.currentValue })) }
+    const r = splitSip({ att, amount: 10000, mfHoldings: H })
+    expect(r).toHaveLength(1); expect(r[0].amount).toBe(10000)
+  })
+  it('drifted: new money goes first to the funds below target (no selling), never to the one above', () => {
+    // targets 40/20/20/20 of ₹10 L; PP has grown to 46%, B fell to 14%
+    const H = [mf('P', 'PP', 'Equity', 460000), mf('P', 'B', 'Equity', 140000), mf('P', 'C', 'Equity', 200000), mf('P', 'D', 'Debt', 200000)]
+      .map((h, i) => ({ ...h, targetAllocationPct: [40, 20, 20, 20][i] }))
+    const att = { items: H.map((h) => ({ kind: 'mf', portfolioId: 'P', holding: h, value: h.currentValue })) }
+    const r = splitSip({ att, amount: 50000, mfHoldings: H })
+    expect(r.find((x) => x.fund.schemeCode === 'PP')).toBeUndefined()
+    expect(r.find((x) => x.fund.schemeCode === 'B').amount).toBeGreaterThan(35000) // furthest below target gets most
+    expect(r.reduce((t, x) => t + x.amount, 0)).toBe(50000)
   })
 })

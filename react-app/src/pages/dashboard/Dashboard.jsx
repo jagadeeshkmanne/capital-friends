@@ -14,6 +14,13 @@ import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePat
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
+const STEADY_CATS = new Set(['Debt', 'Liquid', 'Gilt', 'Cash', 'Money Market', 'Overnight', 'Arbitrage'])
+const isSteadyFund = (h) => {
+  const n = h.fundName || ''
+  if (/equity/i.test(n)) return false // equity & debt (aggressive hybrid) still moves with the market
+  return STEADY_CATS.has(h.category) || STEADY_CATS.has(inferCategory(n)) || /arbitrage|overnight|money market|liquid|duration|debt|bond|gilt/i.test(n)
+}
+
 function plColor(val) { return val >= 0 ? 'text-emerald-400' : 'text-red-400' }
 function plPrefix(val) { return val >= 0 ? '+' : '' }
 
@@ -407,6 +414,8 @@ export default function Dashboard() {
     const nearATHMap = {}
     activeMFPortfolios.forEach(p => {
       activeMFHoldings.filter(h => h.portfolioId === p.portfolioId).forEach(h => {
+        // debt / liquid funds sit at their high almost every day, so "near peak" says nothing useful for them
+        if (isSteadyFund(h)) return
         if (h.athNav > 0 && h.belowATHPct >= 0 && h.belowATHPct < 1.5) {
           const name = splitFundName(h.fundName).main
           if (!nearATHMap[name] || h.belowATHPct < nearATHMap[name].belowATHPct) {

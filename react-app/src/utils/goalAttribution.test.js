@@ -50,4 +50,24 @@ describe('goal attribution', () => {
       mfHoldings: [eqFund('P', 'E', 500000), debtFund('P', 'D', 500000)] })
     expect(Math.round(r.HOME.total + r.RET.total)).toBe(1000000)
   })
+  it('two goals sharing a portfolio each get a slice of every equity fund (not one whole fund each)', () => {
+    const goals = [{ goalId: 'KID' }, { goalId: 'RET' }]
+    const T = { KID: 0.75, RET: 0.84 }
+    const r = attributeGoals({ goals, targetOf: (g) => T[g.goalId], mappings: [{ goalId: 'KID', portfolioId: 'P', allocationPct: 50 }, { goalId: 'RET', portfolioId: 'P', allocationPct: 50 }],
+      mfHoldings: [eqFund('P', 'PPFAS', 800000), eqFund('P', 'N50', 800000), eqFund('P', 'MID', 400000), debtFund('P', 'LIQ', 300000)] })
+    const val = (g, c) => r[g].items.filter((i) => i.holding.schemeCode === c).reduce((t, i) => t + i.value, 0)
+    for (const g of ['KID', 'RET']) for (const c of ['PPFAS', 'N50', 'MID']) expect(val(g, c)).toBeGreaterThan(100000)
+    // same equity level -> same fraction of each fund
+    expect(val('RET', 'PPFAS') / 800000).toBeCloseTo(val('RET', 'MID') / 400000, 6)
+    expect(Math.round(r.KID.total + r.RET.total)).toBe(2300000)
+  })
+  it('one goal on part of a portfolio: equity-type funds share its equity in proportion (flexi cap is not left for last)', () => {
+    const allocMap = { PPFAS: { Equity: 70 } }
+    const r = attributeGoals({ goals: [{ goalId: 'RET' }], targetOf: () => 0.84, mappings: [{ goalId: 'RET', portfolioId: 'P', allocationPct: 50 }], allocMap,
+      mfHoldings: [eqFund('P', 'N50', 1000000), { ...eqFund('P', 'PPFAS', 600000) }, debtFund('P', 'LIQ', 400000)] })
+    const f = (c) => r.RET.items.find((i) => i.holding.schemeCode === c)?.fraction || 0
+    expect(f('PPFAS')).toBeGreaterThan(0.3)
+    expect(f('PPFAS')).toBeCloseTo(f('N50'), 6)
+    expect(r.RET.total).toBeCloseTo(1000000, 0)
+  })
 })

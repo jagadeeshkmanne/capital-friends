@@ -219,6 +219,8 @@ export const redeemMFBulk = (redemptions) => callAPI('mf:redeem-bulk', { redempt
 export const switchMF = (data) => callAPI('mf:switch', data)
 export const executeMFPlan = (switches, redemptions) => callAPI('mf:plan-batch', { switches, redemptions })
 export const updateAllocations = (portfolioId, allocations) => callAPI('mf:allocations-update', { portfolioId, allocations })
+// Original Target % (portfolio sheet column V): 'save' keeps the user's own targets before a goal changes them, 'restore' brings them back
+export const originalTargets = (portfolioId, mode) => callAPI('mf:original-targets', { portfolioId, mode })
 export const toggleLumpsumRestricted = (portfolioId, fundCode, restricted) => callAPI('mf:lumpsum-restricted', { portfolioId, fundCode, restricted })
 export const toggleSipRestricted = (portfolioId, fundCode, restricted) => callAPI('mf:sip-restricted', { portfolioId, fundCode, restricted })
 export const searchFunds = (query) => callAPI('funds:search', { query })

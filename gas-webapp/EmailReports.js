@@ -864,7 +864,8 @@ function buildDashboardReportData() {
       pHoldings.forEach(function(h) {
         const athNav = parseFloat(h.athNav) || 0;
         const belowATHPct = parseFloat(h.belowATHPct) || 0;
-        if (athNav > 0 && belowATHPct >= 5) {
+        // 95%+ below the high means today's NAV is missing (shows as -100%), not a real fall
+        if (athNav > 0 && belowATHPct >= 5 && belowATHPct < 95) {
           buyOpportunities.push({
             fundName: _splitFundName(h.fundName),
             portfolioName: p.portfolioName,

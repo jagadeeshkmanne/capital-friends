@@ -6,10 +6,18 @@ import { FormActions } from '../Modal'
 import { Plus, Trash2, IndianRupee, Repeat } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useMaskText } from '../../hooks/useMaskText'
+import { equityFraction } from '../../utils/goalAttribution'
+import { inferCategory } from '../../utils/fundCategory'
 
 export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
   const mt = useMaskText()
-  const { mfHoldings, mfPortfolios, toggleLumpsumRestricted, toggleSipRestricted } = useData()
+  const { mfHoldings, mfPortfolios, toggleLumpsumRestricted, toggleSipRestricted, goalPortfolioMappings, goalList, assetAllocations } = useData()
+  const linkedGoals = (goalPortfolioMappings || []).filter((m) => m.portfolioId === portfolioId && Number(m.allocationPct) > 0).map((m) => (goalList || []).find((g) => g.goalId === m.goalId)).filter((g) => g && g.isActive !== false && g.status !== 'Achieved')
+  // linked to a goal: the goal sets the targets, so % are read-only; only adding or exiting a fund is allowed
+  const locked = linkedGoals.length > 0
+  const allocMap = useMemo(() => { const m = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) m[a.fundCode] = a.assetAllocation }); return m }, [assetAllocations])
+  const r2 = (v) => Math.round(v * 100) / 100
+  const isEq = (a) => equityFraction({ schemeCode: a.schemeCode, category: a.category || inferCategory(a.fundName) }, allocMap) >= 0.5
   const { showToast, showBlockUI, hideBlockUI } = useToast()
 
   const portfolio = mfPortfolios.find((p) => p.portfolioId === portfolioId)
@@ -26,6 +34,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
       currentValue: h.currentValue,
       currentAllocationPct: h.currentAllocationPct,
       targetAllocationPct: h.targetAllocationPct,
+      category: h.category,
       lumpsumRestricted: h.lumpsumRestricted || false,
       sipRestricted: h.sipRestricted || false,
       isNew: false,
@@ -57,22 +66,46 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
       setError('Fund already exists in portfolio')
       return
     }
-    setAllocations((prev) => [...prev, {
-      schemeCode: newFund.schemeCode,
-      fundName: newFund.fundName,
-      units: 0,
-      currentValue: 0,
-      currentAllocationPct: 0,
-      targetAllocationPct: Number(newTarget) || 0,
-      isNew: true,
-    }])
+    const row = { schemeCode: newFund.schemeCode, fundName: newFund.fundName, category: newFund.category, units: 0, currentValue: 0, currentAllocationPct: 0, targetAllocationPct: Number(newTarget) || 0, isNew: true }
+    if (locked) {
+      // the new fund takes an equal share of its side (equity or safe); the side's total stays what the goal set
+      const side = allocations.filter((a) => a.targetAllocationPct > 0 && isEq(a) === isEq(row))
+      const S = side.reduce((t, a) => t + a.targetAllocationPct, 0)
+      if (!side.length || S <= 0) {
+        setAllocations((prev) => [...prev, { ...row, targetAllocationPct: 0 }])
+        setNewFund(null); setNewTarget('')
+        setError(`Your goal's targets have no ${isEq(row) ? 'equity' : 'safe'} part in this portfolio yet, so the new fund gets 0% for now.`)
+        return
+      }
+      const n = side.length + 1, share = r2(S / n)
+      const scaled = side.map((a) => ({ code: a.schemeCode, t: r2(a.targetAllocationPct * (n - 1) / n) }))
+      const rest = r2(S - share - scaled.reduce((t, x) => t + x.t, 0)) // rounding remainder, so the side total stays exactly S
+      if (scaled.length) scaled[scaled.length - 1].t = r2(scaled[scaled.length - 1].t + rest)
+      const m = Object.fromEntries(scaled.map((x) => [x.code, x.t]))
+      setAllocations((prev) => [...prev.map((a) => (a.schemeCode in m ? { ...a, targetAllocationPct: m[a.schemeCode] } : a)), { ...row, targetAllocationPct: share }])
+    } else setAllocations((prev) => [...prev, row])
     setNewFund(null)
     setNewTarget('')
     setError('')
   }
 
+  // linked: stop a fund – its share goes to the other funds on the same side, Rebalance then shows "sell all"
+  function exitFund(schemeCode) {
+    const f = allocations.find((a) => a.schemeCode === schemeCode); if (!f || !(f.targetAllocationPct > 0)) return
+    const others = allocations.filter((a) => a !== f && a.targetAllocationPct > 0 && isEq(a) === isEq(f))
+    const S = others.reduce((t, a) => t + a.targetAllocationPct, 0)
+    if (!others.length || S <= 0) { setError(`It is the only ${isEq(f) ? 'equity' : 'safe'} fund here – add another ${isEq(f) ? 'equity' : 'safe'} fund first, then exit this one.`); return }
+    const total = S + f.targetAllocationPct
+    const scaled = others.map((a) => ({ code: a.schemeCode, t: r2(a.targetAllocationPct * total / S) }))
+    const rest = r2(total - scaled.reduce((t, x) => t + x.t, 0))
+    scaled[scaled.length - 1].t = r2(scaled[scaled.length - 1].t + rest)
+    const m = Object.fromEntries(scaled.map((x) => [x.code, x.t]))
+    setAllocations((prev) => prev.map((a) => (a.schemeCode === schemeCode ? { ...a, targetAllocationPct: 0 } : a.schemeCode in m ? { ...a, targetAllocationPct: m[a.schemeCode] } : a)))
+    setError('')
+  }
+
   async function handleSave() {
-    if (totalTarget > 100) {
+    if (totalTarget > 100.05) {
       setError(`Total allocation is ${totalTarget.toFixed(1)}% — must be ≤ 100%`)
       return
     }
@@ -118,6 +151,11 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
   return (
     <div className="space-y-4">
+      {linkedGoals.length > 0 && (
+        <div className="rounded-lg px-3 py-2 border border-violet-500/30 bg-violet-500/5 text-xs text-[var(--text-secondary)]">
+          <b className="text-violet-400">🔒 Set by your goal.</b> This portfolio is linked to {linkedGoals.map((g) => mt(g.goalName)).join(', ')}, so its targets follow the goal's timeline and can't be edited here. You can still <b>add a fund</b> (it gets an equal share of its side) or <b>exit a fund</b> (its share goes to the others). Unlink the goal to get your own targets back.
+        </div>
+      )}
       {/* Portfolio Info */}
       <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
         <p className="text-xs font-semibold text-[var(--text-primary)]">{mt(String(portfolio?.portfolioName || '').replace(/^PFL-/, ''))}</p>
@@ -170,7 +208,9 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                         type="number"
                         value={a.targetAllocationPct}
                         onChange={(e) => updateTarget(a.schemeCode, e.target.value)}
-                        className="w-20 mx-auto block bg-[var(--bg-inset)] border border-[var(--border)] rounded px-2 py-1 text-xs text-center text-[var(--text-primary)] focus:outline-none focus:border-violet-500/50"
+                        disabled={locked}
+                        title={locked ? 'Set by your goal' : undefined}
+                        className="disabled:opacity-60 disabled:cursor-not-allowed w-20 mx-auto block bg-[var(--bg-inset)] border border-[var(--border)] rounded px-2 py-1 text-xs text-center text-[var(--text-primary)] focus:outline-none focus:border-violet-500/50"
                       />
                     </td>
                     <td className="py-2 px-2">
@@ -192,6 +232,9 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                               <Repeat size={11} strokeWidth={2.5} />
                             </button>
                           </>
+                        )}
+                        {locked && a.units > 0 && a.targetAllocationPct > 0 && (
+                          <button onClick={() => exitFund(a.schemeCode)} className="px-1.5 py-0.5 text-[11px] font-semibold rounded border border-[var(--border-light)] text-[var(--text-muted)] hover:text-[var(--accent-rose)]" title="Stop this fund: its share goes to the others">Exit</button>
                         )}
                         {a.units === 0 && (
                           <button onClick={() => removeZeroFund(a.schemeCode)} className="p-1 rounded hover:bg-rose-500/15 text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors">
@@ -266,6 +309,9 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                         </button>
                       </>
                     )}
+                    {locked && a.units > 0 && a.targetAllocationPct > 0 && (
+                      <button onClick={() => exitFund(a.schemeCode)} className="px-2 py-1 text-[11px] font-semibold rounded border border-[var(--border-light)] text-[var(--text-muted)]">Exit</button>
+                    )}
                     {a.units === 0 && (
                       <button onClick={() => removeZeroFund(a.schemeCode)} className="p-1.5 rounded-lg hover:bg-rose-500/15 text-[var(--text-dim)] hover:text-[var(--accent-rose)] transition-colors">
                         <Trash2 size={14} />
@@ -284,7 +330,8 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                     step="0.5"
                     value={a.targetAllocationPct}
                     onChange={(e) => updateTarget(a.schemeCode, e.target.value)}
-                    className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-violet-500"
+                    disabled={locked}
+                    className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-violet-500 disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       background: `linear-gradient(to right, rgb(139 92 246) 0%, rgb(139 92 246) ${(a.targetAllocationPct / 50) * 100}%, var(--bg-inset) ${(a.targetAllocationPct / 50) * 100}%, var(--bg-inset) 100%)`
                     }}
@@ -293,7 +340,8 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                     type="number"
                     value={a.targetAllocationPct}
                     onChange={(e) => updateTarget(a.schemeCode, e.target.value)}
-                    className="w-14 bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-1 text-xs text-center text-[var(--text-primary)] tabular-nums focus:outline-none focus:border-violet-500/50 shrink-0"
+                    disabled={locked}
+                    className="disabled:opacity-60 disabled:cursor-not-allowed w-14 bg-[var(--bg-inset)] border border-[var(--border)] rounded px-1.5 py-1 text-xs text-center text-[var(--text-primary)] tabular-nums focus:outline-none focus:border-violet-500/50 shrink-0"
                   />
                   <span className="text-xs text-[var(--text-dim)] shrink-0">%</span>
                 </div>
@@ -322,11 +370,11 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
         {/* Add New Fund */}
         <div className="border-t border-[var(--border-light)] pt-3">
           <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-1">Add New Fund</p>
-          <p className="text-xs text-[var(--text-dim)] mb-2">Set target % to see how much to invest. After buying, use Invest to record the transaction.</p>
+          <p className="text-xs text-[var(--text-dim)] mb-2">{locked ? 'The new fund gets an equal share of its side (equity or safe). After buying, use Invest to record it.' : 'Set target % to see how much to invest. After buying, use Invest to record the transaction.'}</p>
           <div className="space-y-2">
             <FundSearchInput value={newFund} onSelect={(f) => setNewFund(f.schemeCode ? f : null)} placeholder="Search fund to add..." />
             <div className="flex items-center gap-2">
-              <div className="w-28">
+              {!locked && <div className="w-28">
                 <input
                   type="number"
                   value={newTarget}
@@ -334,7 +382,7 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                   placeholder="Target %"
                   className="w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] text-center focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
                 />
-              </div>
+              </div>}
               <button
                 onClick={addNewFund}
                 disabled={!newFund}

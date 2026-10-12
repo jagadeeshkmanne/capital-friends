@@ -352,7 +352,7 @@ export default function StocksPage() {
               <button
                 onClick={() => selectedPortfolioId !== 'all' && setModal({ buy: selectedPortfolioId })}
                 disabled={selectedPortfolioId === 'all'}
-                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-colors shadow-sm ${selectedPortfolioId === 'all' ? 'bg-emerald-600/40 text-white/50 cursor-not-allowed' : 'text-white bg-emerald-600 hover:bg-emerald-500'}`}
+                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-colors shadow-sm ${selectedPortfolioId === 'all' ? 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border-light)] cursor-not-allowed' : 'text-white bg-emerald-600 hover:bg-emerald-500'}`}
                 title={selectedPortfolioId === 'all' ? 'Select a portfolio first' : ''}
               >
                 <TrendingUp size={14} /> Buy
@@ -360,7 +360,7 @@ export default function StocksPage() {
               <button
                 onClick={() => selectedPortfolioId !== 'all' && holdings.length > 0 && setModal({ sell: selectedPortfolioId })}
                 disabled={selectedPortfolioId === 'all' || holdings.length === 0}
-                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-colors shadow-sm ${selectedPortfolioId === 'all' || holdings.length === 0 ? 'bg-rose-600/40 text-white/50 cursor-not-allowed' : 'text-white bg-rose-600 hover:bg-rose-500'}`}
+                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-colors shadow-sm ${selectedPortfolioId === 'all' || holdings.length === 0 ? 'bg-[var(--bg-inset)] text-[var(--text-dim)] border border-[var(--border-light)] cursor-not-allowed' : 'text-white bg-rose-600 hover:bg-rose-500'}`}
                 title={selectedPortfolioId === 'all' ? 'Select a portfolio first' : ''}
               >
                 <TrendingDown size={14} /> Sell

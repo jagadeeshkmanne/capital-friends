@@ -1527,3 +1527,59 @@ function migrateOngoingSipFormula_() {
   log('Ongoing SIP formula (v4) set on ' + n + ' fund row(s)');
   props.setProperty(key, new Date().toISOString());
 }
+
+
+/**
+ * Original Target % (column V) — the user's own fund targets, kept while a linked goal sets column I.
+ *   mode 'save'    : copy I -> V for every fund row, only when V is still empty for the whole sheet
+ *                    (so later goal changes never overwrite the user's own numbers)
+ *   mode 'restore' : copy V -> I (empty V -> 0), then clear V   (used when the portfolio is no longer linked to a goal)
+ * The column header is created on first use, so sheets made before this feature keep working.
+ */
+function originalTargets(portfolioId, mode) {
+  var sheet = getSpreadsheet().getSheetByName(portfolioId);
+  if (!sheet) throw new Error('Portfolio sheet "' + portfolioId + '" not found');
+  var COL_T = 9, COL_V = 22;
+  if (sheet.getMaxColumns() < COL_V) sheet.insertColumnsAfter(sheet.getMaxColumns(), COL_V - sheet.getMaxColumns());
+  var head = String(sheet.getRange(3, COL_V).getValue() || '');
+  if (head && !/^original/i.test(head)) {
+    // the user has their own column V: never write over it
+    if (mode === 'restore') return { mode: mode, rows: 0, nothing: true };
+    throw new Error('Column V of "' + portfolioId + '" is already used ("' + head + '"). Move it to free column V.');
+  }
+  if (!head) {
+    sheet.getRange(3, COL_V - 1).copyTo(sheet.getRange(3, COL_V), { formatOnly: true }); // same look as the other headers
+    sheet.getRange(3, COL_V).setValue('Original\nTarget %');
+  }
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 4) return { mode: mode, rows: 0 };
+  var n = lastRow - 3;
+  var codes = sheet.getRange(4, 1, n, 1).getValues();
+  var tgt = sheet.getRange(4, COL_T, n, 1).getValues();
+  var orig = sheet.getRange(4, COL_V, n, 1).getValues();
+  var rows = 0;
+  if (mode === 'save') {
+    var anySaved = orig.some(function (r, i) { return codes[i][0] && r[0] !== '' && r[0] !== null; });
+    if (anySaved) return { mode: mode, rows: 0, kept: true };
+    var out = tgt.map(function (r, i) { if (codes[i][0]) { rows++; return [parseFloat(r[0]) || 0]; } return ['']; });
+    sheet.getRange(4, COL_V, n, 1).setValues(out);
+  } else if (mode === 'restore') {
+    var anyOrig = orig.some(function (r, i) { return codes[i][0] && r[0] !== '' && r[0] !== null; });
+    if (!anyOrig) return { mode: mode, rows: 0, nothing: true };
+    // funds with a saved original get it back; a fund added while linked (empty V) keeps its current share,
+    // and the originals are scaled to fill the rest, so the total is 100 and no fund drops to 0
+    var isEmpty = function (v) { return v === '' || v === null; };
+    var kept = 0, origSum = 0;
+    orig.forEach(function (r, i) { if (!codes[i][0]) return; if (isEmpty(r[0])) kept += parseFloat(tgt[i][0]) || 0; else origSum += parseFloat(r[0]) || 0; });
+    var room = Math.max(0, 100 - kept), k = origSum > 0 ? room / origSum : 0;
+    var back = orig.map(function (r, i) {
+      if (!codes[i][0]) return [tgt[i][0]];
+      rows++;
+      if (isEmpty(r[0])) return [parseFloat(tgt[i][0]) || 0];
+      return [Math.round((parseFloat(r[0]) || 0) * k * 100) / 100];
+    });
+    sheet.getRange(4, COL_T, n, 1).setValues(back);
+    sheet.getRange(4, COL_V, n, 1).clearContent();
+  } else throw new Error('Unknown mode: ' + mode);
+  return { mode: mode, rows: rows };
+}

@@ -86,8 +86,10 @@ export function attributeGoals({ goals, targetOf, mappings, mfHoldings, stockHol
     let shareSum = links.reduce((s, l) => s + l.share, 0)
     const scale = shareSum > 1 ? 1 / shareSum : 1     // links adding up to more than 100%: scale down
 
-    const byEqAsc = items.map((_, i) => i).sort((a, b) => items[a].eq - items[b].eq)
-    const byEqDesc = byEqAsc.slice().reverse()
+    // holdings grouped by equity share: inside a group a goal takes the same slice of every fund,
+    // so two goals sharing a portfolio both hold a part of each equity fund (not one fund each)
+    const eqLevels = [...new Set(items.map((it) => Math.round(it.eq * 1000) / 1000))].sort((a, b) => a - b)
+    const groups = eqLevels.map((lv) => items.map((_, i) => i).filter((i) => Math.round(items[i].eq * 1000) / 1000 === lv))
 
     links.forEach((l) => {
       const budget = totalValue * l.share * scale
@@ -99,20 +101,29 @@ export function attributeGoals({ goals, targetOf, mappings, mfHoldings, stockHol
         const ex = g.items.find((y) => y.key === items[i].key)
         if (ex) { ex.value += x; ex.fraction = ex.value / items[i].value } else g.items.push({ kind: items[i].kind, portfolioId: pid, key: items[i].key, holding: items[i].holding, value: x, eq: items[i].eq, fraction: x / items[i].value })
       }
+      // take `amount` from one group, in proportion to what is left of each fund in it
+      const takeGroup = (grp, amount) => {
+        const avail = grp.reduce((t, i) => t + left[i], 0)
+        if (avail <= 1e-9 || amount <= 1e-9) return
+        const x = Math.min(amount, avail)
+        grp.forEach((i) => take(i, (left[i] / avail) * x))
+      }
       // 1) the debt it needs, from the most debt-like holdings
       const wantDebt = budget * (1 - tgt[l.goalId])
-      for (const i of byEqAsc) {
+      for (const grp of groups) {
         const need = wantDebt - debtGot, room = budget - taken
         if (need <= 1e-6 || room <= 1e-6) break
-        const d = 1 - items[i].eq
+        const d = 1 - items[grp[0]].eq
         if (d <= 1e-9) break
-        take(i, Math.min(left[i], need / d, room))
+        takeGroup(grp, Math.min(need / d, room))
       }
-      // 2) the rest of its amount, equity-rich holdings first
-      for (const i of byEqDesc) {
+      // 2) the rest of its amount from the equity-type funds (half or more in equity) together, in proportion,
+      //    so a flexi cap with some foreign / cash is not left for last; then anything still missing, equity-rich first
+      takeGroup(items.map((_, i) => i).filter((i) => items[i].eq >= 0.5), budget - taken)
+      for (const grp of groups.slice().reverse()) {
         const room = budget - taken
         if (room <= 1e-6) break
-        take(i, Math.min(left[i], room))
+        takeGroup(grp, room)
       }
       g.total += taken
       g.equity += taken - debtGot

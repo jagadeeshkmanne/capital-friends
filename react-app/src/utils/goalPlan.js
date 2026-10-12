@@ -33,6 +33,57 @@ export function needToday({ target, years, annualReturn, sip }) {
   return Math.max(0, pvTarget - pvSip)
 }
 
+/**
+ * Spread a goal's extra SIP over the goal's own funds, following the portfolio's target % (for a goal-linked
+ * portfolio these are the goal's targets). New money first tops up the funds that are BELOW their target
+ * (so drift is fixed without selling), and whatever is left is split by target %.
+ * Portfolios without targets: split by today's value. Across portfolios: by how much of the goal sits in each.
+ * Rounded to ₹100; funds that would get under ₹500 are left out (their part goes to the others).
+ */
+export function splitSip({ att, amount, mfHoldings }) {
+  if (!(amount > 0)) return []
+  const items = (att?.items || []).filter((it) => it.kind === 'mf' && it.value > 0)
+  if (!items.length) return []
+  const byP = {}
+  for (const it of items) (byP[it.portfolioId] = byP[it.portfolioId] || []).push(it)
+  const total = items.reduce((t, it) => t + it.value, 0)
+  let parts = []
+  for (const [pid, its] of Object.entries(byP)) {
+    const M = amount * its.reduce((t, it) => t + it.value, 0) / total // this portfolio's part of the new money
+    const all = (mfHoldings || []).filter((h) => h.portfolioId === pid)
+    const tsum = all.reduce((t, h) => t + (Number(h.targetAllocationPct) || 0), 0)
+    if (tsum >= 99 && tsum <= 101) {
+      const tg = all.filter((h) => (Number(h.targetAllocationPct) || 0) > 0)
+      const V = all.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
+      const after = V + M
+      const gap = tg.map((h) => Math.max(0, (Number(h.targetAllocationPct) / tsum) * after - (Number(h.currentValue) || 0)))
+      const G = gap.reduce((t, x) => t + x, 0)
+      if (G >= M) tg.forEach((h, i) => { if (gap[i] > 0) parts.push({ fund: h, w: M * gap[i] / G }) })
+      else {
+        const rest = M - G
+        tg.forEach((h, i) => parts.push({ fund: h, w: gap[i] + rest * (Number(h.targetAllocationPct) / tsum) }))
+      }
+    } else {
+      const v = its.reduce((t, it) => t + it.value, 0)
+      for (const it of its) parts.push({ fund: it.holding, w: M * it.value / v })
+    }
+  }
+  const merged = {}
+  for (const x of parts) { if (!(x.w > 0)) continue; const k = x.fund.portfolioId + '::' + (x.fund.schemeCode || x.fund.fundCode); merged[k] = merged[k] ? { ...merged[k], w: merged[k].w + x.w } : { ...x } }
+  parts = Object.values(merged)
+  for (let guard = 0; guard < 20; guard++) {
+    const W = parts.reduce((t, x) => t + x.w, 0)
+    const small = parts.filter((x) => (x.w / W) * amount < 500)
+    if (!small.length || small.length === parts.length) break
+    parts = parts.filter((x) => !small.includes(x))
+  }
+  const W = parts.reduce((t, x) => t + x.w, 0)
+  const out = parts.map((x) => ({ fund: x.fund, amount: Math.floor(((x.w / W) * amount) / 100) * 100 })).sort((a, b) => b.amount - a.amount)
+  const rest = amount - out.reduce((t, x) => t + x.amount, 0)
+  if (out.length) out[0].amount += rest
+  return out.filter((x) => x.amount > 0)
+}
+
 /** Monthly SIP that grows to `amountToday * (1+r)^years` by the goal date (rounded up to ₹500). */
 export function sipForAmount({ amountToday, years, annualReturn }) {
   if (!(amountToday > 0) || !(years > 0)) return 0
@@ -118,10 +169,14 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
       addSip = sipForAmount({ amountToday: -gap, years, annualReturn: r })
       // new money goes to the goal's own fund of the right kind: safe fund for a near goal, equity fund for a far one
       const wantEq = rec.equity >= 50
-      const sipFund = (att.items || []).filter((it) => it.kind === 'mf' && (wantEq ? it.eq >= EQ_MIN : it.eq <= SAFE_MAX)).sort((a, b) => b.value - a.value)[0]?.holding || null
-      steps.push({ t: 'sip', amount: addSip, lump: -gap, sipFrom: sip, sipTo: sip + addSip, fund: sipFund, wantEq })
+      const split = splitSip({ att, amount: addSip, mfHoldings })
+      const sipFund = split.length ? split[0].fund
+        : (att.items || []).filter((it) => it.kind === 'mf' && (wantEq ? it.eq >= EQ_MIN : it.eq <= SAFE_MAX)).sort((a, b) => b.value - a.value)[0]?.holding || null
+      steps.push({ t: 'sip', amount: addSip, lump: -gap, sipFrom: sip, sipTo: sip + addSip, fund: sipFund, wantEq, split })
     }
-    return { goal: g, plannedSip, years, yearsLeft: Math.ceil(years - 1e-9), r, sip, target, has, need, gap, state, eqNow, eqTarget: rec.equity, bucketMode, isRet, steps, addSip, lumpToday: state === 'short' ? -gap : 0, att }
+    // the monthly SIP this goal needs from today, given what it already holds (0 when it is already covered)
+    const sipNeeded = years > 0 ? sipForAmount({ amountToday: Math.max(0, needToday({ target, years, annualReturn: r, sip: 0 }) - has), years, annualReturn: r }) : 0
+    return { goal: g, plannedSip, sipNeeded, years, yearsLeft: Math.ceil(years - 1e-9), r, sip, target, has, need, gap, state, eqNow, eqTarget: rec.equity, bucketMode, isRet, steps, addSip, lumpToday: state === 'short' ? -gap : 0, att }
   })
   // extra in one goal can pay for another goal's SIP: suggest moving SIP, never more than the goal's own SIP
   const donors = plans.filter((p) => p.state === 'extra' && p.sip > 0 && p.years > 0)
