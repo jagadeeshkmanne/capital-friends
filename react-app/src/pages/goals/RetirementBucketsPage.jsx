@@ -346,6 +346,7 @@ export function RetirementActions({ goal, slot = 'alert' }) {
   const monthly = plan?.expense?.monthlyExpense || 0
   // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
   if (slot === 'alert' && !showRefill) return null
+  if (slot === 'chip') return showRefill ? <button type="button" className="g2-jump" onClick={() => document.getElementById(`goal-${goal.goalId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>🌴 {goal.goalName}: refill due {formatINR(Math.round(refillTotal))} ›</button> : null
   if (slot === 'stat' && !showIncome) return null
   return (
     <>

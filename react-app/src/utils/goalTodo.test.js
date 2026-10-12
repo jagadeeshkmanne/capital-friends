@@ -79,4 +79,16 @@ describe('to do this month', () => {
     // within 20 points: nothing
     expect(goalTodo({ plans: [{ ...home, eqNow: 45 }] }).steps.some((x) => x.t === 'protect')).toBe(false)
   })
+
+  it('"Make it safer" never sells ELSS, and never sells units the family switch already sells', () => {
+    const elss = { fundName: 'Axis ELSS Tax Saver', category: 'ELSS', schemeCode: 'X1', units: 100, currentValue: 500000, currentNav: 5000, portfolioId: 'P1' }
+    const eqF = { fundName: 'Flexi Cap', schemeCode: 'E1', units: 1000, currentValue: 400000, currentNav: 400, portfolioId: 'P1' }
+    const home = { goal: { goalId: 'G1', goalName: 'Home' }, state: 'ok', years: 2, eqNow: 100, eqTarget: 30, has: 900000, gap: 0,
+      att: { items: [{ kind: 'mf', portfolioId: 'P1', holding: elss, value: 500000, eq: 1 }, { kind: 'mf', portfolioId: 'P1', holding: eqF, value: 400000, eq: 1 }] } }
+    const family = { status: 'steps', steps: [{ t: 'sell', portfolioId: 'P1', fund: eqF, value: 300000 }, { t: 'buy', portfolioId: 'P1', fund: null, value: 300000, wantSafe: true }] }
+    const { steps } = goalTodo({ plans: [home], family })
+    const st = steps.find((x) => x.t === 'protect')
+    expect(st.sells.every((r) => r.fund.schemeCode !== 'X1')).toBe(true)
+    expect(st.total).toBe(100000) // only the ₹1 L of Flexi Cap the switch does not already sell
+  })
 })

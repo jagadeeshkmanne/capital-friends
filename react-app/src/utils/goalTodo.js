@@ -13,6 +13,8 @@
  */
 import { splitSip } from './goalPlan'
 
+const isLocked = (h) => /elss/i.test(h?.category || '') || /\b(elss|tax ?saver)\b/i.test(h?.fundName || '')
+const fkey = (h) => `${h?.portfolioId}::${h?.schemeCode || h?.fundCode || h?.fundName}`
 const navOf = (h) => Number(h.currentNav) || ((Number(h.currentValue) || 0) / (Number(h.units) || 1)) || 0
 
 /** The portfolio a short goal should add money to: the MF portfolio it already uses most, else one owned by
@@ -79,6 +81,10 @@ export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPor
     for (const [pid, g] of Object.entries(byPort)) if (g.sells.length) steps.push({ t: 'switch', portfolioId: pid, sells: g.sells.map((s) => ({ ...s, units: s.units ?? (navOf(s.fund) ? s.value / navOf(s.fund) : null) })), buys: g.buys, total: g.sells.reduce((t, s) => t + s.value, 0), toSafe: !!g.buys[0]?.wantSafe })
   }
 
+  // value each fund is already sold for by the steps above (so two steps never sell the same units twice)
+  const sold = {}
+  for (const st of steps.filter((x) => x.t === 'switch')) for (const r of st.sells) sold[fkey(r.fund)] = (sold[fkey(r.fund)] || 0) + (r.value || 0)
+
   // 5. a goal within 5 years holding far more equity than its glide path wants (the family total can look fine
   //    while one near goal sits in equity): move that part to safe money, inside the same portfolio
   for (const p of plans || []) {
@@ -86,12 +92,16 @@ export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPor
     const over = p.eqNow - p.eqTarget
     const amount = Math.round(((over / 100) * p.has) / 1000) * 1000
     if (over <= 20 || amount < 25000) continue
-    const eqMf = (p.att?.items || []).filter((it) => it.kind === 'mf' && it.eq >= 0.65 && it.value > 0.5).sort((a, b) => b.value - a.value)
+    // never ELSS (locked 3 years), and never units another step on this page already sells
+    const eqMf = (p.att?.items || []).filter((it) => it.kind === 'mf' && it.eq >= 0.65 && it.value > 0.5 && !isLocked(it.holding)).sort((a, b) => b.value - a.value)
     let left = amount
     const sells = []
     for (const it of eqMf) {
-      if (left < 500) break
-      const v = Math.min(left, it.value)
+      if (left < 1000) break
+      const free = Math.min(it.value, (Number(it.holding.currentValue) || 0) - (sold[fkey(it.holding)] || 0))
+      const v = Math.min(left, free)
+      if (v < 1000) continue
+      sold[fkey(it.holding)] = (sold[fkey(it.holding)] || 0) + v
       const nav = navOf(it.holding)
       sells.push({ fund: it.holding, portfolioId: it.portfolioId, value: v, units: nav ? v / nav : null, all: v >= (Number(it.holding.currentValue) || 0) - 1 })
       left -= v

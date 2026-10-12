@@ -108,10 +108,19 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
     <div className="g2">
       <style>{CSS}</style>
 
+      {(Object.keys(readyOf).length > 0 || live.some((p) => p.isRet)) && (
+        <div className="g2-onc">
+          <span className="lbl">On your goal cards:</span>
+          {Object.values(readyOf).map((r) => <button key={r.goal.goalId} type="button" className="g2-jump" onClick={() => document.getElementById(`goal-${r.goal.goalId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>{icon(r.goal)} {mt(r.goal.goalName)}: date reached, withdraw plan ›</button>)}
+          {live.filter((p) => p.isRet).map((p) => <RetirementActions key={p.goal.goalId} goal={p.goal} slot="chip" />)}
+        </div>
+      )}
+
       {/* 1. To do this month (only when there is something to do) */}
       {steps.length > 0 && (
         <div className="g2-card g2-todo">
           <div className="g2-lbl"><span>Rebalance this month</span><span>{steps.length} step{steps.length > 1 ? 's' : ''}</span></div>
+          <p className="g2-hint" style={{ margin: '10px 0 0' }}>Before you act: import your latest CAS if you bought or sold since, so the units and amounts are today's. Do the steps in order.</p>
           {steps.map((s, i) => <Step key={i} s={s} n={i + 1} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />)}
         </div>
       )}
@@ -217,7 +226,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
   const yrs = retired ? `retired ${Math.round(-p.years) || ''}${Math.round(-p.years) ? ' yrs ago' : ''}` : due ? 'date reached' : `${p.years < 1 ? `${Math.max(1, Math.round(p.years * 12))} months` : `${Math.round(p.years * 2) / 2} years`} left`
   const items = (p.att?.items || []).filter((it) => it.value > 0.5).sort((a, b) => b.value - a.value)
   return (
-    <div className={`g2-card g2-goal ${st[0]}`}>
+    <div id={`goal-${g.goalId}`} className={`g2-card g2-goal ${st[0]}`}>
       <div className="g2-gh">
         <div className={`g2-gi ${st[0]}`}>{icon(g)}</div>
         <div className="g2-gt"><h3>{mt(g.goalName)}</h3><p>{monthYear(g)} · {yrs}{g.familyMemberName ? ` · ${mt(g.familyMemberName)}` : ''}</p><span className={`g2-badge ${st[0]}`}>{st[1]}</span></div>
@@ -520,6 +529,8 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-stats>button.inc{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;text-align:left;cursor:pointer;font:inherit;color:inherit;background:var(--bg-inset);border:1px solid var(--border);border-radius:12px;padding:10px 14px}.g2-stats>button.inc b{margin:0}.g2-stats>button.inc small{margin-left:auto}.g2-stats>button.inc:hover{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-stats>button.inc small{color:#a78bfa}
 .g2-lock{margin-top:10px;padding:10px 12px;border:1px dashed var(--border);border-radius:12px;font-size:12.5px;color:var(--text-secondary)}.g2-lock b{display:block;color:var(--text-primary);margin-bottom:2px}.g2-lock small{display:block;color:var(--text-muted);margin-top:4px}
 .g2-pkn{display:inline;font-size:11px;color:var(--text-muted);font-weight:500}.g2-pf{font-style:normal;margin-right:6px;opacity:.8}
+.g2-onc{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.g2-onc .lbl{font-size:12px;color:var(--text-muted)}.g2-onc:not(:has(.g2-jump)){display:none}
+.g2-jump{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;font-size:12px;font-weight:600;color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,var(--bg-card));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--border));border-radius:999px;cursor:pointer}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
