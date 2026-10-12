@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Users, LockKeyhole, HardDrive, CodeXml } from 'lucide-react'
+import { Users, LockKeyhole, HardDrive, CodeXml, Target } from 'lucide-react'
 import HeaderSocial from '../components/HeaderSocial'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
@@ -383,7 +383,7 @@ const SLIDES = [
     dotColor: '#16a34a',
     tag: 'Family First',
     tagStyle: { background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' },
-    heading: 'Your family knows where everything is — even in your absence',
+    heading: 'A monthly summary for your family, and they can sign in any time',
     para: 'If something happens to you, your family needs instant access to every investment, policy, loan, and FD — not months of confusion.',
     bullets: [
       { ck: '✓', ckColor: '#16a34a', text: 'Auto monthly email reports sent to family' },
@@ -658,10 +658,10 @@ export default function LandingPage() {
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80' }} /> Free · open source · made in India
             </div>
             <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 30 : 48, fontWeight: 700, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.1, margin: '0 0 16px' }}>
-              One dashboard for your family's <span style={{ background: 'linear-gradient(90deg,#4ade80,#22d3ee)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>entire wealth</span>
+              Your family knows where <span style={{ background: 'linear-gradient(90deg,#4ade80,#22d3ee)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>every rupee is</span>, even without you
             </h1>
-            <p style={{ fontSize: isMobile ? 15 : 17.5, color: '#94a3b8', margin: isMobile ? '0 auto 24px' : '0 0 28px', maxWidth: 500, lineHeight: 1.6 }}>
-              Mutual funds, stocks, insurance and loans for every family member — and your data is stored in <b style={{ color: '#4ade80', fontWeight: 700 }}>your own Google Sheet</b>, in your Drive.
+            <p style={{ fontSize: isMobile ? 15 : 17.5, color: '#94a3b8', margin: isMobile ? '0 auto 24px' : '0 0 28px', maxWidth: 520, lineHeight: 1.6 }}>
+              Track mutual funds, stocks, FDs, gold, insurance and loans for every family member, get clear steps for each goal, and send your family a regular summary. Your data stays in <b style={{ color: '#4ade80', fontWeight: 700 }}>your own Google Sheet</b>.
             </p>
             <button onClick={signIn} className="cf-gbtn" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, padding: isMobile ? '8px 22px 8px 8px' : '9px 28px 9px 9px', borderRadius: 14,
               background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 15.5 : 17, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 14px 30px -12px rgba(124,58,237,.65)' }}>
@@ -694,6 +694,22 @@ export default function LandingPage() {
             </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ─── 3 REASONS (right under the hero: what makes it different, in one look) ─── */}
+      <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '22px 16px' : '30px 24px' }}>
+        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 12 : 18 }}>
+          {[
+            [Users, '#16a34a', 'Your family is never in the dark', 'A regular email summary goes to the people you choose, with every fund, policy, FD and loan, and family members can sign in to see it any time.'],
+            [Target, '#0891b2', 'A clear plan for every goal', 'Retirement, education, house or emergency fund: the app shares your money across goals and tells you the exact SIP, switch or withdrawal each month.'],
+            [LockKeyhole, '#7c3aed', 'Private, free, open source', 'Everything stays in a Google Sheet in your own Drive. No bank or broker passwords, no ads, nothing to pay.'],
+          ].map(([Ic, c, h, p]) => (
+            <div key={h} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: isMobile ? '14px 14px' : '18px 18px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: `${c}14`, color: c }}><Ic size={19} strokeWidth={2.2} /></span>
+              <div><div style={{ fontFamily: "'Poppins',sans-serif", fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>{h}</div><div style={{ fontSize: 13, color: '#475569', lineHeight: 1.55 }}>{p}</div></div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -828,7 +844,7 @@ export default function LandingPage() {
                   'Retirement corpus eroded by panicked decisions',
                   'Family spends months just finding out what you owned',
                 ].map((t, i, arr) => (
-                  <li key={i} style={{ fontSize: 12.5, color: '#64748b', padding: '6px 0', display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', lineHeight: 1.5 }}>
+                  <li key={i} style={{ fontSize: 12.5, color: '#a1abbd', padding: '6px 0', display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', lineHeight: 1.5 }}>
                     <span style={{ color: '#f87171', flexShrink: 0, fontSize: 11, fontWeight: 700, marginTop: 1 }}>✕</span>
                     {t}
                   </li>
@@ -850,7 +866,7 @@ export default function LandingPage() {
                   'Goals tracked — retirement, education, emergency fund',
                   'Family signs in directly — all data available, any time',
                 ].map((t, i, arr) => (
-                  <li key={i} style={{ fontSize: 12.5, color: '#64748b', padding: '6px 0', display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', lineHeight: 1.5 }}>
+                  <li key={i} style={{ fontSize: 12.5, color: '#a1abbd', padding: '6px 0', display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', lineHeight: 1.5 }}>
                     <span style={{ color: '#34d399', flexShrink: 0, fontSize: 11, fontWeight: 700, marginTop: 1 }}>✓</span>
                     {t}
                   </li>
@@ -886,7 +902,7 @@ export default function LandingPage() {
                 <div key={s.n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative', zIndex: 1, padding: '0 16px' }}>
                   <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#080d1a', border: '1px solid rgba(167,139,250,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontSize: 16, fontWeight: 700, color: '#a78bfa', marginBottom: 12, flexShrink: 0 }}>{s.n}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 5 }}>{s.h}</div>
-                  <p style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.6 }}>{s.p}</p>
+                  <p style={{ fontSize: 12.5, color: '#94a3b8', lineHeight: 1.6 }}>{s.p}</p>
                 </div>
               ))}
             </div>
