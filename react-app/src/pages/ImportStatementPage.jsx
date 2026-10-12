@@ -182,7 +182,18 @@ export default function ImportStatementPage() {
   async function doImport() {
     setConfirm(false); setSaving(true); setCheckErr('')
     try {
-      const r = await api.importSave(parsed, mapping, preview.token, accounts)
+      // The app may be updating NAVs / goal links in the background (it holds the same lock for a minute or
+      // two, e.g. right after sign-in). Wait and try again by itself instead of asking the user to retry.
+      let r = null
+      for (let tries = 0; ; tries++) {
+        try { r = await api.importSave(parsed, mapping, preview.token, accounts); break }
+        catch (e) {
+          if (!/another import or update is running/i.test(e.message || '') || tries >= 10) throw e
+          setCheckErr('')
+          showToast('The app is finishing a background update (fund prices). Your import starts as soon as it is done…', 'warning')
+          await new Promise((res) => setTimeout(res, 15000))
+        }
+      }
       setResult(r)
       setParsed(null); setPreview(null)
       showToast(`Imported: ${r.summary}`, 'success')
