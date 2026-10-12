@@ -4,6 +4,7 @@ import { useState, useRef, useLayoutEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
 import { createPortal } from 'react-dom'
+import { RetirementActions, BucketHelpLink } from './RetirementBucketsPage'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -24,7 +25,7 @@ function mixOf(items) {
 const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
 
 /** equity / debt: now vs target, one calm line of text */
-function Mix({ m, plan, note }) {
+function Mix({ m, plan, note, soft }) {
   if (!m) return null
   const e = m.e + (m.g || 0)
   const off = plan == null ? null : e - plan
@@ -35,7 +36,7 @@ function Mix({ m, plan, note }) {
       <span>{m.g > 0 ? 'Equity + gold' : 'Equity'} <b>{e}%</b>{plan != null && <small> / {plan}% target</small>}</span>
       <span className="sep" />
       <span>Debt <b>{m.d}%</b>{plan != null && <small> / {Math.max(0, 100 - plan)}% target</small>}</span>
-      {mark && <em className={mark[0]}>{mark[1]}</em>}
+      {mark && <em className={soft && mark[0] === 'warn' ? 'soft' : mark[0]}>{mark[1]}{soft && mark[0] === 'warn' ? ' · fine, the family mix is on plan' : ''}</em>}
       {note && <small className="g2-mxn">{note}</small>}
     </div>
   )
@@ -83,7 +84,8 @@ function useCurve(dep) {
 
 export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   const { mt, navigate, pname, closeGoal } = ctx
-  const steps = todo.steps.filter((x) => x.t === 'cash' || x.t === 'switch')
+  const steps = todo.steps.filter((x) => x.t === 'cash' || x.t === 'switch' || x.t === 'protect')
+  const protectOf = Object.fromEntries(todo.steps.filter((x) => x.t === 'protect').map((x) => [x.goal.goalId, x]))
   const shortStep = todo.steps.find((x) => x.t === 'short')
   const readyOf = Object.fromEntries(todo.steps.filter((x) => x.t === 'ready').map((x) => [x.goal.goalId, x]))
   const live = plans
@@ -112,6 +114,8 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
         </div>
       )}
 
+      {live.filter((p) => p.isRet).map((p) => <RetirementActions key={p.goal.goalId} goal={p.goal} part="refill" />)}
+
       {/* 2. All goals together: the same small boxes as the goal cards */}
       <div className="g2-card g2-all">
         <div className="g2-lbl"><span>All goals together</span><span>{live.length} goal{live.length > 1 ? 's' : ''}</span></div>
@@ -134,14 +138,14 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
         {groups.filter((x) => x.past).map(({ y, ps }, gi) => (
           <div key={y} className={sideOf(gi)}>
             <div className="g2-yr due"><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
-            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} closeGoal={closeGoal} navigate={navigate} />)}</div>
+            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} protect={protectOf[p.goal.goalId]} familyOk={fam?.status !== 'steps'} closeGoal={closeGoal} navigate={navigate} />)}</div>
           </div>
         ))}
         <div className={`g2-now ${sideOf(nPast)} ${nPast ? "after" : ""}`}>📍 Today · {new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
         {groups.filter((x) => !x.past).map(({ y, ps }, gi) => (
           <div key={y} className={sideOf(gi + nPast)}>
             <div className={`g2-yr ${ps.some((p) => p.state === 'short') ? 'w' : ''} ${ps.some((p) => p.state === 'due' && !p.isRet) ? 'due' : ''}`}><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
-            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} closeGoal={closeGoal} navigate={navigate} />)}</div>
+            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} protect={protectOf[p.goal.goalId]} familyOk={fam?.status !== 'steps'} closeGoal={closeGoal} navigate={navigate} />)}</div>
           </div>
         ))}
       </div>
@@ -191,14 +195,16 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
     <div className="g2-bk">
       {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
         : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Now: one growth mix</div><div className={p.bucketMode && !retired ? 'on' : ''}>{yearOf(p.goal) - 5}: fill the jars</div><div>{yearOf(p.goal)}: live from them</div></div>}
+      <div className="g2-bkh"><BucketHelpLink /></div>
       <div className="g2-jars">{jar('inc', 'Income', '2 years of expenses · safe')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('gro', 'Growth', 'the rest · equity')}</div>
       <div className="g2-flow"><div>↓ pays your monthly income</div><div>→ refills Income once a year</div><div>→ refills Stability after good years</div></div>
-      <p className="g2-hint">{retired ? 'You spend only from Income. Once a year To do shows the refill (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, in To do).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}{onOpen && <> <a className="g2-link" onClick={() => onOpen(p)}>Open the buckets page ›</a></>}</p>
+      {retired && <RetirementActions goal={p.goal} part="income" />}
+      <p className="g2-hint">{retired ? 'You spend only from Income. Once a year the refill shows at the top of this page (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown at the top of this page).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
     </div>
   )
 }
 
-function GoalCard({ p, mt, pname, renderBuckets, ready, closeGoal, navigate }) {
+function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, closeGoal, navigate }) {
   const g = p.goal
   const retired = p.isRet && p.years <= 0
   const due = p.state === 'due' && !p.isRet
@@ -221,7 +227,13 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, closeGoal, navigate }) {
         <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'see All goals together'}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
       </div>
-      <Mix m={mixOf(items)} plan={due ? null : p.eqTarget} />
+      {(() => {
+        const retOnly = items.filter((it) => it.kind === 'other' && /epf|ppf|nps|vpf/i.test(it.holding?.investmentType || '')).reduce((t, it) => t + it.value, 0)
+        const mostlyRet = p.isRet && p.has > 0 && retOnly / p.has >= 0.5
+        return <Mix m={mixOf(items)} plan={due || mostlyRet ? null : p.eqTarget}
+          soft={!protect && familyOk}
+          note={protect ? `⚠ Too much equity for ${p.years < 1 ? 'a few months' : `${Math.round(p.years * 2) / 2} years`} left: see "Make it safer" at the top.` : mostlyRet ? `Mostly EPF / PPF / NPS (${L(retOnly)}), which count as debt and stay for retirement. Your equity is counted in your other goals' share.` : null} />
+      })()}
       {due && ready && <ReadyStep s={ready} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />}
       {items.length > 0 && (
         <details><summary>Investments in this goal ({items.length})</summary>
@@ -295,14 +307,34 @@ function Step({ s, n, mt, pname, closeGoal, navigate }) {
       {s.rows.map((r, i) => <Row key={i} chip="buy" k="BUY" a={r.fund ? fname(r.fund) : 'An equity fund of your choice'} b={r.fund ? pname(r.portfolioId) : 'any equity fund'} v={L(r.amount)} />)}
     </div>
   )
-  if (s.t === 'switch') return (
-    <div className="g2-step">
-      <div className="g2-sh"><span className="g2-n">{n}</span><div><small>🔁 All goals · more than 10 points off the plan</small><b>One switch: {L(s.total)} {s.toSafe ? 'from equity to safe funds' : 'from debt to equity'}</b><p>In {pname(s.portfolioId)}: the money only moves between your funds.</p></div></div>
-      {s.sells.map((r, i) => <Row key={'s' + i} chip="sell" k="SELL" a={fname(r.fund)} b={`${r.units != null ? `${U(r.units)} units` : ''}${r.nav ? ` · NAV ₹${Number(r.nav).toFixed(2)}` : ''}`} v={`≈ ${L(r.value)}`} />)}
-      {s.buys.map((r, i) => <Row key={'b' + i} chip="buy" k="BUY" a={r.fund ? fname(r.fund) : (r.wantSafe ? 'A liquid or debt fund' : 'An equity fund')} b="the money from the sale · units depend on that day's NAV" v={L(r.value)} />)}
-      <p className="g2-how">Sell in units, buy in ₹. Selling may have tax.</p>
-    </div>
-  )
+  if (s.t === 'switch' || s.t === 'protect') {
+    const prot = s.t === 'protect'
+    const buys = prot ? [{ fund: s.buy, value: s.total, wantSafe: true }] : s.buys
+    const left = prot ? (s.years < 1 ? `${Math.max(1, Math.round(s.years * 12))} months` : `${Math.round(s.years * 2) / 2} years`) : null
+    return (
+      <div className="g2-mv">
+        <div className="g2-mvh">
+          <div className="g2-mvi">{prot ? icon(s.goal) : '🔁'}</div>
+          <div className="g2-mvt"><small>{prot ? `${mt(s.goal.goalName)} · ${left} left` : 'All goals · mix more than 10 points off'}</small>
+            <b>{prot ? 'Make it safer' : s.toSafe ? 'Move some equity to safe funds' : 'Move some safe money to equity'}</b>
+            <span>{prot ? `${s.eqNow}% is in equity; with ${left} left its plan is ${s.eqTarget}%.` : `In ${pname(s.portfolioId)}, only between your own funds.`}</span></div>
+          <div className="g2-mva"><b>{L(s.total)}</b><small>to move</small></div>
+        </div>
+        <div className="g2-two">
+          <div className="g2-pk sell">
+            <div className="g2-pkh"><span className="g2-chip sell">SELL</span><span>{pname(s.portfolioId)}</span></div>
+            {s.sells.map((r, i) => <div key={i} className="g2-pkr"><span>{fname(r.fund)}<small>{r.units != null ? `${r.all ? 'all ' : ''}${U(r.units)} units` : ''}</small></span><span className="v"><b>≈ {L(r.value)}</b></span></div>)}
+          </div>
+          <em className="g2-orw">→</em>
+          <div className="g2-pk buy">
+            <div className="g2-pkh"><span className="g2-chip buy">BUY</span><span>same portfolio</span></div>
+            {buys.map((r, i) => <div key={i} className="g2-pkr"><span>{r.fund ? fname(r.fund) : (r.wantSafe ? 'A liquid or short-term debt fund' : 'An equity fund')}<small>with the money from the sale</small></span><span className="v"><b>{L(r.value)}</b></span></div>)}
+          </div>
+        </div>
+        <p className="g2-how">Sell in units, buy in ₹ (units depend on that day's NAV). Selling may have tax.</p>
+      </div>
+    )
+  }
   return null
 }
 const WdRow = ({ r, mt, pname }) => <Row chip="wd" k="WITHDRAW" a={r.name ? (r.kind === 'other' ? mt(r.name) : splitFundName(r.name).main) : ''} b={r.kind === 'other' ? 'close it, or let it mature' : `${pname(r.portfolioId)} · redeem ${r.all ? 'all ' : ''}${U(r.units)} ${r.kind === 'stock' ? 'shares' : 'units'}`} v={`≈ ${L(r.value)}`} />
@@ -453,6 +485,12 @@ const CSS = `
 .g2-rdy>div>b{display:block;font-size:14px;color:var(--due)}.g2-rdy>div>span{display:block;font-size:12px;color:var(--text-muted);margin-top:3px}
 .g2-wdmh{font-size:13.5px;color:var(--text-secondary);margin:0 0 6px}.g2-wdmh b{color:var(--text-primary)}.g2-wdf{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .g2-shs{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}.g2-all .g2-two{margin-left:0}.g2-all .g2-step{padding:0;border:0}
+.g2-bkh{display:flex;justify-content:flex-end;margin-bottom:8px}
+.g2-mv{padding:14px 0 6px}.g2-mv+.g2-mv{border-top:1px solid var(--border)}
+.g2-mvh{display:flex;align-items:center;gap:12px}.g2-mvi{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--bg-inset);border:1px solid var(--border)}
+.g2-mvt{flex:1;min-width:0}.g2-mvt small{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}.g2-mvt b{display:block;font-size:15px;color:var(--text-primary);margin:2px 0}.g2-mvt span{font-size:12.5px;color:var(--text-secondary)}
+.g2-mva{text-align:right}.g2-mva b{display:block;font-size:18px;color:var(--text-primary)}.g2-mva small{font-size:11px;color:var(--text-muted)}
+.g2-mv .g2-two{margin-left:0}.g2-pk.sell{border-top:3px solid var(--sell)!important}.g2-pkr small{display:block;font-size:11px;color:var(--text-muted);margin-top:1px}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
@@ -462,7 +500,7 @@ const CSS = `
 .g2-badge.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}.g2-badge.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
 .g2-mx2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;color:var(--text-secondary);padding:2px 2px 0}.g2-mx2 .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
 .g2-mx2 b{color:var(--text-primary);font-weight:600}.g2-mx2 small{color:var(--text-muted);font-size:12px}.g2-mx2 .sep{width:1px;height:14px;background:var(--border)}
-.g2-mx2 em{font-style:normal;font-size:12px;font-weight:600;margin-left:auto}.g2-mx2 em.ok{color:var(--ok)}.g2-mx2 em.warn{color:var(--warn)}
+.g2-mx2 em{font-style:normal;font-size:12px;font-weight:600;margin-left:auto}.g2-mx2 em.ok{color:var(--ok)}.g2-mx2 em.warn{color:var(--warn)}.g2-mx2 em.soft{color:var(--text-muted);font-weight:500}.g2-mx2 .g2-mxn{flex-basis:100%;margin-top:2px}.g2-mx2 .g2-mxn{color:var(--text-muted)}
 @media(max-width:640px){
  .g2-gh{gap:10px;margin-top:34px}.g2-gt{padding-right:4px}.g2-gi{width:40px;height:40px;font-size:20px}.g2-ring{transform:scale(.85)}.g2-mt{padding:4px 7px;font-size:11.5px}
  .g2-two{grid-template-columns:1fr;margin-left:0}.g2-orw{text-align:center}

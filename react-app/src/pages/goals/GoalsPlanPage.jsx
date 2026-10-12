@@ -95,8 +95,7 @@ export default function GoalsPlanPage() {
           <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic?add=1')}><Plus size={14} /> Add Goal</button>
         </span>
       </div>
-      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)}
-        renderBuckets={(p) => navigate(`/retirement-buckets?goal=${encodeURIComponent(p.goal.goalId)}`)} />}
+      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
       {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
     </div>
   )
@@ -223,7 +222,6 @@ function BucketsPanel({ p, onOpen }) {
         {box('grw', 'Growth', 'the rest · equity', growth)}
       </div>
       {b?.monthly ? <p className="gp-foot">Based on your monthly expense in retirement of about {L(b.monthly)}. Amounts are for the goal amount of {L(p.target)}.</p> : null}
-      <button className="gp-btn" onClick={onOpen}>{p.bucketMode ? 'Open retirement buckets ›' : 'Preview your buckets ›'}</button>
     </div>
   )
 }
@@ -414,7 +412,7 @@ function GoalDetail({ p, ctx }) {
         </> : <div className="gp-ok">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
       </div>
 
-      {p.isRet && <BucketsPanel p={p} onOpen={() => navigate(`/retirement-buckets?goal=${encodeURIComponent(g.goalId)}`)} />}
+      {p.isRet && <BucketsPanel p={p} />}
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Funds in this goal</h2><span className="gp-hs">{p.att.items.length} holdings · {L(p.att.total)}{fundsEq !== null && ` · ${fundsEq}% equity, ${100 - fundsEq}% safe`}</span></div>

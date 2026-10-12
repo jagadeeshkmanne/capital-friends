@@ -79,6 +79,30 @@ export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPor
     for (const [pid, g] of Object.entries(byPort)) if (g.sells.length) steps.push({ t: 'switch', portfolioId: pid, sells: g.sells.map((s) => ({ ...s, units: s.units ?? (navOf(s.fund) ? s.value / navOf(s.fund) : null) })), buys: g.buys, total: g.sells.reduce((t, s) => t + s.value, 0), toSafe: !!g.buys[0]?.wantSafe })
   }
 
+  // 5. a goal within 5 years holding far more equity than its glide path wants (the family total can look fine
+  //    while one near goal sits in equity): move that part to safe money, inside the same portfolio
+  for (const p of plans || []) {
+    if (p.isRet || p.state === 'due' || !(p.years > 0) || p.years > 5 || p.eqNow == null) continue
+    const over = p.eqNow - p.eqTarget
+    const amount = Math.round(((over / 100) * p.has) / 1000) * 1000
+    if (over <= 20 || amount < 25000) continue
+    const eqMf = (p.att?.items || []).filter((it) => it.kind === 'mf' && it.eq >= 0.65 && it.value > 0.5).sort((a, b) => b.value - a.value)
+    let left = amount
+    const sells = []
+    for (const it of eqMf) {
+      if (left < 500) break
+      const v = Math.min(left, it.value)
+      const nav = navOf(it.holding)
+      sells.push({ fund: it.holding, portfolioId: it.portfolioId, value: v, units: nav ? v / nav : null, all: v >= (Number(it.holding.currentValue) || 0) - 1 })
+      left -= v
+    }
+    if (!sells.length) continue
+    // buy: a debt fund already in that portfolio (from any goal's money), else one of your choice
+    const pid = sells[0].portfolioId
+    const debt = (plans || []).flatMap((q) => q.att?.items || []).filter((it) => it.kind === 'mf' && it.portfolioId === pid && it.eq < 0.2 && !it.holding?.lumpsumRestricted).sort((a, b) => b.value - a.value)[0]
+    steps.push({ t: 'protect', goal: p.goal, portfolioId: pid, eqNow: p.eqNow, eqTarget: p.eqTarget, years: p.years, total: sells.reduce((t, x) => t + x.value, 0), sells, buy: debt?.holding || null })
+  }
+
   // banner: today's SIPs + investments cannot reach the goals
   const runningSip = Math.round((mfHoldings || []).filter((h) => included.has(h.portfolioId) && Number(h.units) > 0).reduce((t, h) => t + (Number(h.ongoingSIP) || 0), 0))
   // a small top-up is just a step; the banner is for SIPs that clearly can't reach the goals

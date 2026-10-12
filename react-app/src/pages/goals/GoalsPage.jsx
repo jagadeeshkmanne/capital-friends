@@ -720,8 +720,8 @@ export default function GoalsPage() {
                       </button>
                     )}
                     {g.goalType === 'Retirement' && (
-                      <button onClick={() => navigate(`/retirement-buckets?goal=${encodeURIComponent(g.goalId)}`)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
-                        <Wallet size={11} /> {isPastDue || g.status === 'Achieved' || parseFloat(yearsLeft) <= 3 ? 'Buckets' : 'Bucket Preview'}
+                      <button onClick={() => navigate('/goals')} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors">
+                        <Wallet size={11} /> Buckets
                       </button>
                     )}
                     <button onClick={() => setModal({ edit: g })} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-white/5 rounded-lg transition-colors ml-auto">

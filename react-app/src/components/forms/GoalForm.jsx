@@ -940,7 +940,7 @@ function RetireNowPanel({ calc, lumpsum }) {
       ) : (
         <p className="text-sm font-bold text-emerald-400">What you have covers this goal</p>
       )}
-      <p className="text-xs text-[var(--text-dim)]">Link your investments to this goal, then use the Retirement Buckets page for the monthly income plan.</p>
+      <p className="text-xs text-[var(--text-dim)]">Link your investments to this goal, then see its buckets and monthly income in the retirement card on the Goals page.</p>
     </div>
   )
 }

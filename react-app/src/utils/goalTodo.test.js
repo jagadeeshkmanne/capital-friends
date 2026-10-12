@@ -62,4 +62,21 @@ describe('to do this month', () => {
     expect(r.steps.map((s) => s.t)).toEqual(['cash', 'switch'])
     expect(r.steps[1].sells[0].units).toBe(200)
   })
+
+  it('a near goal far above its equity target gets a move-to-safe step in its portfolio', () => {
+    const eqF = { fundName: 'Flexi Cap', schemeCode: 'E1', units: 1000, currentValue: 900000, currentNav: 900, portfolioId: 'P1' }
+    const dF = { fundName: 'Liquid', schemeCode: 'D1', units: 100, currentValue: 50000, currentNav: 500, portfolioId: 'P1' }
+    const home = { goal: { goalId: 'G1', goalName: 'Home' }, state: 'ok', years: 2.3, eqNow: 100, eqTarget: 30, has: 900000, gap: 0,
+      att: { items: [{ kind: 'mf', portfolioId: 'P1', holding: eqF, value: 900000, eq: 1 }] } }
+    const ef = { goal: { goalId: 'G2', goalName: 'EF' }, state: 'ok', years: 0.2, eqNow: 0, eqTarget: 0, has: 50000, gap: 0,
+      att: { items: [{ kind: 'mf', portfolioId: 'P1', holding: dF, value: 50000, eq: 0 }] } }
+    const { steps } = goalTodo({ plans: [home, ef] })
+    const st = steps.find((x) => x.t === 'protect')
+    expect(st).toBeTruthy()
+    expect(st.total).toBe(630000)
+    expect(st.sells[0].units).toBeCloseTo(700, 0)
+    expect(st.buy.schemeCode).toBe('D1')
+    // within 20 points: nothing
+    expect(goalTodo({ plans: [{ ...home, eqNow: 45 }] }).steps.some((x) => x.t === 'protect')).toBe(false)
+  })
 })
