@@ -55,7 +55,7 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
   const emailFor = (rel) => (rel === 'Spouse' ? (stmt && stmt !== me ? stmt : '') : me)
   const [rows, setRows] = useState(() => people.map((p) => {
     const rel = !hasSelf && p === mostFolios ? 'Self' : ''
-    return { key: p.key, name: p.name, names: p.names, rel, email: rel ? emailFor(rel) : me, emailEdited: false }
+    return { key: p.key, name: p.name, names: p.names, rel, email: rel ? emailFor(rel) : me, emailEdited: false, report: rel === 'Self', reportEdited: false }
   }))
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -64,6 +64,7 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
     if (j !== i) return r
     const n = { ...r, ...patch }
     if (patch.rel && !r.emailEdited) n.email = emailFor(patch.rel)
+    if (patch.rel && !r.reportEdited) n.report = ['Self', 'Spouse'].includes(patch.rel)
     return n
   }))
   const selfCount = rows.filter((r) => r.rel === 'Self').length + (hasSelf ? 1 : 0)
@@ -78,9 +79,8 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
     try {
       for (const r of rows) {
         const email = r.email.trim()
-        // kids and anyone using your own email: no daily email of their own and no sharing invite
-        const own = email.toLowerCase() === me
-        await addMember({ memberName: r.name.trim(), relationship: r.rel, email, includeInEmailReports: !KIDS.includes(r.rel) && (r.rel === 'Self' || !own), pan: '', aadhar: '', mobile: '', dynamicFields: {} })
+        // the daily email: your choice per person (on for you and your spouse, off for kids by default)
+        await addMember({ memberName: r.name.trim(), relationship: r.rel, email, includeInEmailReports: !!r.report, pan: '', aadhar: '', mobile: '', dynamicFields: {} })
       }
       onDone?.()
     } catch (e) { setErr(e.message || 'Could not add the family members') }
@@ -106,8 +106,12 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
           </select>
           <div>
             <input className={inp} type="email" value={r.email} onChange={(e) => set(i, { email: e.target.value, emailEdited: true })} placeholder="Email" aria-label="Email" />
-            {KIDS.includes(r.rel) && <p className="text-[11px] text-[var(--text-dim)] mt-1">Kids can use your email. They get no daily email.</p>}
-            {r.rel === 'Spouse' && <p className="text-[11px] text-[var(--text-dim)] mt-1">Their own email: they get the daily email and can sign in.</p>}
+            {KIDS.includes(r.rel) && <p className="text-[11px] text-[var(--text-dim)] mt-1">Young kids can use your email. A grown-up child can use their own.</p>}
+            {r.rel === 'Spouse' && <p className="text-[11px] text-[var(--text-dim)] mt-1">Their own email: they can also sign in and see the family.</p>}
+            <label className="flex items-center gap-2 mt-1.5 text-xs text-[var(--text-primary)]">
+              <input type="checkbox" checked={r.report} onChange={(e) => set(i, { report: e.target.checked, reportEdited: true })} />
+              Send them the daily email
+            </label>
           </div>
         </div>
       ))}
