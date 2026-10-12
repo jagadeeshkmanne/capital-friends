@@ -263,18 +263,18 @@ function ShortStep({ s, n, pname }) {
     const [open, setOpen] = useState(false)
     return (
     <div className="g2-step">
-      <div className="g2-sh g2-shs"><div><b>To close the gap, pick one</b><p>Either one is enough. SIPs change per portfolio and split by your fund targets.</p></div></div>
+      <div className="g2-sh g2-shs"><div><b>To close the gap, pick one</b><p>Either one is enough. The names below are your portfolios (as in Mutual Funds): SIPs are set per portfolio and split by its fund targets. The money still counts for all goals together.</p></div></div>
       <div className="g2-two">
         <div className="g2-pk sip">
-          <div className="g2-pkh"><span className="g2-chip sip">SIP</span><span>Raise monthly SIPs</span><b>+{L(s.sip)}<em>/mo</em></b></div>
-          {s.sipRows.map((r, i) => <div key={i} className="g2-pkr"><span>{r.portfolioId ? pname(r.portfolioId) : 'New SIP'}</span><span className="v">{r.portfolioId ? <><s>{L(r.sipFrom)}</s> → <b>{L(r.sipFrom + r.sip)}</b></> : <b>{L(r.sip)}</b>}</span></div>)}
+          <div className="g2-pkh"><span className="g2-chip sip">SIP</span><span>Raise monthly SIPs <small className="g2-pkn">in these portfolios</small></span><b>+{L(s.sip)}<em>/mo</em></b></div>
+          {s.sipRows.map((r, i) => <div key={i} className="g2-pkr"><span>{r.portfolioId ? <><i className="g2-pf">📁</i>{pname(r.portfolioId)}</> : 'New SIP'}</span><span className="v">{r.portfolioId ? <><s>{L(r.sipFrom)}</s> → <b>{L(r.sipFrom + r.sip)}</b></> : <b>{L(r.sip)}</b>}</span></div>)}
         </div>
         <em className="g2-orw">or</em>
         <div className="g2-pk buy">
-          <div className="g2-pkh"><span className="g2-chip buy">ONCE</span><span>Invest one time</span><b>{L(s.lump)}</b></div>
+          <div className="g2-pkh"><span className="g2-chip buy">ONCE</span><span>Invest one time <small className="g2-pkn">in these portfolios</small></span><b>{L(s.lump)}</b></div>
           {once.length ? once.map(([pid, v]) => (
             <div key={pid}>
-              <div className="g2-pkr"><span>{pname(pid)}</span><span className="v"><b>{L(v)}</b></span></div>
+              <div className="g2-pkr"><span><i className="g2-pf">📁</i>{pname(pid)}</span><span className="v"><b>{L(v)}</b></span></div>
               {open && s.buys.filter((b) => b.portfolioId === pid).map((b, i) => <div key={i} className="g2-pkf"><span>{fname(b.fund)}</span><span>{L(b.amount)}</span></div>)}
             </div>)) : <div className="g2-pkr"><span>Into an equity fund</span><span className="v"><b>{L(s.lump)}</b></span></div>}
           {s.buys.length > 0 && <button className={`g2-pb g2-pkb ${open ? '' : 'g2-pulse'}`} onClick={() => setOpen(!open)}>{open ? 'Hide funds ▴' : `Show the ${s.buys.length} funds ▾`}</button>}
@@ -519,6 +519,7 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-dlg{display:block;gap:0}
 .g2-stats>button.inc{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;text-align:left;cursor:pointer;font:inherit;color:inherit;background:var(--bg-inset);border:1px solid var(--border);border-radius:12px;padding:10px 14px}.g2-stats>button.inc b{margin:0}.g2-stats>button.inc small{margin-left:auto}.g2-stats>button.inc:hover{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-stats>button.inc small{color:#a78bfa}
 .g2-lock{margin-top:10px;padding:10px 12px;border:1px dashed var(--border);border-radius:12px;font-size:12.5px;color:var(--text-secondary)}.g2-lock b{display:block;color:var(--text-primary);margin-bottom:2px}.g2-lock small{display:block;color:var(--text-muted);margin-top:4px}
+.g2-pkn{display:inline;font-size:11px;color:var(--text-muted);font-weight:500}.g2-pf{font-style:normal;margin-right:6px;opacity:.8}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
