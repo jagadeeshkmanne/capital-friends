@@ -8,6 +8,7 @@ import { readCasPdf, statementForServer } from '../utils/cas/casPdf'
 import ImportHelp, { HowToStrip } from './ImportHelp'
 import Modal from '../components/Modal'
 import FollowCard from '../components/FollowCard'
+import AddMissingMembers from './AddMissingMembers'
 
 // Import a CAMS consolidated statement (beta). Steps: choose PDF -> Check (nothing is written) -> Import.
 const SAVED_KEY = 'cf_import_draft_v1'
@@ -335,11 +336,12 @@ export default function ImportStatementPage() {
               {mustFix && (
                 <Note tone="bad">
                   <p className="font-semibold">Before you can import:</p>
-                  {preview.missingMembers.map((m) => (
-                    <p key={m.holder}>• Add <b>{m.holder}</b> in <Link to="/family" className="underline">Family</Link> (same name as the statement), then come back.</p>
-                  ))}
+                  {preview.missingMembers.length > 0 && <p>• Some people on the statement are not in your family yet. Add them below (or in <Link to="/family" className="underline">Family</Link>).</p>}
                   {preview.needsBank && <p>• Add a bank account in <Link to="/accounts/bank" className="underline">Bank Accounts</Link> first – a new investment account needs one. Or pick one of your existing portfolios below.</p>}
                 </Note>
+              )}
+              {preview.missingMembers.length > 0 && (
+                <AddMissingMembers key={preview.missingMembers.map((m) => m.holder).join('|')} missing={preview.missingMembers} folios={parsed?.folios} statementEmail={parsed?.meta?.email} onDone={() => check()} />
               )}
 
               {preview.unknownFunds.length > 0 && (
