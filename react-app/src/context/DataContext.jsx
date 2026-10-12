@@ -64,11 +64,19 @@ export function DataProvider({ children }) {
   const [healthCheckAnswers, setHealthCheckAnswers] = useState(null)
 
   const didInitRef = useRef(false)
+  // When each section was last written by a section refresh (after an add/edit), and which sections hold data.
+  // A full load that started before such a write must not put the older copy back (e.g. a new loan
+  // "disappearing" when a slower background load finishes later), and a section the server failed to
+  // read must not wipe what is on screen.
+  const touchedAt = useRef({})
+  const hasData = useRef({})
+  const touch = (...keys) => { const t = Date.now(); keys.forEach((k) => { touchedAt.current[k] = t; hasData.current[k] = true }) }
 
   // ── Hydrate state from a data object (IDB or API response) ──
   // Uses 'key' in data to set even empty arrays (transitions null → [])
   const hydrateState = useCallback((data) => {
     if (!data) return
+    Object.keys(data).forEach((k) => { if (k !== '_errors') hasData.current[k] = true })
     if ('members' in data) setMembers(data.members || [])
     if ('bankAccounts' in data) setBanks(data.bankAccounts || [])
     if ('investments' in data) setInvestmentAccounts(data.investments || [])
@@ -90,24 +98,12 @@ export function DataProvider({ children }) {
 
   // ── Save all data to IDB (after API load) ──
   const persistToIDB = useCallback((data) => {
-    idb.putMany({
-      members: data.members || [],
-      bankAccounts: data.bankAccounts || [],
-      investments: data.investments || [],
-      insurancePolicies: data.insurancePolicies || [],
-      liabilities: data.liabilities || [],
-      otherInvestments: data.otherInvestments || [],
-      stockPortfolios: data.stockPortfolios || [],
-      stockHoldings: data.stockHoldings || [],
-      stockTransactions: data.stockTransactions || [],
-      mfPortfolios: data.mfPortfolios || [],
-      mfHoldings: data.mfHoldings || [],
-      mfTransactions: data.mfTransactions || [],
-      goals: data.goals || [],
-      reminders: data.reminders || [],
-      goalPortfolioMappings: data.goalPortfolioMappings || [],
-      assetAllocations: data.assetAllocations || [],
-    })
+    const KEYS = ['members', 'bankAccounts', 'investments', 'insurancePolicies', 'liabilities', 'otherInvestments',
+      'stockPortfolios', 'stockHoldings', 'stockTransactions', 'mfPortfolios', 'mfHoldings', 'mfTransactions',
+      'goals', 'reminders', 'goalPortfolioMappings', 'assetAllocations']
+    const out = {}
+    KEYS.forEach((k) => { if (k in data) out[k] = data[k] || [] })
+    idb.putMany(out)
     // Tag IDB with current user so a different user on same device gets a clean cache
     if (user?.email) setIDBOwner(user.email)
   }, [user?.email])
@@ -118,7 +114,19 @@ export function DataProvider({ children }) {
       if (background) setIsRefreshing(true)
       else setLoading(true)
       setError(null)
-      const data = await api.loadAllData()
+      const started = Date.now()
+      const data = { ...(await api.loadAllData()) }
+      // keep newer section writes, and keep what we have for sections the server could not read
+      const FN_KEY = {
+        getAllFamilyMembers: 'members', getAllBankAccounts: 'bankAccounts', getAllInvestmentAccounts: 'investments',
+        getAllPortfoliosStrict_: 'mfPortfolios', getAllMFHoldings: 'mfHoldings', getAllMFTransactions: 'mfTransactions',
+        getAllGoals: 'goals', getGoalPortfolioMappings: 'goalPortfolioMappings', getAllInsurancePolicies: 'insurancePolicies',
+        getAllLiabilities: 'liabilities', getAllInvestmentsStrict_: 'otherInvestments', getAllStockPortfoliosStrict_: 'stockPortfolios',
+        getAllStockHoldingsData: 'stockHoldings', getAllStockTransactionsData: 'stockTransactions', getAllReminders: 'reminders',
+        getAllAssetAllocationsData: 'assetAllocations',
+      }
+      ;(data._errors || []).forEach((e) => { const k = FN_KEY[e.fn]; if (k && hasData.current[k]) delete data[k] })
+      Object.keys(touchedAt.current).forEach((k) => { if (touchedAt.current[k] > started) delete data[k] })
       hydrateState(data)
       persistToIDB(data)
       setFreshLoad({ at: Date.now(), errors: (data && data._errors) || [] })
@@ -134,36 +142,42 @@ export function DataProvider({ children }) {
   const refreshMembers = useCallback(async () => {
     const data = await api.getMembers()
     setMembers(data || [])
+    touch('members')
     idb.put('members', data || [])
   }, [])
 
   const refreshBanks = useCallback(async () => {
     const data = await api.getBanks()
     setBanks(data || [])
+    touch('bankAccounts')
     idb.put('bankAccounts', data || [])
   }, [])
 
   const refreshInvestmentAccounts = useCallback(async () => {
     const data = await api.getInvestmentAccounts()
     setInvestmentAccounts(data || [])
+    touch('investments')
     idb.put('investments', data || [])
   }, [])
 
   const refreshInsurance = useCallback(async () => {
     const data = await api.getInsurance()
     setInsurance(data || [])
+    touch('insurancePolicies')
     idb.put('insurancePolicies', data || [])
   }, [])
 
   const refreshLiabilities = useCallback(async () => {
     const data = await api.getLiabilities()
     setLiabilities(data || [])
+    touch('liabilities')
     idb.put('liabilities', data || [])
   }, [])
 
   const refreshOtherInvestments = useCallback(async () => {
     const data = await api.getOtherInvestments()
     setOtherInvestments(data || [])
+    touch('otherInvestments')
     idb.put('otherInvestments', data || [])
   }, [])
 
@@ -171,6 +185,7 @@ export function DataProvider({ children }) {
     const [goals, mappings] = await Promise.all([api.getGoals(), api.getGoalMappings()])
     setGoals(goals || [])
     setGoalPortfolioMappings(mappings || [])
+    touch('goals', 'goalPortfolioMappings')
     idb.put('goals', goals || [])
     idb.put('goalPortfolioMappings', mappings || [])
   }, [])
@@ -178,6 +193,7 @@ export function DataProvider({ children }) {
   const refreshReminders = useCallback(async () => {
     const data = await api.getReminders()
     setReminders(data || [])
+    touch('reminders')
     idb.put('reminders', data || [])
   }, [])
 
@@ -191,6 +207,7 @@ export function DataProvider({ children }) {
     setMFPortfolios(portfolios || [])
     setMFHoldings(normalizedHoldings)
     setMFTransactions(transactions || [])
+    touch('mfPortfolios', 'mfHoldings', 'mfTransactions')
     idb.putMany({
       mfPortfolios: portfolios || [],
       mfHoldings: normalizedHoldings,
@@ -207,6 +224,7 @@ export function DataProvider({ children }) {
     setStockPortfolios(portfolios || [])
     setStockHoldings(holdings || [])
     setStockTransactions(transactions || [])
+    touch('stockPortfolios', 'stockHoldings', 'stockTransactions')
     idb.putMany({
       stockPortfolios: portfolios || [],
       stockHoldings: holdings || [],
@@ -691,6 +709,7 @@ export function DataProvider({ children }) {
   const updateAssetAllocation = useCallback(async (data) => {
     const result = await api.saveAssetAllocation(data)
     // Optimistically update local state
+    touch('assetAllocations')
     setAssetAllocations(prev => {
       const list = prev || []
       const idx = list.findIndex(a => a.fundCode === data.fundCode)

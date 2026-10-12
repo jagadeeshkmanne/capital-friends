@@ -187,6 +187,8 @@ export default function ImportStatementPage() {
       setParsed(null); setPreview(null)
       showToast(`Imported: ${r.summary}`, 'success')
       refreshData(true)
+      // the sheet finishes its NAV / P&L formulas a little after the save: load once more so XIRR and values are complete
+      setTimeout(() => refreshData(true), 20000)
     } catch (e) {
       setCheckErr(e.message)
     } finally {
