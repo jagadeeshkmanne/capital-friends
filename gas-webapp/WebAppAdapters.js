@@ -255,7 +255,16 @@ function getStockTransactions(portfolioId) {
  * Original: mapPortfoliosToGoal(goalId, portfolioMappings)
  */
 function updateGoalPortfolioMappings(goalId, mappings) {
-  return mapPortfoliosToGoal(goalId, mappings);
+  // one writer at a time (two open tabs could otherwise delete / append over each other's rows)
+  var lock = LockService.getUserLock();
+  lock.waitLock(30000);
+  try {
+    _investmentNameCache = {};
+    return mapPortfoliosToGoal(goalId, mappings);
+  } finally {
+    _investmentNameCache = null;
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================

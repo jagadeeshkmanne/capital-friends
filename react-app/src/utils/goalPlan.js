@@ -53,19 +53,22 @@ export function splitSip({ att, amount, mfHoldings }) {
     const all = (mfHoldings || []).filter((h) => h.portfolioId === pid)
     const tsum = all.reduce((t, h) => t + (Number(h.targetAllocationPct) || 0), 0)
     if (tsum >= 99 && tsum <= 101) {
-      const tg = all.filter((h) => (Number(h.targetAllocationPct) || 0) > 0)
-      const V = all.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
+      // funds you marked "no SIP" never get new SIP money; the others share it by their targets
+      const tg = all.filter((h) => (Number(h.targetAllocationPct) || 0) > 0 && !h.sipRestricted)
+      const ts = tg.reduce((t, h) => t + Number(h.targetAllocationPct), 0)
+      const V = tg.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
       const after = V + M
-      const gap = tg.map((h) => Math.max(0, (Number(h.targetAllocationPct) / tsum) * after - (Number(h.currentValue) || 0)))
+      const gap = tg.map((h) => Math.max(0, (Number(h.targetAllocationPct) / ts) * after - (Number(h.currentValue) || 0)))
       const G = gap.reduce((t, x) => t + x, 0)
       if (G >= M) tg.forEach((h, i) => { if (gap[i] > 0) parts.push({ fund: h, w: M * gap[i] / G }) })
       else {
         const rest = M - G
-        tg.forEach((h, i) => parts.push({ fund: h, w: gap[i] + rest * (Number(h.targetAllocationPct) / tsum) }))
+        tg.forEach((h, i) => parts.push({ fund: h, w: gap[i] + rest * (Number(h.targetAllocationPct) / ts) }))
       }
     } else {
-      const v = its.reduce((t, it) => t + it.value, 0)
-      for (const it of its) parts.push({ fund: it.holding, w: M * it.value / v })
+      const ok = its.filter((it) => !it.holding?.sipRestricted)
+      const v = ok.reduce((t, it) => t + it.value, 0)
+      for (const it of ok) parts.push({ fund: it.holding, w: M * it.value / v })
     }
   }
   const merged = {}
@@ -140,8 +143,8 @@ export function switchSteps({ att, targetEq, mfHoldings, eqOf }) {
  * The whole plan for a family's active goals.
  * @returns { goals: [planGoal], portfolios: [{ portfolioId, value, equityPct, targetPct, goals }] }
  */
-export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, now = new Date() }) {
-  const plans = (goals || []).filter((g) => g.targetDate).map((g) => {
+export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, now = new Date(), pool = false }) {
+  const plans = (goals || []).filter((g) => g.targetDate && Number.isFinite(new Date(g.targetDate).getTime())).map((g) => {
     const years = Math.max(0, (new Date(g.targetDate) - now) / YEAR_MS)
     const r = Number(g.expectedCAGR) || 0.12
     const target = Number(g.targetAmount) || 0
@@ -151,16 +154,25 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     const sip = Math.round((att.items || []).filter((it) => it.kind === 'mf').reduce((s2, it) => s2 + (Number(it.holding.ongoingSIP) || 0) * (it.fraction || 0), 0))
     const plannedSip = Number(g.monthlyInvestment) || 0
     const has = att.total > 0 ? att.total : (Number(g.currentValue) || 0)
-    const rec = years > 0 ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }
+    const rec = { ...(years > 0 ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }) }
     const isRet = g.goalType === 'Retirement'
     const bucketMode = isRet && followsBucketPlan(g.goalType, years)
     const eqNow = att.total > 0 ? Math.round(att.equity / att.total * 100) : null
-    const need = needToday({ target, years, annualReturn: r, sip })
+    // the emergency fund is needed in full today (pool mode); other goals can grow towards their date
+    const need = pool && g.goalType === 'Emergency Fund' ? target : needToday({ target, years, annualReturn: r, sip })
     const gap = has - need
     const tol = Math.max(1000, 0.02 * need)
-    const state = years <= 0 ? 'due' : gap < -tol ? 'short' : gap > tol ? 'extra' : 'onplan'
+    // pool mode: a goal that already holds its full amount before its date is "achieved": protect it (all safe).
+    // Retirement is the exception: its money must last for decades after the date, so it keeps its glide path.
+    const achieved = pool && years > 0 && target > 0 && has >= target * 0.98
+    const state = years <= 0 ? 'due' : achieved ? 'achieved' : gap < -tol ? 'short' : gap > tol ? 'extra' : 'onplan'
+    if ((achieved && !isRet) || years <= 0) rec.equity = 0
     const steps = []
-    if (!bucketMode && years > 0 && eqNow !== null) {
+    if (pool) {
+      // one family plan does the equity / safe moves; a goal only shows what is its own
+      if (state === 'due' && has > 0) steps.push({ t: 'ready' })
+      if (state === 'achieved' && !isRet && eqNow > 5) steps.push({ t: 'protect' })
+    } else if (!bucketMode && years > 0 && eqNow !== null) {
       for (const sw of switchSteps({ att, targetEq: rec.equity / 100, mfHoldings, eqOf })) steps.push({ t: 'switch', ...sw })
     }
     if (bucketMode) steps.push({ t: 'buckets' })
@@ -179,7 +191,7 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     return { goal: g, plannedSip, sipNeeded, years, yearsLeft: Math.ceil(years - 1e-9), r, sip, target, has, need, gap, state, eqNow, eqTarget: rec.equity, bucketMode, isRet, steps, addSip, lumpToday: state === 'short' ? -gap : 0, att }
   })
   // extra in one goal can pay for another goal's SIP: suggest moving SIP, never more than the goal's own SIP
-  const donors = plans.filter((p) => p.state === 'extra' && p.sip > 0 && p.years > 0)
+  const donors = pool ? [] : plans.filter((p) => p.state === 'extra' && p.sip > 0 && p.years > 0)
   for (const rcv of plans.filter((p) => p.addSip > 0).sort((a, b) => a.years - b.years)) {
     for (const d of donors) {
       const free = Math.min(d.sip - (d.moved || 0), sipForAmount({ amountToday: d.gap, years: d.years, annualReturn: d.r }) - (d.moved || 0))

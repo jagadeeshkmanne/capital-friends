@@ -628,7 +628,7 @@ function addPortfolioSummarySection(sheet, portfolioId, portfolioName) {
  * Get all portfolios
  * @returns {Array} - Array of portfolio objects
  */
-function getAllPortfolios() {
+function getAllPortfolios(strict) {
   try {
     log('getAllPortfolios() called');
 
@@ -685,9 +685,15 @@ function getAllPortfolios() {
   } catch (error) {
     log('ERROR in getAllPortfolios: ' + error.toString());
     log('Stack trace: ' + error.stack);
+    if (strict) throw error; // app load: report the failed read instead of "no portfolios"
     // Return empty array instead of null to avoid issues in UI
     return [];
   }
+}
+
+/** For loadAllData: a failed read is reported (in _errors), not shown as "no portfolios". */
+function getAllPortfoliosStrict_() {
+  return getAllPortfolios(true);
 }
 
 /**

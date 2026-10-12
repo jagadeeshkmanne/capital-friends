@@ -50,7 +50,7 @@ function showManageInvestmentTypesDialog() {
  * Get all investments from OtherInvestments sheet
  * @returns {Array} Array of investment objects
  */
-function getAllInvestments() {
+function getAllInvestments(strict) {
   try {
     const sheet = getSheet(CONFIG.otherInvestmentsSheet);
     if (!sheet) {
@@ -120,8 +120,14 @@ function getAllInvestments() {
     return investments;
   } catch (error) {
     Logger.log('Error in getAllInvestments: ' + error.message);
+    if (strict) throw error; // the app load must know the read failed (it reports it in _errors)
     return [];
   }
+}
+
+/** For loadAllData: same list, but a failed read is reported instead of looking like "no investments". */
+function getAllInvestmentsStrict_() {
+  return getAllInvestments(true);
 }
 
 /**

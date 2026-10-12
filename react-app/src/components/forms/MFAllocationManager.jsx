@@ -14,7 +14,8 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
   const { mfHoldings, mfPortfolios, toggleLumpsumRestricted, toggleSipRestricted, goalPortfolioMappings, goalList, assetAllocations } = useData()
   const linkedGoals = (goalPortfolioMappings || []).filter((m) => m.portfolioId === portfolioId && Number(m.allocationPct) > 0).map((m) => (goalList || []).find((g) => g.goalId === m.goalId)).filter((g) => g && g.isActive !== false && g.status !== 'Achieved')
   // linked to a goal: the goal sets the targets, so % are read-only; only adding or exiting a fund is allowed
-  const locked = linkedGoals.length > 0
+  // goals now use one shared pool (Money for goals): your own targets are always yours to edit
+  const locked = false
   const allocMap = useMemo(() => { const m = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) m[a.fundCode] = a.assetAllocation }); return m }, [assetAllocations])
   const r2 = (v) => Math.round(v * 100) / 100
   const isEq = (a) => equityFraction({ schemeCode: a.schemeCode, category: a.category || inferCategory(a.fundName) }, allocMap) >= 0.5
@@ -151,11 +152,6 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
   return (
     <div className="space-y-4">
-      {linkedGoals.length > 0 && (
-        <div className="rounded-lg px-3 py-2 border border-violet-500/30 bg-violet-500/5 text-xs text-[var(--text-secondary)]">
-          <b className="text-violet-400">🔒 Set by your goal.</b> This portfolio is linked to {linkedGoals.map((g) => mt(g.goalName)).join(', ')}, so its targets follow the goal's timeline and can't be edited here. You can still <b>add a fund</b> (it gets an equal share of its side) or <b>exit a fund</b> (its share goes to the others). Unlink the goal to get your own targets back.
-        </div>
-      )}
       {/* Portfolio Info */}
       <div className="bg-[var(--bg-inset)] rounded-lg px-3 py-2 border border-[var(--border-light)]">
         <p className="text-xs font-semibold text-[var(--text-primary)]">{mt(String(portfolio?.portfolioName || '').replace(/^PFL-/, ''))}</p>

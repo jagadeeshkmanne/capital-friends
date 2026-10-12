@@ -702,7 +702,7 @@ function getGoalPortfolioMappings(goalId) {
       goalName: row[2],
       portfolioId: row[3],
       portfolioName: row[4],
-      allocationPct: Math.round((row[5] || 0) * 100), // Convert decimal → integer for React (0.80 → 80)
+      allocationPct: Math.round((Number(row[5]) || 0) * 10000) / 100, // decimal → % with 2 decimals (0.8 → 80, 0.0028 → 0.28)
       investmentType: (numCols >= 7 && row[6]) ? row[6] : 'MF' // Column G, default to MF
     });
   });
@@ -723,20 +723,26 @@ function inferInvestmentType(id) {
 /**
  * Resolve investment display name by looking up from the correct sheet
  */
+var _investmentNameCache = null; // set for one save call so the lists are read once, not once per row
+function cachedList_(key, fn) {
+  if (!_investmentNameCache) return fn();
+  if (!_investmentNameCache[key]) _investmentNameCache[key] = fn();
+  return _investmentNameCache[key];
+}
 function resolveInvestmentName(investmentId, investmentType) {
   try {
     if (investmentType === 'Stock') {
-      const portfolios = getAllStockPortfolios();
+      const portfolios = cachedList_('stock', getAllStockPortfolios);
       const p = portfolios.find(p => p.portfolioId === investmentId);
       return p ? p.portfolioName : investmentId;
     }
     if (investmentType === 'Other') {
-      const investments = getAllInvestments();
+      const investments = cachedList_('other', getAllInvestments);
       const inv = investments.find(i => i.investmentId === investmentId);
       return inv ? inv.investmentName : investmentId;
     }
     // MF portfolio
-    const portfolios = getAllPortfolios();
+    const portfolios = cachedList_('mf', getAllPortfolios);
     const p = portfolios.find(p => p.portfolioId === investmentId);
     return p ? p.portfolioName : investmentId;
   } catch (e) {
@@ -1051,7 +1057,13 @@ function determineGoalStatus(currentAllocated, targetAmount, yearsToGo, expected
 function parseSheetDate(dateStr) {
   if (!dateStr) return new Date();
   if (dateStr instanceof Date) return dateStr;
-  // Take just YYYY-MM-DD from any format (ISO string, date string, etc.)
+  // A full ISO time (as getAllGoals sends it: IST midnight = 18:30Z the day before): read it in the
+  // script's time zone, so saving a goal back unchanged keeps the same day
+  if (/T\d{2}:\d{2}/.test(String(dateStr))) {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  // Take just YYYY-MM-DD from any format (date string, etc.)
   const str = String(dateStr).substring(0, 10);
   const parts = str.split('-');
   if (parts.length === 3) {

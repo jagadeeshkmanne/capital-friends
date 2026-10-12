@@ -116,6 +116,7 @@ export function classifyOtherInvestment(investment) {
   const category = String(investment?.investmentCategory || '').trim().toLowerCase()
   const t = type.toLowerCase()
   if (t === 'fixed deposit' || t === 'fd') return { bucket: 'b1', reason: 'Fixed deposit', equity: 0, confidence: 'type' }
+  if (t === 'cash / savings' || category === 'cash') return { bucket: 'b1', reason: 'Cash / savings', equity: 0, confidence: 'type' }
   if (['epf', 'ppf', 'bonds', 'nps'].includes(t)) return { bucket: 'b2', reason: type, equity: 0, confidence: 'type' }
   if (category === 'gold' || category === 'silver' || includesAny(t, COMMODITY_WORDS)) return { bucket: 'b3', reason: 'Gold/silver', equity: 0, confidence: 'type' }
   if (category === 'equity') return { bucket: 'b3', reason: type || 'Equity', equity: 100, confidence: 'type' }

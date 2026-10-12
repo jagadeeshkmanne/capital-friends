@@ -6,6 +6,7 @@ import { useMask } from '../../context/MaskContext'
 import { useMetalPrices, metalLiveValue } from '../../utils/metals'
 
 const INVESTMENT_TYPES = [
+  { value: 'Cash / Savings', category: 'Cash' },
   { value: 'Fixed Deposit', category: 'Debt' },
   { value: 'PPF', category: 'Debt' },
   { value: 'EPF', category: 'Debt' },
@@ -26,7 +27,7 @@ const LOAN_SUGGESTIONS = {
 }
 
 const TYPE_OPTIONS = INVESTMENT_TYPES.map((t) => ({ value: t.value, label: t.value }))
-const CATEGORY_OPTIONS = ['Equity', 'Debt', 'Gold', 'Silver', 'Property', 'Alternative', 'Other'].map((c) => ({ value: c, label: c }))
+const CATEGORY_OPTIONS = ['Equity', 'Debt', 'Cash', 'Gold', 'Silver', 'Property', 'Alternative', 'Other'].map((c) => ({ value: c, label: c }))
 const STATUS_OPTIONS = [
   { value: 'Active', label: 'Active' },
   { value: 'Sold', label: 'Sold' },

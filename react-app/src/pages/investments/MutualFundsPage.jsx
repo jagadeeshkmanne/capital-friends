@@ -165,7 +165,7 @@ function buildJourney(txns, currentValue) {
 /** Goals a portfolio is linked to. Chips are spans (not buttons) because some rows are buttons themselves. */
 function GoalChips({ pid, big, goalLinks, navigate, mt }) {
   const l = goalLinks[pid]
-  if (!l?.length) return big ? <span><span className="font-semibold">Goals:</span> not linked</span> : null
+  if (!l?.length) return big ? <span><span className="font-semibold">Goals:</span> not used for goals</span> : null
   const open = (e, id) => { e.stopPropagation(); e.preventDefault(); navigate(`/goals/plan/${encodeURIComponent(id)}`) }
   return (
     <span className={`inline-flex flex-wrap items-center gap-1 ${big ? '' : 'mt-1'}`}>
@@ -177,7 +177,7 @@ function GoalChips({ pid, big, goalLinks, navigate, mt }) {
           🎯 {mt(x.goal.goalName)} · {x.pct}%
         </span>
       ))}
-      {big && <span className="text-[11px] text-[var(--text-dim)]">· targets follow these goals</span>}
+      
     </span>
   )
 }

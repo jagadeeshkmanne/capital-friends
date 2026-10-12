@@ -104,6 +104,7 @@ function getSectionHex(key) {
 const ASSET_CLASS_MAP = {
   stocks: 'Equity',
   PPF: 'Debt', EPF: 'Debt', NPS: 'Debt',
+  'Cash / Savings': 'Cash',
   'Fixed Deposit': 'Debt', FD: 'Debt', RD: 'Debt', SSY: 'Debt', NSC: 'Debt', Bonds: 'Debt', Debt: 'Debt',
   'Physical Gold': 'Gold', 'Digital Gold': 'Gold', 'Sovereign Gold Bond': 'Gold', Gold: 'Gold',
   'Physical Silver': 'Gold', 'Digital Silver': 'Gold', Silver: 'Gold',

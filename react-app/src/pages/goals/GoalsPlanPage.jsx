@@ -2,7 +2,7 @@
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
 // All numbers come from utils/goalPlan.js (tested in goalPlan.test.js).
 import { useMemo, useRef, useLayoutEffect, useState, useId } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
@@ -10,8 +10,12 @@ import { useMaskText } from '../../hooks/useMaskText'
 import PageLoading from '../../components/PageLoading'
 import { attributeFamilyGoals, equityFraction } from '../../utils/goalAttribution'
 import { buildGoalPlan } from '../../utils/goalPlan'
-import { allPortfolioTargets, TARGET_BAND } from '../../utils/goalTargets'
+import { familyPlan } from '../../utils/familyPlan'
+import { useGoalPool } from '../../hooks/useGoalPoolSync'
+import MoneyForGoals from './MoneyForGoals'
 import Modal from '../../components/Modal'
+import { useConfirm } from '../../context/ConfirmContext'
+import { useToast } from '../../context/ToastContext'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 
 const L = (v) => (v ? formatINR(Math.round(v)) : '—')
@@ -28,7 +32,15 @@ export default function GoalsPlanPage() {
   const navigate = useNavigate()
   const mt = useMaskText()
   const { selectedMember } = useFamily()
-  const { goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList } = useData()
+  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList, updateGoal, updateGoalMappings } = useData()
+  const confirm = useConfirm()
+  const { showToast } = useToast()
+  const closing = useRef(false)
+  // goals take their money from one shared pool (Money for goals): the links are worked out, not entered
+  const pool = useGoalPool()
+  const goalPortfolioMappings = pool.mappings
+  const [sp, setSp] = useSearchParams()
+  const [moneyOpen, setMoneyOpen] = useState(() => sp.get('money') === '1')
   // net worth, worked out the same way as the Goals page header
   const netWorth = useMemo(() => {
     const act = (l) => (l || []).filter((x) => x.status === 'Active')
@@ -45,44 +57,54 @@ export default function GoalsPlanPage() {
     // every active goal takes part, so shared portfolios are split the same way for all members
     const attribution = attributeFamilyGoals({ goals: active, mappings: goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap })
     const eqOf = (h) => equityFraction(h, allocMap)
-    const plan0 = buildGoalPlan({ goals: active, attribution, mfHoldings, mappings: goalPortfolioMappings, eqOf })
-    // portfolios with fund targets: the glide path moves the targets, and ONE rebalance does the moves,
-    // so a goal shows "Rebalance <portfolio>" instead of its own fund-to-fund switches
-    const managed = {}
-    for (const x of allPortfolioTargets({ goals: active, mappings: goalPortfolioMappings, mfHoldings, eqOf, attribution })) {
-      if (!['ok', 'update'].includes(x.status)) continue
-      const hs = (mfHoldings || []).filter((h) => h.portfolioId === x.portfolioId && Number(h.units) > 0)
-      const v = hs.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
-      const actEq = v > 0 ? hs.reduce((t, h) => t + (Number(h.currentValue) || 0) * eqOf(h), 0) / v * 100 : null
-      managed[x.portfolioId] = { ...x, actEq, pending: actEq != null && Math.abs(actEq - x.needEq) >= TARGET_BAND }
-    }
-    for (const p of plan0.goals) {
-      const pids = new Set()
-      p.steps = p.steps.filter((st) => { if (st.t === 'switch' && managed[st.portfolioId]) { pids.add(st.portfolioId); return false } return true })
-      for (const it of p.att.items || []) if (managed[it.portfolioId]?.pending) pids.add(it.portfolioId)
-      for (const pid of pids) if (managed[pid]?.pending) p.steps.unshift({ t: 'rebalance', portfolioId: pid, needEq: managed[pid].needEq, actEq: managed[pid].actEq })
-    }
+    const plan0 = buildGoalPlan({ goals: active, attribution, mfHoldings, mappings: goalPortfolioMappings, eqOf, pool: true })
+    // one family plan for the equity / safe moves of all goals together
+    const included = new Set(pool.items.filter((i) => i.included).map((i) => i.id))
+    const efTake = new Set(goalPortfolioMappings.filter((m) => active.find((g) => g.goalId === m.goalId)?.goalType === 'Emergency Fund').map((m) => m.portfolioId))
+    const cashItems = pool.items.filter((i) => i.included && i.type === 'Other' && /cash|saving/i.test(i.otherType || '') && !efTake.has(i.id))
+    plan0.family = familyPlan({ plans: plan0.goals, mfHoldings, included, cashItems, eqOf, lockedIds: new Set(pool.items.filter((i) => i.locked).map((i) => i.id)) })
     return plan0
-  }, [goalList, active, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap])
+  }, [goalList, active, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap, pool.items])
   const [rebal, setRebal] = useState(null)
 
   if (!plan) return <PageLoading title="Loading goals" />
   const shown = plan.goals.filter((p) => selectedMember === 'all' || p.goal.familyMemberId === selectedMember)
   const pname = (pid) => mt(((mfPortfolios || []).find((x) => x.portfolioId === pid)?.portfolioName || '').replace(/^PFL-/, ''))
-  const ctx = { mt, navigate, pname, netWorth, openRebalance: setRebal }
+  const closeGoal = async (g, how) => {
+    // withdrawn / not needed: the goal stops taking money from the pool (its money goes back to the other goals)
+    if (closing.current) return
+    const used = how === 'used'
+    const ok = await confirm(used
+      ? `Close "${g.goalName}" as withdrawn? Also record the redemption in Mutual Funds (or update the holding), otherwise the money you took out still counts for your other goals.`
+      : `Close "${g.goalName}" as not needed? Its money goes back to your other goals.`,
+    { title: used ? 'Money withdrawn' : 'Goal not needed', confirmLabel: 'Close goal', destructive: false })
+    if (!ok) return
+    closing.current = true
+    const note = `${used ? 'Withdrawn' : 'Not needed'} on ${new Date().toLocaleDateString('en-IN')}`
+    try {
+      // close first, then free its links (an open goal would just be given its share again)
+      await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', isActive: false, notes: [g.notes, note].filter(Boolean).join(' · ') })
+      await updateGoalMappings(g.goalId, [])
+      showToast(`${g.goalName} closed. Its money now goes to your other goals.`)
+    } catch (e) { showToast(e.message || 'Could not close the goal', 'error') }
+    finally { closing.current = false }
+  }
+  const ctx = { mt, navigate, pname, netWorth, openRebalance: setRebal, closeGoal }
   const sel = goalId ? plan.goals.find((p) => p.goal.goalId === goalId) : null
 
   return (
     <div className="gp space-y-4">
       <style>{CSS}</style>
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
+      <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} />}</Modal>
       <div className="gp-bar">
         <div>
           <h1>{sel ? <a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a> : 'My goals'}</h1>
           <p>Steps are worked out from your own funds and your glide path · <a className="gp-link" onClick={() => navigate('/goals/classic')}>Classic view</a></p>
         </div>
         <span className="gp-acts">
-          <button className="gp-btn gp-btn-s" onClick={() => navigate('/goals/classic')}>Edit &amp; link goals</button>
+          <button className="gp-btn gp-btn-s" onClick={() => setMoneyOpen(true)}>Money for goals</button>
+          <button className="gp-btn gp-btn-s" onClick={() => navigate('/goals/classic')}>Edit goals</button>
           <button className="gp-btn gp-btn-s gp-btn-p" onClick={() => navigate('/goals/classic?add=1')}>+ Add goal</button>
         </span>
       </div>
@@ -136,8 +158,9 @@ function GoalList({ plans, all, ctx }) {
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{(() => { const k = withSteps.reduce((s, p) => s + realSteps(p).length, 0); return `${k} step${k === 1 ? '' : 's'} for ${withSteps.length} goal${withSteps.length === 1 ? '' : 's'} this month · based on today's fund values` })()}</span></div>
-        {withSteps.length ? <>
+        {(withSteps.length || (all.family?.status === 'steps' && all.family.steps.some((x) => x.t !== 'note'))) ? <>
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
+          <FamilyBlock f={all.family} pname={pname} mt={mt} />{(() => { n = all.family?.status === 'steps' ? all.family.steps.filter((x) => ['sip-cut', 'sip-add', 'lump', 'sell', 'buy'].includes(x.t)).length : 0; return null })()}
           {withSteps.map((p) => {
             const [stt, sc] = STATUS[p.status]
             return (
@@ -145,12 +168,12 @@ function GoalList({ plans, all, ctx }) {
                 <div className="gp-gh" onClick={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)}>
                   <span>{icon(p.goal)}</span><b>{mt(p.goal.goalName)}</b><Dot c={sc}>{stt}</Dot><span className="gp-go">Open ›</span>
                 </div>
-                {realSteps(p).map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} />)}
+                {realSteps(p).map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} onClose={ctx.closeGoal} navigate={navigate} />)}
               </div>
             )
           })}
           <p className="gp-foot">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p>
-        </> : <div className="gp-ok">✓ Nothing to do this month. Keep your SIPs running.</div>}
+        </> : <div className="gp-ok">✓ Nothing to do this month. Your goals' money is in the right mix{all.family?.P ? ` (${Math.round(all.family.haveEq)}% equity, goals need ${Math.round(all.family.needEq)}%)` : ''}. Keep your SIPs running.</div>}
       </div>
 
       <div className="gp-panel">
@@ -161,7 +184,7 @@ function GoalList({ plans, all, ctx }) {
         ]} />
       </div>
 
-      {all.portfolios.some((x) => x.goals.length > 1) && (
+      {false && all.portfolios.some((x) => x.goals.length > 1) && (
         <div className="gp-panel">
           <div className="gp-ph"><h2>One portfolio, many goals</h2><span className="gp-hs">Near goals use a portfolio's safe money first, far goals its equity</span></div>
           <div className="gp-grp">
@@ -281,9 +304,20 @@ function GoalCard({ p, mt, navigate }) {
 }
 
 /* ───────── one step as a row: Action | From → To | Amount ───────── */
-function StepRow({ s, p, n, mt, pname, onRebalance }) {
+function StepRow({ s, p, n, mt, pname, onRebalance, onClose, navigate }) {
   let k, fr, to, am, amS, extra = null
-  if (s.t === 'rebalance') {
+  if (s.t === 'ready' || s.t === 'protect') {
+    const ready = s.t === 'ready'
+    k = ready ? 'Money ready' : 'Protect it'
+    fr = [mt(p.goal.goalName), ready ? `Due ${new Date(p.goal.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · ${L(p.has)} kept for it` : `It already has its full ${L(p.target)}`]
+    to = ready ? ['Withdraw when you need it', 'Its money stays safe and kept aside until then'] : ['Safe funds', 'The family plan above moves its equity to safe funds']
+    am = ready ? <span className="gp-acts2">
+      <button className="gp-btn gp-btn-s" onClick={(e) => { e.stopPropagation(); onClose?.(p.goal, 'used') }}>Withdrawn</button>
+      <button className="gp-btn gp-btn-s" onClick={(e) => { e.stopPropagation(); navigate?.('/goals/classic') }}>More time</button>
+      <button className="gp-btn gp-btn-s" onClick={(e) => { e.stopPropagation(); onClose?.(p.goal, 'not-needed') }}>Not needed</button>
+    </span> : L(p.has)
+    amS = ready ? 'not needed = its money goes back to your other goals' : 'kept aside for this goal'
+  } else if (s.t === 'rebalance') {
     k = 'Rebalance'
     fr = [pname(s.portfolioId) || 'This portfolio', `Equity ${Math.round(s.actEq)}% today`]
     to = ['Its new targets', `${Math.round(s.needEq)}% equity for its goals`]
@@ -322,6 +356,46 @@ function StepRow({ s, p, n, mt, pname, onRebalance }) {
   )
 }
 
+/** The family plan: one set of moves for all goals together (SIP changes first, a switch only if still needed). */
+function FamilyBlock({ f, pname, mt }) {
+  let num = 0
+  const next = () => ++num
+  if (!f || f.status !== 'steps' || !f.steps.filter((x) => x.t !== 'note').length) return null
+  const safe = f.gap > 0
+  const rows = []
+  for (const s of f.steps) {
+    if (s.t === 'note') continue
+    let k, fr, to, am, amS
+    const fn = (h, wantSafe) => (h ? fname(h) : wantSafe ? 'A liquid or debt fund of your choice' : 'An equity fund of your choice')
+    if (s.t === 'sip-cut') { k = 'Lower SIP'; fr = [fname(s.fund), pname(s.portfolioId)]; to = ['SIP', `₹${s.from.toLocaleString('en-IN')} → ₹${s.to.toLocaleString('en-IN')}/mo`]; am = `−₹${(s.from - s.to).toLocaleString('en-IN')}`; amS = 'per month' }
+    else if (s.t === 'sip-add') { k = s.from ? 'Raise SIP' : 'Start SIP'; fr = ['The SIP money above', 'same total, no new money']; to = [fn(s.fund, s.wantSafe), s.fund ? `${pname(s.portfolioId)} · SIP ₹${s.from.toLocaleString('en-IN')} → ₹${s.to.toLocaleString('en-IN')}/mo` : `${s.portfolioId ? pname(s.portfolioId) + ' · ' : ''}pick one; the app then tracks it`]; am = `+₹${s.amount.toLocaleString('en-IN')}`; amS = 'per month' }
+    else if (s.t === 'lump') { k = 'Invest'; fr = [mt(s.from.name), 'idle cash']; to = [fn(s.fund, false), s.fund ? pname(s.portfolioId) : '']; am = `₹${Math.round(s.amount).toLocaleString('en-IN')}`; amS = 'one time' }
+    else if (s.t === 'sell') { k = 'Sell'; fr = [fname(s.fund), pname(s.portfolioId)]; to = ['Sell', s.units != null ? `${U(s.units)} units` : `about ${L(s.value)}`]; am = L(s.value); amS = s.nav ? `≈ at NAV ₹${Number(s.nav).toFixed(2)}` : 'approx.' }
+    else if (s.t === 'buy') { k = 'Buy'; fr = ['The money from the sell above', pname(s.portfolioId)]; to = [fn(s.fund, s.wantSafe), s.fund ? 'buy in ₹, units depend on that day\'s NAV' : `in ${pname(s.portfolioId)}; buy in ₹`]; am = L(s.value); amS = 'one time' }
+    else continue
+    rows.push({ k, fr, to, am, amS })
+  }
+  const note = f.steps.find((s) => s.t === 'note')?.text
+  const cell = (c) => <div className="gp-cell"><b>{c[0]}</b><span>{c[1]}</span></div>
+  return (
+    <div className="gp-grp">
+      <div className="gp-gh"><span>👪</span><b>Family plan</b><span className="gp-hs" style={{ margin: 0 }}>Goals hold {Math.round(f.haveEq)}% in equity, they need {Math.round(f.needEq)}% · these steps move about {L(f.doable)} {safe ? 'to safe money' : 'to equity'}{f.after > 1000 ? '; the rest comes with the goals\' new SIPs below' : ''}</span></div>
+      {rows.map((r, i) => {
+        const [a1, a2] = String(r.amS).split(' · ')
+        return (
+          <div className="gp-row" key={i}>
+            <span className="gp-num">{next()}</span><span className="gp-k">{r.k}</span>
+            {cell(r.fr)}<span className="gp-ar">→</span>{cell(r.to)}
+            <div className="gp-am"><b>{r.am}</b><span>{a1}{a2 && <><br />{a2}</>}</span></div>
+            <div className="gp-mflow">{cell(r.fr)}<span className="gp-ar2">↓</span>{cell(r.to)}</div>
+          </div>
+        )
+      })}
+      {note && <p className="gp-foot" style={{ padding: '4px 14px 8px' }}>{note} Do them in order and stop when this shows ✓.</p>}
+    </div>
+  )
+}
+
 /* ───────── goal page ───────── */
 function GoalDetail({ p, ctx }) {
   const { mt, navigate, pname } = ctx
@@ -347,7 +421,7 @@ function GoalDetail({ p, ctx }) {
         <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{p.bucketMode ? 'In the last 5 years before retirement your money follows the retirement buckets.' : `Equity ${p.eqNow ?? '—'}%, your glide path says ${p.eqTarget}% · a switch shows only when it is 5 points or more off`}</span></div>
         {st.length ? <>
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
-          <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} />)}</div>
+          <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} onClose={ctx.closeGoal} navigate={navigate} />)}</div>
           <p className="gp-foot">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p>
         </> : <div className="gp-ok">✓ Nothing to do now. Keep SIP {L(p.sip)}/month.</div>}
       </div>
@@ -518,6 +592,7 @@ const CSS = `
 .gp-btn-s{margin-top:0;padding:5px 10px;font-size:12px}
 .gp-split{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 14px;padding:2px 0 4px 64px;font-size:12px;color:var(--text-muted)}.gp-split b{color:var(--text-primary)}
 @media(max-width:640px){.gp-split{padding-left:8px;flex-direction:column}}
+.gp-acts2{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .gp-need-ok{margin-top:10px;font-size:12px;font-weight:600;color:var(--accent-green)}
 
 .gp-vf{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-muted)}
@@ -540,9 +615,9 @@ const CSS = `
  .gp-vc:before,.gp-rc:before{width:12px}.gp-rw.L .gp-vc:before,.gp-rw.L .gp-rc:before{right:-13px}.gp-rw.R .gp-vc:before,.gp-rw.R .gp-rc:before{left:-13px}
  .gp-rw{grid-template-columns:1fr 56px 1fr}.gp-panel{padding:16px}
 }
-@media(max-width:520px){
+@media(max-width:520px){.gp-slot{min-width:0}.gp-grid b{white-space:normal;overflow-wrap:anywhere}
  .gp-sum{grid-template-columns:1fr 1fr;gap:12px 0}.gp-sum div:nth-child(3){border-left:0;padding-left:0}
- .gp-rw{grid-template-columns:44px 1fr;min-height:0;padding:8px 0}.gp-rw.sm{padding:4px 0}
+ .gp-rw{grid-template-columns:44px minmax(0,1fr);min-height:0;padding:8px 0}.gp-rw.sm{padding:4px 0}
  .gp-slot{grid-column:2;grid-row:1}.gp-slot:empty{display:none}.gp-rw.L .gp-slot.l{justify-content:flex-start}.gp-rw.L .gp-qs{text-align:left}
  .gp-stop,.gp-tick{grid-column:1;grid-row:1}.gp-stop{width:36px;height:36px;font-size:15px}.gp-yl{display:none}
  .gp-vc,.gp-rc{max-width:none}.gp-rw .gp-vc:before,.gp-rw .gp-rc:before{left:-13px!important;right:auto!important}

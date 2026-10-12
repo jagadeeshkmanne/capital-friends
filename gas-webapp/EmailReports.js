@@ -804,6 +804,8 @@ function buildDashboardReportData() {
         assetClasses.Debt += cv;
       } else if (t.includes('real estate') || t.includes('property')) {
         assetClasses['Real Estate'] += cv;
+      } else if (t.includes('cash') || t.includes('saving')) {
+        assetClasses.Cash += cv;
       } else {
         assetClasses.Other += cv;
       }

@@ -35,6 +35,7 @@ export function DataProvider({ children }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   // set after a successful load from the server (not the browser cache); loadErrors = sections that failed on the server
   const [freshLoad, setFreshLoad] = useState({ at: 0, errors: [] })
+  const [settingsAt, setSettingsAt] = useState(0) // when settings last came from the server (not the cache)
   const [error, setError] = useState(null)
 
   // ── All Data State — starts null (not loaded), hydrated from IDB then API ──
@@ -216,6 +217,7 @@ export function DataProvider({ children }) {
   const refreshSettings = useCallback(async () => {
     const data = await api.getSettings()
     setSettings(data || {})
+    setSettingsAt(Date.now())
     if (data) idb.put('settings', data)
     idb.put('settings', data || {})
   }, [])
@@ -546,6 +548,11 @@ export function DataProvider({ children }) {
     await api.updateGoalMappings(goalId, mappings)
     await refreshGoals()
   }, [refreshGoals])
+  // several goals at once (the goals pool): one save per goal, one refresh at the end — even if a save fails
+  const updateManyGoalMappings = useCallback(async (list) => {
+    try { for (const [goalId, mappings] of list) await api.updateGoalMappings(goalId, mappings) }
+    finally { await refreshGoals() }
+  }, [refreshGoals])
 
   // ── Stock Portfolios CRUD ──
   const addStockPortfolio = useCallback(async (data) => {
@@ -647,7 +654,6 @@ export function DataProvider({ children }) {
   }, [refreshMF])
 
   // goal-linked portfolios: keep / bring back the user's own targets (portfolio sheet column V)
-  const saveOriginalTargets = useCallback((portfolioId) => api.originalTargets(portfolioId, 'save'), [])
   const restoreOriginalTargets = useCallback(async (portfolioId) => {
     const r = await api.originalTargets(portfolioId, 'restore')
     await refreshMF()
@@ -723,7 +729,7 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider value={{
       // Loading state
-      loading, isSetupLoading, isRefreshing, freshLoad, error, refreshData,
+      loading, isSetupLoading, isRefreshing, freshLoad, settingsAt, error, refreshData,
       // Data
       members, banks, investmentAccounts, insurancePolicies, liabilityList, otherInvList,
       // Filtered
@@ -756,9 +762,9 @@ export function DataProvider({ children }) {
       mfPortfolios, mfHoldings, mfTransactions,
       // MF CRUD
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
-      investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, saveOriginalTargets, restoreOriginalTargets, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
+      investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, restoreOriginalTargets, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
       // Settings
-      settings, updateSettings, refreshSettings,
+      settings, updateSettings, refreshSettings, updateManyGoalMappings,
       // Health Check
       healthCheckCompleted, healthCheckAnswers, completeHealthCheck,
     }}>

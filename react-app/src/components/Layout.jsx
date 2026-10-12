@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useRef as useRefScroll, useLayoutEffect as useLayoutEffectScroll } from 'react'
 import { useScreenMask } from '../hooks/useScreenMask'
-import { useGoalTargetSync } from '../hooks/useGoalTargetSync'
+import { useGoalPoolSync } from '../hooks/useGoalPoolSync'
 import Header from './Header'
 import BottomNav from './BottomNav'
 import BrandedLoading from './BrandedLoading'
@@ -16,7 +16,7 @@ export default function Layout() {
   const mainRef = useRefScroll(null)
   const { pathname } = useLocation()
   useScreenMask()
-  useGoalTargetSync()
+  useGoalPoolSync()
   useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname])
 
   const { loading, error } = useData()
@@ -57,7 +57,7 @@ export default function Layout() {
     <div className="cf-app flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">
       <Header />
 
-      <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
+      <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-y-contain pb-20 lg:pb-0">
         <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
           <DailyUpdatesBanner />
           <Outlet />

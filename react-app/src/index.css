@@ -41,6 +41,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg-base: #f0f2f5;
   --bg-sidebar: #ffffff;
   --bg-header: #ffffff;

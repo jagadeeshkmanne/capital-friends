@@ -610,8 +610,7 @@ export default function MFRebalanceDialog({ filterPortfolioId }) {
         }).length
         const exitCount = pHoldings.filter((h) => h.targetAllocationPct === 0 && h.units > 0 && h.currentValue >= 500).length
         const hasTargets = pHoldings.some((h) => h.targetAllocationPct > 0)
-        let goalStep = null
-        try { const r = JSON.parse(localStorage.getItem(`cf-gt-reason:${p.portfolioId}`) || 'null'); if (r && Array.isArray(r.goals) && Date.now() - r.at < 120 * 864e5) goalStep = r } catch { /* ignore */ }
+        const goalStep = null // goal moves now come from the family plan on the goals page
         return { ...p, holdings: pHoldings, totalValue, driftedCount, exitCount, hasTargets, goalStep }
       })
       .filter((p) => p.hasTargets && (p.driftedCount > 0 || p.exitCount > 0))
@@ -674,16 +673,13 @@ export default function MFRebalanceDialog({ filterPortfolioId }) {
         <div key={p.portfolioId} className="border border-[var(--border-light)] border-l-2 border-l-violet-500/50 rounded-lg">
           {/* Portfolio header — desktop: single row, mobile: stacked */}
           <div className="px-3 py-2.5 bg-[var(--bg-inset)]">
-            <p className="text-xs mb-1.5 text-[var(--text-muted)]">{p.goalStep
-              ? <><b className="text-violet-400">Goal step:</b> {p.goalStep.goals.join(', ')} now need{p.goalStep.goals.length > 1 ? '' : 's'} about {p.goalStep.needEq}% equity, so the targets moved. Do this one – it keeps money you need soon safe.</>
-              : <><b className="text-[var(--text-secondary)]">Drift:</b> a fund moved away from your own targets. Optional – do it when it suits you, often just by changing SIPs.</>}</p>
             {/* Desktop header */}
             <div className="hidden sm:flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-violet-400 bg-violet-500/15 w-5 h-5 rounded flex items-center justify-center">{i + 1}</span>
                 <p className="text-sm font-bold text-[var(--text-primary)]">{mt(String(p.portfolioName || '').replace(/^PFL-/, ''))}</p>
                 <span className="text-xs text-[var(--text-muted)]">{p.ownerName}</span>
-                {p.goalStep ? <span className="whitespace-nowrap text-xs font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">Goal step · required</span> : <span className="whitespace-nowrap text-xs font-bold px-1.5 py-0.5 rounded-full bg-[var(--bg-card)] text-[var(--text-muted)] border border-[var(--border-light)]">Drift · optional</span>}
+                
                 {p.driftedCount > 0 && <span className="whitespace-nowrap text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{p.driftedCount} drifted</span>}
                 {p.exitCount > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-[var(--accent-rose)]">{p.exitCount} exit</span>}
               </div>

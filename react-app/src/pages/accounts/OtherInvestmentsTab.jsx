@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
-import { Plus, Pencil, Package } from 'lucide-react'
+import { Plus, Pencil, Package, ArrowDownToLine } from 'lucide-react'
+import ReceivedForm from '../../components/forms/ReceivedForm'
+import { otherKind } from '../../utils/goalPool'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -27,6 +29,27 @@ export default function OtherInvestmentsTab() {
   const { mv } = useMask()
 
   const [modal, setModal] = useState(null)
+  const [received, setReceived] = useState(null) // the EPF / PPF / NPS being marked as paid out
+  const cashList = (otherInvList || []).filter((x) => x.status !== 'Inactive' && /cash|saving/i.test(x.investmentType || ''))
+  const canReceive = (i) => otherKind(i) === 'retirement' && (Number(i.currentValue) || 0) > 0
+  async function saveReceived({ amount, dest, newName }) {
+    const i = received
+    showBlockUI('Saving...')
+    try {
+      const rest = Math.max(0, (Number(i.currentValue) || 0) - amount)
+      const note = `Received ${formatINR(amount)} on ${new Date().toLocaleDateString('en-IN')}`
+      // the cash is added first: if that fails, the EPF / PPF is still there (no money disappears)
+      if (dest === 'new') {
+        await addOtherInvestment({ investmentType: 'Cash / Savings', investmentCategory: 'Cash', investmentName: newName, familyMemberId: i.familyMemberId, familyMemberName: i.familyMemberName, familyMember: i.familyMemberId, investedAmount: amount, currentValue: amount, status: 'Active', notes: `From ${i.investmentType}` })
+      } else if (dest !== 'none') {
+        const c = cashList.find((x) => x.investmentId === dest)
+        if (c) await updateOtherInvestment(c.investmentId, { ...c, familyMember: c.familyMemberId, investedAmount: (Number(c.investedAmount) || 0) + amount, currentValue: (Number(c.currentValue) || 0) + amount })
+      }
+      await updateOtherInvestment(i.investmentId, { ...i, familyMember: i.familyMemberId, currentValue: rest, status: rest > 0 ? 'Active' : 'Inactive', notes: [i.notes, note].filter(Boolean).join(' · ') })
+      showToast(`${i.investmentType} marked received. Your goals plan now counts it as cash.`)
+      setReceived(null)
+    } catch (e) { showToast(e.message || 'Could not save', 'error') } finally { hideBlockUI() }
+  }
   const metalPrices = useMetalPrices() // live gold / silver rate
 
   const filtered = useMemo(() => {
@@ -187,9 +210,12 @@ export default function OtherInvestmentsTab() {
                           })()}
                         </td>
                         <td className="py-2.5 px-2">
+                          <span className="inline-flex items-center gap-1">
+                          {canReceive(i) && <button onClick={() => setReceived(i)} title="It paid out: mark it received" className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded border border-[var(--border-light)] text-violet-400 hover:bg-violet-500/10"><ArrowDownToLine size={11} /> Received</button>}
                           <button onClick={() => setModal({ edit: i })} className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
                             <Pencil size={12} />
                           </button>
+                          </span>
                         </td>
                       </tr>
                     )
@@ -211,7 +237,8 @@ export default function OtherInvestmentsTab() {
                         {i.investmentCategory}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">{mv(i.familyMemberName, 'name')} · {i.investmentType}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{mv(i.familyMemberName, 'name')} · {i.investmentType}
+                      {canReceive(i) && <button onClick={(e) => { e.stopPropagation(); setReceived(i) }} className="ml-2 px-2 py-0.5 text-[11px] font-semibold rounded border border-[var(--border-light)] text-violet-400">Received</button>}</p>
                     <div className="flex items-center justify-between mt-1.5">
                       <div>
                         <p className="text-xs text-[var(--text-dim)]">Invested</p>
@@ -251,6 +278,9 @@ export default function OtherInvestmentsTab() {
         </>
       )}
 
+      <Modal open={!!received} onClose={() => setReceived(null)} title={`${received?.investmentType || ''} received`}>
+        {received && <ReceivedForm inv={received} cashList={cashList} onSave={saveReceived} onCancel={() => setReceived(null)} />}
+      </Modal>
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Investment' : 'Add Investment'} wide>
         <OtherInvestmentForm
           initial={modal?.edit || undefined}

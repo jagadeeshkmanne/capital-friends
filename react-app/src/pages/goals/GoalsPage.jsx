@@ -13,11 +13,8 @@ import GoalWithdrawalPlan from '../../components/forms/GoalWithdrawalPlan'
 import GlidepathRebalancePlan from '../../components/forms/GlidepathRebalancePlan'
 import PageLoading from '../../components/PageLoading'
 import { calculateGoalFundingProjection } from '../../utils/goalProjection'
-import { suggestGoalLinks, linkedSummary } from '../../utils/goalLinkSuggest'
-import { classifyOtherInvestment } from '../../utils/retirementBuckets'
 import { attributeFamilyGoals, equityFraction } from '../../utils/goalAttribution'
-import { buildGoalPlan, needToday, sipForAmount } from '../../utils/goalPlan'
-import { realignForGoal } from '../../utils/goalRealign'
+import { buildGoalPlan } from '../../utils/goalPlan'
 
 const statusBadge = {
   'On Track': 'bg-blue-500/15 text-[var(--accent-blue)]',
@@ -45,23 +42,6 @@ function getMemberDOB(member) {
 }
 
 // Equity categories for allocation analysis
-const EQUITY_CATS = new Set(['Equity', 'ELSS', 'Index'])
-
-function classifyPortfolio(portfolioId, holdings, allocMap) {
-  const ph = holdings.filter(h => h.portfolioId === portfolioId && h.units > 0)
-  let total = 0, equity = 0
-  for (const h of ph) {
-    total += h.currentValue
-    const detailed = allocMap?.[h.schemeCode || h.fundCode]
-    if (detailed) {
-      equity += h.currentValue * ((detailed.Equity || 0) / 100)
-    } else if (EQUITY_CATS.has(h.category)) equity += h.currentValue
-    else if (h.category === 'Hybrid') equity += h.currentValue * 0.65
-    else if (h.category === 'Multi-Asset') equity += h.currentValue * 0.50
-  }
-  return total > 0 ? Math.round((equity / total) * 100) : null
-}
-
 export default function GoalsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -81,14 +61,6 @@ export default function GoalsPage() {
   const prevAchievedRef = useRef(new Set())
 
   // Inline allocation state (replaces separate Allocation Manager)
-  const [linkingGoalId, setLinkingGoalId] = useState(null)
-  const [localMappings, setLocalMappings] = useState([])
-  const [goalDirty, setGoalDirty] = useState(false)
-  // "Realign goals": money another goal holds above what it needs today can move to the goal being linked
-  const [realign, setRealign] = useState(null)        // { goalName, moves, still, moved, sipNew, donors }
-  const [pendingDonors, setPendingDonors] = useState({}) // goalId -> its new links, saved together with this goal
-  const [goalSaving, setGoalSaving] = useState(false)
-  const [suggestReasons, setSuggestReasons] = useState({})
 
   const allActiveGoals = useMemo(() => (goalList || []).filter(g => g.isActive !== false), [goalList])
 
@@ -239,13 +211,6 @@ export default function GoalsPage() {
   }, [filtered])
 
   // === Investment data for allocation ===
-  function inferType(id) {
-    if (!id) return 'MF'
-    if (id.startsWith('PFL-STK-')) return 'Stock'
-    if (id.startsWith('INV-')) return 'Other'
-    return 'MF'
-  }
-
   const investments = useMemo(() => {
     const map = {}
     ;(mfPortfolios || []).forEach((p) => {
@@ -260,22 +225,6 @@ export default function GoalsPage() {
     return map
   }, [mfPortfolios, stockPortfolios, otherInvList])
 
-  const allInvestments = useMemo(() => {
-    const items = []
-    ;(mfPortfolios || []).filter((p) => p.status !== 'Inactive').forEach((p) => {
-      items.push({ id: p.portfolioId, name: p.portfolioName?.replace(/^PFL-/, '') || p.portfolioName, value: p.currentValue || 0, type: 'MF', owner: p.ownerName || '' })
-    })
-    ;(stockPortfolios || []).filter((p) => p.status !== 'Inactive').forEach((p) => {
-      items.push({ id: p.portfolioId, name: p.portfolioName, value: p.currentValue || 0, type: 'Stock', owner: p.ownerName || '' })
-    })
-    ;(otherInvList || []).filter((i) => i.status === 'Active').forEach((i) => {
-      items.push({ id: i.investmentId, name: i.investmentName, value: i.currentValue || 0, type: 'Other', owner: i.familyMemberName || '' })
-    })
-    return items
-  }, [mfPortfolios, stockPortfolios, otherInvList])
-
-  const activeMFPortfolios = useMemo(() => (mfPortfolios || []).filter(p => p.status !== 'Inactive'), [mfPortfolios])
-  const mfItems = allInvestments.filter((it) => it.type === 'MF')
 
   // Under-allocated portfolios: have goal mappings but total active allocation < 100%
   const underAllocatedPortfolios = useMemo(() => {
@@ -294,177 +243,7 @@ export default function GoalsPage() {
       })
       .filter(Boolean)
   }, [goalPortfolioMappings, goalList, investments])
-  const stockItems = allInvestments.filter((it) => it.type === 'Stock')
-  const otherItems = allInvestments.filter((it) => it.type === 'Other')
 
-  // Cross-goal allocation totals (excluding the currently linking goal)
-  const otherGoalAllocs = useMemo(() => {
-    const map = {}
-    const links = (goalPortfolioMappings || []).filter((m) => !pendingDonors[m.goalId])
-      .concat(Object.entries(pendingDonors).flatMap(([goalId, ms]) => ms.map((m) => ({ ...m, goalId }))))
-    links.forEach((m) => {
-      if (m.goalId === linkingGoalId) return
-      if (!map[m.portfolioId]) map[m.portfolioId] = { total: 0, goals: [] }
-      map[m.portfolioId].total += m.allocationPct
-      const g = (goalList || []).find((g2) => g2.goalId === m.goalId)
-      map[m.portfolioId].goals.push({ goalName: g?.goalName || m.goalId, pct: m.allocationPct })
-    })
-    return map
-  }, [goalPortfolioMappings, linkingGoalId, goalList, pendingDonors])
-
-  const overAllocated = useMemo(() => {
-    const issues = []
-    for (const m of localMappings) {
-      const other = otherGoalAllocs[m.portfolioId]
-      const combined = (other?.total || 0) + (m.allocationPct || 0)
-      if (combined > 100) {
-        const item = allInvestments.find((it) => it.id === m.portfolioId)
-        issues.push({ name: item?.name || m.portfolioId, combined, excess: combined - 100 })
-      }
-    }
-    return issues
-  }, [localMappings, otherGoalAllocs, allInvestments])
-
-  const goalIsValid = overAllocated.length === 0
-
-  // === "Suggest for me": all family investments, glide-path equity for this goal ===
-  const suggestItems = useMemo(() => allInvestments.map((it) => {
-    if (it.type === 'MF') return { ...it, equityPct: classifyPortfolio(it.id, mfHoldings || [], goalAllocMap) }
-    if (it.type === 'Stock') return { ...it, equityPct: 100 }
-    const inv = (otherInvList || []).find((i) => i.investmentId === it.id)
-    return { ...it, equityPct: classifyOtherInvestment(inv).equity, otherType: inv?.investmentType || '' }
-  }), [allInvestments, mfHoldings, goalAllocMap, otherInvList])
-  function goalTargetEquity(goal) {
-    const yearsLeft = Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000))
-    return getRecommendedAllocation(goal.goalType, yearsLeft).equity
-  }
-  function buildSuggestion(goalId, goalObj) {
-    const goal = goalObj || (goalList || []).find((g) => g.goalId === goalId)
-    if (!goal) return { rows: [] }
-    const usedByOthers = {}
-    ;(goalPortfolioMappings || []).forEach((m) => { if (m.goalId !== goalId) usedByOthers[m.portfolioId] = (usedByOthers[m.portfolioId] || 0) + m.allocationPct })
-    return suggestGoalLinks({ goal, items: suggestItems, usedByOthers, targetEquity: goalTargetEquity(goal) })
-  }
-  // after the free-money suggestion: can other goals' EXTRA cover the rest? (retirement keeps what it needs)
-  function computeRealign(goalObj, rows) {
-    const goal = goalObj
-    if (!goal?.targetDate) { setRealign(null); return }
-    const years = Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 864e5))
-    const r = Number(goal.expectedCAGR) || 0.12
-    const want = needToday({ target: Number(goal.targetAmount) || 0, years, annualReturn: r, sip: 0 })
-    const have = linkedSummary(rows, suggestItems, null).linkedValue || 0
-    if (!(want > have + 1000)) { setRealign(null); return }
-    const res = realignForGoal({ goal, wantValue: want, haveValue: have, wantEq: goalTargetEquity(goal),
-      plans: goalPlans.filter((p) => p.goal.goalId !== goal.goalId), mappings: goalPortfolioMappings, items: suggestItems })
-    const sipNew = years > 0 ? sipForAmount({ amountToday: res.still, years, annualReturn: r }) : 0
-    setRealign({ goalName: goal.goalName, ...res, sipNew, want, have })
-  }
-  function applyRealign() {
-    if (!realign?.moves?.length) return
-    setLocalMappings((prev) => {
-      const next = prev.map((m) => ({ ...m }))
-      for (const mv of realign.moves) {
-        const row = next.find((m) => m.portfolioId === mv.portfolioId)
-        if (row) row.allocationPct = Number(row.allocationPct || 0) + mv.pct
-        else next.push({ portfolioId: mv.portfolioId, allocationPct: mv.pct, investmentType: mv.investmentType })
-      }
-      return next
-    })
-    setPendingDonors(realign.donors)
-    setRealign((r) => ({ ...r, used: true }))
-    setGoalDirty(true)
-  }
-
-  function applySuggestion() {
-    const sug = buildSuggestion(linkingGoalId)
-    setPendingDonors({})
-    computeRealign((goalList || []).find((g) => g.goalId === linkingGoalId), sug.rows)
-    if (!sug.rows.length) { showToast('No free investments: see "Realign goals" above for money other goals can spare', 'info'); return }
-    setLocalMappings(sug.rows.map(({ portfolioId, allocationPct, investmentType }) => ({ portfolioId, allocationPct, investmentType })))
-    setSuggestReasons(Object.fromEntries(sug.rows.map((r) => [r.portfolioId, { pct: r.allocationPct, reason: r.reason }])))
-    setGoalDirty(true)
-  }
-
-  // === Allocation actions ===
-  function startLinking(goalId) {
-    const existing = (goalPortfolioMappings || []).filter((m) => m.goalId === goalId).map((m) => ({
-      portfolioId: m.portfolioId, allocationPct: m.allocationPct, investmentType: m.investmentType || inferType(m.portfolioId),
-    }))
-    // Nothing linked yet: start with the suggestion (the person can change or remove every row)
-    setPendingDonors({}); setRealign(null)
-    if (existing.length === 0) {
-      const sug = buildSuggestion(goalId)
-      computeRealign((goalList || []).find((g) => g.goalId === goalId), sug.rows)
-      if (sug.rows.length > 0) {
-        setLocalMappings(sug.rows.map(({ portfolioId, allocationPct, investmentType }) => ({ portfolioId, allocationPct, investmentType })))
-        setSuggestReasons(Object.fromEntries(sug.rows.map((r) => [r.portfolioId, { pct: r.allocationPct, reason: r.reason }])))
-        setLinkingGoalId(goalId)
-        setGoalDirty(true)
-        return
-      }
-    }
-    setSuggestReasons({})
-    setLocalMappings(existing)
-    setLinkingGoalId(goalId)
-    setGoalDirty(false)
-  }
-
-  function stopLinking() {
-    setRealign(null); setPendingDonors({})
-    setLinkingGoalId(null)
-    setLocalMappings([])
-    setGoalDirty(false)
-  }
-
-  function addLocalMapping() {
-    const used = new Set(localMappings.map((m) => m.portfolioId))
-    const available = allInvestments.find((item) => !used.has(item.id) && (otherGoalAllocs[item.id]?.total || 0) < 100)
-    if (!available) return
-    setLocalMappings((prev) => [...prev, { portfolioId: available.id, allocationPct: 0, investmentType: available.type }])
-    setGoalDirty(true)
-  }
-
-  function removeLocalMapping(idx) {
-    setLocalMappings((prev) => prev.filter((_, i) => i !== idx))
-    setGoalDirty(true)
-  }
-
-  function updateLocalMapping(idx, field, value) {
-    setLocalMappings((prev) => prev.map((m, i) => {
-      if (i !== idx) return m
-      if (field === 'allocationPct') {
-        const otherTotal = otherGoalAllocs[m.portfolioId]?.total || 0
-        const maxAllowed = Math.max(0, 100 - otherTotal)
-        return { ...m, allocationPct: Math.max(0, Math.min(maxAllowed, Number(value) || 0)) }
-      }
-      if (field === 'portfolioId') {
-        const item = allInvestments.find((it) => it.id === value)
-        const otherTotal = otherGoalAllocs[value]?.total || 0
-        const maxAllowed = Math.max(0, 100 - otherTotal)
-        return { ...m, portfolioId: value, investmentType: item?.type || inferType(value), allocationPct: Math.min(m.allocationPct, maxAllowed) }
-      }
-      return m
-    }))
-    setGoalDirty(true)
-  }
-
-  async function saveGoalMappings() {
-    if (!goalIsValid) return
-    setGoalSaving(true)
-    showBlockUI('Saving...')
-    try {
-      // goals that give part of their extra are saved first, so no investment is ever linked over 100%
-      for (const [gid, ms] of Object.entries(pendingDonors)) await updateGoalMappings(gid, ms.filter((m) => m.allocationPct > 0))
-      await updateGoalMappings(linkingGoalId, localMappings.filter((m) => m.allocationPct > 0))
-      showToast(Object.keys(pendingDonors).length ? 'Goals realigned and saved' : 'Allocation updated')
-      stopLinking()
-    } catch (err) {
-      showToast(err.message || 'Failed to save', 'error')
-    } finally {
-      hideBlockUI()
-      setGoalSaving(false)
-    }
-  }
 
   // Loading state — after all hooks
   if (goalList === null) return <PageLoading title="Loading goals" cards={5} />
@@ -478,21 +257,6 @@ export default function GoalsPage() {
       } else {
         const result = await addGoal(data)
         showToast('Goal added')
-        // New goal: open linking with the suggestion already filled in (the person reviews and saves)
-        const newGoalId = result?.goalId
-        if (newGoalId) {
-          const sug = buildSuggestion(newGoalId, { ...data, goalId: newGoalId })
-          setPendingDonors({})
-          computeRealign({ ...data, goalId: newGoalId }, sug.rows)
-          setLinkingGoalId(newGoalId)
-          if (sug.rows.length === 0) { setLocalMappings([]); setGoalDirty(false) }
-          if (sug.rows.length > 0) {
-            setLocalMappings(sug.rows.map(({ portfolioId, allocationPct, investmentType }) => ({ portfolioId, allocationPct, investmentType })))
-            setSuggestReasons(Object.fromEntries(sug.rows.map((r) => [r.portfolioId, { pct: r.allocationPct, reason: r.reason }])))
-            setLinkingGoalId(newGoalId)
-            setGoalDirty(true)
-          }
-        }
       }
       setModal(null)
     } catch (err) {
@@ -693,7 +457,7 @@ export default function GoalsPage() {
           )}
 
           {/* Under-allocated portfolio warnings */}
-          {underAllocatedPortfolios.length > 0 && (
+          {false && underAllocatedPortfolios.length > 0 && (
             <div className="bg-[var(--bg-card)] rounded-xl border border-yellow-500/20 p-4 space-y-1.5">
               <div className="flex items-center gap-2 mb-1">
                 <Wallet size={14} className="text-yellow-400" />
@@ -939,15 +703,9 @@ export default function GoalsPage() {
 
                   {/* ── Action Footer ── */}
                   <div className="mt-auto border-t border-[var(--border)] px-4 py-2 flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startLinking(g.goalId) }}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                        linkedCount > 0 ? 'text-violet-400 hover:bg-violet-500/10' : 'text-amber-400 hover:bg-amber-500/10'
-                      }`}
-                    >
-                      <Link2 size={11} />
-                      {linkedCount > 0 ? `${linkedCount} linked` : 'Link'}
-                      {linkedCount === 0 && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />}
+                    {/* goals take their money from the shared pool (Money for goals on the goals page): no linking here */}
+                    <button onClick={(e) => { e.stopPropagation(); navigate('/goals?money=1') }} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-violet-400 hover:bg-violet-500/10" title="This goal's money comes from Money for goals">
+                      <Link2 size={11} /> {linkedCount > 0 ? `${linkedCount} investments · auto` : 'Money for goals'}
                     </button>
                     {g.status === 'Achieved' && g.goalType !== 'Retirement' && (
                       <button onClick={() => setWithdrawalGoal(g)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
@@ -999,244 +757,6 @@ export default function GoalsPage() {
         />
       </Modal>
 
-      {/* Link Investments Modal — same GoalForm dialog with linking section */}
-      <Modal open={!!linkingGoalId && !modal} onClose={stopLinking} title={`Link Investments — ${(goalList || []).find(g => g.goalId === linkingGoalId)?.goalName || ''}`} wide>
-        {(() => {
-          const linkGoal = (goalList || []).find(g => g.goalId === linkingGoalId)
-          if (!linkGoal) return null
-          const h = allocationHealth[linkingGoalId]
-          return (
-            <GoalForm
-              initial={linkGoal}
-              onSave={handleSave}
-              onCancel={stopLinking}
-              linkingContent={
-                <div className="space-y-3 pt-2 mt-2 border-t border-[var(--border-light)]">
-                  {/* Suggested Allocation */}
-                  {h && (() => {
-                    const labelColor = h.label === 'Short-term' ? '#60a5fa'
-                      : h.label === 'Medium-term' ? '#fbbf24'
-                      : h.label === 'Long-term' ? '#34d399' : '#94a3b8'
-                    const advice = h.label === 'Safety' ? 'Keep in liquid/debt funds for instant access.'
-                      : h.label === 'Short-term' ? 'Focus on debt/hybrid funds to preserve capital.'
-                      : h.label === 'Medium-term' ? 'Balanced mix — gradually shift to debt as deadline nears.'
-                      : 'Growth-oriented — can take higher equity exposure.'
-                    return (
-                      <div className="rounded-lg border p-3 space-y-2 bg-blue-500/5 border-blue-500/15">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp size={12} className="text-blue-400" />
-                            <span className="text-sm font-bold uppercase tracking-wider text-blue-400">Suggested Allocation</span>
-                          </div>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                                style={{ background: `${labelColor}15`, color: labelColor }}>
-                            {h.label}
-                          </span>
-                        </div>
-                        <div className="flex-1 h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-inset)' }}>
-                          <div className="h-full rounded-l-full" style={{ width: `${h.recommendedEquity}%`, background: '#8b5cf6' }} />
-                          <div className="h-full rounded-r-full" style={{ width: `${h.recommendedDebt}%`, background: '#60a5fa' }} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-violet-500" />
-                              <span className="text-xs text-[var(--text-dim)]">Equity {h.recommendedEquity}%</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-blue-400" />
-                              <span className="text-xs text-[var(--text-dim)]">Debt {h.recommendedDebt}%</span>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-xs text-[var(--text-dim)]">{advice}</p>
-                        {goalDirty && localMappings.length > 0 && (
-                          <p className="text-xs text-violet-400">Auto-suggested — adjust if needed</p>
-                        )}
-                      </div>
-                    )
-                  })()}
-
-                  {/* Link Investments heading */}
-                  <div className="flex items-center gap-2">
-                    <Link2 size={12} className="text-violet-400" />
-                    <span className="text-xs font-semibold text-violet-400">Link Investments</span>
-                    {allInvestments.length > 0 && (
-                      <button onClick={applySuggestion} className="ml-auto px-2.5 py-1 text-xs font-semibold text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors">
-                        ✨ Suggest for me
-                      </button>
-                    )}
-                  </div>
-                  {allInvestments.length > 0 && (
-                    <p className="text-xs text-[var(--text-dim)] -mt-1">Picks from all family investments so the linked money is near this goal's recommended equity. You can change anything before saving.</p>
-                  )}
-
-                  {/* Realign goals: what other goals can spare (they keep what they need today; retirement first) */}
-                  {realign && (
-                    <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 space-y-2 text-xs text-[var(--text-secondary)]">
-                      <p className="font-semibold text-violet-400">Realign goals</p>
-                      <p>{realign.goalName || 'This goal'} should have about <b className="text-[var(--text-primary)]">{formatINR(Math.round(realign.want))}</b> today; free money gives <b className="text-[var(--text-primary)]">{formatINR(Math.round(realign.have))}</b>. Your other goals keep what they need today – <b>retirement is protected</b>; only their extra can move.</p>
-                      {realign.moves.length > 0 ? (
-                        <>
-                          <div className="space-y-1">{realign.moves.map((mv) => (
-                            <p key={mv.fromGoal.goalId + mv.portfolioId}>• Move <b className="text-[var(--text-primary)]">{mv.pct}% of {mv.name}</b> ({formatINR(Math.round(mv.value))}) from {mv.fromGoal.goalName}</p>
-                          ))}</div>
-                          {realign.still > 1000 && <p>Still missing <b className="text-[var(--text-primary)]">{formatINR(Math.round(realign.still))}</b>: start a SIP of about <b className="text-[var(--text-primary)]">{formatINR(realign.sipNew)}/mo</b> for this goal.</p>}
-                          {realign.used
-                            ? <p className="text-emerald-400 font-semibold">✓ Added below. Press Save to update both goals.</p>
-                            : <div className="flex gap-2"><button onClick={applyRealign} className="px-3 py-1.5 font-semibold rounded-lg bg-violet-600 text-white">Use this</button><button onClick={() => setRealign(null)} className="px-3 py-1.5 rounded-lg border border-[var(--border-light)]">Keep as is</button></div>}
-                        </>
-                      ) : (
-                        <p>No other goal has extra money right now, so nothing moves. Start this goal with new money: a SIP of about <b className="text-[var(--text-primary)]">{formatINR(realign.sipNew)}/mo</b> (or a lump sum).</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Empty state — no investments exist */}
-                  {allInvestments.length === 0 && localMappings.length === 0 && (
-                    <div className="bg-[var(--bg-inset)] rounded-lg p-4 text-center space-y-2">
-                      <Wallet size={24} className="text-[var(--text-dim)] mx-auto" />
-                      <p className="text-xs text-[var(--text-secondary)]">No investment portfolios yet</p>
-                      <p className="text-xs text-[var(--text-dim)]">Create a Mutual Fund portfolio first, then come back to link it to this goal.</p>
-                      <button
-                        onClick={() => { stopLinking(); navigate('/investments/mutual-funds') }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors"
-                      >
-                        <Plus size={12} /> Create Portfolio
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Mapping rows */}
-                  {localMappings.map((m, idx) => {
-                    const item = allInvestments.find((it) => it.id === m.portfolioId)
-                    const other = otherGoalAllocs[m.portfolioId]
-                    const otherTotal = other?.total || 0
-                    const available = 100 - otherTotal
-                    const combined = otherTotal + (m.allocationPct || 0)
-                    return (
-                      <div key={idx} className={`bg-[var(--bg-inset)] rounded-lg border p-2.5 space-y-1.5 ${combined > 100 ? 'border-rose-500/40' : 'border-[var(--border-light)]'}`}>
-                        <select value={m.portfolioId} onChange={(e) => updateLocalMapping(idx, 'portfolioId', e.target.value)}
-                          className="w-full px-2 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--sidebar-active-text)]">
-                          {mfItems.length > 0 && (
-                            <optgroup label="MF Portfolios">
-                              {mfItems.map((p) => {
-                                const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
-                                const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
-                                const eqPct = classifyPortfolio(p.id, mfHoldings || [], goalAllocMap)
-                                const freePct = 100 - (otherGoalAllocs[p.id]?.total || 0)
-                                return (
-                                  <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
-                                    {p.name}{p.owner ? ` (${p.owner})` : ''}{eqPct !== null ? ` · ${eqPct}% Eq` : ''} · {fullyUsed ? 'Fully used' : `${freePct}% free`}
-                                  </option>
-                                )
-                              })}
-                            </optgroup>
-                          )}
-                          {stockItems.length > 0 && (
-                            <optgroup label="Stock Portfolios">
-                              {stockItems.map((p) => {
-                                const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
-                                const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
-                                return (
-                                  <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
-                                    {p.name}{p.owner ? ` (${p.owner})` : ''} — {formatINR(p.value)}{fullyUsed ? ' (Fully allocated)' : ''}
-                                  </option>
-                                )
-                              })}
-                            </optgroup>
-                          )}
-                          {otherItems.length > 0 && (
-                            <optgroup label="Other Investments">
-                              {otherItems.map((p) => {
-                                const fullyUsed = (otherGoalAllocs[p.id]?.total || 0) >= 100
-                                const alreadyLinked = localMappings.some((o, i) => i !== idx && o.portfolioId === p.id)
-                                return (
-                                  <option key={p.id} value={p.id} disabled={alreadyLinked || fullyUsed}>
-                                    {p.name}{p.owner ? ` (${p.owner})` : ''} — {formatINR(p.value)}{fullyUsed ? ' (Fully allocated)' : ''}
-                                  </option>
-                                )
-                              })}
-                            </optgroup>
-                          )}
-                        </select>
-                        {otherTotal > 0 && (
-                          <div className={`text-xs px-2 py-1 rounded ${combined > 100 ? 'bg-rose-500/10 text-rose-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                            {other.goals.map((g2) => `${g2.goalName} (${g2.pct}%)`).join(', ')} — <span className="font-bold">Available: {Math.max(0, available)}%</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-[var(--text-dim)]">Allocation</span>
-                            <input type="number" value={m.allocationPct} onChange={(e) => updateLocalMapping(idx, 'allocationPct', e.target.value)}
-                              className="w-16 px-2 py-1 text-xs text-center bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-[var(--text-primary)] focus:outline-none focus:border-[var(--sidebar-active-text)]" min="0" max={available} />
-                            <span className="text-xs text-[var(--text-dim)]">%</span>
-                            <button onClick={() => removeLocalMapping(idx)} className="p-1 text-[var(--text-dim)] hover:text-rose-400 rounded transition-colors ml-1">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                          {item && <p className="text-xs text-[var(--text-dim)]">Contributes {formatINR((item.value * m.allocationPct) / 100)}</p>}
-                        </div>
-                        {suggestReasons[m.portfolioId] && Number(suggestReasons[m.portfolioId].pct) === Number(m.allocationPct) && (
-                          <p className="text-xs text-violet-400">Suggested: {suggestReasons[m.portfolioId].reason}</p>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {/* Linked total vs the goal's recommended equity */}
-                  {localMappings.length > 0 && (() => {
-                    const lg = (goalList || []).find((g) => g.goalId === linkingGoalId)
-                    const sm = linkedSummary(localMappings, suggestItems, lg ? goalTargetEquity(lg) : null)
-                    const off = sm.equityPct !== null && sm.targetEquity !== null && Math.abs(sm.equityPct - sm.targetEquity) > 5
-                    return (
-                      <p className={`text-xs font-semibold ${off ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        Linked {formatINR(sm.linkedValue)}{sm.equityPct !== null ? ` · equity ${sm.equityPct}%` : ''}{sm.targetEquity !== null ? ` · recommended now ${sm.targetEquity}%` : ''}
-                      </p>
-                    )
-                  })()}
-
-                  {/* Over-allocation warnings */}
-                  {overAllocated.length > 0 && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2 space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <AlertTriangle size={12} className="text-rose-400 shrink-0" />
-                        <span className="text-xs font-bold text-rose-400 uppercase">Over-allocated</span>
-                      </div>
-                      {overAllocated.map((o, i) => (
-                        <p key={i} className="text-xs text-rose-300">{o.name}: {o.combined}% total (exceeds by {o.excess}%)</p>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add more investments */}
-                  {(() => {
-                    const used = new Set(localMappings.map((m) => m.portfolioId))
-                    const canAdd = allInvestments.some((item) => !used.has(item.id) && (otherGoalAllocs[item.id]?.total || 0) < 100)
-                    return canAdd && (
-                      <button onClick={addLocalMapping} className="flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors">
-                        <Plus size={14} /> Add Another Investment
-                      </button>
-                    )
-                  })()}
-
-                  {/* Save/Cancel for linking */}
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-light)]">
-                    <button onClick={stopLinking} className="px-4 py-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={saveGoalMappings} disabled={!goalDirty || !goalIsValid || goalSaving}
-                      className="px-5 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                      {goalSaving ? 'Saving...' : 'Save Links'}
-                    </button>
-                  </div>
-                </div>
-              }
-            />
-          )
-        })()}
-      </Modal>
-
       <Modal open={!!rebalanceGoal} onClose={() => setRebalanceGoal(null)} title={`Rebalance to Glide Path — ${rebalanceGoal?.goalName || ''}`} wide>
         {rebalanceGoal && (
           <GlidepathRebalancePlan
@@ -1270,11 +790,11 @@ export default function GoalsPage() {
                   const result = await executeMFPlan([], redemptions)
                   if (!result?.success) throw new Error(result?.message || 'Redemption failed')
                 }
-                // The completed goal releases its allocation. Other goals retain their
-                // existing percentages; deliberately unallocated capacity stays free.
+                // The completed goal releases its money: it is closed, so the shared pool gives its share to the other goals
+                await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', isActive: false, notes: [g.notes, 'Withdrawn'].filter(Boolean).join(' · ') })
                 await updateGoalMappings(g.goalId, [])
                 setWithdrawalGoal(null)
-                showToast('Redemption recorded. Other goal allocations were not changed.')
+                showToast('Redemption recorded. The goal is closed and its money is free for your other goals.')
               } catch (err) {
                 showToast(err.message || 'Failed to record redemption', 'error')
               } finally {

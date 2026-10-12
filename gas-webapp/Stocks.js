@@ -234,7 +234,7 @@ function fetchStockPrice(symbol) {
 /**
  * Get all stock portfolios
  */
-function getAllStockPortfolios() {
+function getAllStockPortfolios(strict) {
   try {
     log('getAllStockPortfolios() called');
 
@@ -293,8 +293,14 @@ function getAllStockPortfolios() {
 
   } catch (error) {
     log('Error getting stock portfolios: ' + error.toString());
+    if (strict) throw error; // app load: report the failed read instead of "no portfolios"
     return [];
   }
+}
+
+/** For loadAllData: a failed read is reported (in _errors), not shown as "no portfolios". */
+function getAllStockPortfoliosStrict_() {
+  return getAllStockPortfolios(true);
 }
 
 /**
