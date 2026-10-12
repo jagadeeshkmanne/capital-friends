@@ -94,7 +94,7 @@ export default function GoalsPlanPage() {
           <button className="gp-btn gp-btn-s gp-btn-p" onClick={() => navigate('/goals/classic?add=1')}>+ Add goal</button>
         </span>
       </div>
-      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)}
+      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)}
         renderBuckets={(p) => navigate(`/retirement-buckets?goal=${encodeURIComponent(p.goal.goalId)}`)} />}
       {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
     </div>

@@ -30,7 +30,7 @@ function MixBar({ m, plan }) {
   )
 }
 
-export default function GoalsHome({ plan, todo, pool, plans, mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
+export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   const { mt, navigate, pname, closeGoal } = ctx
   const live = plans
   const has = live.reduce((t, p) => t + p.has, 0), need = live.reduce((t, p) => t + (p.state === 'due' ? p.has : p.need), 0)
@@ -117,6 +117,15 @@ export default function GoalsHome({ plan, todo, pool, plans, mfHoldings, mfPortf
           </div>
         ))}
       </div>
+      {closed.length > 0 && (
+        <div className="g2-card">
+          <div className="g2-lbl"><span>Completed goals</span><span>{closed.length}</span></div>
+          {closed.map((g) => { const nm = String(g.notes || ''); const used = /withdrawn/i.test(nm); const when = (nm.match(/(?:Withdrawn|Not needed) on ([0-9/.-]+)/i) || [])[1]; return (
+            <div key={g.goalId} className="g2-done"><span className={`g2-flag ${used ? 'ok' : ''}`}>{used ? '✓' : '–'}</span>
+              <div><b>{icon(g)} {mt(g.goalName)}</b><small>{used ? 'Completed · money used' : 'Closed · not needed'}{when ? ` · ${when}` : ''}</small></div>
+              <span className="g2-v">{L(g.targetAmount)}</span></div>) })}
+        </div>
+      )}
       <p className="g2-hint" style={{ textAlign: 'center' }}>Steps come from your own funds, each goal's timeline and the app's glide path. Not investment advice.</p>
     </div>
   )
@@ -182,7 +191,7 @@ function GoalCard({ p, mt, pname, renderBuckets }) {
         <div><span>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
       </div>
       <MixBar m={mixOf(items)} plan={p.eqTarget} />
-      {(due || p.state === 'short') && <div className="g2-sip"><span>{due ? 'Kept in safe funds for it. See To do: withdraw, then confirm.' : <b className="warn">Short: see the SIP / lump sum in To do</b>}</span></div>}
+      {(due || p.state === 'short') && <div className="g2-sip"><span>{due ? (mixOf(items)?.e > 10 ? `Kept for it (${mixOf(items).e}% still in equity: withdraw that part first). See To do.` : 'Kept in safe funds for it. See To do: withdraw, then tell the app.') : <b className="warn">Short: see the SIP / lump sum in To do</b>}</span></div>}
       {items.length > 0 && (
         <details><summary>Investments in this goal ({items.length})</summary>
           {items.map((it, i) => { const t = tagOf(it); return (
@@ -197,16 +206,21 @@ function GoalCard({ p, mt, pname, renderBuckets }) {
 
 function Step({ s, n, mt, pname, closeGoal, navigate }) {
   if (s.t === 'ready') {
-    const top = s.rows.slice(0, 2).map((r) => `${r.kind === 'other' ? mt(r.name) : splitFundName(r.name || '').main} ${L(r.value)}`).join(', ')
+    const where = s.rows.slice(0, 2).map((r) => `${r.kind === 'other' ? mt(r.name) : splitFundName(r.name || '').main} ${L(r.value)}`)
     return (
-    <div className="g2-step">
-      <div className="g2-sh"><span className="g2-n">{n}</span><div><small>{icon(s.goal)} {mt(s.goal.goalName)} · date reached</small><b>{L(s.has)} is ready</b><p>It's in {top}{s.rows.length > 2 ? `, +${s.rows.length - 2} more` : ''}.</p></div></div>
-      <div className="g2-ask"><span>Did you use it?</span>
-        <button className="g2-yes" onClick={() => closeGoal(s.goal, 'used')}>Yes, close the goal</button>
-        <button className="g2-lnk" onClick={() => navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`)}>Need more time</button>
-        <button className="g2-lnk" onClick={() => closeGoal(s.goal, 'not')}>Not needed</button>
+    <div className="g2-step g2-ready">
+      <div className="g2-rh">
+        <div className="g2-ri">{icon(s.goal)}</div>
+        <div className="g2-rt"><small>Date reached · {monthYear(s.goal)}</small><b>{mt(s.goal.goalName)}</b></div>
+        <div className="g2-ra"><b>{L(s.has)}</b><small>ready to use</small></div>
       </div>
-      <details className="g2-more"><summary>How to withdraw</summary>{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}<p className="g2-hint">After you close it, anything left becomes free money for your other goals.</p></details>
+      <p className="g2-rk">Kept in {where.join(' · ')}{s.rows.length > 2 ? ` · +${s.rows.length - 2} more` : ''}</p>
+      <div className="g2-acts"><span>What happened?</span>
+        <button className="g2-pb p" title="Close the goal" onClick={() => closeGoal(s.goal, 'used')}>✓ I used it</button>
+        <button className="g2-pb" title="Pick a new date" onClick={() => navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`)}>Need more time</button>
+        <button className="g2-pb" title="Its money becomes free" onClick={() => closeGoal(s.goal, 'not')}>Not needed</button>
+      </div>
+      <details className="g2-wd"><summary>How to withdraw ({s.rows.length})</summary>{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}<p className="g2-hint">After you close the goal, anything left becomes free money for your other goals.</p></details>
     </div>
   ) }
   if (s.t === 'short') {
@@ -243,17 +257,20 @@ const WdRow = ({ r, mt, pname }) => <Row chip="wd" k="WITHDRAW" a={r.name ? (r.k
 const Row = ({ chip, k, a, b, v }) => <div className="g2-row"><span className={`g2-chip ${chip}`}>{k}</span><div><b>{a}</b><small>{b}</small></div><span className="g2-v">{v}</span></div>
 
 const CSS = `
-.g2{--e:#a78bfa;--dt:#60a5fa;--gd:#fbbf24;--ok:#34d399;--warn:#fbbf24;--due:#60a5fa;--sell:#fb7185;display:flex;flex-direction:column;gap:14px;max-width:900px;margin:0 auto}
-.g2-card{background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:16px 18px}
-.g2-lbl{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}
+[data-theme="light"] .g2-jar.inc .nm{color:#047857}[data-theme="light"] .g2-jar.stb .nm{color:#b45309}[data-theme="light"] .g2-jar.gro .nm{color:#6d28d9}
+[data-theme="light"] .g2{--e:#6d28d9;--dt:#2563eb;--gd:#b45309;--ok:#047857;--warn:#b45309;--due:#1d4ed8;--sell:#be123c}
+.g2{--e:#a78bfa;--dt:#60a5fa;--gd:#fbbf24;--ok:#34d399;--warn:#fbbf24;--due:#60a5fa;--sell:#fb7185;display:flex;flex-direction:column;gap:16px;width:100%}
+.g2-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:0 24px 20px;overflow:hidden}
+.g2-lbl{display:flex;justify-content:space-between;align-items:center;margin:0 -24px 16px;padding:14px 24px;background:rgba(128,128,128,.04);border-bottom:1px solid rgba(128,128,128,.08);font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.g2-lbl>span:first-child{display:flex;align-items:center;gap:8px}.g2-lbl>span:first-child:before{content:"";width:3px;height:14px;border-radius:2px;background:currentColor;opacity:.6}
 .g2 .ok{color:var(--ok)}.g2 .warn{color:var(--warn)}
 .g2-hint{font-size:12.5px;color:var(--text-muted);margin:8px 0 0;line-height:1.45}
 .g2-link{color:var(--accent-violet);cursor:pointer}
-.g2-btn{margin-top:12px;font-size:13px;font-weight:600;color:var(--accent-violet);background:none;border:1px solid var(--border);border-radius:10px;padding:7px 12px;cursor:pointer}
+.g2-btn{margin-top:12px;font-size:12px;font-weight:600;color:var(--accent-violet);background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer}
 .g2-banner{border-radius:16px;padding:14px 16px;background:color-mix(in srgb,var(--warn) 10%,var(--bg-card));border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:var(--text-secondary);line-height:1.5}
 .g2-banner>b{color:var(--warn);font-size:14.5px}.g2-banner span b{color:var(--text-primary)}
 .g2-ok{font-size:14px;font-weight:600;color:var(--ok);padding:4px 0}
-.g2-step{border-top:1px solid var(--border);padding:14px 0 6px}.g2-step:first-of-type{border-top:0;padding-top:4px}
+.g2-step{border-top:1px solid var(--border);padding:14px 0 6px}.g2-lbl+.g2-step{border-top:0;padding-top:0}
 .g2-sh{display:flex;gap:12px}.g2-sh small{display:block;font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
 .g2-sh b{display:block;font-size:15.5px;color:var(--text-primary);margin-top:3px}.g2-sh p{margin:3px 0 0;font-size:13px;color:var(--text-secondary)}
 .g2-n{width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent-violet);background:var(--bg-inset)}
@@ -283,9 +300,29 @@ const CSS = `
 .g2-flow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px;font-size:11.5px;color:var(--text-muted);text-align:center}
 .g2-chip.sip{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}
 .g2-ask{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:12px 0 4px 36px}.g2-ask>span{font-size:13.5px;font-weight:600;color:var(--text-primary)}
-.g2-yes{font-size:13px;font-weight:700;border:0;border-radius:10px;padding:8px 13px;background:var(--accent-violet);color:#fff;cursor:pointer}
+.g2-yes{font-size:13px;font-weight:600;border:0;border-radius:8px;padding:8px 14px;background:#7c3aed;color:#fff;cursor:pointer}
 .g2-lnk{font-size:13px;font-weight:600;border:1px solid var(--border);border-radius:10px;padding:7px 11px;background:transparent;color:var(--text-secondary);cursor:pointer}
-.g2-sum{display:grid;grid-template-columns:1fr 1fr;gap:0}.g2-sum>div+div{border-left:1px solid var(--border);padding-left:20px;margin-left:20px}
+.g2-ready{padding-bottom:10px}
+.g2-acts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:12px}.g2-acts>span{font-size:12.5px;color:var(--text-muted);margin-right:4px}
+.g2-pb{height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:12.5px;font-weight:600;cursor:pointer}
+.g2-pb:hover{border-color:var(--text-muted);color:var(--text-primary)}.g2-pb.p{background:#7c3aed;border-color:#7c3aed;color:#fff}.g2-pb.p:hover{background:#6d28d9}
+.g2-rh{display:flex;align-items:center;gap:12px}
+.g2-ri{width:38px;height:38px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:18px;background:color-mix(in srgb,var(--due) 14%,var(--bg-inset))}
+.g2-rt{flex:1;min-width:0}.g2-rt small{display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--due)}.g2-rt b{display:block;font-size:16px;color:var(--text-primary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g2-ra{text-align:right}.g2-ra b{display:block;font-size:19px;color:var(--text-primary)}.g2-ra small{font-size:11.5px;color:var(--text-muted)}
+.g2-rk{margin:10px 0 0;font-size:12.5px;color:var(--text-muted);line-height:1.5}
+.g2-q{margin:14px 0 8px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.g2-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.g2-tile{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 8px;border-radius:14px;border:1px solid var(--border);background:var(--bg-inset);color:var(--text-primary);cursor:pointer;transition:border-color .15s,background .15s}
+.g2-tile:hover{border-color:color-mix(in srgb,var(--accent-violet) 55%,transparent)}
+.g2-tile i{font-style:normal;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--bg-card);margin-bottom:4px}
+.g2-tile b{font-size:13.5px}.g2-tile span{font-size:11.5px;color:var(--text-muted)}
+.g2-tile.ok{border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,var(--bg-inset))}.g2-tile.ok i{background:var(--ok);color:#06281d;font-weight:800}
+.g2-wd{margin-top:12px!important;border-top:1px solid var(--border)!important;padding-top:10px!important}
+.g2-done{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}.g2-done:first-of-type{border-top:0}
+.g2-done b{display:block;font-size:14px;color:var(--text-primary)}.g2-done small{font-size:12px;color:var(--text-muted)}
+.g2-flag{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;background:var(--bg-inset);color:var(--text-muted)}.g2-flag.ok{background:var(--ok);color:#06281d}
+.g2-sum{display:grid;grid-template-columns:1fr 1fr;gap:0;padding-top:0}.g2-sum .g2-lbl{margin:0 -24px 16px}.g2-sum>div:first-child .g2-lbl{margin-right:-20px}.g2-sum>div+div .g2-lbl{margin-left:-20px}.g2-sum>div+div{border-left:1px solid var(--border);padding-left:20px;margin-left:20px}
 .g2-tot{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}.g2-tot span{font-size:12px;color:var(--text-muted)}.g2-tot b{display:block;font-size:19px;color:var(--text-primary);margin-top:3px}.g2-tot small{font-size:11px;color:var(--text-muted)}
 .g2-mixw{position:relative}.g2-mix{height:12px;border-radius:7px;background:var(--bg-inset);display:flex;overflow:hidden;margin:6px 0 7px}
 .g2-mix i{display:block;height:100%}.g2-mix .e{background:var(--e)}.g2-mix .d{background:var(--dt)}.g2-mix .g{background:var(--gd)}
@@ -320,7 +357,8 @@ const CSS = `
 .g2-tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:6px}
 .g2-tag.e{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}.g2-tag.d{color:var(--dt);background:color-mix(in srgb,var(--dt) 14%,transparent)}.g2-tag.g{color:var(--gd);background:color-mix(in srgb,var(--gd) 14%,transparent)}.g2-tag.l{color:var(--text-secondary);background:var(--bg-inset)}
  @media(max-width:640px){
- .g2-goal{padding-top:48px}.g2-ask{margin-left:0}
+ .g2-card{padding:0 16px 16px}.g2-lbl{margin:0 -16px 14px;padding:12px 16px;font-size:12.5px}.g2-sum .g2-lbl{margin:0 -16px 14px}.g2-sum>div:first-child .g2-lbl{margin-right:-16px}.g2-sum>div+div .g2-lbl{margin:0 -16px 14px}
+ .g2-goal{padding-top:48px}.g2-ask{margin-left:0}.g2-acts>span{width:100%}.g2-pb{padding:0 10px}
  .g2-jars{grid-template-columns:1fr}.g2-jh{display:flex;align-items:center;gap:12px;text-align:left}.g2-jh svg{margin:0}.g2-flow{grid-template-columns:1fr;text-align:left}
  .g2-tot3{grid-template-columns:1fr 1fr!important}.g2-or,.g2-more{margin-left:0}
  .g2-card{padding:14px;border-radius:16px}.g2-sum{grid-template-columns:1fr}.g2-sum>div+div{border-left:0;padding-left:0;margin-left:0;border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
