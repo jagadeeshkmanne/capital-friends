@@ -12,6 +12,7 @@ import { useMaskText } from '../../hooks/useMaskText'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
+import { useGoalsPlan } from '../../hooks/useGoalsPlan'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
 const STEADY_CATS = new Set(['Debt', 'Liquid', 'Gilt', 'Cash', 'Money Market', 'Overnight', 'Arbitrage'])
@@ -117,6 +118,21 @@ export default function Dashboard() {
     activeMembers, activeBanks, activeInvestmentAccounts,
     healthCheckCompleted, healthCheckAnswers
   } = useData()
+
+  // goals: the same plan and steps as the Goals page (Money for goals pool)
+  const { plan: goalsPlan, todo: goalsTodo } = useGoalsPlan()
+  const goalCards = useMemo(() => (goalsPlan?.goals || []).filter((p) => selectedMember === 'all' || p.goal.familyMemberId === selectedMember), [goalsPlan, selectedMember])
+  const goalTodos = useMemo(() => {
+    const t = []
+    for (const s of goalsTodo?.steps || []) {
+      if (s.t === 'ready') t.push(`${mt(s.goal.goalName)}: date reached, withdraw plan`)
+      else if (s.t === 'protect') t.push(`${mt(s.goal.goalName)}: make it safer (move ${formatINR(Math.round(s.total))} to safe funds)`)
+      else if (s.t === 'switch') t.push(`Rebalance: one switch of ${formatINR(Math.round(s.total))}`)
+      else if (s.t === 'cash') t.push(`Invest ${formatINR(Math.round(s.total))} of idle cash`)
+      else if (s.t === 'short') t.push(`Goals ${formatINR(Math.round(s.gap))} short: add ${formatINR(s.sip)}/month or ${formatINR(s.lump)} once`)
+    }
+    return t
+  }, [goalsTodo, mt])
 
   const [showRebalanceDialog, setShowRebalanceDialog] = useState(false)
   const [openRebalance, setOpenRebalance] = useState({ 0: true })
@@ -556,20 +572,13 @@ export default function Dashboard() {
       }
     }
 
-    // Check emergency fund goals
-    const emergencyGoals = filterOwner((goalList || []).filter((g) => g.isActive !== false && g.goalType === 'Emergency Fund'), 'familyMemberId')
-    emergencyGoals.forEach((g) => {
-      const pct = g.targetAmount > 0 ? (g.currentValue / g.targetAmount) * 100 : 0
-      if (pct < 100) {
-        const remaining = g.targetAmount - g.currentValue
-        items.push({
-          type: pct >= 75 ? 'warning' : 'warning',
-          title: `Emergency Fund at ${pct.toFixed(0)}%`,
-          description: `Job loss or medical emergency forces debt. ${formatINR(remaining)} more needed for full cushion.`,
-          action: 'View Goal', navigateTo: '/goals',
-        })
-      }
-    })
+    // Goals: the same steps as the Goals page (date reached, make it safer, rebalance, goals short)
+    for (const st of goalsTodo?.steps || []) {
+      if (st.t === 'ready') items.push({ type: 'warning', title: `${st.goal.goalName}: date reached`, description: `${formatINR(Math.round(st.has))} is ready. See the withdraw plan, then mark the goal.`, action: 'Withdraw plan', navigateTo: '/goals' })
+      else if (st.t === 'protect') items.push({ type: 'warning', title: `${st.goal.goalName}: make it safer`, description: `${st.eqNow}% in equity with little time left. Move ${formatINR(Math.round(st.total))} to safe funds.`, action: 'See steps', navigateTo: '/goals' })
+      else if (st.t === 'switch' || st.t === 'cash') items.push({ type: 'warning', title: 'Goals: rebalance this month', description: st.t === 'cash' ? `Invest ${formatINR(Math.round(st.total))} of idle cash for your goals.` : `One switch of ${formatINR(Math.round(st.total))} inside ${'your portfolio'}.`, action: 'See steps', navigateTo: '/goals' })
+      else if (st.t === 'short') items.push({ type: 'warning', title: `Goals ${formatINR(Math.round(st.gap))} short`, description: `Add ${formatINR(st.sip)}/month to your SIPs, or ${formatINR(st.lump)} once.`, action: 'View Goals', navigateTo: '/goals' })
+    }
 
     // Overdue reminders
     const activeReminders = filterOwner((reminderList || []).filter((r) => r.isActive !== false), 'familyMemberId')
@@ -582,44 +591,8 @@ export default function Dashboard() {
       })
     })
 
-    // Goals needing attention
-    const needsAttention = filterOwner((goalList || []).filter((g) => g.isActive !== false && g.status === 'Needs Attention'), 'familyMemberId')
-    needsAttention.forEach((g) => {
-      items.push({
-        type: 'warning', title: `${g.goalName} needs attention`,
-        description: `Progress is behind schedule. Consider increasing monthly investment.`,
-        action: 'View Goal', navigateTo: '/goals',
-      })
-    })
-
-    // Goal allocation mismatches (de-risk alerts)
-    const nowD = new Date()
-    filterOwner((goalList || []).filter(g => g.isActive !== false), 'familyMemberId').forEach(g => {
-      if (g.status === 'Achieved') return
-      const yearsLeft = (new Date(g.targetDate) - nowD) / (365.25 * 24 * 60 * 60 * 1000)
-      if (yearsLeft <= 0) return
-      // Retirement follows its own glide path, and the bucket plan in the last 5 years.
-      if (followsBucketPlan(g.goalType, yearsLeft)) return
-      const rec = g.goalType === 'Emergency Fund' ? 0
-        : g.goalType === 'Retirement' ? getRecommendedAllocation('Retirement', yearsLeft).equity
-        : yearsLeft <= 1 ? 10 : yearsLeft <= 3 ? 30 : yearsLeft <= 5 ? 50
-        : yearsLeft <= 7 ? 65 : yearsLeft <= 10 ? 75 : 85
-      const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
-      if (!maps.length) return
-      const att = goalAttribution[g.goalId] || { total: 0, equity: 0 }
-      const total = att.total, eq = att.equity
-      const actual = total > 0 ? Math.round((eq / total) * 100) : null
-      if (actual !== null && actual - rec > 15) {
-        items.push({
-          type: 'warning', title: `${g.goalName}: De-risk needed`,
-          description: `${actual}% equity, recommended max ${rec}%. ${Math.round(yearsLeft)} yrs to target — shift to debt.`,
-          action: 'View Goal', navigateTo: '/goals',
-        })
-      }
-    })
-
     return items.slice(0, 6)
-  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, goalAttribution, healthCheckCompleted, healthCheckAnswers])
+  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, goalAttribution, healthCheckCompleted, healthCheckAnswers, goalsTodo])
 
   // ── Upcoming Reminders (sorted by due date) ──
   const upcomingReminders = useMemo(() => {
@@ -787,7 +760,7 @@ export default function Dashboard() {
                     <span className="flex items-center gap-2">
                       <span className="text-[var(--text-secondary)] font-semibold tabular-nums">{formatINR(item.value)}</span>
                       <span className="inline-flex items-center justify-center min-w-[36px] px-2 py-0.5 rounded-[5px] text-xs font-semibold tabular-nums"
-                            style={{ background: 'rgba(128,128,128,0.08)', color: item.fill }}>
+                            style={{ background: `color-mix(in srgb, ${item.fill} 14%, transparent)`, color: 'var(--text-primary)' }}>
                         {item.pct < 1 ? item.pct.toFixed(1) : item.pct.toFixed(0)}%
                       </span>
                     </span>
@@ -1181,120 +1154,40 @@ export default function Dashboard() {
         )}
 
         {/* ═══ GOALS ═══ */}
-        {data.activeGoals.length > 0 && (
-          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 cursor-pointer hover:border-[var(--border-light)] transition-colors ${upcomingReminders.length === 0 ? 'md:col-span-2' : ''}`}
-               onClick={() => navigate('/goals')}>
-            <SectionHeader label="Financial Goals" color="var(--text-muted)"
-                           linkText="View All" onClick={(e) => { e.stopPropagation(); navigate('/goals') }} />
-
-            {data.activeGoals.map((g, idx) => {
-              const pct = g.targetAmount > 0 ? Math.min((g.currentValue / g.targetAmount) * 100, 100) : 0
-              const gh = data.dashGoalHealth[g.goalId]
-              const yearsLeft = g.targetDate ? (new Date(g.targetDate) - new Date()) / (365.25 * 24 * 60 * 60 * 1000) : null
-              const isPastDue = yearsLeft !== null && yearsLeft <= 0 && pct < 100
-
-              let statusColor, statusText
-              if (pct >= 100) {
-                statusColor = '#34d399'; statusText = 'Achieved'
-              } else if (isPastDue) {
-                statusColor = '#f87171'; statusText = 'Overdue'
-              } else if (!g.currentValue || g.currentValue === 0) {
-                statusColor = '#94a3b8'; statusText = 'Not started'
-              } else if (g.status === 'Needs Attention') {
-                statusColor = '#fbbf24'; statusText = 'Needs Attention'
-              } else if (g.status === 'On Track') {
-                statusColor = '#60a5fa'; statusText = 'On Track'
-              } else {
-                statusColor = '#a78bfa'; statusText = g.status || 'In Progress'
-              }
-
-              const labelColor = gh?.label === 'Short-term' ? '#60a5fa'
-                : gh?.label === 'Medium-term' ? '#fbbf24'
-                : gh?.label === 'Long-term' ? '#34d399' : '#94a3b8'
-              const gap = Math.max(0, (g.targetAmount || 0) - (g.currentValue || 0))
-
+        {/* ═══ GOALS (same numbers as the Goals page) ═══ */}
+        {goalCards.length > 0 && (
+          <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6 ${upcomingReminders.length === 0 ? 'md:col-span-2' : ''}`}>
+            <SectionHeader label="Financial Goals" color="var(--text-muted)" badge={goalTodos.length || undefined}
+                           linkText="Open Goals" onClick={() => navigate('/goals')} />
+            {goalTodos.length > 0 && (
+              <button type="button" onClick={() => navigate('/goals')}
+                className="w-full text-left mb-4 rounded-lg border px-3.5 py-2.5 transition-colors"
+                style={{ borderColor: 'color-mix(in srgb, #f59e0b 45%, var(--border))', background: 'color-mix(in srgb, #f59e0b 8%, var(--bg-card))' }}>
+                <span className="block text-[13px] font-semibold" style={{ color: 'var(--accent-amber, #f59e0b)' }}>{goalTodos.length} thing{goalTodos.length > 1 ? 's' : ''} to do on Goals ›</span>
+                {goalTodos.slice(0, 3).map((t, i) => <span key={i} className="block text-xs text-[var(--text-secondary)] mt-1">• {t}</span>)}
+              </button>
+            )}
+            {goalCards.map((p, idx) => {
+              const pct = p.target > 0 ? Math.min(100, Math.round((p.has / p.target) * 100)) : 0
+              const due = p.state === 'due' && !p.isRet
+              const tone = due ? '#60a5fa' : p.state === 'short' ? '#f59e0b' : '#10b981'
+              const label = due ? 'Money ready' : p.state === 'short' ? `${formatINR(Math.round(-p.gap))} short` : 'On track'
+              const r = 15, c = 2 * Math.PI * r
+              const yrs = p.years <= 0 ? (p.isRet ? 'retired' : 'date reached') : p.years < 1 ? `${Math.max(1, Math.round(p.years * 12))} months left` : `${Math.round(p.years * 2) / 2} yrs left`
               return (
-                <div key={g.goalId || idx} className={idx < data.activeGoals.length - 1 ? 'mb-4 pb-4 border-b border-[var(--border-light)]' : ''}>
-                  {/* Header: Name + Status */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[13px] font-medium text-[var(--text-secondary)] truncate">{g.goalName}</span>
-                      {gh && (
-                        <span className="text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                              style={{ background: `${labelColor}15`, color: labelColor }}>
-                          {gh.label}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ml-2"
-                          style={{ background: `${statusColor}15`, color: statusColor }}>
-                      {statusText}
-                    </span>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="h-[5px] rounded-[3px] overflow-hidden mt-2" style={{ background: 'var(--bg-inset)' }}>
-                    <div className="h-full rounded-[3px]" style={{ width: `${pct}%`, background: statusColor }} />
-                  </div>
-
-                  {/* Stats: Current/Target + Progress */}
-                  <div className="flex items-center justify-between text-xs mt-1.5">
-                    <span className="text-[var(--text-muted)] tabular-nums">
-                      {formatINR(g.currentValue)} <span className="text-[var(--text-dim)]">/ {formatINR(g.targetAmount)}</span>
-                    </span>
-                    <span className="text-[var(--text-dim)] tabular-nums">
-                      {pct.toFixed(0)}%{gh ? ` · ${gh.yearsLeft.toFixed(1)} yrs` : ''}
-                    </span>
-                  </div>
-
-                  {/* Allocation health + Suggestion */}
-                  {gh && pct < 100 && (
-                    <div className="mt-2 space-y-1.5">
-                      {/* Recommended vs Actual table */}
-                      <div className="bg-[var(--bg-inset)] rounded-md px-2.5 py-1.5">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-[var(--text-dim)]">Recommended</span>
-                          <span className="text-[var(--text-muted)] font-semibold tabular-nums">{gh.recommendedEquity}% Equity · {gh.recommendedDebt}% Debt</span>
-                        </div>
-                        {gh.isMapped && gh.actualEquity !== null ? (
-                          <>
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-[var(--text-dim)]">Actual</span>
-                              <span className="text-[var(--text-muted)] font-semibold tabular-nums">{gh.actualEquity}% Equity · {100 - gh.actualEquity}% Debt</span>
-                            </div>
-                            {gh.mismatch !== null && gh.mismatch !== 0 && (
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-[var(--text-dim)]">Difference</span>
-                                <span className={`font-bold tabular-nums ${gh.needsAttention ? (gh.mismatch > 0 ? 'text-amber-400' : 'text-blue-400') : 'text-emerald-400'}`}>
-                                  {gh.mismatch > 0 ? '+' : ''}{gh.mismatch}% Equity
-                                  {gh.needsAttention && gh.mismatch > 0 && ' — shift to debt'}
-                                  {gh.needsAttention && gh.mismatch < 0 && ' — room for growth'}
-                                  {!gh.needsAttention && ' ✓'}
-                                </span>
-                              </div>
-                            )}
-                            {gh.mismatch === 0 && (
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-[var(--text-dim)]">Difference</span>
-                                <span className="text-emerald-400 font-bold">Perfectly aligned ✓</span>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-xs font-semibold text-amber-400">⚠ No investments linked — at risk</div>
-                        )}
-                      </div>
-                      {/* SIP / Lumpsum suggestion — only when investments are linked */}
-                      {gh.isMapped && gh.liveSIP > 0 && gap > 0 && (
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-violet-400 font-semibold tabular-nums">SIP {formatINR(gh.liveSIP)}/mo</span>
-                          <span className="text-[var(--text-dim)]">or</span>
-                          <span className="text-violet-400 font-semibold tabular-nums">Lumpsum {formatINR(gh.liveLumpsum)}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <button type="button" key={p.goal.goalId} onClick={() => navigate('/goals')}
+                  className={`w-full flex items-center gap-3 text-left py-2.5 ${idx < goalCards.length - 1 ? 'border-b border-[var(--border-light)]' : ''}`}>
+                  <span className="relative shrink-0" style={{ width: 40, height: 40 }}>
+                    <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r={r} fill="none" stroke="var(--bg-inset)" strokeWidth="4" />
+                      <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 20 20)" /></svg>
+                    <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-[var(--text-primary)] tabular-nums tracking-tight">{pct}%</span>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">{mt(p.goal.goalName)}</span>
+                    <span className="block text-xs text-[var(--text-dim)] mt-0.5 tabular-nums">{formatINR(Math.round(p.has))} of {formatINR(Math.round(p.target))} · {yrs}</span>
+                  </span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ background: `color-mix(in srgb, ${tone} 14%, transparent)`, color: 'var(--text-primary)' }}>{label}</span>
+                </button>
               )
             })}
           </div>

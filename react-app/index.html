@@ -43,6 +43,10 @@
     </script>
   </head>
   <body style="margin:0;padding:0;background:#f8fafc">
+    <!-- Signed-in users: hide the static landing copy (kept for Google and first-time visitors) until the app replaces it,
+         so it does not flash on every page load -->
+    <style>.cf-in #root{visibility:hidden}html[data-theme="dark"].cf-in body{background:#0b1220!important}</style>
+    <script>try{if(localStorage.getItem('cf_user_profile')){var d=document.documentElement;d.classList.add('cf-in');var off=function(){d.classList.remove('cf-in')};setTimeout(off,6000);document.addEventListener('DOMContentLoaded',function(){var r=document.getElementById('root');if(!r||!document.getElementById('cf-shell'))return off();new MutationObserver(function(m,o){if(!document.getElementById('cf-shell')){off();o.disconnect()}}).observe(r,{childList:true})})}}catch(e){}</script>
     <div id="root">
       <!-- Static shell matching React landing page exactly — no flash on React load -->
       <div id="cf-shell" style="font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased">

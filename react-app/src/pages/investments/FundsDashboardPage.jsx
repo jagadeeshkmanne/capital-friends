@@ -471,7 +471,7 @@ function Section({ title, children, last }) {
 function CheckRow({ active, onClick, label, sub, hint, dim }) {
   return (
     <button onClick={onClick} aria-pressed={active}
-      className={`w-full flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg text-left transition-colors ${active ? 'bg-violet-500/10' : 'hover:bg-[var(--bg-hover)]'} ${dim ? 'opacity-50' : ''}`}>
+      className={`w-full flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg text-left transition-colors ${active ? 'bg-violet-500/10' : 'hover:bg-[var(--bg-hover)]'} ${dim ? 'opacity-70' : ''}`}>
       <span className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${active ? 'bg-violet-500 border-violet-500' : 'border-[var(--text-dim)]'}`}>
         {active && <Check size={11} strokeWidth={3} className="text-white" />}
       </span>

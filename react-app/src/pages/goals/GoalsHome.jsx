@@ -532,6 +532,7 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-pkn{display:inline;font-size:11px;color:var(--text-muted);font-weight:500}.g2-pf{font-style:normal;margin-right:6px;opacity:.8}
 .g2-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}.g2-onc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}.g2-acts2{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
 .g2-jump{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;font-size:12px;font-weight:600;color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,var(--bg-card));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--border));border-radius:999px;cursor:pointer}
+[data-theme="light"] .g2-chip.sell,[data-theme="light"] .g2-chip.buy,[data-theme="light"] .g2-chip.wd,[data-theme="light"] .g2-chip.sip{background:color-mix(in srgb,currentColor 9%,#fff)}[data-theme="light"] .g2-chip.sell{color:#9f1239}[data-theme="light"] .g2-chip.buy{color:#065f46}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
