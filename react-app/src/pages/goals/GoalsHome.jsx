@@ -332,7 +332,7 @@ const CSS = `
 .g2-msg{font-size:13px;font-weight:600;margin-top:10px;padding:8px 11px;border-radius:10px}.g2-msg.ok{background:color-mix(in srgb,var(--ok) 9%,transparent)}.g2-msg.warn{background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .g2-free{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:center}.g2-free b{display:block;font-size:26px;color:var(--text-primary)}.g2-free span{font-size:13px;color:var(--text-secondary)}
 .g2-ideas{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.g2-ideas div{background:var(--bg-inset);border-radius:12px;padding:11px 12px;font-size:13.5px;color:var(--text-primary)}.g2-ideas span{display:block;font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.4}
-.g2-road{position:relative;padding:8px 0 16px}
+.g2-road{position:relative;padding:8px 0 16px;width:100%;max-width:900px;margin:0 auto}
 .g2-road:before{content:"";position:absolute;left:50%;transform:translateX(-50%);top:0;bottom:0;width:18px;border-radius:10px;background:color-mix(in srgb,var(--text-muted) 22%,transparent)}
 .g2-road:after{content:"";position:absolute;left:50%;transform:translateX(-50%);top:8px;bottom:8px;width:2px;background:repeating-linear-gradient(color-mix(in srgb,var(--text-primary) 40%,transparent) 0 10px,transparent 10px 20px)}
 .g2-now{position:relative;z-index:1;width:max-content;margin:0 auto 44px;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:12.5px;color:var(--text-secondary)}
