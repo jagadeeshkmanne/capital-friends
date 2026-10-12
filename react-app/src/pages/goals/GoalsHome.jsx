@@ -4,7 +4,8 @@ import { useState, useRef, useLayoutEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
 import { createPortal } from 'react-dom'
-import { RetirementActions, BucketHelpLink } from './RetirementBucketsPage'
+import { RetirementActions } from './RetirementBucketsPage'
+import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -195,7 +196,6 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
     <div className="g2-bk">
       {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
         : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Now: one growth mix</div><div className={p.bucketMode && !retired ? 'on' : ''}>{yearOf(p.goal) - 5}: fill the jars</div><div>{yearOf(p.goal)}: live from them</div></div>}
-      <div className="g2-bkh"><BucketHelpLink /></div>
       <div className="g2-jars">{jar('inc', 'Income', '2 years of expenses · safe')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('gro', 'Growth', 'the rest · equity')}</div>
       <div className="g2-flow"><div>↓ pays your monthly income</div><div>→ refills Income once a year</div><div>→ refills Stability after good years</div></div>
       {retired && <RetirementActions goal={p.goal} part="income" />}
@@ -242,7 +242,8 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
               <small>{it.kind === 'other' ? (/epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? 'retirement only · never sold' : 'other investments') : pname(it.portfolioId)}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% of it for this goal` : ''}</small></div>) })}
         </details>
       )}
-      {p.isRet && <details open={p.bucketMode}><summary>Retirement buckets {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
+      {p.isRet && <div className="g2-hiw"><div className="g2-hiwh">How your retirement buckets work</div><BucketHowItWorks compact /></div>}
+      {p.isRet && <details open={p.bucketMode}><summary>Your buckets today {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
     </div>
   )
 }
@@ -491,6 +492,7 @@ const CSS = `
 .g2-mvt{flex:1;min-width:0}.g2-mvt small{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}.g2-mvt b{display:block;font-size:15px;color:var(--text-primary);margin:2px 0}.g2-mvt span{font-size:12.5px;color:var(--text-secondary)}
 .g2-mva{text-align:right}.g2-mva b{display:block;font-size:18px;color:var(--text-primary)}.g2-mva small{font-size:11px;color:var(--text-muted)}
 .g2-mv .g2-two{margin-left:0}.g2-pk.sell{border-top:3px solid var(--sell)!important}.g2-pkr small{display:block;font-size:11px;color:var(--text-muted);margin-top:1px}
+.g2-hiw{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}.g2-hiwh{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}

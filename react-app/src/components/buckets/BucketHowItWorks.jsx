@@ -78,7 +78,7 @@ const BUCKET_VIEW = [
 
 const SCENE_MS = 6500
 
-export default function BucketHowItWorks() {
+export default function BucketHowItWorks({ compact = false }) {
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [settled, setSettled] = useState(false)
@@ -116,41 +116,16 @@ export default function BucketHowItWorks() {
         ))}
       </div>
 
-      {/* Stage */}
-      <div className="relative rounded-xl border border-[var(--border-light)] bg-[var(--bg-inset)] px-3 pt-12 pb-4 sm:px-6 overflow-hidden">
-        {/* Long lane: Growth → Income (above the buckets) */}
-        <Lane active={scene.flows.includes('b3b1')} className="top-4 left-[16%] right-[16%]" color="bg-violet-400" label="Growth → Income" />
-
-        <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_1fr_auto] items-end gap-1 sm:gap-2">
-          {/* Bank */}
-          <div className="flex flex-col items-center gap-1 pb-6">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${scene.flows.includes('out') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-card)] text-[var(--text-dim)]'}`}>
-              <Landmark size={16} />
-            </div>
-            <span className="text-[10px] text-[var(--text-dim)]">Bank</span>
-          </div>
-
-          {BUCKET_VIEW.map((b, i) => {
-            const flowIn = i === 0 ? 'out' : i === 1 ? 'b2b1' : 'b3b2'
-            return [
-              <SideLane key={`${b.key}-lane`} active={scene.flows.includes(flowIn)}
-                color={i === 0 ? 'bg-emerald-400' : i === 1 ? 'bg-amber-400' : 'bg-violet-400'} />,
-              <Bucket key={b.key} view={b} level={levels[b.key]}
-                locked={b.key === 'b3' && scene.lockGrowth}
-                floor={b.key === 'b2' && scene.warning}
-                market={b.key === 'b3' ? scene.market : null} />,
-            ]
-          })}
-        </div>
-      </div>
+      {/* Stage: the jars, with money flowing along curved arrows into the bucket it fills */}
+      <Stage scene={scene} levels={levels} compact={compact} />
 
       {/* Caption */}
-      <div className="min-h-[88px]">
+      <div className={compact ? "min-h-[64px]" : "min-h-[88px]"}>
         <p className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
           {scene.warning && <AlertTriangle size={15} className="text-amber-400 shrink-0" />}
           {scene.title}
         </p>
-        <p className="text-sm text-[var(--text-muted)] mt-1 leading-relaxed">{scene.text}</p>
+        <p className={`${compact ? "text-xs" : "text-sm"} text-[var(--text-muted)] mt-1 leading-relaxed`}>{scene.text}</p>
       </div>
 
       {/* Controls */}
@@ -170,52 +145,96 @@ export default function BucketHowItWorks() {
   )
 }
 
-function Bucket({ view, level, locked, floor, market }) {
-  const Icon = view.icon
+const JX = { b1: 200, b2: 340, b3: 480 }
+const JC = { b1: '#34d399', b2: '#fbbf24', b3: '#a78bfa' }
+const NAME = { b1: 'Income', b2: 'Stability', b3: 'Growth' }
+const TOP = 96, BOT = 206, JW = 76
+// a curved arrow from one jar's mouth to another's (higher arc for the longer jump)
+const arc = (from, to) => {
+  const x1 = JX[from], x2 = JX[to], h = Math.abs(x1 - x2) > 200 ? 92 : 58
+  const apex = TOP - 8 - h / 2
+  // long jump: label above its arc; short jump: label just under its arc (so two arcs never overlap)
+  return { d: `M${x1},${TOP - 8} Q${(x1 + x2) / 2},${TOP - 8 - h} ${x2 + (x1 > x2 ? 10 : -10)},${TOP - 10}`, lx: (x1 + x2) / 2, ly: h > 60 ? apex - 16 : apex + 18 }
+}
+const FLOW = { b3b1: ['b3', 'b1'], b3b2: ['b3', 'b2'], b2b1: ['b2', 'b1'] }
+
+function Stage({ scene, levels }) {
+  const flows = scene.flows
   return (
-    <div className="flex flex-col items-center gap-1.5 min-w-0">
-      <div className="h-6 flex items-center">
-        {market === 'good' && <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 rounded-full px-2 py-0.5 whitespace-nowrap"><TrendingUp size={11} /> near high</span>}
-        {market === 'down' && <span className="flex items-center gap-1 text-[10px] font-semibold text-rose-400 bg-rose-500/10 rounded-full px-2 py-0.5 whitespace-nowrap"><TrendingDown size={11} /> down</span>}
-      </div>
-      <div className={`relative w-12 sm:w-20 h-28 sm:h-32 rounded-b-2xl rounded-t-md border-2 ${view.ring} bg-[var(--bg-card)] overflow-hidden`}>
-        <div className={`absolute bottom-0 left-0 right-0 ${view.fill} transition-[height] duration-[1400ms] ease-in-out`} style={{ height: `${level}%` }} />
-        {floor && <div className="absolute left-0 right-0 border-t-2 border-dashed border-rose-400" style={{ bottom: '40%' }} title="2-year floor" />}
-        {locked && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="w-8 h-8 rounded-full bg-[var(--bg-card)]/90 flex items-center justify-center"><Lock size={15} className="text-rose-400" /></span>
-          </div>
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-inset)] overflow-hidden">
+      <svg viewBox="0 0 600 250" className="w-full h-auto block" role="img" aria-label={scene.title}>
+        <defs>
+          {Object.entries(JC).map(([k, c]) => (
+            <marker key={k} id={`hw-ar-${k}`} viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>
+          ))}
+          {Object.keys(JX).map((k) => <clipPath key={k} id={`hw-c-${k}`}><rect x={JX[k] - JW / 2 + 3} y={TOP + 3} width={JW - 6} height={BOT - TOP - 6} rx="12" /></clipPath>)}
+        </defs>
+
+        {/* bank */}
+        <g opacity={flows.includes('out') ? 1 : 0.45}>
+          <rect x="44" y="150" width="56" height="44" rx="10" fill="var(--bg-card)" stroke={flows.includes('out') ? JC.b1 : 'var(--border)'} strokeWidth="2" />
+          <text x="72" y="178" textAnchor="middle" fontSize="20">🏦</text>
+          <text x="72" y="212" textAnchor="middle" fontSize="12" fill="var(--text-muted)">Your bank</text>
+        </g>
+
+        {/* jars */}
+        {Object.keys(JX).map((k) => {
+          const x = JX[k] - JW / 2, lvl = Math.max(0, Math.min(100, levels[k])) / 100
+          return (
+            <g key={k}>
+              <rect x={JX[k] - 22} y={TOP - 12} width="44" height="10" rx="4" fill={JC[k]} opacity=".8" />
+              <rect x={x} y={TOP} width={JW} height={BOT - TOP} rx="14" fill="var(--bg-card)" stroke={JC[k]} strokeOpacity=".6" strokeWidth="2.5" />
+              <g clipPath={`url(#hw-c-${k})`}>
+                <rect x={x} y={TOP} width={JW} height={BOT - TOP} fill={JC[k]} opacity=".55"
+                  style={{ transformBox: 'fill-box', transformOrigin: 'bottom', transform: `scaleY(${lvl})`, transition: 'transform 1.4s ease-in-out' }} />
+              </g>
+              {k === 'b3' && scene.lockGrowth && <text x={JX[k]} y={TOP + 62} textAnchor="middle" fontSize="22">🔒</text>}
+              {k === 'b2' && scene.warning && <line x1={x + 4} x2={x + JW - 4} y1={BOT - (BOT - TOP) * 0.4} y2={BOT - (BOT - TOP) * 0.4} stroke="#fb7185" strokeWidth="2" strokeDasharray="5 4" />}
+              <text x={JX[k]} y={BOT + 20} textAnchor="middle" fontSize="13" fontWeight="700" fill={JC[k]}>{NAME[k]}</text>
+              <text x={JX[k]} y={BOT + 36} textAnchor="middle" fontSize="11" fill="var(--text-muted)">{k === 'b2' && scene.warning ? 'min 2 years' : { b1: '2 years', b2: '5 years', b3: 'the rest' }[k]}</text>
+            </g>
+          )
+        })}
+        {scene.market && (
+          <g>
+            <rect x={JX.b3 - 44} y="8" width="88" height="22" rx="11" fill={scene.market === 'good' ? 'rgba(52,211,153,.14)' : 'rgba(251,113,133,.14)'} />
+            <text x={JX.b3} y="23" textAnchor="middle" fontSize="11" fontWeight="700" fill={scene.market === 'good' ? '#34d399' : '#fb7185'}>{scene.market === 'good' ? '▲ near its high' : '▼ market down'}</text>
+          </g>
         )}
-      </div>
-      <div className="text-center leading-tight">
-        <p className={`text-xs font-bold ${view.text} flex items-center gap-1 justify-center`}><Icon size={12} />{view.name}</p>
-        <p className="text-[10px] text-[var(--text-dim)]">{floor ? 'min 2 years' : view.note}</p>
-      </div>
-    </div>
-  )
-}
 
-// Short lane between two neighbours; dots move right-to-left (towards Income/Bank).
-function SideLane({ active, color }) {
-  return (
-    <div className="relative h-2 mb-16 sm:mb-20 mx-0.5">
-      <div className="absolute inset-0 rounded-full bg-[var(--border)]" />
-      {active && [0, 1, 2].map(i => (
-        <span key={i} className={`bucket-dot absolute top-1/2 w-2 h-2 rounded-full ${color}`} style={{ animationDelay: `${i * 0.45}s` }} />
-      ))}
-      {active && <ArrowLeft size={12} className="absolute -top-4 left-1/2 -translate-x-1/2 text-[var(--text-muted)]" />}
-    </div>
-  )
-}
-
-function Lane({ active, className, color, label }) {
-  return (
-    <div className={`absolute h-2 ${className} transition-opacity duration-500 ${active ? 'opacity-100' : 'opacity-0'}`}>
-      <div className="absolute inset-0 rounded-full bg-[var(--border)]" />
-      {active && [0, 1, 2, 3].map(i => (
-        <span key={i} className={`bucket-dot-long absolute top-1/2 w-2 h-2 rounded-full ${color}`} style={{ animationDelay: `${i * 0.5}s` }} />
-      ))}
-      <span className="absolute left-1/2 -translate-x-1/2 top-2.5 text-[10px] font-semibold text-violet-400 whitespace-nowrap">{label}</span>
+        {/* flows: curved arrow + coins moving along it + a label saying where the money goes */}
+        {flows.filter((f) => FLOW[f]).map((f) => {
+          const [a, b] = FLOW[f], { d, lx, ly } = arc(a, b)
+          return (
+            <g key={scene.key + f}>
+              <path d={d} fill="none" stroke={JC[a]} strokeOpacity=".35" strokeWidth="5" strokeLinecap="round" />
+              <path d={d} fill="none" stroke={JC[a]} strokeWidth="2" strokeDasharray="6 6" markerEnd={`url(#hw-ar-${a})`}>
+                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />
+              </path>
+              {[0, 0.6, 1.2].map((t) => (
+                <circle key={t} r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5">
+                  <animateMotion dur="1.8s" begin={`${t}s`} repeatCount="indefinite" path={d} />
+                </circle>
+              ))}
+              <rect x={lx - 62} y={ly - 13} width="124" height="20" rx="10" fill="var(--bg-card)" stroke={JC[a]} strokeOpacity=".5" />
+              <text x={lx} y={ly + 1} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">{NAME[a]} → {NAME[b]}</text>
+            </g>
+          )
+        })}
+        {flows.includes('out') && (() => {
+          const d = `M${JX.b1 - JW / 2 - 4},${BOT - 30} Q140,${BOT + 6} 104,174`
+          return (
+            <g key={scene.key + 'out'}>
+              <path d={d} fill="none" stroke={JC.b1} strokeWidth="2" strokeDasharray="6 6" markerEnd="url(#hw-ar-b1)">
+                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />
+              </path>
+              {[0, 0.7].map((t) => <circle key={t} r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5"><animateMotion dur="1.6s" begin={`${t}s`} repeatCount="indefinite" path={d} /></circle>)}
+              <rect x="24" y="118" width="96" height="20" rx="10" fill="var(--bg-card)" stroke={JC.b1} strokeOpacity=".5" />
+              <text x="72" y="132" textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">1 month → bank</text>
+            </g>
+          )
+        })()}
+      </svg>
     </div>
   )
 }
@@ -230,6 +249,7 @@ function IconButton({ label, onClick, children }) {
 }
 
 const FLOW_CSS = `
+@media (prefers-reduced-motion: reduce) { svg animate, svg animateMotion { display: none } }
 @keyframes bucket-flow { 0% { right: 0; opacity: 0 } 15% { opacity: 1 } 85% { opacity: 1 } 100% { right: calc(100% - 8px); opacity: 0 } }
 .bucket-dot, .bucket-dot-long { transform: translateY(-50%); animation: bucket-flow 1.4s linear infinite; }
 .bucket-dot-long { animation-duration: 2s; }
