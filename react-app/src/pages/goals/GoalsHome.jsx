@@ -226,7 +226,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
       <div className={`g2-stats ${retired ? 'g2-st5' : ''}`}>
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
         <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{due ? 'the goal amount' : 'with your SIP'}</small></div>
-        <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'see All goals together'}</small></div>
+        <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'today'}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
         {retired && <RetirementActions goal={p.goal} slot="stat" />}
       </div>
