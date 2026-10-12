@@ -2,6 +2,8 @@
 // Numbers come from the goals pool (Money for goals), buildGoalPlan (pool mode), familyPlan and goalTodo.
 import { useState, useRef, useLayoutEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
+import Modal from '../../components/Modal'
+import { createPortal } from 'react-dom'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -70,6 +72,9 @@ function useCurve(dep) {
 
 export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   const { mt, navigate, pname, closeGoal } = ctx
+  const steps = todo.steps.filter((x) => x.t === 'cash' || x.t === 'switch')
+  const shortStep = todo.steps.find((x) => x.t === 'short')
+  const readyOf = Object.fromEntries(todo.steps.filter((x) => x.t === 'ready').map((x) => [x.goal.goalId, x]))
   const live = plans
   const has = live.reduce((t, p) => t + p.has, 0), need = live.reduce((t, p) => t + (p.state === 'due' ? p.has : p.need), 0)
   const amounts = live.reduce((t, p) => t + p.target, 0)
@@ -87,10 +92,10 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
       <style>{CSS}</style>
 
       {/* 1. To do this month (only when there is something to do) */}
-      {todo.steps.length > 0 && (
+      {steps.length > 0 && (
         <div className="g2-card g2-todo">
-          <div className="g2-lbl"><span>To do this month</span><span>{todo.steps.length} step{todo.steps.length > 1 ? 's' : ''}</span></div>
-          {todo.steps.map((s, i) => <Step key={i} s={s} n={i + 1} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />)}
+          <div className="g2-lbl"><span>Rebalance this month</span><span>{steps.length} step{steps.length > 1 ? 's' : ''}</span></div>
+          {steps.map((s, i) => <Step key={i} s={s} n={i + 1} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />)}
         </div>
       )}
 
@@ -100,13 +105,14 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
         <div className={`g2-stats ${extra > 1000 ? 'five' : ''}`}>
           <div className="hv"><span><i>₹</i>Have today</span><b>{L(has)}</b><small>in Money for goals</small></div>
           <div className="nd"><span><i>◎</i>Need today</span><b>{L(need)}</b><small>with your SIPs</small></div>
-          <div className={`gp ${short > 1000 ? 'warn' : 'ok'}`}><span><i>{short > 1000 ? '!' : '✓'}</i>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b><small>{short > 1000 ? 'see To do' : 'nothing to do this month'}</small></div>
+          <div className={`gp ${short > 1000 ? 'warn' : 'ok'}`}><span><i>{short > 1000 ? '!' : '✓'}</i>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b><small>{short > 1000 ? 'see below' : 'nothing to add'}</small></div>
           <div className="tg"><span><i>↻</i>SIPs running</span><b>{L(todo.runningSip)}<em>/mo</em></b><small>all portfolios</small></div>
           {extra > 1000 && <div className="fr"><span><i>+</i>Free money</span><b>{L(extra)}</b><small>{extraEq}% equity · covers future gaps</small></div>}
         </div>
         <div className="g2-sumf"><Mix m={famMix} plan={fam && fam.P > 0 ? Math.round(fam.needEq) : null} />
           <a className="g2-link" onClick={onMoney}>Money for goals ›</a></div>
-        {fam?.status === 'steps' && <p className="g2-okline warn">! Mix more than 10 points off: see To do</p>}
+        {fam?.status === 'steps' && <p className="g2-okline warn">! Mix more than 10 points off: see Rebalance above</p>}
+        {shortStep && <ShortStep s={shortStep} pname={pname} />}
       </div>
 
       {/* 4. The road: a year, then that year's goals */}
@@ -115,14 +121,14 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
         {groups.filter((x) => x.past).map(({ y, ps }, gi) => (
           <div key={y} className={gi % 2 ? 'side-r' : 'side-l'}>
             <div className="g2-yr due"><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
-            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} />)}</div>
+            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} closeGoal={closeGoal} navigate={navigate} />)}</div>
           </div>
         ))}
         <div className="g2-now">📍 Today · {new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
         {groups.filter((x) => !x.past).map(({ y, ps }, gi) => (
           <div key={y} className={(gi + groups.filter((x) => x.past).length) % 2 ? 'side-r' : 'side-l'}>
             <div className={`g2-yr ${ps.some((p) => p.state === 'short') ? 'w' : ''} ${ps.some((p) => p.state === 'due' && !p.isRet) ? 'due' : ''}`}><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
-            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} />)}</div>
+            <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} closeGoal={closeGoal} navigate={navigate} />)}</div>
           </div>
         ))}
       </div>
@@ -179,7 +185,7 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   )
 }
 
-function GoalCard({ p, mt, pname, renderBuckets }) {
+function GoalCard({ p, mt, pname, renderBuckets, ready, closeGoal, navigate }) {
   const g = p.goal
   const retired = p.isRet && p.years <= 0
   const due = p.state === 'due' && !p.isRet
@@ -199,11 +205,11 @@ function GoalCard({ p, mt, pname, renderBuckets }) {
       <div className="g2-stats">
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
         <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{due ? 'the goal amount' : 'with your SIP'}</small></div>
-        <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'see To do'}</small></div>
+        <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'see All goals together'}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
       </div>
       <Mix m={mixOf(items)} plan={due ? null : p.eqTarget} />
-      {due && <div className="g2-sip"><span>{due ? (mixOf(items)?.e > 10 ? `Kept for it (${mixOf(items).e}% still in equity: withdraw that part first). See To do.` : 'Kept in safe funds for it. See To do: withdraw, then tell the app.') : null}</span></div>}
+      {due && ready && <ReadyStep s={ready} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />}
       {items.length > 0 && (
         <details><summary>Investments in this goal ({items.length})</summary>
           {items.map((it, i) => { const t = tagOf(it); return (
@@ -223,7 +229,7 @@ function ShortStep({ s, n, pname }) {
     const [open, setOpen] = useState(false)
     return (
     <div className="g2-step">
-      <div className="g2-sh"><span className="g2-n">{n}</span><div><b>Your goals are {L(s.gap)} short</b><p>Pick one of these two. Either one closes the gap.</p></div></div>
+      <div className="g2-sh g2-shs"><div><b>To close the gap, pick one</b><p>Either one is enough. SIPs change per portfolio and split by your fund targets.</p></div></div>
       <div className="g2-two">
         <div className="g2-pk sip">
           <div className="g2-pkh"><span className="g2-chip sip">SIP</span><span>Raise monthly SIPs</span><b>+{L(s.sip)}<em>/mo</em></b></div>
@@ -237,32 +243,38 @@ function ShortStep({ s, n, pname }) {
               <div className="g2-pkr"><span>{pname(pid)}</span><span className="v"><b>{L(v)}</b></span></div>
               {open && s.buys.filter((b) => b.portfolioId === pid).map((b, i) => <div key={i} className="g2-pkf"><span>{fname(b.fund)}</span><span>{L(b.amount)}</span></div>)}
             </div>)) : <div className="g2-pkr"><span>Into an equity fund</span><span className="v"><b>{L(s.lump)}</b></span></div>}
-          {s.buys.length > 0 && <button className="g2-pb g2-pkb" onClick={() => setOpen(!open)}>{open ? 'Hide funds ▴' : `Show the ${s.buys.length} funds ▾`}</button>}
+          {s.buys.length > 0 && <button className={`g2-pb g2-pkb ${open ? '' : 'g2-pulse'}`} onClick={() => setOpen(!open)}>{open ? 'Hide funds ▴' : `Show the ${s.buys.length} funds ▾`}</button>}
         </div>
       </div>
     </div>
   )
 }
 
-function Step({ s, n, mt, pname, closeGoal, navigate }) {
-  if (s.t === 'ready') {
-    const where = s.rows.slice(0, 2).map((r) => `${r.kind === 'other' ? mt(r.name) : splitFundName(r.name || '').main} ${L(r.value)}`)
-    return (
-    <div className="g2-step g2-ready">
-      <div className="g2-rh">
-        <div className="g2-ri">{icon(s.goal)}</div>
-        <div className="g2-rt"><small>Date reached · {monthYear(s.goal)}</small><b>{mt(s.goal.goalName)}</b></div>
-        <div className="g2-ra"><b>{L(s.has)}</b><small>ready to use</small></div>
-      </div>
-      <p className="g2-rk">Kept in {where.join(' · ')}{s.rows.length > 2 ? ` · +${s.rows.length - 2} more` : ''}</p>
-      <div className="g2-acts"><span>What happened?</span>
-        <button className="g2-pb p" title="Close the goal" onClick={() => closeGoal(s.goal, 'used')}>✓ I used it</button>
-        <button className="g2-pb" title="Pick a new date" onClick={() => navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`)}>Need more time</button>
-        <button className="g2-pb" title="Its money becomes free" onClick={() => closeGoal(s.goal, 'not')}>Not needed</button>
-      </div>
-      <details className="g2-wd"><summary>How to withdraw ({s.rows.length})</summary>{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}<p className="g2-hint">After you close the goal, anything left becomes free money for your other goals.</p></details>
+function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
+  const [open, setOpen] = useState(false)
+  const done = (how) => { setOpen(false); closeGoal(s.goal, how) }
+  return (
+    <div className="g2-rdy">
+      <div><b>Date reached · {L(s.has)} ready to use</b><span>Withdraw it when you need it, then mark the goal.</span></div>
+      <button className="g2-pb g2-pulse" onClick={() => setOpen(true)}>Withdraw plan ›</button>
+      {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw: ${mt(s.goal.goalName)}`} wide>
+        <div className="g2 g2-wdm">
+          <p className="g2-wdmh"><b>{L(s.has)}</b> from {s.rows.length} investment{s.rows.length > 1 ? 's' : ''}. Redeem these when you pay, then tell the app what happened.</p>
+          <div className="g2-wdl">{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}</div>
+          <div className="g2-wdf">
+            <button className="g2-pb p" onClick={() => done('used')}>✓ Withdrawn, mark completed</button>
+            <button className="g2-pb" onClick={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`) }}>Need more time</button>
+            <button className="g2-pb" onClick={() => done('not')}>Not needed</button>
+          </div>
+          <p className="g2-hint">Anything left after you close the goal becomes free money for your other goals.</p>
+        </div>
+      </Modal>, document.body)}
     </div>
-  ) }
+  )
+}
+
+function Step({ s, n, mt, pname, closeGoal, navigate }) {
+  if (s.t === 'ready') return <ReadyStep s={s} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />
   if (s.t === 'short') return <ShortStep s={s} n={n} pname={pname} />
   if (s.t === 'cash') return (
     <div className="g2-step">
@@ -419,6 +431,14 @@ const CSS = `
 .g2-road.curvy .g2-grp{width:64%}.g2-road.curvy .side-r .g2-grp{margin-left:auto}
 .g2-road.curvy .side-l .g2-yr{margin-left:calc(32% - 32px)}.g2-road.curvy .side-r .g2-yr{margin-left:calc(68% - 32px)}
 .g2-road.curvy .g2-grp{margin-bottom:90px}
+.g2-pulse{animation:g2p 2.2s ease-out 3;border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}
+@keyframes g2p{0%{box-shadow:0 0 0 0 color-mix(in srgb,#a78bfa 55%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media(prefers-reduced-motion:reduce){.g2-pulse{animation:none}}
+.g2-wdl{margin-top:8px;border-top:1px solid var(--border)}
+.g2-rdy{margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid color-mix(in srgb,var(--due) 35%,var(--border));border-radius:12px;padding:12px 14px;background:color-mix(in srgb,var(--due) 6%,var(--bg-inset))}
+.g2-rdy>div>b{display:block;font-size:14px;color:var(--due)}.g2-rdy>div>span{display:block;font-size:12px;color:var(--text-muted);margin-top:3px}
+.g2-wdmh{font-size:13.5px;color:var(--text-secondary);margin:0 0 6px}.g2-wdmh b{color:var(--text-primary)}.g2-wdf{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.g2-shs{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}.g2-all .g2-two{margin-left:0}.g2-all .g2-step{padding:0;border:0}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
