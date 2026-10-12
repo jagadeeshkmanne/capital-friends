@@ -239,7 +239,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
         </details>
       )}
       {p.isRet && <div className="g2-ract"><RetirementActions goal={p.goal} /></div>}
-      {p.isRet && <details open={p.bucketMode}><summary>Your buckets today {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
+      {p.isRet && <details><summary>Your buckets today {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
     </div>
   )
 }
