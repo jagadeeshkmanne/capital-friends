@@ -9,7 +9,6 @@ import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
 import { useData } from '../../context/DataContext'
 import Modal from '../../components/Modal'
-import FundSearchInput from '../../components/forms/FundSearchInput'
 import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 import { allocateBucketWithdrawal } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
@@ -36,7 +35,6 @@ const yrs = months => {
   const y = Math.max(0, months) / 12
   return `${y.toFixed(1)} ${y >= 0.95 && y < 1.05 ? 'yr' : 'yrs'}`
 }
-const EMPTY_SET = new Set()
 // Same tolerance as the Goals card's equity check.
 
 const BUILD_STATUSES = new Set(['building', 'building-wait', 'step-done', 'built'])
@@ -72,8 +70,7 @@ const num = (value, fallback) => {
 // each, the fund furthest below its target comes first.
 function destinationCandidates(plan, bucket, portfolioId) {
   const gap = f => (Number(f.portfolioGoalValue) || 0) * (Number(f.effectiveTargetAllocationPct ?? f.targetAllocationPct) || 0) / 100 - (Number(f.goalValue) || 0)
-  return plan.byBucket[bucket].filter(f => !f.isOther).sort((a, b) =>
-    Number(b.portfolioId === portfolioId) - Number(a.portfolioId === portfolioId) || gap(b) - gap(a))
+  return plan.byBucket[bucket].filter(f => !f.isOther && f.portfolioId === portfolioId).sort((a, b) => gap(b) - gap(a))
 }
 
 function groupByPortfolio(allocations) {
@@ -209,105 +206,74 @@ const FLOW_CSS = `
 .txn-arrow-x{animation:txn-ax 4s ease-in-out infinite}.txn-arrow-y{animation:txn-ay 4s ease-in-out infinite}
 @media (prefers-reduced-motion: reduce){.flow-dash{animation:none}.txn-sell,.txn-buy,.txn-arrow-x,.txn-arrow-y{animation:none}.flow-coin{animation:none;opacity:0}.flow-level{animation:none}.flow-t1,.flow-t2{animation:none;opacity:0}.flow-t3{animation:none;opacity:1}}`
 
-function RefillSteps({ plan, operations, recorded }) {
+function RefillSteps({ plan, operations }) {
   const [destinations, setDestinations] = useState({})
-  const multiPortfolio = new Set(plan.allFunds.map(f => f.portfolioId)).size > 1
+  // buy inside the same portfolio, so retirement money stays in the retirement portfolio
   const destinationFor = (op, portfolioId) =>
     destinations[`${op.id}::${portfolioId}`] || destinationCandidates(plan, op.to, portfolioId)[0] || null
+  const anyFund = (to) => (to === 'b1' ? 'A liquid fund of your choice' : 'A hybrid or short-term debt fund of your choice')
 
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl">
-      <div className="px-4 py-3.5 border-b border-[var(--border-light)]">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-bold text-[var(--text-primary)]">Retirement buckets · this year's refill</p>
-          {recorded.size > 0 && (
-            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 rounded-full px-2.5 py-0.5">
-              {recorded.size} of {operations.reduce((n, op) => n + op.allocations.length, 0)} recorded
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-[var(--text-dim)] mt-0.5">
-          For each line: sell the units in your broker or fund-house app and buy the fund shown (a switch). Done it? Import your CAS and the jars update on their own.
-        </p>
-      </div>
-
+    <div className="space-y-4">
       <style>{FLOW_CSS}</style>
-      <div className="divide-y divide-[var(--border-light)]">
-        {operations.map((op, i) => {
-          const from = BUCKET[op.from], to = BUCKET[op.to]
-          const before = { ...plan.totals }
-          for (const prev of operations.slice(0, i)) { before[prev.from] -= prev.fundedAmount; before[prev.to] += prev.fundedAmount }
-          return (
-            <div key={op.id} className="px-4 py-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <span className="w-7 h-7 rounded-full bg-violet-500/15 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className={`text-sm font-bold ${from.text}`}>{from.name}</span>
-                    <ArrowRight size={14} className="text-[var(--text-dim)]" />
-                    <span className={`text-sm font-bold ${to.text}`}>{to.name}</span>
-                    <span className="ml-auto text-base font-bold text-[var(--text-primary)] tabular-nums">{formatINR(op.fundedAmount)}</span>
-                  </div>
-                  <p className="text-xs text-[var(--text-dim)] mt-0.5">{REASON[op.reason]}</p>
+      <p className="text-sm text-[var(--text-muted)]">Do these as switches in your broker or fund-house app: sell the units shown, buy the fund shown with the money. Then import your CAS and the jars update on their own.</p>
+      {operations.map((op, i) => {
+        const from = BUCKET[op.from], to = BUCKET[op.to]
+        const before = { ...plan.totals }
+        for (const prev of operations.slice(0, i)) { before[prev.from] -= prev.fundedAmount; before[prev.to] += prev.fundedAmount }
+        const groups = groupByPortfolio(op.allocations)
+        return (
+          <div key={op.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="w-6 h-6 rounded-full bg-[var(--bg-card)] border border-[var(--border)] text-xs font-bold text-[var(--text-primary)] flex items-center justify-center shrink-0">{i + 1}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold"><span className={from.text}>{from.name}</span> <span className="text-[var(--text-dim)]">→</span> <span className={to.text}>{to.name}</span></p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">{REASON[op.reason]}</p>
                 </div>
               </div>
-
-              <StepFlow plan={plan} op={op} before={before} />
-
-              {Object.entries(groupByPortfolio(op.allocations)).map(([portfolioId, allocations]) => {
-                const destKey = `${op.id}::${portfolioId}`
-                const dest = destinationFor(op, portfolioId)
-                const candidates = destinationCandidates(plan, op.to, portfolioId)
-                return (
-                  <div key={portfolioId} className={`sm:ml-10 space-y-2.5 ${multiPortfolio ? 'rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] p-3' : ''}`}>
-                    {multiPortfolio && <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Portfolio · {allocations[0].portfolioName}</p>}
-
-                    {candidates.length !== 1 && (<div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <p className={`text-[11px] font-semibold ${to.text} shrink-0 sm:w-16`}>Buy into</p>
-                      <div className="flex-1 min-w-0">
+              <p className="text-lg font-bold text-[var(--text-primary)] tabular-nums whitespace-nowrap">{formatINR(op.fundedAmount)}</p>
+            </div>
+            <StepFlow plan={plan} op={op} before={before} />
+            {Object.entries(groups).map(([portfolioId, allocations]) => {
+              const destKey = `${op.id}::${portfolioId}`
+              const candidates = destinationCandidates(plan, op.to, portfolioId)
+              const dest = destinationFor(op, portfolioId)
+              const total = allocations.reduce((t, a) => t + a.amount, 0)
+              return (
+                <div key={portfolioId} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-start">
+                  <div className={`rounded-lg border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden border-t-[3px] ${from.border}`}>
+                    <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-rose-400">Sell · {allocations[0].portfolioName}</p>
+                    {allocations.map(a => (
+                      <div key={a.key} className="flex justify-between gap-3 px-3 py-2 border-t border-[var(--border-light)]">
+                        <div className="min-w-0"><p className="text-sm text-[var(--text-primary)]">{splitFundName(a.fundName || '').main}</p><p className="text-[11px] text-[var(--text-dim)] tabular-nums">{fmtUnits(a.units)} units</p></div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums whitespace-nowrap">≈ {formatINR(a.amount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden md:flex items-center self-center text-[var(--text-dim)]">→</div>
+                  <div className={`rounded-lg border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden border-t-[3px] ${to.border}`}>
+                    <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-400">Buy · same portfolio</p>
+                    <div className="flex justify-between gap-3 px-3 py-2 border-t border-[var(--border-light)]">
+                      <div className="min-w-0 flex-1">
                         {candidates.length > 1 ? (
                           <select value={dest?.key || ''} onChange={e => setDestinations(p => ({ ...p, [destKey]: candidates.find(c => c.key === e.target.value) }))}
-                            className="w-full text-sm font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)]">
-                            {candidates.map(c => <option key={c.key} value={c.key}>{splitFundName(c.fundName || '').main}{multiPortfolio ? ` · ${c.portfolioName}` : ''}</option>)}
+                            className="w-full text-sm bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[var(--text-primary)]">
+                            {candidates.map(c => <option key={c.key} value={c.key}>{splitFundName(c.fundName || '').main}</option>)}
                           </select>
-                        ) : candidates.length === 1 ? (
-                          <div className="bg-[var(--bg-card)] rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text-secondary)]">{splitFundName(candidates[0].fundName || '').main}{multiPortfolio && <span className="font-normal text-[var(--text-dim)]"> · {candidates[0].portfolioName}</span>}</div>
-                        ) : (
-                          <div className="space-y-1.5">
-                            <p className="text-xs text-amber-400">No {to.name.toLowerCase()} fund linked to this goal yet. Pick one to add to this portfolio:</p>
-                            <FundSearchInput value={dest ? { schemeCode: dest.schemeCode, fundName: dest.fundName } : null}
-                              onSelect={({ schemeCode, fundName, nav }) => setDestinations(p => ({ ...p, [destKey]: { key: `new::${schemeCode}`, schemeCode: String(schemeCode), fundName, currentNav: nav || 0, portfolioId } }))}
-                              placeholder={op.to === 'b1' ? 'Search a liquid fund…' : 'Search a hybrid or debt fund…'} />
-                          </div>
-                        )}
+                        ) : <p className="text-sm text-[var(--text-primary)]">{dest ? splitFundName(dest.fundName || '').main : anyFund(op.to)}</p>}
+                        <p className="text-[11px] text-[var(--text-dim)]">{dest ? 'with the money from the sale' : `no ${to.name.toLowerCase()} fund in this portfolio yet: pick one there`}</p>
                       </div>
-                    </div>)}
-
-                    {dest?.portfolioId && dest.portfolioId !== portfolioId && (
-                      <p className="text-[11px] text-violet-400">Cross-portfolio switch: money moves from {allocations[0].portfolioName} to {dest.portfolioName}.</p>
-                    )}
-                    {allocations.map(a => {
-                      const lineKey = `${op.id}::${a.key}`
-                      const done = recorded.has(lineKey)
-                      return (
-                        <div key={a.key} className={`rounded-lg border ${done ? 'border-emerald-500/30' : 'border-[var(--border-light)]'} bg-[var(--bg-card)] p-3`}>
-                          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
-                            <TxnSide step="sell" label={`Sell · ${from.name}`} tone={from} fund={splitFundName(a.fundName || '').main}
-                              detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
-                            <FlowArrow />
-                            <TxnSide step="buy" label={`Buy · ${to.name}`} tone={to} fund={dest ? splitFundName(dest.fundName || '').main : 'Choose a fund above'}
-                              detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b>{dest?.portfolioName && multiPortfolio ? ` · ${dest.portfolioName}` : ''}</>} />
-                          </div>
-                        </div>
-                      )
-                    })}
+                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums whitespace-nowrap">{formatINR(total)}</p>
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+      <p className="text-[11px] text-[var(--text-dim)]">Sell in units, buy in ₹ (units depend on that day's NAV). Selling may have tax. Not investment advice.</p>
     </div>
   )
 }
@@ -399,7 +365,7 @@ export function RetirementActions({ goal, slot = 'alert' }) {
       {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
         <div className="space-y-3">
       {open === 'refill' && (
-        <RefillSteps key={goal.goalId} plan={plan} operations={ops} recorded={EMPTY_SET} />
+        <RefillSteps key={goal.goalId} plan={plan} operations={ops} />
       )}
       {open === 'income' && (
         <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan} />

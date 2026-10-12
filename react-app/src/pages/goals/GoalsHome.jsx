@@ -168,6 +168,7 @@ function JarSvg({ c, f }) {
   return <svg width="46" height="60" viewBox="0 0 54 70" aria-hidden="true"><rect x="15" y="2" width="24" height="7" rx="3" fill={c} /><path d="M12 12Q8 12 8 18L8 60Q8 66 14 66L40 66Q46 66 46 60L46 18Q46 12 42 12Z" fill="none" stroke={c} strokeWidth="2.4" /><rect x="10" y={y} width="34" height={64 - y} rx="4" fill={c} opacity=".55" /></svg>
 }
 /** Which jar an investment sits in today: liquid / short debt / cash → Income, other debt / hybrid → Stability, equity & gold → Growth */
+const isLocked = (it) => it.kind === 'other' && /\b(epf|ppf|nps|vpf)\b/i.test(it.holding?.investmentType || '')
 const jarOf = (it) => {
   const n = `${it.holding?.fundName || ''} ${it.holding?.investmentType || ''} ${it.holding?.category || ''}`
   if (isGold(it.holding) || (it.eq || 0) >= 0.65) return 'gro'
@@ -179,10 +180,11 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   const b = stop?.bucket
   const tgt = b?.monthly ? { inc: b.income, stb: b.stability, gro: Math.max(0, p.target - b.income - b.stability) } : null
   const hold = { inc: [], stb: [], gro: [] }
+  const locked = items.filter(isLocked)
   for (const it of items) hold[jarOf(it)].push(it)
   const sum = (k) => hold[k].reduce((t, it) => t + it.value, 0)
   const tot = sum('inc') + sum('stb') + sum('gro') || 1
-  const name = (it) => (it.kind === 'mf' ? fname(it.holding) : mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment'))
+  const name = (it) => (it.kind === 'mf' ? fname(it.holding) : `${isLocked(it) ? '🔒 ' : ''}${mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}`)
   const payFund = [...hold.inc].sort((a, c) => c.value - a.value)[0]
   const jar = (k, label, sub) => (
     <div className={`g2-jar ${k}`}>
@@ -195,6 +197,7 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
       {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
         : retired ? null : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Until {yearOf(p.goal) - 5}: one growth mix</div><div className={p.bucketMode ? 'on' : ''}>{yearOf(p.goal) - 5}–{yearOf(p.goal)}: fill the jars</div><div>From {yearOf(p.goal)} (retirement): live from them</div></div>}
       <div className="g2-jars">{jar('gro', 'Growth', 'the rest · equity')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('inc', 'Income', '2 years of expenses · safe')}</div>
+      {locked.length > 0 && <p className="g2-hint">🔒 EPF / PPF / NPS ({L(locked.reduce((t, it) => t + it.value, 0))}) count in Stability but are never switched: you withdraw them by their own rules (EPF at retirement, PPF at maturity) and put the money in a liquid or debt fund.</p>}
       <div className="g2-flow"><div>→ refills Stability after good years</div><div>→ refills Income once a year</div><div>↓ pays your monthly income</div></div>
       <p className="g2-hint">{retired ? 'You spend only from Income. Once a year a Refill plan shows on this card (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown on this card).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
     </div>
@@ -513,6 +516,7 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-open{margin-top:10px;padding:4px 12px 10px;border:1px solid var(--border);border-radius:12px;background:var(--bg-inset)}
 .g2-dlg{display:block;gap:0}
 .g2-stats>button.inc{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;text-align:left;cursor:pointer;font:inherit;color:inherit;background:var(--bg-inset);border:1px solid var(--border);border-radius:12px;padding:10px 14px}.g2-stats>button.inc b{margin:0}.g2-stats>button.inc small{margin-left:auto}.g2-stats>button.inc:hover{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-stats>button.inc small{color:#a78bfa}
+.g2-lock{margin-top:10px;padding:10px 12px;border:1px dashed var(--border);border-radius:12px;font-size:12.5px;color:var(--text-secondary)}.g2-lock b{display:block;color:var(--text-primary);margin-bottom:2px}.g2-lock small{display:block;color:var(--text-muted);margin-top:4px}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
