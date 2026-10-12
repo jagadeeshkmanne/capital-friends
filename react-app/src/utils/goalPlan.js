@@ -162,16 +162,15 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     const need = pool && g.goalType === 'Emergency Fund' ? target : needToday({ target, years, annualReturn: r, sip })
     const gap = has - need
     const tol = Math.max(1000, 0.02 * need)
-    // pool mode: a goal that already holds its full amount before its date is "achieved": protect it (all safe).
-    // Retirement is the exception: its money must last for decades after the date, so it keeps its glide path.
+    // pool mode: a goal that already holds its full amount before its date is "achieved" (covered). Its mix still
+    // follows its timeline (glide path): a goal 10 years away keeps growing in equity, one 1 year away is safe.
     const achieved = pool && years > 0 && target > 0 && has >= target * 0.98
     const state = years <= 0 ? 'due' : achieved ? 'achieved' : gap < -tol ? 'short' : gap > tol ? 'extra' : 'onplan'
-    if ((achieved && !isRet) || years <= 0) rec.equity = 0
+    if (years <= 0) rec.equity = 0
     const steps = []
     if (pool) {
       // one family plan does the equity / safe moves; a goal only shows what is its own
       if (state === 'due' && has > 0) steps.push({ t: 'ready' })
-      if (state === 'achieved' && !isRet && eqNow > 5) steps.push({ t: 'protect' })
     } else if (!bucketMode && years > 0 && eqNow !== null) {
       for (const sw of switchSteps({ att, targetEq: rec.equity / 100, mfHoldings, eqOf })) steps.push({ t: 'switch', ...sw })
     }

@@ -8,9 +8,10 @@
  * 2. sharePool(): shares the pool across goals, no input needed —
  *      A. safe money first to the nearest goals (Emergency Fund first), up to the safe part each needs
  *         (retirement takes its EPF / PPF / NPS here, counted in full)
- *      B. equity: retirement first (it is protected – there is no loan for retirement), then by date
- *      C. anything a goal still needs, from whatever is left (retirement first, then by date)
- *      D. money left over tops goals up to their full amount (retirement first), so a goal can be "achieved"
+ *      B. equity: the goals with the most time first (a 10-year goal before a 4-year one)
+ *      C. anything a goal still needs, from whatever is left (retirement first — there is no loan for retirement)
+ *      D. money left over tops goals up to their full amount, each in its own timeline mix (glide path)
+ *    Every goal's mix follows its timeline, also when it is already fully covered.
  *    Each goal's "need" is what it should hold today for its amount and date (no SIP assumed).
  *    The result is written as ordinary goal links (goalId, portfolioId, allocationPct), so the buckets page,
  *    dashboard, email report and everything else keep working unchanged.
@@ -101,6 +102,9 @@ export function sharePool({ goals, items, now = new Date() }) {
     return v
   }
   const byDate = live.slice().sort((a, b) => (isEF(b) - isEF(a)) || (yearsTo(a, now) - yearsTo(b, now)))
+  // equity goes to the goals with the most time first (they can ride out a fall); when equity is short,
+  // the near goals hold the safe money
+  const farFirst = live.slice().sort((a, b) => (yearsTo(b, now) - yearsTo(a, now)))
   const retFirst = live.slice().sort((a, b) => (isEF(b) - isEF(a)) || (isRet(b) - isRet(a)) || (yearsTo(a, now) - yearsTo(b, now)))
   const pool = its.filter((i) => i.kind !== 'retirement')
   const safeItems = pool.filter((i) => i.eq < 0.5).sort((a, b) => a.eq - b.eq)
@@ -121,41 +125,24 @@ export function sharePool({ goals, items, now = new Date() }) {
 
   // A. safe part, nearest goal first (the emergency fund and near goals come first, whoever owns the money)
   for (const g of byDate) { const m = meta[g.goalId]; from(g, safeItems, m.want * (1 - m.eq) - m.gotSafe) }
-  // B. equity part, retirement first; the emergency fund never takes equity.
+  // B. equity part, farthest goal first; the emergency fund never takes equity.
   //    First each goal takes only its own member's equity (Priya's retirement takes Priya's portfolio), then the rest.
   for (const round of [true, false]) {
     ownOnly = round
-    for (const g of retFirst) { if (isEF(g)) continue; const m = meta[g.goalId]; from(g, eqItems, m.want * m.eq - m.gotEq) }
+    for (const g of farFirst) { if (isEF(g)) continue; const m = meta[g.goalId]; from(g, eqItems, m.want * m.eq - m.gotEq) }
   }
   ownOnly = false
   // C. whatever a goal still needs, from what is left (near goals prefer safe money)
   for (const g of retFirst) { const m = meta[g.goalId]; from(g, isEF(g) ? safeItems : m.eq < 0.5 ? [...safeItems, ...eqItems] : [...eqItems, ...safeItems], m.want - m.got) }
-  // D. money left over tops goals up to their full amount (retirement first), safe money first — a goal that is
-  //    filled to its amount is protected, so it should not be handed equity it would be told to sell
-  //    Safe first only for a goal that this fills to its amount (it is then protected); retirement and goals
-  //    that stay short keep growing, so they take equity first.
-  const leftOf = (list) => list.reduce((t, i) => t + i.left, 0)
-  for (const g of retFirst) {
+  // D. money left over tops goals up to their full amount, nearest goal first, in each goal's own timeline mix
+  //    (its glide path at today's distance): the equity part from equity, the safe part from safe money, then
+  //    whatever is left. So a goal 1 year away is filled with safe money and one 10 years away with equity.
+  for (const g of byDate) {
     if (isEF(g)) continue
-    const m = meta[g.goalId], fills = !isRet(g) && leftOf(pool) >= m.target - m.got
-    from(g, fills || m.eq < 0.5 ? [...safeItems, ...eqItems] : [...eqItems, ...safeItems], m.target - m.got)
-  }
-  // E. a goal that is now full (not retirement) swaps the equity it took for safe money nobody uses
-  for (const g of live) {
-    const m = meta[g.goalId]
-    if (isRet(g) || isEF(g) || !(m.target > 0) || m.got < m.target * 0.98) continue
-    for (const [id, v] of Object.entries(take[g.goalId])) {
-      const eqIt = eqItems.find((i) => i.id === id); if (!eqIt) continue
-      let move = v
-      for (const sf of mineFirst(g, safeItems)) {
-        if (move <= 0.5) break
-        const x = Math.min(move, sf.left); if (!(x > 0.5)) continue
-        sf.left -= x; take[g.goalId][sf.id] = (take[g.goalId][sf.id] || 0) + x
-        eqIt.left += x; take[g.goalId][id] -= x; move -= x
-        m.gotSafe += x * (1 - sf.eq) - x * (1 - eqIt.eq); m.gotEq += x * sf.eq - x * eqIt.eq
-      }
-      if (take[g.goalId][id] <= 0.5) delete take[g.goalId][id]
-    }
+    const m = meta[g.goalId], mix = isEF(g) || m.years <= 0 ? 0 : getRecommendedAllocation(g.goalType, m.years).equity / 100
+    from(g, eqItems, m.target * mix - m.gotEq)
+    from(g, safeItems, m.target * (1 - mix) - m.gotSafe)
+    from(g, mix >= 0.5 ? [...eqItems, ...safeItems] : [...safeItems, ...eqItems], m.target - m.got)
   }
 
   const itemOf = Object.fromEntries((items || []).map((i) => [i.id, i]))

@@ -423,7 +423,7 @@ function GoalDetail({ p, ctx }) {
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
           <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} onClose={ctx.closeGoal} navigate={navigate} />)}</div>
           <p className="gp-foot">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p>
-        </> : <div className="gp-ok">✓ Nothing to do now. Keep SIP {L(p.sip)}/month.</div>}
+        </> : <div className="gp-ok">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
       </div>
 
       {p.isRet && <BucketsPanel p={p} onOpen={() => navigate(`/retirement-buckets?goal=${encodeURIComponent(g.goalId)}`)} />}
