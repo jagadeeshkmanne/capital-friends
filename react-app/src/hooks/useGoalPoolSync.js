@@ -3,6 +3,7 @@ import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import { equityFraction } from '../utils/goalAttribution'
 import { poolItems, sharePool, linksChanged } from '../utils/goalPool'
+import { resolvePortfolioOwners } from '../utils/fundsDashboard'
 
 /** The person's "Money for goals" switches, kept in the Settings tab as JSON { off: [ids], on: [ids] }. */
 export function readPoolChoice(settings) {
@@ -12,16 +13,22 @@ export function readPoolChoice(settings) {
 /** Pool + its share per goal, computed live from today's data (used by the goals page and the sync below). */
 export function useGoalPool() {
   const d = useData()
-  const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings } = d
+  const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts } = d
   return useMemo(() => {
     const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
     const eqOf = (h) => equityFraction(h, allocMap)
     const choice = readPoolChoice(settings)
-    const items = poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, eqOf, choice })
     const goals = (goalList || []).filter((g) => g.isActive !== false)
+    // owners: MF portfolios get theirs from the investment account, stock portfolios from the member id
+    const people = members || []
+    const mfP = resolvePortfolioOwners(mfPortfolios, investmentAccounts, people)
+    const stP = (stockPortfolios || []).map((p) => ({ ...p, ownerName: p.ownerName || people.find((m) => m.memberId === p.ownerId)?.memberName || '' }))
+    const withGoal = new Set(goals.map((g) => String(g.familyMemberName || '').trim().toLowerCase()))
+    const kidNames = people.filter((m) => /^(son|daughter)$/i.test(String(m.relationship || '').trim()) && !withGoal.has(String(m.memberName || '').trim().toLowerCase())).map((m) => m.memberName)
+    const items = poolItems({ mfPortfolios: mfP, mfHoldings, stockPortfolios: stP, stockHoldings, otherInvList, eqOf, choice, kidNames })
     const shared = sharePool({ goals, items })
     return { items, choice, eqOf, allocMap, ...shared }
-  }, [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings])
+  }, [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts])
 }
 
 /**

@@ -133,10 +133,10 @@ function GoalsHeader({ plans, netWorth }) {
       <div className="gp-tiles">
         <div className="gp-tile"><span className="gp-lbl">Target</span><b>{L(target)}</b></div>
         <div className="gp-tile"><span className="gp-lbl">Current value</span><b>{L(has)}</b></div>
-        <div className="gp-tile"><span className="gp-lbl">Gap</span><b style={{ color: 'var(--accent-amber)' }}>{L(Math.max(0, target - has))}</b></div>
+        <div className="gp-tile"><span className="gp-lbl">Gap</span><b style={{ color: 'var(--accent-amber)' }}>{L(Math.max(0, target - has))}</b><small>{short.length ? 'target minus today' : 'your money + SIPs grow into it'}</small></div>
         <div className="gp-tile"><span className="gp-lbl">Progress</span><b style={{ color: 'var(--accent-amber)' }}>{prog.toFixed(1)}%</b><small>{plans.length} goal{plans.length > 1 ? 's' : ''}</small></div>
         <div className="gp-tile gp-tile-or">
-          <div><span className="gp-lbl">SIP / month</span><b style={{ color: 'var(--accent-violet)' }}>{sipNeed ? L(sipNeed) : '—'}</b><small>{short.length ? `for ${short.length} short goal${short.length > 1 ? 's' : ''}` : 'all goals covered'}</small></div>
+          <div><span className="gp-lbl">SIP / month</span><b style={{ color: 'var(--accent-violet)' }}>{sipNeed ? L(sipNeed) : '—'}</b><small>{short.length ? `for ${short.length} short goal${short.length > 1 ? 's' : ''}` : 'on track: no extra SIP needed'}</small></div>
           <em>OR</em>
           <div style={{ textAlign: 'right' }}><span className="gp-lbl">Lump sum today</span><b style={{ color: 'var(--accent-amber)' }}>{lump ? L(lump) : '—'}</b><small>{short.length ? 'one time' : '\u00a0'}</small></div>
         </div>
@@ -157,7 +157,7 @@ function GoalList({ plans, all, ctx }) {
       <GoalsHeader plans={plans} netWorth={ctx.netWorth} />
 
       <div className="gp-panel">
-        <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{(() => { const k = withSteps.reduce((s, p) => s + realSteps(p).length, 0); return `${k} step${k === 1 ? '' : 's'} for ${withSteps.length} goal${withSteps.length === 1 ? '' : 's'} this month · based on today's fund values` })()}</span></div>
+        <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{(() => { const k = withSteps.reduce((s, p) => s + realSteps(p).length, 0); const fam = all.family?.status === 'steps' ? all.family.steps.filter((x) => ['sip-cut', 'sip-add', 'lump', 'sell', 'buy'].includes(x.t)).length : 0; const t = k + fam; return t ? `${t} step${t === 1 ? '' : 's'} this month${fam ? ' · family plan first' : ''} · based on today's fund values` : 'Nothing to do this month · based on today\'s fund values' })()}</span></div>
         {(withSteps.length || (all.family?.status === 'steps' && all.family.steps.some((x) => x.t !== 'note'))) ? <>
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
           <FamilyBlock f={all.family} pname={pname} mt={mt} />{(() => { n = all.family?.status === 'steps' ? all.family.steps.filter((x) => ['sip-cut', 'sip-add', 'lump', 'sell', 'buy'].includes(x.t)).length : 0; return null })()}
@@ -490,7 +490,7 @@ function Road({ items }) {
       const pts = [...el.querySelectorAll('.gp-stop,.gp-tick')].map((e) => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2 - m.left, r.top + r.height / 2 - m.top] })
       if (pts.length < 2) return setD({ path: '', w: m.width, h: m.height, narrow })
       let path = `M${pts[0][0]} ${pts[0][1]}`
-      for (let i = 1; i < pts.length; i++) { const [a, b] = pts[i - 1], [c, e] = pts[i], sw = narrow ? 0 : (i % 2 ? -1 : 1) * 28, my = (b + e) / 2; path += ` C${a + sw} ${my} ${c + sw} ${my} ${c} ${e}` }
+      for (let i = 1; i < pts.length; i++) { const [a, b] = pts[i - 1], [c, e] = pts[i], sw = (i % 2 ? -1 : 1) * (narrow ? 7 : 28), my = (b + e) / 2; path += ` C${a + sw} ${my} ${c + sw} ${my} ${c} ${e}` }
       setD({ path, w: m.width, h: m.height, narrow })
     }
     draw()
@@ -501,7 +501,7 @@ function Road({ items }) {
   const sides = items.map((it) => { if (it.side) { last = it.side; return it.side } if (it.small) return last === 'L' ? 'R' : 'L'; last = (side++ % 2) ? 'R' : 'L'; return last })
   return (
     <div className="gp-map" ref={ref}>
-      <svg width={d.w} height={d.h}><path d={d.path} stroke="var(--gp-road)" strokeWidth={d.narrow ? 10 : 18} fill="none" strokeLinecap="round" /><path d={d.path} stroke="var(--gp-roadln)" strokeWidth="1.5" strokeDasharray="7 9" fill="none" /></svg>
+      <svg width={d.w} height={d.h}><path d={d.path} stroke="var(--gp-road)" strokeWidth={d.narrow ? 14 : 18} fill="none" strokeLinecap="round" /><path d={d.path} stroke="var(--gp-roadln)" strokeWidth="1.5" strokeDasharray="7 9" fill="none" /></svg>
       {items.map((it, idx) => {
         const s = sides[idx]
         return (
@@ -619,7 +619,9 @@ const CSS = `
  .gp-sum{grid-template-columns:1fr 1fr;gap:12px 0}.gp-sum div:nth-child(3){border-left:0;padding-left:0}
  .gp-rw{grid-template-columns:44px minmax(0,1fr);min-height:0;padding:8px 0}.gp-rw.sm{padding:4px 0}
  .gp-slot{grid-column:2;grid-row:1}.gp-slot:empty{display:none}.gp-rw.L .gp-slot.l{justify-content:flex-start}.gp-rw.L .gp-qs{text-align:left}
- .gp-stop,.gp-tick{grid-column:1;grid-row:1}.gp-stop{width:36px;height:36px;font-size:15px}.gp-yl{display:none}
+ .gp-stop,.gp-tick{grid-column:1;grid-row:1}.gp-stop{width:36px;height:36px;font-size:15px}.gp-yl{display:block;top:39px;left:50%;transform:translateX(-50%);font-size:10.5px;background:var(--bg-card);padding:0 3px;border-radius:4px;white-space:nowrap}
+ .gp-rw:has(.gp-yl){padding-bottom:18px}
+ .gp-panel{padding:12px}.gp-row{padding:10px 2px;gap:6px 8px}.gp-mflow{padding:6px 10px}.gp-mflow .gp-cell b{font-size:13px}.gp-mflow .gp-cell span{font-size:11.5px}.gp-ar2{padding:0;line-height:1.2}
  .gp-vc,.gp-rc{max-width:none}.gp-rw .gp-vc:before,.gp-rw .gp-rc:before{left:-13px!important;right:auto!important}
  .gp-grid.six{grid-template-columns:1fr 1fr}.gp-grid.six div{border-left:0!important}.gp-grid.six div:nth-child(even){border-left:1px solid var(--border)!important}.gp-grid.six div:nth-child(n+3){border-top:1px solid var(--border)!important}
  .gp-beta{display:none}.gp-acts{width:100%;justify-content:flex-start}
