@@ -84,7 +84,7 @@ function useCurve(dep) {
   return [ref, d]
 }
 
-export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
+export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   const { mt, navigate, pname, closeGoal } = ctx
   const steps = todo.steps.filter((x) => x.t === 'cash' || x.t === 'switch' || x.t === 'protect')
   const protectOf = Object.fromEntries(todo.steps.filter((x) => x.t === 'protect').map((x) => [x.goal.goalId, x]))
@@ -108,13 +108,14 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
     <div className="g2">
       <style>{CSS}</style>
 
-      {(Object.keys(readyOf).length > 0 || live.some((p) => p.isRet)) && (
+      {/* one row like the other pages: what waits on a goal card (left), the page's buttons (right) */}
+      <div className="g2-top">
         <div className="g2-onc">
-          <span className="lbl">On your goal cards:</span>
-          {Object.values(readyOf).map((r) => <button key={r.goal.goalId} type="button" className="g2-jump" onClick={() => document.getElementById(`goal-${r.goal.goalId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>{icon(r.goal)} {mt(r.goal.goalName)}: date reached, withdraw plan ›</button>)}
+          {Object.values(readyOf).map((r) => <button key={r.goal.goalId} type="button" className="g2-jump" onClick={() => document.getElementById(`goal-${r.goal.goalId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>{icon(r.goal)} {mt(r.goal.goalName)}: date reached ›</button>)}
           {live.filter((p) => p.isRet).map((p) => <RetirementActions key={p.goal.goalId} goal={p.goal} slot="chip" />)}
         </div>
-      )}
+        <div className="g2-acts2">{actions}</div>
+      </div>
 
       {/* 1. To do this month (only when there is something to do) */}
       {steps.length > 0 && (
@@ -529,7 +530,7 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-stats>button.inc{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;text-align:left;cursor:pointer;font:inherit;color:inherit;background:var(--bg-inset);border:1px solid var(--border);border-radius:12px;padding:10px 14px}.g2-stats>button.inc b{margin:0}.g2-stats>button.inc small{margin-left:auto}.g2-stats>button.inc:hover{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-stats>button.inc small{color:#a78bfa}
 .g2-lock{margin-top:10px;padding:10px 12px;border:1px dashed var(--border);border-radius:12px;font-size:12.5px;color:var(--text-secondary)}.g2-lock b{display:block;color:var(--text-primary);margin-bottom:2px}.g2-lock small{display:block;color:var(--text-muted);margin-top:4px}
 .g2-pkn{display:inline;font-size:11px;color:var(--text-muted);font-weight:500}.g2-pf{font-style:normal;margin-right:6px;opacity:.8}
-.g2-onc{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.g2-onc .lbl{font-size:12px;color:var(--text-muted)}.g2-onc:not(:has(.g2-jump)){display:none}
+.g2-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}.g2-onc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}.g2-acts2{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
 .g2-jump{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;font-size:12px;font-weight:600;color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,var(--bg-card));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--border));border-radius:999px;cursor:pointer}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}

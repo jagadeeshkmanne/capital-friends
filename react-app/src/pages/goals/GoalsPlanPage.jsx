@@ -84,18 +84,10 @@ export default function GoalsPlanPage() {
       <style>{CSS}</style>
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
       <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} />}</Modal>
-      <div className="gp-bar">
-        <div>
-          <h1>{sel ? <a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a> : 'My goals'}</h1>
-          <p>Steps are worked out from your own funds and your glide path · <a className="gp-link" onClick={() => navigate('/goals/classic')}>Classic view</a></p>
-        </div>
-        <span className="gp-acts">
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
+      {sel && <div className="gp-bar"><div><h1><a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a></h1></div></div>}
+      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome actions={<><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
           <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic')}><Pencil size={14} /> Edit goals</button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic?add=1')}><Plus size={14} /> Add Goal</button>
-        </span>
-      </div>
-      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic?add=1')}><Plus size={14} /> Add Goal</button></>} plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
       {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
     </div>
   )
