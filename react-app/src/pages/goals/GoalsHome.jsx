@@ -1,5 +1,6 @@
 // The Goals page (one page): To do this month → all goals together → free money → the road of goals by year.
 // Numbers come from the goals pool (Money for goals), buildGoalPlan (pool mode), familyPlan and goalTodo.
+import { useState, useRef, useLayoutEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 
 const L = (v) => formatINR(Math.round(v || 0))
@@ -42,6 +43,31 @@ function Ring({ pct, cls }) {
   return <div className={`g2-ring ${cls}`}><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r={r} fill="none" stroke="var(--bg-inset)" strokeWidth="6" /><circle cx="32" cy="32" r={r} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${len} ${c}`} transform="rotate(-90 32 32)" /></svg><span><b>{pct}%</b><small>funded</small></span></div>
 }
 
+/** The winding road behind the goal cards (wide screens): a smooth curve through each year circle. */
+function useCurve(dep) {
+  const ref = useRef(null)
+  const [d, setD] = useState('')
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const draw = () => {
+      if (window.innerWidth < 900) { setD(''); return }
+      const box = el.getBoundingClientRect()
+      const pts = [...el.querySelectorAll('.g2-yr,.g2-now')].map((n) => { const r = n.getBoundingClientRect(); return [r.left + r.width / 2 - box.left, r.top + r.height / 2 - box.top] })
+      if (!pts.length) { setD(''); return }
+      const all = [[pts[0][0], 0], ...pts, [pts[pts.length - 1][0], box.height]]
+      let path = `M${all[0][0]},${all[0][1]}`
+      for (let i = 1; i < all.length; i++) { const [x1, y1] = all[i - 1], [x2, y2] = all[i], m = (y2 - y1) / 2; path += ` C${x1},${y1 + m} ${x2},${y2 - m} ${x2},${y2}` }
+      setD(path)
+    }
+    draw()
+    const ro = new ResizeObserver(draw); ro.observe(el)
+    window.addEventListener('resize', draw)
+    return () => { ro.disconnect(); window.removeEventListener('resize', draw) }
+  }, [dep])
+  return [ref, d]
+}
+
 export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   const { mt, navigate, pname, closeGoal } = ctx
   const live = plans
@@ -53,6 +79,7 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
   const extra = pool.extra || 0, extraEq = extra > 0 ? Math.round(((pool.extraEq || 0) / extra) * 100) : 0
   const groups = [...new Set(live.map((p) => yearOf(p.goal)))].sort((a, b) => a - b).map((y) => { const ps = live.filter((p) => yearOf(p.goal) === y); return { y, ps, past: ps.every((p) => p.years <= 0) } })
 
+  const [roadRef, curve] = useCurve(live.length + ':' + closed.length)
   if (!live.length) return <div className="g2 g2-card"><p className="g2-hint">No goals yet. <a className="g2-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p><style>{CSS}</style></div>
 
   return (
@@ -83,16 +110,17 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
       </div>
 
       {/* 4. The road: a year, then that year's goals */}
-      <div className="g2-road">
-        {groups.filter((x) => x.past).map(({ y, ps }) => (
-          <div key={y}>
+      <div ref={roadRef} className={`g2-road ${curve ? 'curvy' : ''}`}>
+        {curve && <svg className="g2-curve" aria-hidden="true"><path className="bed" d={curve} /><path className="mid" d={curve} /></svg>}
+        {groups.filter((x) => x.past).map(({ y, ps }, gi) => (
+          <div key={y} className={gi % 2 ? 'side-r' : 'side-l'}>
             <div className="g2-yr due"><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
             <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} />)}</div>
           </div>
         ))}
         <div className="g2-now">📍 Today · {new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
-        {groups.filter((x) => !x.past).map(({ y, ps }) => (
-          <div key={y}>
+        {groups.filter((x) => !x.past).map(({ y, ps }, gi) => (
+          <div key={y} className={(gi + groups.filter((x) => x.past).length) % 2 ? 'side-r' : 'side-l'}>
             <div className={`g2-yr ${ps.some((p) => p.state === 'short') ? 'w' : ''} ${ps.some((p) => p.state === 'due' && !p.isRet) ? 'due' : ''}`}><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
             <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} />)}</div>
           </div>
@@ -188,6 +216,34 @@ function GoalCard({ p, mt, pname, renderBuckets }) {
   )
 }
 
+function ShortStep({ s, n, pname }) {
+    const byPort = {}
+    for (const b of s.buys) byPort[b.portfolioId] = (byPort[b.portfolioId] || 0) + b.amount
+    const once = Object.entries(byPort).sort((a, b) => b[1] - a[1])
+    const [open, setOpen] = useState(false)
+    return (
+    <div className="g2-step">
+      <div className="g2-sh"><span className="g2-n">{n}</span><div><b>Your goals are {L(s.gap)} short</b><p>Pick one of these two. Either one closes the gap.</p></div></div>
+      <div className="g2-two">
+        <div className="g2-pk sip">
+          <div className="g2-pkh"><span className="g2-chip sip">SIP</span><span>Raise monthly SIPs</span><b>+{L(s.sip)}<em>/mo</em></b></div>
+          {s.sipRows.map((r, i) => <div key={i} className="g2-pkr"><span>{r.portfolioId ? pname(r.portfolioId) : 'New SIP'}</span><span className="v">{r.portfolioId ? <><s>{L(r.sipFrom)}</s> → <b>{L(r.sipFrom + r.sip)}</b></> : <b>{L(r.sip)}</b>}</span></div>)}
+        </div>
+        <em className="g2-orw">or</em>
+        <div className="g2-pk buy">
+          <div className="g2-pkh"><span className="g2-chip buy">ONCE</span><span>Invest one time</span><b>{L(s.lump)}</b></div>
+          {once.length ? once.map(([pid, v]) => (
+            <div key={pid}>
+              <div className="g2-pkr"><span>{pname(pid)}</span><span className="v"><b>{L(v)}</b></span></div>
+              {open && s.buys.filter((b) => b.portfolioId === pid).map((b, i) => <div key={i} className="g2-pkf"><span>{fname(b.fund)}</span><span>{L(b.amount)}</span></div>)}
+            </div>)) : <div className="g2-pkr"><span>Into an equity fund</span><span className="v"><b>{L(s.lump)}</b></span></div>}
+          {s.buys.length > 0 && <button className="g2-pb g2-pkb" onClick={() => setOpen(!open)}>{open ? 'Hide funds ▴' : `Show the ${s.buys.length} funds ▾`}</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Step({ s, n, mt, pname, closeGoal, navigate }) {
   if (s.t === 'ready') {
     const where = s.rows.slice(0, 2).map((r) => `${r.kind === 'other' ? mt(r.name) : splitFundName(r.name || '').main} ${L(r.value)}`)
@@ -207,27 +263,7 @@ function Step({ s, n, mt, pname, closeGoal, navigate }) {
       <details className="g2-wd"><summary>How to withdraw ({s.rows.length})</summary>{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}<p className="g2-hint">After you close the goal, anything left becomes free money for your other goals.</p></details>
     </div>
   ) }
-  if (s.t === 'short') {
-    const byPort = {}
-    for (const b of s.buys) byPort[b.portfolioId] = (byPort[b.portfolioId] || 0) + b.amount
-    const once = Object.entries(byPort).sort((a, b) => b[1] - a[1])
-    return (
-    <div className="g2-step">
-      <div className="g2-sh"><span className="g2-n">{n}</span><div><b>Your goals are {L(s.gap)} short</b><p>Pick one of these two. Either one closes the gap.</p></div></div>
-      <div className="g2-two">
-        <div className="g2-pk sip">
-          <div className="g2-pkh"><span className="g2-chip sip">SIP</span><span>Raise monthly SIPs</span><b>+{L(s.sip)}<em>/mo</em></b></div>
-          {s.sipRows.map((r, i) => <div key={i} className="g2-pkr"><span>{r.portfolioId ? pname(r.portfolioId) : 'New SIP'}</span><span className="v">{r.portfolioId ? <><s>{L(r.sipFrom)}</s> → <b>{L(r.sipFrom + r.sip)}</b></> : <b>{L(r.sip)}</b>}</span></div>)}
-        </div>
-        <em className="g2-orw">or</em>
-        <div className="g2-pk buy">
-          <div className="g2-pkh"><span className="g2-chip buy">ONCE</span><span>Invest one time</span><b>{L(s.lump)}</b></div>
-          {once.length ? once.map(([pid, v]) => <div key={pid} className="g2-pkr"><span>{pname(pid)}</span><span className="v"><b>{L(v)}</b></span></div>) : <div className="g2-pkr"><span>Into an equity fund</span><span className="v"><b>{L(s.lump)}</b></span></div>}
-        </div>
-      </div>
-      {s.buys.length > 0 && <details className="g2-wd"><summary>Which funds for the one-time amount</summary>{s.buys.map((b, i) => <Row key={i} chip="buy" k="BUY" a={fname(b.fund)} b={pname(b.portfolioId)} v={L(b.amount)} />)}<p className="g2-hint">Split by your fund targets at today's values, so it changes a little each month.</p></details>}
-    </div>
-  ) }
+  if (s.t === 'short') return <ShortStep s={s} n={n} pname={pname} />
   if (s.t === 'cash') return (
     <div className="g2-step">
       <div className="g2-sh"><span className="g2-n">{n}</span><div><small>💰 Idle cash · your goals need more equity</small><b>Invest {L(s.total)} from {mt(s.from?.name || 'your savings')}</b><p>No selling, no tax.</p></div></div>
@@ -326,9 +362,10 @@ const CSS = `
 .g2-goal.ok{background:color-mix(in srgb,var(--ok) 5%,var(--bg-card));border-color:color-mix(in srgb,var(--ok) 22%,var(--border))}
 .g2-goal.warn{background:color-mix(in srgb,var(--warn) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--warn) 28%,var(--border))}
 .g2-goal.due{background:color-mix(in srgb,var(--due) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--due) 28%,var(--border))}
-.g2-two{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;margin:12px 0 0 36px}.g2-orw{align-self:center;font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
+.g2-two{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:start;margin:12px 0 0 36px}.g2-orw{align-self:center;font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
 .g2-pk{border:1px solid var(--border)!important;border-radius:12px;background:var(--bg-inset)!important;padding:4px 14px 8px}.g2-pk.sip{border-top:3px solid var(--e)}.g2-pk.buy{border-top:3px solid var(--ok)}
 .g2-pkh{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text-secondary)}.g2-pkh .g2-chip{padding:3px 7px;flex:none}.g2-pkh b{margin-left:auto;font-size:16px;color:var(--text-primary);white-space:nowrap}.g2-pkh b em{font-style:normal;font-size:11px;color:var(--text-muted)}
+.g2-pkf{display:flex;justify-content:space-between;gap:10px;padding:3px 0 3px 12px;font-size:11.5px;color:var(--text-muted);border-left:2px solid var(--border);margin-left:2px}.g2-pkb{margin:6px 0 4px}
 .g2-pkr{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px;color:var(--text-secondary)}.g2-pkr .v{white-space:nowrap;color:var(--text-muted)}.g2-pkr .v b{color:var(--text-primary)}.g2-pkr s{opacity:.7}
 .g2-sum3{display:grid;grid-template-columns:1.4fr 1fr;padding-bottom:16px}.g2-sum3.one{grid-template-columns:1fr}
 .g2-mixrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}.g2-mixrow .g2-okline{margin:0}
@@ -376,7 +413,13 @@ const CSS = `
 .g2-fd b{font-size:13.5px;font-weight:600;color:var(--text-primary)}.g2-fd .v{font-size:13.5px;font-weight:700;color:var(--text-primary);text-align:right}.g2-fd small{font-size:12px;color:var(--text-muted)}
 .g2-tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:6px}
 .g2-tag.e{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}.g2-tag.d{color:var(--dt);background:color-mix(in srgb,var(--dt) 14%,transparent)}.g2-tag.g{color:var(--gd);background:color-mix(in srgb,var(--gd) 14%,transparent)}.g2-tag.l{color:var(--text-secondary);background:var(--bg-inset)}
- /* calm palette: neutral surfaces, one status colour per card */
+ .g2-curve{position:absolute;inset:0;width:100%;height:100%;z-index:0;overflow:visible;pointer-events:none}.g2-curve path{fill:none;stroke-linecap:round}
+.g2-curve .bed{stroke:color-mix(in srgb,var(--text-muted) 22%,transparent);stroke-width:18}.g2-curve .mid{stroke:color-mix(in srgb,var(--text-primary) 40%,transparent);stroke-width:2;stroke-dasharray:10 10}
+.g2-road.curvy{max-width:1040px}.g2-road.curvy:before,.g2-road.curvy:after{display:none}
+.g2-road.curvy .g2-grp{width:64%}.g2-road.curvy .side-r .g2-grp{margin-left:auto}
+.g2-road.curvy .side-l .g2-yr{margin-left:calc(32% - 32px)}.g2-road.curvy .side-r .g2-yr{margin-left:calc(68% - 32px)}
+.g2-road.curvy .g2-grp{margin-bottom:90px}
+/* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
 .g2-stats>div,.g2-stats>div.gp.ok,.g2-stats>div.gp.warn{background:var(--bg-inset);border:1px solid var(--border);padding:11px 14px}
