@@ -489,7 +489,17 @@ const CSS = `
 .g2-mva{text-align:right}.g2-mva b{display:block;font-size:18px;color:var(--text-primary)}.g2-mva small{font-size:11px;color:var(--text-muted)}
 .g2-mv .g2-two{margin-left:0}.g2-pk.sell{border-top:3px solid var(--sell)!important}.g2-pkr small{display:block;font-size:11px;color:var(--text-muted);margin-top:1px}
 .g2-hiw{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}.g2-hiwh{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
-.g2-ract{display:flex;flex-direction:column;gap:8px;margin-top:12px}.g2-ract:empty{display:none}
+.g2-ract:empty{display:none}
+div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2due 2.4s ease-in-out infinite}
+.g2-goal:has(.g2-lrow.due) .g2-gt::after{content:"● Refill due";display:inline-block;margin-left:6px;font-size:12px;font-weight:700;color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent);border-radius:999px;padding:5px 10px;animation:g2blink 1.6s ease-in-out infinite}
+.g2-lrow{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;padding:10px 0 0;border:0;border-top:1px solid var(--border);background:none;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:var(--accent-violet)}
+.g2-lrow em{font-style:normal;font-weight:500;color:var(--text-muted);white-space:nowrap}.g2-lrow small{display:block;font-size:11.5px;font-weight:500;color:var(--text-muted);margin-top:2px}
+.g2-lrow.due{margin-top:12px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--warn) 8%,var(--bg-inset));color:var(--warn);animation:g2due 2.4s ease-in-out infinite}
+.g2-lrow.due em{color:var(--warn);font-weight:700}
+.g2-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:8px;vertical-align:middle;animation:g2blink 1.2s ease-in-out infinite}
+@keyframes g2due{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--warn) 0%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--warn) 22%,transparent)}}
+@keyframes g2blink{0%,100%{opacity:1}50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.g2-lrow.due,.g2-dot{animation:none}}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}

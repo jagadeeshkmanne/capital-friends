@@ -404,18 +404,15 @@ export function RetirementActions({ goal }) {
   const monthly = plan?.expense?.monthlyExpense || 0
   // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">{showRefill ? `Yearly refill due · ${formatINR(Math.round(refillTotal))}` : showIncome ? `Monthly income · ${formatINR(Math.round(monthly))}` : 'Your 3 retirement buckets'}</p>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">{showRefill ? ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ') : showIncome ? 'Paid from the Income bucket. Nothing else to do this year.' : 'Growth → Stability → Income: see how money moves between them.'}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button type="button" onClick={() => setOpen('how')} className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"><CircleHelp size={15} /> How it works</button>
-          {showRefill && <button type="button" onClick={() => setOpen('refill')} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Refill now ›</button>}
-          {showIncome && <button type="button" onClick={() => setOpen('income')} className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${showRefill ? 'border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]' : 'bg-violet-600 hover:bg-violet-500 text-white'}`}>Income plan ›</button>}
-        </div>
-      </div>
+    <div>
+      {/* link rows like the card's other rows; the refill row shows only when a refill is due, and draws the eye */}
+      <button type="button" className="g2-lrow" onClick={() => setOpen('how')}><span>How the buckets work</span><em>Open ›</em></button>
+      {showRefill && (
+        <button type="button" className="g2-lrow due" onClick={() => setOpen('refill')}>
+          <span><i className="g2-dot" />Refill plan · {formatINR(Math.round(refillTotal))} due<small>{ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ')}</small></span><em>Refill now ›</em>
+        </button>
+      )}
+      {showIncome && <button type="button" className="g2-lrow" onClick={() => setOpen('income')}><span>Monthly income · {formatINR(Math.round(monthly))}<small>from the Income bucket</small></span><em>Open ›</em></button>}
       {open === 'how' && createPortal(<Modal open onClose={() => setOpen(null)} title="How the 3 buckets work" maxWidth="max-w-2xl" maxHeight="max-h-[90vh]"><BucketHowItWorks /></Modal>, document.body)}
       {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
         <div className="space-y-3">
