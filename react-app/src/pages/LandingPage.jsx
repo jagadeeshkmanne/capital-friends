@@ -274,146 +274,102 @@ function Slide2() {
   )
 }
 
-// ─── Slide 3: Goals ───
+// ─── Slide 3: Goals (one pool for all goals, the road of goals, this month's steps) ───
+const MiniRing = ({ pct, c }) => {
+  const r = 11, cc = 2 * Math.PI * r
+  return (
+    <span style={{ position: 'relative', width: 30, height: 30, flexShrink: 0 }}>
+      <svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="3.5" /><circle cx="15" cy="15" r={r} fill="none" stroke={c} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(pct / 100) * cc} ${cc}`} transform="rotate(-90 15 15)" /></svg>
+      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7.5, fontWeight: 700, color: '#f1f5f9' }}>{pct}%</span>
+    </span>
+  )
+}
 function Slide3() {
+  const box = (l, v, c, sub) => (
+    <div key={l} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 7, padding: '6px 8px' }}>
+      <div style={{ fontSize: 7.5, color: '#64748b' }}>{l}</div>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: c, marginTop: 2 }}>{v}</div>
+      {sub && <div style={{ fontSize: 7.5, color: '#64748b' }}>{sub}</div>}
+    </div>
+  )
+  const goal = (icon, name, sub, pct, c, badge, side) => (
+    <div style={{ width: '62%', marginLeft: side === 'r' ? 'auto' : 0, background: '#0f172a', border: '1px solid rgba(255,255,255,.07)', borderRadius: 9, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, position: 'relative', zIndex: 1 }}>
+      <span style={{ fontSize: 15 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#f1f5f9' }}>{name}</div>
+        <div style={{ fontSize: 8.5, color: '#64748b' }}>{sub}</div>
+        <span style={{ display: 'inline-block', marginTop: 3, fontSize: 7.5, fontWeight: 700, padding: '1px 6px', borderRadius: 100, background: `${c}22`, color: c }}>{badge}</span>
+      </div>
+      <MiniRing pct={pct} c={c} />
+    </div>
+  )
   return (
     <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
       <MockNav active="GL" />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,.25)' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Goals</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <span style={{ fontSize: 11, color: '#60a5fa' }}>2 On Track</span>
-            <span style={{ fontSize: 11, color: '#fb923c' }}>1 Attention</span>
+      <div style={{ flex: 1, minWidth: 0, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 8.5, fontWeight: 600, padding: '3px 8px', borderRadius: 100, border: '1px solid rgba(251,191,36,.4)', background: 'rgba(251,191,36,.08)', color: '#fbbf24' }}>🌴 Retirement: refill due ›</span>
+          <span style={{ display: 'flex', gap: 5 }}>{['Money for goals', 'Edit goals', '+ Add Goal'].map((t) => <span key={t} style={{ fontSize: 8, fontWeight: 600, padding: '3px 7px', borderRadius: 5, border: '1px solid rgba(255,255,255,.08)', color: '#a78bfa' }}>{t}</span>)}</span>
+        </div>
+        <div style={{ border: '1px solid rgba(255,255,255,.07)', borderRadius: 9, padding: '7px 10px', background: '#0f172a' }}>
+          <div style={{ fontSize: 7.5, fontWeight: 700, letterSpacing: '.08em', color: '#64748b', marginBottom: 5 }}>REBALANCE THIS MONTH</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#f1f5f9' }}>🏠 Home · Make it safer</div><div style={{ fontSize: 8.5, color: '#64748b' }}>Sell 2,051 units of a flexi cap fund → buy a liquid fund, same portfolio</div></div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#f1f5f9' }}>₹6.6L</div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 1, background: 'rgba(255,255,255,.04)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-          {[['Target','₹2.7 Cr','#f1f5f9',null],['Current','₹59.7L','#f1f5f9',null],['Gap','₹2.1 Cr','#f87171',null],['Progress','22%','#f1f5f9','3 goals'],['SIP Needed','₹42,000','#34d399','per month'],['Lumpsum','₹8.4L','#f1f5f9','one-time']].map(([l, v, c, sub]) => (
-            <div key={l} style={{ padding: '8px 9px', background: '#080d1a' }}>
-              <div style={{ fontSize: 7.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#64748b', marginBottom: 2 }}>{l}</div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: c }}>{v}</div>
-              {sub && <div style={{ fontSize: 8, color: '#64748b' }}>{sub}</div>}
-            </div>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5 }}>
+          {box('Have today', '₹79.3L', '#f1f5f9', 'Money for goals')}{box('Need today', '₹78.1L', '#f1f5f9', 'with your SIPs')}{box('Gap', 'On track', '#34d399', 'nothing to add')}{box('Free money', '₹1.2L', '#f1f5f9', 'covers future gaps')}
         </div>
-        <div style={{ padding: '10px 14px 12px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#475569', marginBottom: 10 }}>Goal Timeline</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              { name: 'Retirement', status: 'Behind', statusBg: 'rgba(239,68,68,.12)', statusColor: '#ef4444', yrs: '18.0 yrs', pct: 14, barColor: '#ef4444', val: '₹28.5L', extra: '₹4.2L behind', extraColor: '#ef4444' },
-              { name: 'Child Education', status: 'On track', statusBg: 'rgba(16,185,129,.12)', statusColor: '#10b981', yrs: '12.0 yrs', pct: 24, barColor: '#10b981', val: '₹12.2L', extra: 'Target ₹50L', extraColor: '#64748b' },
-              { name: 'Own House', status: 'On track', statusBg: 'rgba(16,185,129,.12)', statusColor: '#10b981', yrs: '8.0 yrs', pct: 38, barColor: '#10b981', val: '₹19.0L', extra: 'Target ₹50L', extraColor: '#64748b' },
-            ].map(r => (
-              <div key={r.name}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                    <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 7px', borderRadius: 100, background: r.statusBg, color: r.statusColor, flexShrink: 0 }}>{r.status}</span>
-                  </div>
-                  <span style={{ fontSize: 10, color: '#64748b', flexShrink: 0, marginLeft: 8 }}>{r.yrs}</span>
-                </div>
-                <div style={{ height: 8, background: 'rgba(255,255,255,.06)', borderRadius: 100, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${r.pct}%`, background: r.barColor, borderRadius: 100 }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: '#f1f5f9' }}>{r.val}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: r.barColor }}>{r.pct}%</span>
-                  <span style={{ fontSize: 10, color: r.extraColor }}>{r.extra}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ margin: '8px 10px', padding: '9px 12px', borderRadius: 8, background: 'rgba(251,146,60,.04)', border: '1px solid rgba(251,146,60,.2)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <svg style={{ width: 13, height: 13, flexShrink: 0, color: '#fb923c', marginTop: 2 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 2 }}>
+          <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M50,0 C50,15 31,15 31,30 C31,50 69,45 69,62 C69,78 31,75 31,100" fill="none" stroke="rgba(148,163,184,.18)" strokeWidth="5" vectorEffect="non-scaling-stroke" />
           </svg>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#fb923c', marginBottom: 2 }}>De-Risking Alert</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0' }}>Retirement · Equity 78% vs rec. max 60%</div>
-            <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>Excess ₹3.2L in equity — above glide path by 18%</div>
-          </div>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 5, background: 'rgba(251,146,60,.12)', color: '#fb923c', whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer' }}>Rebalance</span>
+          {goal('🛟', 'Emergency Fund', 'Dec 2026 · 3 months left', 100, '#34d399', 'On track', 'l')}
+          {goal('🎓', 'Child Education', 'Jun 2038 · 11.5 yrs left', 64, '#34d399', 'On track', 'r')}
+          {goal('🌴', 'Retirement', 'Jan 2045 · 18 yrs left', 41, '#fbbf24', '● Refill due', 'l')}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Slide 4: Retirement Buckets ───
+// ─── Slide 4: Retirement buckets (money flows Growth → Stability → Income → your bank) ───
 function Slide4() {
+  const jar = (x, c, name, amt, sub, fill) => (
+    <g>
+      <rect x={x - 26} y="58" width="52" height="74" rx="10" fill="#0f172a" stroke={c} strokeOpacity=".6" strokeWidth="2" />
+      <rect x={x - 24} y={58 + 74 * (1 - fill)} width="48" height={74 * fill - 2} rx="8" fill={c} opacity=".55" />
+      <rect x={x - 14} y="50" width="28" height="7" rx="3" fill={c} opacity=".8" />
+      <text x={x} y="148" textAnchor="middle" fontSize="10" fontWeight="700" fill={c}>{name}</text>
+      <text x={x} y="161" textAnchor="middle" fontSize="10" fontWeight="700" fill="#f1f5f9">{amt}</text>
+      <text x={x} y="173" textAnchor="middle" fontSize="8" fill="#64748b">{sub}</text>
+    </g>
+  )
   return (
     <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
       <MockNav active="GL" />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,.25)' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Retirement Bucket Plan</span>
-          <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(251,146,60,.1)', color: '#fb923c' }}>Smart routing</span>
+      <div style={{ flex: 1, minWidth: 0, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700 }}>🌴 Retirement · how your buckets work</span>
+          <span style={{ fontSize: 8.5, fontWeight: 700, padding: '2px 8px', borderRadius: 100, background: 'rgba(52,211,153,.12)', color: '#34d399' }}>▲ market near its high</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-          <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#ea580c' }} />
-          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#ea580c' }}>Bucket State vs Targets</span>
-        </div>
-        <div style={{ padding: '8px 14px 10px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-          <div style={{ display: 'flex', height: 9, borderRadius: 5, overflow: 'hidden', gap: 1, marginBottom: 9 }}>
-            <div style={{ width: '83%', background: '#8b5cf6' }} />
-            <div style={{ width: '10%', background: '#fbbf24' }} />
-            <div style={{ width: '7%', background: '#34d399' }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <div style={{ background: 'rgba(139,92,246,.06)', border: '1px solid rgba(139,92,246,.25)', borderRadius: 8, padding: '10px 11px' }}>
-              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#a78bfa', marginBottom: 4 }}>B3 · Equity</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1.2, marginBottom: 3 }}>₹48.2L</div>
-              <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 5 }}>Long-term growth</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: '#34d399' }}>✓ On target</div>
-            </div>
-            <div style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '10px 11px' }}>
-              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#fbbf24', marginBottom: 4 }}>B2 · Hybrid</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#fbbf24', lineHeight: 1.2, marginBottom: 3 }}>₹6.1L</div>
-              <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 5 }}>Target: 60 mo</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: '#f87171' }}>↓ ₹2.5L short</div>
-            </div>
-            <div style={{ background: 'rgba(52,211,153,.06)', border: '1px solid rgba(52,211,153,.25)', borderRadius: 8, padding: '10px 11px' }}>
-              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#34d399', marginBottom: 4 }}>B1 · Liquid</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#34d399', lineHeight: 1.2, marginBottom: 3 }}>₹3.8L</div>
-              <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 5 }}>Target: 24 mo</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: '#f87171' }}>↓ ₹3.4L short</div>
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-          <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#34d399' }} />
-          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#34d399' }}>Annual Refill Switches</span>
-        </div>
-        <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div style={{ background: 'rgba(52,211,153,.05)', border: '1px solid rgba(52,211,153,.18)', borderRadius: 8, padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(139,92,246,.15)', color: '#a78bfa' }}>B3 Equity</span>
-                <span style={{ fontSize: 10, color: '#64748b' }}>→</span>
-                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(52,211,153,.15)', color: '#34d399' }}>B1 Liquid</span>
-                <span style={{ fontSize: 8, fontWeight: 700, color: '#34d399', marginLeft: 2 }}>DIRECT</span>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399' }}>₹3.4L</div>
-              <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>Skips B2 · Saves ~₹12,000 LTCG tax</div>
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399', cursor: 'pointer', flexShrink: 0, marginLeft: 10 }}>Confirm →</span>
-          </div>
-          <div style={{ background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.18)', borderRadius: 8, padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(139,92,246,.15)', color: '#a78bfa' }}>B3 Equity</span>
-                <span style={{ fontSize: 10, color: '#64748b' }}>→</span>
-                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(251,191,36,.15)', color: '#fbbf24' }}>B2 Hybrid</span>
-                <span style={{ fontSize: 8, fontWeight: 700, color: '#fbbf24', marginLeft: 2 }}>REFILL</span>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#fbbf24' }}>₹2.5L</div>
-              <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>Only what B2 actually needs</div>
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', cursor: 'pointer', flexShrink: 0, marginLeft: 10 }}>Confirm →</span>
-          </div>
+        <svg viewBox="0 0 400 180" style={{ width: '100%', maxHeight: 210, background: 'rgba(255,255,255,.02)', borderRadius: 9 }} aria-hidden="true">
+          <defs><marker id="lp-ar" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a78bfa" /></marker></defs>
+          {jar(70, '#a78bfa', 'Growth', '₹48L', 'the rest · equity', 0.85)}
+          {jar(170, '#fbbf24', 'Stability', '₹30L', '5 years · hybrid / debt', 0.9)}
+          {jar(270, '#34d399', 'Income', '₹12L', '2 years · liquid', 0.95)}
+          <path d="M70,46 Q170,0 262,46" fill="none" stroke="#a78bfa" strokeWidth="2" strokeDasharray="5 5" markerEnd="url(#lp-ar)" />
+          <rect x="128" y="10" width="96" height="16" rx="8" fill="#0f172a" stroke="#a78bfa" strokeOpacity=".5" />
+          <text x="176" y="21" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#f1f5f9">✓ Income refilled</text>
+          <rect x="330" y="78" width="46" height="36" rx="8" fill="#0f172a" stroke="#34d399" strokeWidth="1.5" />
+          <text x="353" y="101" textAnchor="middle" fontSize="15">🏦</text>
+          <path d="M298,112 Q318,132 330,104" fill="none" stroke="#34d399" strokeWidth="2" strokeDasharray="4 4" />
+          <text x="353" y="128" textAnchor="middle" fontSize="8" fill="#64748b">₹50K / month</text>
+        </svg>
+        <div style={{ border: '1px solid rgba(251,191,36,.4)', background: 'rgba(251,191,36,.07)', borderRadius: 9, padding: '7px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#fbbf24' }}>● Refill plan · ₹6.4L due</div><div style={{ fontSize: 8.5, color: '#64748b' }}>Growth → Income · sell units shown, buy a liquid fund in the same portfolio</div></div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24' }}>Refill now ›</span>
         </div>
       </div>
     </div>
@@ -474,17 +430,17 @@ const SLIDES = [
   },
   {
     id: 3,
-    tabLabel: 'Goals & Glide Path',
+    tabLabel: 'Goals',
     dotColor: '#0891b2',
     tag: 'Goals',
     tagStyle: { background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc' },
-    heading: 'Goals with automatic glide path de-risk alerts',
-    para: 'As you get closer to a goal, equity % is auto-checked against the glide path. Alert fires when you\'re over-exposed.',
+    heading: 'All your goals from one pool of money, with exact steps',
+    para: 'No linking funds to goals. The app shares your investments across all goals, each on its own glide path, and tells you exactly what to do this month.',
     bullets: [
-      { ck: '✓', ckColor: '#0891b2', text: 'Link portfolios to goals with % allocation' },
-      { ck: '✓', ckColor: '#0891b2', text: 'Live goal progress as NAVs change daily' },
-      { ck: '✓', ckColor: '#0891b2', text: 'Glide path: equity reduces as goal nears' },
-      { ck: '✓', ckColor: '#0891b2', text: 'One-click rebalance when alert fires' },
+      { ck: '✓', ckColor: '#0891b2', text: 'Money for goals: choose what counts, the app shares it out' },
+      { ck: '✓', ckColor: '#0891b2', text: 'Priority decides who gets money first; same priority shares equally' },
+      { ck: '✓', ckColor: '#0891b2', text: 'Near goals get "Make it safer" with exact units to switch' },
+      { ck: '✓', ckColor: '#0891b2', text: 'Short? One SIP or one-time amount. Date reached? A withdraw plan' },
     ],
     url: 'capitalfriends.in/goals',
     MockUI: Slide3,
@@ -495,15 +451,15 @@ const SLIDES = [
     dotColor: '#ea580c',
     tag: 'Retirement',
     tagStyle: { background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa' },
-    heading: 'Retirement buckets with tax-smart routing',
-    para: 'B3→B1 direct switch skips B2 — avoiding an unnecessary redemption and capital gains tax every annual refill cycle.',
+    heading: 'Retirement income from 3 buckets, refilled once a year',
+    para: 'Money flows Growth → Stability → Income → your bank. Growth is sold only when markets are near their high; after a fall, Stability pays instead.',
     bullets: [
-      { ck: '✓', ckColor: '#ea580c', text: 'B3 Equity — long-term growth (10+ yrs)' },
-      { ck: '✓', ckColor: '#ea580c', text: 'B2 Hybrid — bridge buffer (3–7 yrs)' },
-      { ck: '✓', ckColor: '#ea580c', text: 'B1 Liquid — safety net (1–2 yrs)' },
-      { ck: '✓', ckColor: '#ea580c', text: 'Direct B3→B1 saves ~₹12,000/yr in tax' },
+      { ck: '✓', ckColor: '#ea580c', text: 'Income: 2 years of expenses in liquid funds, pays your monthly SWP' },
+      { ck: '✓', ckColor: '#ea580c', text: 'Stability: 5 years in hybrid and short-term debt funds' },
+      { ck: '✓', ckColor: '#ea580c', text: 'Growth: the rest in equity, built step by step from 5 years before you retire' },
+      { ck: '✓', ckColor: '#ea580c', text: '"Refill due" shows on the retirement card with exact sell and buy' },
     ],
-    url: 'capitalfriends.in/goals — Retirement Bucket Plan',
+    url: 'capitalfriends.in/goals — Retirement card',
     MockUI: Slide4,
   },
 ]
@@ -511,7 +467,7 @@ const SLIDES = [
 const TRACK_CARDS = [
   { color: '#f97316', title: 'Mutual Funds', desc: 'Track all MF portfolios across AMCs. Units, NAV, current value, P&L, XIRR. SIP and lumpsum transactions. ATH buy signals per fund.' },
   { color: '#8b5cf6', title: 'Stocks', desc: 'Equity holdings across brokers. Buy/sell transactions, average cost, unrealized and realized P&L per scrip and portfolio.' },
-  { color: '#fbbf24', title: 'FDs, Gold & Other', desc: 'Fixed deposits, SGB, real estate, PPF and any other asset. Track invested amount, current value, maturity date and expected returns.' },
+  { color: '#fbbf24', title: 'FDs, Gold & Other', desc: 'Fixed deposits, EPF, PPF, NPS, real estate, and gold: SGBs, gold and silver ETFs (like GoldBees), and physical gold at today\'s rate. For goals, gold counts as growth, not safe money.' },
   { color: '#f43f5e', title: 'Insurance Policies', desc: 'Term life, health, motor, home and travel policies. Sum assured, premium, maturity date — for every family member.' },
   { color: '#ef4444', title: 'Loans & Liabilities', desc: 'Home loan, car loan, personal loan, credit card. Outstanding balance, EMI, interest rate, tenure — all in one view.' },
   { color: '#16a34a', title: 'Family Members', desc: 'Add your entire family — spouse, parents, children. View combined or individual net worth, goals, insurance and loans per member.' },
@@ -521,8 +477,8 @@ const SMART_CARDS = [
   { color: '#16a34a', title: 'Import from CAMS Statement', desc: 'Upload your CAMS + KFintech statement PDF and every purchase, SIP, switch and redemption since day one comes in — with true XIRR, CAGR and profit. Read on your device; undo anytime.', uniq: true },
   { color: '#c62828', title: 'ATH Buy Signals', desc: 'See how far each fund is from its All-Time High NAV. Strong Buy / Good Buy / Watch — color-coded signals updated daily from AMFI.', uniq: true },
   { color: '#7c3aed', title: 'Smart Rebalancing — 3 Modes', desc: 'Set target allocation per fund. Get exact SIP adjustment, lumpsum top-up, or buy/sell units when portfolio drifts beyond threshold.', uniq: true },
-  { color: '#0891b2', title: 'Goals & Glide Path De-risk', desc: 'Link portfolios to goals. Equity % auto-checked against years left. De-risk alert fires when you\'re overexposed — one click to rebalance.', uniq: true },
-  { color: '#ea580c', title: 'Retirement Bucket Strategy', desc: 'Split corpus into B3 (equity), B2 (hybrid), B1 (liquid). B3→B1 direct routing saves capital gains tax every refill cycle.', uniq: true },
+  { color: '#0891b2', title: 'Goals from one pool', desc: 'Your investments are shared across all goals by priority, each on its own glide path. Every month: the exact SIP, one-time amount or switch, and a withdraw plan when a goal\'s date comes.', uniq: true },
+  { color: '#ea580c', title: 'Retirement Buckets', desc: 'Growth, Stability and Income buckets for a steady monthly income. Built step by step before you retire, refilled once a year, and Growth is never sold in a fall.', uniq: true },
   { color: '#0d9488', title: 'Smart Reminders', desc: 'Insurance renewals, FD maturities, SIP due dates, loan EMIs. Sorted by urgency — never let a policy lapse or a date slip by.' },
   { color: '#2563eb', title: 'Your Data, Your Drive', desc: 'Everything stored in a Google Spreadsheet in YOUR Google Drive. No servers, no database. Auto monthly email reports to your whole family.' },
 ]
