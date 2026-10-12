@@ -472,7 +472,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
               ? <p className="text-sm font-semibold text-[var(--text-primary)] px-3 py-2 rounded-lg bg-[var(--bg-inset)]">{form.targetDate ? form.targetDate.split('T')[0] : '—'}</p>
               : <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />}
           </FormField>
-          {form.goalType === 'Child Education' && <ChildAgeHelper member={(activeMembers || []).find((m) => m.memberId === form.familyMemberId)} onDate={(v) => set('targetDate', v)} hasDate={!!initial?.targetDate} />}
+          {form.goalType === 'Child Education' && <ChildAgeHelper member={(activeMembers || []).find((m) => m.memberId === form.familyMemberId)} onDate={(v) => set('targetDate', v)} hasDate={!!initial?.targetDate} date={form.targetDate} />}
         </div>
 
         {/* Type-specific fields */}
@@ -676,7 +676,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {form.goalType === 'Child Education' && <ChildAgeHelper member={(activeMembers || []).find((m) => m.memberId === form.familyMemberId)} onDate={(v) => set('targetDate', v)} hasDate={!!initial?.targetDate} />}
+              {form.goalType === 'Child Education' && <ChildAgeHelper member={(activeMembers || []).find((m) => m.memberId === form.familyMemberId)} onDate={(v) => set('targetDate', v)} hasDate={!!initial?.targetDate} date={form.targetDate} />}
               <FormField label="Target Date" required error={errors.targetDate}>
                 <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
               </FormField>
@@ -821,7 +821,7 @@ const COURSES = [
   { value: '22', label: 'Post-graduation (M.Tech, MBA, MS…) · starts at 22' },
   { value: '15', label: 'Class 11–12 / coaching · starts at 15' },
 ]
-function ChildAgeHelper({ member, onDate, hasDate }) {
+function ChildAgeHelper({ member, onDate, hasDate, date }) {
   const dobAge = (() => { const d = getMemberDOB(member); return d ? dobToAge(toDateInputValue(d)) : '' })()
   const [age, setAge] = useState(dobAge || '')
   const [start, setStart] = useState('18')
@@ -840,7 +840,7 @@ function ChildAgeHelper({ member, onDate, hasDate }) {
         <FormSelect value={start} onChange={(v) => { setTouched(true); setStart(v) }} options={COURSES} />
       </FormField>
       <p className="sm:col-span-2 text-xs text-[var(--text-muted)]">
-        {ok && (touched || !hasDate) ? (years > 0 ? `Starts in about ${years} year${years > 1 ? 's' : ''}: target date set to June ${year}. You can still change the date.` : 'The course starts this year or has already started: target date set to June this year.') : hasDate && ok ? 'Change the age or course to set a new target date.' : 'Enter the age to set the target date automatically, or pick the date yourself.'}
+        {ok && (touched || !hasDate) ? (years > 0 ? `Starts in about ${years} year${years > 1 ? 's' : ''}: target date set to June ${year}. You can still change the date.` : 'The course starts this year or has already started: target date set to June this year.') : hasDate && ok ? `Your saved date is kept${date && !isNaN(new Date(date)) ? ` (${new Date(date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}: your child will be about ${Number(age) + Math.round((new Date(date) - new Date()) / (365.25 * 864e5))} then)` : ''}. Change the age or course only if you want a new date.` : 'Enter the age to set the target date automatically, or pick the date yourself.'}
       </p>
     </div>
   )
