@@ -20,19 +20,12 @@ function mixOf(items) {
 }
 const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
 
-/** equity / debt / gold: a donut with the equity % inside, then small tiles (no long bars) */
+/** equity / debt / gold as small text tiles */
 function Mix({ m, plan, note }) {
   if (!m) return null
-  const r = 19, c = 2 * Math.PI * r
-  const seg = [[m.e, 'var(--e)'], [m.g, 'var(--gd)'], [m.d, 'var(--dt)']].filter((x) => x[0] > 0)
-  const gap = seg.length > 1 ? 2 : 0
-  let off = 0
   const tile = (k, label, v) => <div className={`g2-mt ${k}`}><i />{label}<b>{v}%</b></div>
   return (
     <div className="g2-mx">
-      <div className="g2-dn"><svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r={r} fill="none" stroke="var(--bg-inset)" strokeWidth="7" />
-        {seg.map(([v, col], i) => { const len = Math.max(0, (v / 100) * c - gap); const el = <circle key={i} cx="26" cy="26" r={r} fill="none" stroke={col} strokeWidth="7" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-off} transform="rotate(-90 26 26)" />; off += (v / 100) * c; return el })}</svg>
-        <span><b>{m.e}%</b></span></div>
       <div className="g2-mts">
         {tile('e', 'Equity', m.e)}{m.g > 0 && tile('g', 'Gold', m.g)}{tile('d', 'Debt', m.d)}
         {plan != null && <div className="g2-mt p">Plan<b>{plan}%</b><small>equity</small></div>}
@@ -324,7 +317,7 @@ const CSS = `
 .g2-mt i{width:8px;height:8px;border-radius:50%}.g2-mt.e i{background:var(--e)}.g2-mt.d i{background:var(--dt)}.g2-mt.g i{background:var(--gd)}.g2-mt b{color:var(--text-primary);font-size:12.5px}.g2-mt small{font-size:11px;color:var(--text-muted)}
 .g2-mt.p{border-style:dashed;background:transparent}.g2-mxn{flex-basis:100%;font-size:12px;color:var(--text-muted)}
 .g2-ring{position:relative;width:64px;height:64px;flex:none;color:var(--ok)}.g2-ring.warn{color:var(--warn)}.g2-ring.due{color:var(--due)}.g2-ring span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}.g2-ring b{font-size:14px;color:var(--text-primary)}.g2-ring small{font-size:8.5px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
-.g2-gh{display:flex!important;align-items:center;gap:14px;text-align:left!important;margin-top:24px}.g2-gh h3{margin:0;font-size:16.5px;color:var(--text-primary)}.g2-gh p{margin:3px 0 7px;font-size:12.5px;color:var(--text-muted)}.g2-gt{flex:1;min-width:0}.g2-gt .g2-badge{margin:0;display:inline-block}
+.g2-gh{display:flex!important;align-items:center;gap:16px;text-align:left!important;margin-top:24px}.g2-gh h3{margin:0;font-size:16.5px;color:var(--text-primary)}.g2-gh p{margin:3px 0 7px;font-size:12.5px;color:var(--text-muted)}.g2-gt{flex:1;min-width:0}.g2-gt .g2-badge{margin:0;display:inline-block}
 .g2-gi{width:46px;height:46px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;font-size:23px;background:color-mix(in srgb,var(--ok) 14%,var(--bg-inset));border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}.g2-gi.warn{background:color-mix(in srgb,var(--warn) 14%,var(--bg-inset));border-color:color-mix(in srgb,var(--warn) 30%,transparent)}.g2-gi.due{background:color-mix(in srgb,var(--due) 14%,var(--bg-inset));border-color:color-mix(in srgb,var(--due) 30%,transparent)}
 .g2-goal.ok{background:color-mix(in srgb,var(--ok) 5%,var(--bg-card));border-color:color-mix(in srgb,var(--ok) 22%,var(--border))}
 .g2-goal.warn{background:color-mix(in srgb,var(--warn) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--warn) 28%,var(--border))}
@@ -378,7 +371,7 @@ const CSS = `
 .g2-tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:6px}
 .g2-tag.e{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}.g2-tag.d{color:var(--dt);background:color-mix(in srgb,var(--dt) 14%,transparent)}.g2-tag.g{color:var(--gd);background:color-mix(in srgb,var(--gd) 14%,transparent)}.g2-tag.l{color:var(--text-secondary);background:var(--bg-inset)}
  @media(max-width:640px){
- .g2-gh{gap:10px}.g2-gi{width:40px;height:40px;font-size:20px}.g2-ring{transform:scale(.85)}.g2-mt{padding:4px 7px;font-size:11.5px}
+ .g2-gh{gap:10px;margin-top:34px}.g2-gt{padding-right:4px}.g2-gi{width:40px;height:40px;font-size:20px}.g2-ring{transform:scale(.85)}.g2-mt{padding:4px 7px;font-size:11.5px}
  .g2-two{grid-template-columns:1fr;margin-left:0}.g2-two>em{text-align:center}
  .g2-sum3,.g2-sum3.one{grid-template-columns:1fr}.g2-sum3>div{padding:0;border-left:0}.g2-sum3>div+div{border-top:1px solid var(--border);margin-top:14px}.g2-sum3 .g2-lbl,.g2-sum3>div:first-child .g2-lbl,.g2-sum3>div:last-child .g2-lbl{margin:0 -16px 12px}
  .g2-card{padding:0 16px 16px}.g2-lbl{margin:0 -16px 14px;padding:12px 16px;font-size:12.5px}.g2-sum .g2-lbl{margin:0 -16px 14px}.g2-sum>div:first-child .g2-lbl{margin-right:-16px}.g2-sum>div+div .g2-lbl{margin:0 -16px 14px}
