@@ -30,14 +30,15 @@ function Mix({ m, plan, note, soft }) {
   if (!m) return null
   const e = m.e + (m.g || 0)
   const off = plan == null ? null : e - plan
-  const mark = off == null ? null : Math.abs(off) <= 2 ? ['ok', '✓ On target'] : Math.abs(off) <= 10 ? ['ok', '✓ Close to target'] : ['warn', off > 0 ? `${off} pts more equity than target` : `${-off} pts less equity than target`]
+  // only a quiet tick when it is close; nothing when it is off (a near goal that is off gets its own step)
+  const mark = off != null && Math.abs(off) <= 10 ? ['ok', '✓ On target'] : null
   return (
     <div className="g2-mx2">
       <span className="k">Mix</span>
-      <span>{m.g > 0 ? 'Equity + gold' : 'Equity'} <b>{e}%</b>{plan != null && <small> / {plan}% target</small>}</span>
+      <span>{m.g > 0 ? 'Equity + gold' : 'Equity'} <b>{e}%</b>{plan != null && <small> · target {plan}%</small>}</span>
       <span className="sep" />
-      <span>Debt <b>{m.d}%</b>{plan != null && <small> / {Math.max(0, 100 - plan)}% target</small>}</span>
-      {mark && <em className={soft && mark[0] === 'warn' ? 'soft' : mark[0]}>{mark[1]}{soft && mark[0] === 'warn' ? ' · fine, the family mix is on plan' : ''}</em>}
+      <span>Debt <b>{m.d}%</b>{plan != null && <small> · target {Math.max(0, 100 - plan)}%</small>}</span>
+      {mark && <em className={mark[0]}>{mark[1]}</em>}
       {note && <small className="g2-mxn">{note}</small>}
     </div>
   )
@@ -239,11 +240,12 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
       {due && ready && <ReadyStep s={ready} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />}
       {p.isRet && <RetirementActions goal={p.goal} slot="alert" />}
       {/* one row of small buttons (like the app's other buttons); the lists open below */}
-      <div className="g2-pills">
+      {p.has < 1 && p.state === 'short' && <p className="g2-hint" style={{ marginTop: 10 }}>Nothing is set aside yet: goals with a higher priority use the money first. To share it with them, give this goal the same priority in Edit goals.</p>}
+      {(items.length > 0 || p.isRet) && <div className="g2-pills">
         {items.length > 0 && <button type="button" className="g2-pill" onClick={() => setShow('inv')}><List size={14} /> Investments ({items.length})</button>}
         {p.isRet && <button type="button" className="g2-pill" onClick={() => setShow('bk')}><Layers size={14} /> Buckets today</button>}
         {p.isRet && <RetirementActions goal={p.goal} slot="pills" />}
-      </div>
+      </div>}
       {show === 'inv' && createPortal(<Modal open onClose={() => setShow(null)} title={`${mt(g.goalName)} · investments (${items.length})`} wide maxHeight="max-h-[90vh]"><div className="g2 g2-dlg">
         {items.map((it, i) => { const t = tagOf(it); return (
           <div key={i} className="g2-fd"><b>{it.kind === 'mf' ? fname(it.holding) : it.kind === 'stock' ? (it.holding.symbol || it.holding.stockName) : mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}<span className={`g2-tag ${t[0]}`}>{t[1]}</span></b><span className="v">{L(it.value)}</span>

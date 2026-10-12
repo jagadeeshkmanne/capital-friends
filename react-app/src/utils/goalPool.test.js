@@ -213,9 +213,11 @@ describe('money for goals', () => {
     const RJ = { ...RET, goalId: 'RJ', targetDate: inY(18), targetAmount: 60000000, familyMemberName: 'Jagadeesh' }
     const r = sharePool({ goals: [EF, RJ], items, now: NOW })
     expect(r.byGoal.EF.got).toBeCloseTo(600000, -1)
-    const kid = { ...KID, targetDate: inY(1), familyMemberName: 'Visali' }
+    // a near goal with a higher priority gets the money first, and its safe part is the safe money
+    const kid = { ...KID, targetDate: inY(1), familyMemberName: 'Visali', priority: 'High' }
     const r2 = sharePool({ goals: [kid, RJ], items, now: NOW })
     expect(r2.byGoal.KID.got).toBeGreaterThan(500000)
+    expect(r2.mappings.some((m) => m.goalId === 'KID' && m.portfolioId === 'FD')).toBe(true)
   })
 })
 
@@ -266,5 +268,19 @@ describe('corner cases (ages, timelines, shortages)', () => {
     expect(items[0].eq).toBe(1)
     const r = sharePool({ goals: [g('EF', 'Emergency Fund', 0.5, 5e5), g('RET', 'Retirement', 20, 5e7)], items, now })
     expect(r.byGoal.RET.gotEq).toBeGreaterThan(0)
+  })
+
+  it('money short: higher priority first; the same priority shares the money at the same % of each need', () => {
+    const items = [EQ(3e6), SF(1e6)]
+    const a = g('EDU', 'Education', 8, 6e6), b = g('HOUSE', 'House Purchase', 4, 8e6)
+    const r = sharePool({ goals: [a, b], items, now })
+    const pa = r.byGoal.EDU.got / r.byGoal.EDU.want, pb = r.byGoal.HOUSE.got / r.byGoal.HOUSE.want
+    expect(Math.abs(pa - pb)).toBeLessThan(0.02) // both get the same share of what they need
+    const r2 = sharePool({ goals: [{ ...a, priority: 'High' }, b], items, now })
+    expect(r2.byGoal.EDU.got).toBeCloseTo(r2.byGoal.EDU.want, -2) // High is funded in full first
+    expect(r2.byGoal.HOUSE.got).toBeLessThan(r.byGoal.HOUSE.got)
+    // the emergency fund always comes first, whatever the priorities
+    const r3 = sharePool({ goals: [{ ...a, priority: 'High' }, g('EF', 'Emergency Fund', 0.5, 6e5)], items: [SF(5e5), EQ(1e6)], now })
+    expect(r3.byGoal.EF.got).toBeCloseTo(6e5, -2) // in full (the family plan then moves any equity part to safe)
   })
 })

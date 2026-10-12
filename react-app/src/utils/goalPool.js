@@ -117,7 +117,7 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   const pool = its.filter((i) => i.kind !== 'retirement')
   const safeItems = pool.filter((i) => i.eq < 0.5).sort((a, b) => a.eq - b.eq)
   const eqItems = pool.filter((i) => i.eq >= 0.5).sort((a, b) => b.eq - a.eq)
-  const room = (g) => { const m = meta[g.goalId]; return Math.max(0, m.want - m.got) }
+  const room = (g) => { const m = meta[g.goalId]; return Math.max(0, (m.cap ?? m.want) - m.got) }
   // a goal uses its own family member's money first (Priya's retirement takes Priya's portfolio), then the rest
   const own = (g, it) => !!g.familyMemberName && !!it.owner && norm(it.owner) === norm(g.familyMemberName)
   const mineFirst = (g, list) => list.filter((it) => own(g, it)).concat(list.filter((it) => !own(g, it)))
@@ -141,6 +141,26 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   const retOf = (it) => rets.find((g) => own(g, it)) || rets[0]
   for (const it of its.filter((i) => i.kind === 'retirement')) { const g = retOf(it); if (g) give(g, it, it.left) }
   for (const it of its.filter((i) => i.fromRetirement)) { const g = retOf(it); if (g) { const m = meta[g.goalId]; give(g, it, Math.max(0, m.want - m.got)) } }
+
+  // When money is short: the emergency fund comes first, then a higher Priority is funded first; goals with the
+  // SAME priority share what is left in proportion to what each needs (each gets the same % of its need), so two
+  // goals can be put first together. A goal still keeps its own member's money (Priya's portfolio stays with
+  // Priya's goal) before anything is shared.
+  const poolLeft = its.filter((i) => i.kind !== 'retirement')
+  let avail = poolLeft.reduce((t, i) => t + i.left, 0)
+  for (const g of live.filter((x) => open(x) && isEF(x))) avail -= Math.min(avail, room(g))
+  for (const tier of [0, 1, 2]) {
+    const tg = live.filter((g) => open(g) && !isEF(g) && prio(g) === tier)
+    const want = tg.reduce((t, g) => t + room(g), 0)
+    const give = Math.min(avail, want), f = want > 0 ? give / want : 0
+    for (const g of tg) {
+      const m = meta[g.goalId]
+      const mates = tg.filter((x) => norm(x.familyMemberName) && norm(x.familyMemberName) === norm(g.familyMemberName)).length || 1
+      const mine = g.familyMemberName && !isEF(g) ? poolLeft.filter((it) => own(g, it) && it.eq >= 0.5).reduce((t, it) => t + it.left, 0) / mates : 0
+      m.cap = m.got + Math.min(room(g), Math.max(room(g) * f, mine))
+    }
+    avail -= give
+  }
 
   // A. safe part, nearest goal first (the emergency fund and near goals come first, whoever owns the money)
   for (const g of byDate) { if (!open(g)) continue; const m = meta[g.goalId]; from(g, safeItems, m.want * (1 - m.eq) - m.gotSafe) }
