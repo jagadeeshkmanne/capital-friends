@@ -107,7 +107,7 @@ function retirementAgeAtDate(dob, targetDate) {
   return age > 0 ? String(age) : ''
 }
 
-export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent }) {
+export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent, defaultType }) {
   const { mv } = useMask()
   const isEdit = !!initial
   const { activeMembers } = useData()
@@ -177,7 +177,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     }
 
     return {
-      goalType: '',
+      goalType: defaultType || '', // a quick-start choice on the empty Goals page
       goalName: '',
       familyMemberId: '',
       todaysCost: '',
@@ -460,7 +460,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             <FormSelect value={form.goalType} onChange={(v) => set('goalType', v)} options={GOAL_TYPES} placeholder="Select type..." />
           </FormField>
           <FormField label="Goal Name" required error={errors.goalName}>
-            <FormInput value={form.goalName} onChange={(v) => set('goalName', v)} placeholder="e.g., Retirement Fund (2045)" />
+            <FormInput sensitive value={form.goalName} onChange={(v) => set('goalName', v)} placeholder="e.g., Retirement Fund (2045)" />
           </FormField>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -610,7 +610,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             </div>
           )}
           <FormField label="Goal Name" required error={errors.goalName}>
-            <FormInput value={form.goalName} onChange={(v) => set('goalName', v)} placeholder="e.g., Retirement Fund (2045)" />
+            <FormInput sensitive value={form.goalName} onChange={(v) => set('goalName', v)} placeholder="e.g., Retirement Fund (2045)" />
           </FormField>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="For" error={errors.familyMemberId}>

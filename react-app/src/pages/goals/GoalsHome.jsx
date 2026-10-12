@@ -102,7 +102,7 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
   const nPast = groups.filter((x) => x.past).length
   const sideOf = (i) => (i === 0 ? 'side-c' : i % 2 ? 'side-r' : 'side-l')
   const [roadRef, curve] = useCurve(live.length + ':' + closed.length)
-  if (!live.length) return <div className="g2 g2-card"><p className="g2-hint">No goals yet. <a className="g2-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p><style>{CSS}</style></div>
+  if (!live.length) return <EmptyGoals navigate={navigate} actions={actions} />
 
   return (
     <div className="g2">
@@ -213,6 +213,47 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   )
 }
 
+const STARTS = [
+  { t: 'Retirement', i: '🌴', d: 'Money to live on when the salary stops' },
+  { t: 'Emergency Fund', i: '🛟', d: '6 months of expenses, ready any day' },
+  { t: 'Child Education', i: '🎓', d: "Your child's age sets the date" },
+  { t: 'Home Purchase', i: '🏠', d: 'Down payment for a home' },
+]
+/** No goals yet: what a goal does here, and one tap to start the usual ones. */
+function EmptyGoals({ navigate, actions }) {
+  const add = (t) => navigate(`/goals/classic?add=1${t ? `&type=${encodeURIComponent(t)}` : ''}`)
+  return (
+    <div className="g2">
+      <style>{CSS}</style>
+      <div className="g2-card g2-empty">
+        <div className="g2-emh">
+          <div><h2>Plan your first goal</h2><p>Tell the app what the money is for and when. It works out how much is needed today, takes it from your investments in priority order, and shows the steps for each month.</p></div>
+          {actions && <div className="g2-ema">{actions}</div>}
+        </div>
+        <div className="g2-ems">
+          {STARTS.map((s) => (
+            <button key={s.t} type="button" className="g2-emc" onClick={() => add(s.t)}>
+              <span className="g2-emi">{s.i}</span><b>{s.t}</b><small>{s.d}</small><em>Add ›</em>
+            </button>
+          ))}
+        </div>
+        <p className="g2-hint">Something else (car, travel, wedding)? <a className="g2-link" onClick={() => add('')}>Add another goal</a>.</p>
+      </div>
+    </div>
+  )
+}
+
+/** Retirement card: how much the money pays each month. Before retiring: what the goal amount pays from the
+ *  retirement year (your monthly expense then, or 4% a year of the goal amount). Retired without a bucket plan:
+ *  about 4% a year of what you have. With a bucket plan the Income bucket's own number shows instead. */
+function RetMonthly({ p, retired }) {
+  const g = p.goal
+  const exp = Number(g.monthlyExpenses) || 0, infl = Number(g.expectedInflation) || 0.06
+  const atRet = exp > 0 ? exp * Math.pow(1 + infl, Math.max(0, p.years)) : (p.target * 0.04) / 12
+  const v = retired ? (p.has * 0.04) / 12 : atRet
+  return <div className="tg"><span><i>↓</i>Monthly income</span><b>{L(v)}</b><small>{retired ? 'about 4% a year of what you have' : `from ${yearOf(g)}${exp > 0 ? ', your expenses then' : ', 4% a year'}`}</small></div>
+}
+
 function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, closeGoal, navigate }) {
   const [show, setShow] = useState(null)
   const g = p.goal
@@ -231,12 +272,12 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
         <div className="g2-gt"><h3>{mt(g.goalName)}</h3><p>{monthYear(g)} · {yrs}{g.familyMemberName ? ` · ${mt(g.familyMemberName)}` : ''}</p><span className={`g2-badge ${st[0]}`}>{st[1]}</span></div>
         <Ring pct={pct} cls={st[0]} />
       </div>
-      <div className={`g2-stats ${retired ? 'g2-st5' : ''}`}>
+      <div className={`g2-stats ${p.isRet ? 'g2-st5' : ''}`}>
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
         <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{due ? 'the goal amount' : 'with your SIP'}</small></div>
         <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'today'}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
-        {retired && <RetirementActions goal={p.goal} slot="stat" />}
+        {p.isRet && <RetirementActions goal={p.goal} slot="stat" fallback={<RetMonthly p={p} retired={retired} />} />}
       </div>
       {(() => {
         const retOnly = items.filter((it) => it.kind === 'other' && /epf|ppf|nps|vpf/i.test(it.holding?.investmentType || '')).reduce((t, it) => t + it.value, 0)
@@ -358,6 +399,15 @@ const WdRow = ({ r, mt, pname }) => <Row chip="wd" k="WITHDRAW" a={r.name ? (r.k
 const Row = ({ chip, k, a, b, v }) => <div className="g2-row"><span className={`g2-chip ${chip}`}>{k}</span><div><b>{a}</b><small>{b}</small></div><span className="g2-v">{v}</span></div>
 
 const CSS = `
+.g2-empty{padding:22px}.g2-emh{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+.g2-emh h2{font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px}.g2-emh p{font-size:13px;line-height:1.55;color:var(--text-muted);max-width:620px;margin:0}
+.g2-ema{display:flex;gap:8px;flex-wrap:wrap}
+.g2-ems{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0 14px}
+@media (max-width:900px){.g2-ems{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.g2-emc{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg-inset);cursor:pointer;transition:border-color .15s,transform .15s}
+.g2-emc:hover{border-color:#8b5cf6;transform:translateY(-1px)}
+.g2-emi{font-size:22px;line-height:1;margin-bottom:6px}.g2-emc b{font-size:14px;color:var(--text-primary)}.g2-emc small{font-size:12px;color:var(--text-muted);line-height:1.4}
+.g2-emc em{font-style:normal;font-size:12px;font-weight:600;color:var(--accent-violet,#8b5cf6);margin-top:6px}
 [data-theme="light"] .g2-jar.inc .nm{color:#047857}[data-theme="light"] .g2-jar.stb .nm{color:#b45309}[data-theme="light"] .g2-jar.gro .nm{color:#6d28d9}
 [data-theme="light"] .g2{--e:#6d28d9;--dt:#2563eb;--gd:#b45309;--ok:#047857;--warn:#b45309;--due:#1d4ed8;--sell:#be123c}
 .g2{--e:#a78bfa;--dt:#60a5fa;--gd:#fbbf24;--ok:#34d399;--warn:#fbbf24;--due:#60a5fa;--sell:#fb7185;display:flex;flex-direction:column;gap:16px;width:100%}

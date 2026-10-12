@@ -84,7 +84,7 @@ export default function GoalsPlanPage() {
     if (typeof to === 'string' && to.startsWith('/goals/classic')) {
       const q = new URLSearchParams(to.split('?')[1] || '')
       const eg = q.get('edit') && (goalList || []).find((x) => x.goalId === q.get('edit'))
-      return setForm(q.get('add') === '1' ? 'add' : eg ? { edit: eg } : 'list')
+      return setForm(q.get('add') === '1' ? (q.get('type') ? { add: true, type: q.get('type') } : 'add') : eg ? { edit: eg } : 'list')
     }
     return navigate(to, ...rest)
   }
@@ -110,7 +110,7 @@ export default function GoalsPlanPage() {
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
       <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} />}</Modal>
       <Modal open={!!form && form !== 'list'} onClose={() => setForm(null)} title={form?.edit ? 'Edit Goal' : 'Add Goal'} wide>
-        {form && form !== 'list' && <GoalForm key={form?.edit?.goalId || 'new'} initial={form?.edit || undefined} onSave={saveGoal} onDelete={form?.edit ? removeGoal : undefined} onCancel={() => setForm(null)} />}
+        {form && form !== 'list' && <GoalForm key={form?.edit?.goalId || 'new-' + (form?.type || '')} initial={form?.edit || undefined} defaultType={form?.type} onSave={saveGoal} onDelete={form?.edit ? removeGoal : undefined} onCancel={() => setForm(null)} />}
       </Modal>
       <Modal open={form === 'list'} onClose={() => setForm(null)} title="Edit goals">
         <div className="space-y-2">

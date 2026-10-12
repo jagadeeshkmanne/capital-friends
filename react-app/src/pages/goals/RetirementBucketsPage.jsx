@@ -321,7 +321,7 @@ function MonthlyWithdrawal({ plan }) {
  * One row on the retirement card: "How it works", plus "Refill now" when this year's refill / build step is due
  * and "Income plan" after retirement. Each opens in a window. Nothing is recorded here: the next CAS import shows the switch.
  */
-export function RetirementActions({ goal, slot = 'alert' }) {
+export function RetirementActions({ goal, slot = 'alert', fallback }) {
   const data = useData()
   const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF } = data
   const [open, setOpen] = useState(null) // 'refill' | 'income' | 'how'
@@ -347,7 +347,7 @@ export function RetirementActions({ goal, slot = 'alert' }) {
   // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
   if (slot === 'alert' && !showRefill) return null
   if (slot === 'chip') return showRefill ? <button type="button" className="g2-jump" onClick={() => document.getElementById(`goal-${goal.goalId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>🌴 {goal.goalName}: refill due {formatINR(Math.round(refillTotal))} ›</button> : null
-  if (slot === 'stat' && !showIncome) return null
+  if (slot === 'stat' && !showIncome) return fallback || null
   return (
     <>
       {/* link rows like the card's other rows; the refill row shows only when a refill is due, and draws the eye */}
