@@ -7,9 +7,9 @@ import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw, AlertTriangle } from 'lu
 const SCENES = [
   {
     key: 'build',
-    tag: 'Last 5 years',
-    title: 'Before retirement: build the buckets in small steps',
-    text: 'In the 5 years before retirement, the app moves a small amount from Growth to Stability every quarter, and in the last 2 years to Income too. It only moves in a good market, so nothing is sold in one go or at a low.',
+    tag: '5 years before retiring',
+    title: '5 years before you retire: build the buckets in small steps',
+    text: 'From 5 years before your retirement date, the app moves a small amount from Growth to Stability every quarter, and in the last 2 years to Income too. It only moves in a good market, so nothing is sold in one go or at a low.',
     from: { b1: 0, b2: 25, b3: 100 },
     to: { b1: 0, b2: 40, b3: 93 },
     flows: ['b3b2'],

@@ -195,7 +195,7 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   return (
     <div className="g2-bk">
       {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
-        : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Now: one growth mix</div><div className={p.bucketMode && !retired ? 'on' : ''}>{yearOf(p.goal) - 5}: fill the jars</div><div>{yearOf(p.goal)}: live from them</div></div>}
+        : retired ? null : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Until {yearOf(p.goal) - 5}: one growth mix</div><div className={p.bucketMode ? 'on' : ''}>{yearOf(p.goal) - 5}–{yearOf(p.goal)}: fill the jars</div><div>From {yearOf(p.goal)} (retirement): live from them</div></div>}
       <div className="g2-jars">{jar('gro', 'Growth', 'the rest · equity')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('inc', 'Income', '2 years of expenses · safe')}</div>
       <div className="g2-flow"><div>→ refills Stability after good years</div><div>→ refills Income once a year</div><div>↓ pays your monthly income</div></div>
       {retired && <RetirementActions goal={p.goal} part="income" />}

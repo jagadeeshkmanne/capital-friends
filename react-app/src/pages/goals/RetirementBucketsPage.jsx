@@ -127,7 +127,7 @@ function StepFlow({ plan, op, before }) {
   }, [])
   const m = plan.expense.monthlyExpense || 1
   const target = { b1: plan.rules.incomeMonths, b2: plan.rules.stabilityMonths }
-  const order = ['b1', 'b2', 'b3']
+  const order = ['b3', 'b2', 'b1'] // left to right in the order money flows: Growth → Stability → Income
   const after = { ...before, [op.from]: before[op.from] - op.fundedAmount, [op.to]: before[op.to] + op.fundedAmount }
   const cx = k => (w / 6) * (order.indexOf(k) * 2 + 1)
   const x1 = cx(op.from), x2 = cx(op.to)
