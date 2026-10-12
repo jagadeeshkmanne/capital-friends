@@ -8,11 +8,8 @@ import {
 import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation } from '../../data/glidePath'
 import { useData } from '../../context/DataContext'
-import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/Modal'
 import FundSearchInput from '../../components/forms/FundSearchInput'
-import MFSwitchForm from '../../components/forms/MFSwitchForm'
-import MFRedeemForm from '../../components/forms/MFRedeemForm'
 import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 import { allocateBucketWithdrawal } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
@@ -107,9 +104,6 @@ function FlowArrow() {
   )
 }
 
-function RecordedPill() {
-  return <span className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg whitespace-nowrap"><CheckCircle2 size={14} /> Recorded</span>
-}
 
 // Animated picture of one refill step. All three buckets are always shown, in
 // the same order as the jars above. Money travels in a half-ellipse over the
@@ -215,7 +209,7 @@ const FLOW_CSS = `
 .txn-arrow-x{animation:txn-ax 4s ease-in-out infinite}.txn-arrow-y{animation:txn-ay 4s ease-in-out infinite}
 @media (prefers-reduced-motion: reduce){.flow-dash{animation:none}.txn-sell,.txn-buy,.txn-arrow-x,.txn-arrow-y{animation:none}.flow-coin{animation:none;opacity:0}.flow-level{animation:none}.flow-t1,.flow-t2{animation:none;opacity:0}.flow-t3{animation:none;opacity:1}}`
 
-function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) {
+function RefillSteps({ plan, operations, recorded }) {
   const [destinations, setDestinations] = useState({})
   const multiPortfolio = new Set(plan.allFunds.map(f => f.portfolioId)).size > 1
   const destinationFor = (op, portfolioId) =>
@@ -233,9 +227,7 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
           )}
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-0.5">
-          {canRecord
-            ? 'For each line: sell the units in your broker or fund-house app, buy the fund shown, then tap Record switch here. The form opens filled in, so you only check the NAV and date.'
-            : 'Preview only. Bucket building starts 5 years before retirement.'}
+          For each line: sell the units in your broker or fund-house app and buy the fund shown (a switch). Done it? Import your CAS and the jars update on their own.
         </p>
       </div>
 
@@ -299,18 +291,12 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
                       const done = recorded.has(lineKey)
                       return (
                         <div key={a.key} className={`rounded-lg border ${done ? 'border-emerald-500/30' : 'border-[var(--border-light)]'} bg-[var(--bg-card)] p-3`}>
-                          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center md:gap-3">
+                          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
                             <TxnSide step="sell" label={`Sell · ${from.name}`} tone={from} fund={splitFundName(a.fundName || '').main}
                               detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
                             <FlowArrow />
                             <TxnSide step="buy" label={`Buy · ${to.name}`} tone={to} fund={dest ? splitFundName(dest.fundName || '').main : 'Choose a fund above'}
                               detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b>{dest?.portfolioName && multiPortfolio ? ` · ${dest.portfolioName}` : ''}</>} />
-                            {canRecord && (done ? <RecordedPill /> : (
-                              <button type="button" disabled={!dest} onClick={() => onRecordSwitch({ lineKey, op, allocation: a, dest })}
-                                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 md:py-2 text-xs font-semibold text-violet-400 border border-violet-500/40 hover:bg-violet-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
-                                <ArrowRightLeft size={14} /> Record switch
-                              </button>
-                            ))}
                           </div>
                         </div>
                       )
@@ -327,7 +313,7 @@ function RefillSteps({ plan, operations, canRecord, onRecordSwitch, recorded }) 
 }
 
 /* ── This month's income ── */
-function MonthlyWithdrawal({ plan, onRecordRedeem }) {
+function MonthlyWithdrawal({ plan }) {
   const [amount, setAmount] = useState(String(Math.round(plan.expense.monthlyExpense / 1000) * 1000))
   const result = allocateBucketWithdrawal(plan.byBucket.b1, num(amount, 0))
   return (
@@ -347,19 +333,16 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
         </label>
         {result.allocations.map(a => (
           <div key={a.key} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center md:gap-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
               <TxnSide step="sell" label="Sell · Income" tone={BUCKET.b1} fund={splitFundName(a.fundName || '').main}
                 detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · <span className="tabular-nums">{fmtUnits(a.units)} units</span></>} />
               <FlowArrow />
               <TxnSide step="buy" label="To your bank" tone={{ border: 'border-[var(--border)]', soft: 'bg-[var(--bg-inset)]', text: 'text-[var(--text-dim)]' }} fund="Your savings account"
                 detail={<><b className="text-[var(--text-primary)] tabular-nums">≈ {formatINR(a.amount)}</b> · for this month</>} />
-              <button type="button" onClick={() => onRecordRedeem(a)}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 md:py-2 text-xs font-semibold text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/10 rounded-lg transition-colors whitespace-nowrap">
-                <CheckCircle2 size={14} /> Record redemption
-              </button>
             </div>
           </div>
         ))}
+        <p className="text-xs text-[var(--text-dim)]">Set this up as a monthly SWP in your fund-house app (or redeem it each month). Your next CAS import updates the Income jar.</p>
         {result.shortfall > 1 && <p className="text-xs text-rose-400">The Income bucket is short by {formatINR(result.shortfall)}. Refill it first.</p>}
       </div>
     </div>
@@ -370,15 +353,11 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
 /**
  * The retirement buckets' actions, shown on the Goals page (the separate buckets page is gone):
  * One row on the retirement card: "How it works", plus "Refill now" when this year's refill / build step is due
- * (with Record switch) and "Income plan" after retirement (with Record redemption). Each opens in a window.
+ * and "Income plan" after retirement. Each opens in a window. Nothing is recorded here: the next CAS import shows the switch.
  */
 export function RetirementActions({ goal, slot = 'alert' }) {
   const data = useData()
   const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF } = data
-  const { showToast, showBlockUI, hideBlockUI } = useToast()
-  const [switchDraft, setSwitchDraft] = useState(null)
-  const [redeemDraft, setRedeemDraft] = useState(null)
-  const [session, setSession] = useState(null)
   const [open, setOpen] = useState(null) // 'refill' | 'income' | 'how'
   const goalAttribution = useMemo(() => {
     const allocMap = {}
@@ -394,11 +373,8 @@ export function RetirementActions({ goal, slot = 'alert' }) {
       otherInvestments: otherInvList || [], attribution: goalAttribution[goal.goalId] })
   }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution])
   const noPlan = !plan || plan.noExpenses || plan.status === 'not-started'
-  const canRecord = !noPlan && (plan.schedule.retired || BUILD_STATUSES.has(plan.status))
-  const active = session && session.goalId === goal.goalId ? session : null
-  const ops = active?.ops || (noPlan ? [] : plan.operations)
-  const recorded = active?.done || EMPTY_SET
-  const showRefill = !noPlan && (!!active || (ops.length > 0 && plan.status !== 'not-due'))
+  const ops = noPlan ? [] : plan.operations
+  const showRefill = !noPlan && ops.length > 0 && plan.status !== 'not-due'
   const showIncome = !noPlan && plan.schedule.retired && plan.totals.b1 > 1
   const refillTotal = ops.reduce((t, op) => t + (op.fundedAmount || 0), 0)
   const monthly = plan?.expense?.monthlyExpense || 0
@@ -423,51 +399,13 @@ export function RetirementActions({ goal, slot = 'alert' }) {
       {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
         <div className="space-y-3">
       {open === 'refill' && (
-        <RefillSteps key={goal.goalId} plan={plan} operations={ops} canRecord={canRecord} recorded={recorded}
-          onRecordSwitch={({ lineKey, op, allocation, dest }) => setSwitchDraft({
-            lineKey, opsSnapshot: ops, portfolioId: allocation.portfolioId,
-            initial: { fromPortfolioId: allocation.portfolioId, toPortfolioId: dest.portfolioId || allocation.portfolioId, fromFundCode: allocation.schemeCode, fromFundName: allocation.fundName,
-              toFundCode: dest.schemeCode, toFundName: dest.fundName, units: unitsDown(allocation.units), fromPrice: allocation.currentNav ? String(allocation.currentNav) : '',
-              toPrice: dest.currentNav ? String(dest.currentNav) : '',
-              notes: `${op.reason === 'build-step' ? 'Retirement bucket build' : 'Retirement bucket refill'}: ${BUCKET[op.from].name} to ${BUCKET[op.to].name} (${goal.goalName})` },
-          })} />
+        <RefillSteps key={goal.goalId} plan={plan} operations={ops} recorded={EMPTY_SET} />
       )}
       {open === 'income' && (
-        <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan}
-          onRecordRedeem={a => setRedeemDraft({ portfolioId: a.portfolioId, fundCode: a.schemeCode, initial: { units: unitsDown(a.units), notes: `Retirement monthly income (${goal.goalName})` } })} />
+        <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan} />
       )}
         </div>
       </Modal>, document.body)}
-      {createPortal(<>
-        <Modal open={!!switchDraft} onClose={() => setSwitchDraft(null)} title="Record switch" wide>
-          {switchDraft && (
-            <MFSwitchForm key={switchDraft.lineKey} portfolioId={switchDraft.portfolioId} initial={switchDraft.initial}
-              onCancel={() => setSwitchDraft(null)}
-              onSave={async d => {
-                showBlockUI('Recording switch...')
-                try {
-                  await switchMF(d)
-                  const lines = switchDraft.opsSnapshot.reduce((n, op) => n + op.allocations.length, 0)
-                  const next = new Set(recorded).add(switchDraft.lineKey)
-                  setSwitchDraft(null)
-                  if (next.size >= lines) { setSession(null); showToast('All switches recorded. Refill done.') }
-                  else { setSession({ goalId: goal.goalId, ops: switchDraft.opsSnapshot, done: next }); showToast(`Switch recorded (${next.size} of ${lines})`) }
-                } catch (err) { showToast(err.message || 'Failed to record switch', 'error') } finally { hideBlockUI() }
-              }} />
-          )}
-        </Modal>
-        <Modal open={!!redeemDraft} onClose={() => setRedeemDraft(null)} title="Record redemption" wide>
-          {redeemDraft && (
-            <MFRedeemForm key={`${redeemDraft.portfolioId}-${redeemDraft.fundCode}`} portfolioId={redeemDraft.portfolioId} fundCode={redeemDraft.fundCode} initial={redeemDraft.initial}
-              onCancel={() => setRedeemDraft(null)}
-              onSave={async d => {
-                showBlockUI('Recording redemption...')
-                try { await redeemMF(d); setRedeemDraft(null); showToast('Redemption recorded') }
-                catch (err) { showToast(err.message || 'Failed to record redemption', 'error') } finally { hideBlockUI() }
-              }} />
-          )}
-        </Modal>
-      </>, document.body)}
     </>
   )
 }
