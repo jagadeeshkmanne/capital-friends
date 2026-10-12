@@ -125,6 +125,18 @@ function casQ_(t) { return "'" + String(t).replace(/'/g, "''") + "'"; }
 function casNameTokens_(s) {
   return String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(function (t) { return t.length > 1; });
 }
+/** First name for a portfolio name: "Jagadeesh Kumar Manne" -> "Jagadeesh", "Manne Sanjith" -> "Sanjith" (the family surname, a name word two or more members share, is skipped). */
+function casShortName_(name, members) {
+  var t = String(name || '').trim().split(/\s+/).filter(Boolean);
+  var count = {};
+  (members || []).forEach(function (m) { casUniq_(casNameTokens_(m.memberName)).forEach(function (x) { count[x] = (count[x] || 0) + 1; }); });
+  var keep = t.filter(function (w) { var k = w.toLowerCase().replace(/[^a-z]/g, ''); return !(count[k] >= 2); });
+  return (keep.length ? keep : t)[0] || String(name || '');
+}
+/** Portfolio name part for a platform: "Zerodha", "Groww", "Direct"; an agent / adviser / broker by its code ("ARN-12345"). */
+function casPlatformLabel_(platform) {
+  return String(platform || 'Unknown').replace(/^(Distributor|Adviser|Broker)\s+/, '');
+}
 function casUniq_(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
 function casPlatformKey_(platform) {
   var p = String(platform || '').toLowerCase();
@@ -368,7 +380,7 @@ function casBuildPlan_(statement, data, mapping) {
     else g.suggestion = 'new';
     var chosen = mapping[key];
     g.target = chosen && (chosen === 'new' || chosen === 'skip' || (portfolioById[chosen] && portfolioById[chosen].status !== 'Inactive')) ? chosen : g.suggestion;
-    g.newName = g.memberName + ' – ' + g.platform.replace(/^Distributor\s+/, 'Agent ');
+    g.newName = casShortName_(g.memberName, members) + ' – ' + casPlatformLabel_(g.platform);
     g.value = Math.round(g.value);
     // accounts the person already has (used if a new portfolio is created)
     g.accounts = data.accounts.filter(function (a) { return a.memberId === g.memberId && a.status !== 'Inactive'; }).map(function (a) { return { accountId: a.accountId, name: a.accountName, platform: a.platformBroker, match: casAccountMatchesPlatform_(a, g.platform) }; });

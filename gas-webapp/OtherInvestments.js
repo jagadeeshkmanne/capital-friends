@@ -208,7 +208,13 @@ function processAddInvestment(data) {
         lenderName: data.quickLoan.lender,
         familyMember: data.familyMember || '',
         outstandingBalance: data.quickLoan.outstanding,
-        dynamicFields: {},
+        // EMI and rate typed in the quick-loan box were dropped before; keep them (same keys the Liabilities form saves)
+        dynamicFields: (function () {
+          var d = {};
+          if (+data.quickLoan.emiAmount > 0) d['EMI Amount'] = +data.quickLoan.emiAmount;
+          if (+data.quickLoan.interestRate > 0) d['Interest Rate'] = +data.quickLoan.interestRate;
+          return d;
+        })(),
         notes: 'Auto-created for ' + data.investmentType + ': ' + data.investmentName,
         linkedInvestmentId: investmentId  // Link back to this investment
       };
