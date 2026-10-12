@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Pause, Play, Landmark, Lock, AlertTriangle, TrendingUp, TrendingDown, Wallet, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw, AlertTriangle } from 'lucide-react'
 
 // Animated explainer for the bucket refill rules. Each scene shows the three
 // buckets, how full they are, and which way money moves.
@@ -70,35 +70,35 @@ const SCENES = [
   },
 ]
 
-const BUCKET_VIEW = [
-  { key: 'b1', name: 'Income', note: '2 years', icon: Wallet, fill: 'bg-emerald-500/70', ring: 'border-emerald-500/40', text: 'text-emerald-400' },
-  { key: 'b2', name: 'Stability', note: '5 years', icon: ShieldCheck, fill: 'bg-amber-500/70', ring: 'border-amber-500/40', text: 'text-amber-400' },
-  { key: 'b3', name: 'Growth', note: 'the rest', icon: TrendingUp, fill: 'bg-violet-500/70', ring: 'border-violet-500/40', text: 'text-violet-400' },
-]
 
 const SCENE_MS = 6500
 
 export default function BucketHowItWorks({ compact = false }) {
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(true)
-  const [settled, setSettled] = useState(false)
+  // phase: 'before' (old levels) → 'flow' (money moves, jars fill) → 'done' (filled; nothing moves any more)
+  const [phase, setPhase] = useState('before')
   const scene = SCENES[index]
+  const last = index === SCENES.length - 1
 
-  // Show the "before" levels first, then animate to "after".
   useEffect(() => {
-    setSettled(false)
-    const t = setTimeout(() => setSettled(true), 450)
-    return () => clearTimeout(t)
+    setPhase('before')
+    const a = setTimeout(() => setPhase('flow'), 500)
+    const b = setTimeout(() => setPhase('done'), 2900)
+    return () => { clearTimeout(a); clearTimeout(b) }
   }, [index])
 
+  // plays through the story once and stops at the end (it does not loop back and refill again)
   useEffect(() => {
-    if (!playing) return
-    const t = setTimeout(() => setIndex(i => (i + 1) % SCENES.length), SCENE_MS)
+    if (!playing || last) { if (last) setPlaying(false); return }
+    const t = setTimeout(() => setIndex(i => i + 1), SCENE_MS)
     return () => clearTimeout(t)
-  }, [index, playing])
+  }, [index, playing, last])
 
+  const settled = phase !== 'before'
   const levels = settled ? scene.to : scene.from
-  const go = step => { setPlaying(false); setIndex(i => (i + step + SCENES.length) % SCENES.length) }
+  const go = step => { setPlaying(false); setIndex(i => Math.max(0, Math.min(SCENES.length - 1, i + step))) }
+  const replay = () => { setIndex(0); setPlaying(true) }
 
   return (
     <div className="space-y-4">
@@ -117,7 +117,7 @@ export default function BucketHowItWorks({ compact = false }) {
       </div>
 
       {/* Stage: the jars, with money flowing along curved arrows into the bucket it fills */}
-      <Stage scene={scene} levels={levels} compact={compact} />
+      <Stage scene={scene} levels={levels} phase={phase} />
 
       {/* Caption */}
       <div className={compact ? "min-h-[64px]" : "min-h-[88px]"}>
@@ -137,7 +137,7 @@ export default function BucketHowItWorks({ compact = false }) {
         </div>
         <div className="flex items-center gap-1">
           <IconButton label="Previous" onClick={() => go(-1)}><ArrowLeft size={15} /></IconButton>
-          <IconButton label={playing ? 'Pause' : 'Play'} onClick={() => setPlaying(p => !p)}>{playing ? <Pause size={15} /> : <Play size={15} />}</IconButton>
+          {last && !playing ? <IconButton label="Play again" onClick={replay}><RotateCcw size={15} /></IconButton> : <IconButton label={playing ? 'Pause' : 'Play'} onClick={() => setPlaying(p => !p)}>{playing ? <Pause size={15} /> : <Play size={15} />}</IconButton>}
           <IconButton label="Next" onClick={() => go(1)}><ArrowRight size={15} /></IconButton>
         </div>
       </div>
@@ -156,12 +156,14 @@ const arc = (from, to) => {
   // long jump: label above its arc; short jump: label just under its arc (so two arcs never overlap)
   return { d: `M${x1},${TOP - 8} Q${(x1 + x2) / 2},${TOP - 8 - h} ${x2 + (x1 > x2 ? 10 : -10)},${TOP - 10}`, lx: (x1 + x2) / 2, ly: h > 60 ? apex - 16 : apex + 18 }
 }
+const OUT = `M${JX.b1 - JW / 2 - 4},${BOT - 30} Q140,${BOT + 6} 104,174`
 const FLOW = { b3b1: ['b3', 'b1'], b3b2: ['b3', 'b2'], b2b1: ['b2', 'b1'] }
 
-function Stage({ scene, levels }) {
+function Stage({ scene, levels, phase }) {
+  const moving = phase === 'flow'
   const flows = scene.flows
   return (
-    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-inset)] overflow-hidden">
+    <div className="relative rounded-xl border border-[var(--border-light)] bg-[var(--bg-inset)] overflow-hidden">
       <svg viewBox="0 0 600 250" className="w-full h-auto block" role="img" aria-label={scene.title}>
         <defs>
           {Object.entries(JC).map(([k, c]) => (
@@ -208,33 +210,38 @@ function Stage({ scene, levels }) {
           return (
             <g key={scene.key + f}>
               <path d={d} fill="none" stroke={JC[a]} strokeOpacity=".35" strokeWidth="5" strokeLinecap="round" />
-              <path d={d} fill="none" stroke={JC[a]} strokeWidth="2" strokeDasharray="6 6" markerEnd={`url(#hw-ar-${a})`}>
-                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />
+              <path d={d} fill="none" stroke={JC[a]} strokeWidth="2" strokeDasharray="6 6" markerEnd={`url(#hw-ar-${a})`} opacity={phase === 'done' ? 0.5 : 1}>
+                {moving && <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />}
               </path>
-              {[0, 0.6, 1.2].map((t) => (
-                <circle key={t} r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5">
-                  <animateMotion dur="1.8s" begin={`${t}s`} repeatCount="indefinite" path={d} />
-                </circle>
-              ))}
               <rect x={lx - 62} y={ly - 13} width="124" height="20" rx="10" fill="var(--bg-card)" stroke={JC[a]} strokeOpacity=".5" />
-              <text x={lx} y={ly + 1} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">{NAME[a]} → {NAME[b]}</text>
+              <text x={lx} y={ly + 1} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">{phase === 'done' ? `✓ ${NAME[b]} refilled` : `${NAME[a]} → ${NAME[b]}`}</text>
             </g>
           )
         })}
         {flows.includes('out') && (() => {
-          const d = `M${JX.b1 - JW / 2 - 4},${BOT - 30} Q140,${BOT + 6} 104,174`
+          const d = OUT
           return (
             <g key={scene.key + 'out'}>
               <path d={d} fill="none" stroke={JC.b1} strokeWidth="2" strokeDasharray="6 6" markerEnd="url(#hw-ar-b1)">
-                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />
+                {moving && <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />}
               </path>
-              {[0, 0.7].map((t) => <circle key={t} r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5"><animateMotion dur="1.6s" begin={`${t}s`} repeatCount="indefinite" path={d} /></circle>)}
+              
               <rect x="24" y="118" width="96" height="20" rx="10" fill="var(--bg-card)" stroke={JC.b1} strokeOpacity=".5" />
-              <text x="72" y="132" textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">1 month → bank</text>
+              <text x="72" y="132" textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">{phase === 'done' ? '✓ paid' : '1 month → bank'}</text>
             </g>
           )
         })()}
       </svg>
+      {moving && (
+        <svg key={scene.key} viewBox="0 0 600 250" className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
+          {[...flows.filter((f) => FLOW[f]).map((f) => arc(...FLOW[f]).d), ...(flows.includes('out') ? [OUT] : [])].map((d, j) => [0, 0.45, 0.9].map((t) => (
+            <circle key={`${j}-${t}`} r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5" opacity="0">
+              <animateMotion dur="1.3s" begin={`${t}s`} fill="freeze" path={d} />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="1.3s" begin={`${t}s`} fill="freeze" />
+            </circle>
+          )))}
+        </svg>
+      )}
     </div>
   )
 }
