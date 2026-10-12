@@ -219,11 +219,12 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
         <div className="g2-gt"><h3>{mt(g.goalName)}</h3><p>{monthYear(g)} · {yrs}{g.familyMemberName ? ` · ${mt(g.familyMemberName)}` : ''}</p><span className={`g2-badge ${st[0]}`}>{st[1]}</span></div>
         <Ring pct={pct} cls={st[0]} />
       </div>
-      <div className="g2-stats">
+      <div className={`g2-stats ${retired ? 'g2-st5' : ''}`}>
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
         <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{due ? 'the goal amount' : 'with your SIP'}</small></div>
         <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'see All goals together'}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
+        {retired && <RetirementActions goal={p.goal} slot="stat" />}
       </div>
       {(() => {
         const retOnly = items.filter((it) => it.kind === 'other' && /epf|ppf|nps|vpf/i.test(it.holding?.investmentType || '')).reduce((t, it) => t + it.value, 0)
@@ -245,7 +246,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
           <div key={i} className="g2-fd"><b>{it.kind === 'mf' ? fname(it.holding) : it.kind === 'stock' ? (it.holding.symbol || it.holding.stockName) : mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}<span className={`g2-tag ${t[0]}`}>{t[1]}</span></b><span className="v">{L(it.value)}</span>
             <small>{it.kind === 'other' ? (/epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? 'retirement only · never sold' : 'other investments') : pname(it.portfolioId)}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% of it for this goal` : ''}</small></div>) })}
       </div></Modal>, document.body)}
-      {show === 'bk' && createPortal(<Modal open onClose={() => setShow(null)} title={`Your buckets today · ${retired ? 'living from them' : p.bucketMode ? 'filling now' : `filling starts in ${yearOf(g) - 5}`}`} wide maxHeight="max-h-[90vh]"><div className="g2 g2-dlg"><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} /></div></Modal>, document.body)}
+      {show === 'bk' && createPortal(<Modal open onClose={() => setShow(null)} title={`Your buckets today · ${retired ? 'living from them' : p.bucketMode ? 'filling now' : `filling starts in ${yearOf(g) - 5}`}`} maxWidth="max-w-5xl" maxHeight="max-h-[90vh]"><div className="g2 g2-dlg"><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} /></div></Modal>, document.body)}
     </div>
   )
 }
@@ -511,6 +512,7 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-pill:hover{color:#c4b5fd}.g2-pill.on{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-pill .cv{transition:transform .2s;opacity:.7}.g2-pill.on .cv{transform:rotate(180deg)}
 .g2-open{margin-top:10px;padding:4px 12px 10px;border:1px solid var(--border);border-radius:12px;background:var(--bg-inset)}
 .g2-dlg{display:block;gap:0}
+.g2-stats>button.inc{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;text-align:left;cursor:pointer;font:inherit;color:inherit;background:var(--bg-inset);border:1px solid var(--border);border-radius:12px;padding:10px 14px}.g2-stats>button.inc b{margin:0}.g2-stats>button.inc small{margin-left:auto}.g2-stats>button.inc:hover{border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}.g2-stats>button.inc small{color:#a78bfa}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}

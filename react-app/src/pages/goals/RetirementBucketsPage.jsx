@@ -404,13 +404,16 @@ export function RetirementActions({ goal, slot = 'alert' }) {
   const monthly = plan?.expense?.monthlyExpense || 0
   // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
   if (slot === 'alert' && !showRefill) return null
+  if (slot === 'stat' && !showIncome) return null
   return (
     <>
       {/* link rows like the card's other rows; the refill row shows only when a refill is due, and draws the eye */}
       {slot === 'pills' && <>
         <button type="button" className="g2-pill" onClick={() => setOpen('how')}><CircleHelp size={14} /> How buckets work</button>
-        {showIncome && <button type="button" className="g2-pill" onClick={() => setOpen('income')}><Wallet size={14} /> Monthly income · {formatINR(Math.round(monthly))}</button>}
       </>}
+      {slot === 'stat' && showIncome && (
+        <button type="button" className="inc" onClick={() => setOpen('income')}><span>Monthly income</span><b>{formatINR(Math.round(monthly))}</b><small>from Income · plan ›</small></button>
+      )}
       {slot === 'alert' && showRefill && (
         <button type="button" className="g2-lrow due" onClick={() => setOpen('refill')}>
           <span><i className="g2-dot" />Refill plan · {formatINR(Math.round(refillTotal))} due<small>{ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ')}</small></span><em>Refill now ›</em>
