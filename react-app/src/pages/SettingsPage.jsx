@@ -15,7 +15,16 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
-  const { members, settings, updateSettings, updateMember, healthCheckCompleted, refreshData, isRefreshing } = useData()
+  const { members, settings, updateSettings, updateMember, healthCheckCompleted, refreshData, isRefreshing, refreshSettings } = useData()
+  // Daily updates: show whether they are on (the Turn on window installs them; check again when you come back)
+  const [daily, setDaily] = useState(null) // null = checking, true / false
+  useEffect(() => {
+    let alive = true
+    const check = () => api.checkTriggers().then((r) => { if (alive) setDaily(!!(r && r.hasDailySync)) }).catch(() => { if (alive) setDaily(null) })
+    check()
+    window.addEventListener('focus', check)
+    return () => { alive = false; window.removeEventListener('focus', check) }
+  }, [])
   const { user, signOut } = useAuth()
   const { masked, toggleMask, mv } = useMask()
   const { showToast } = useToast()
@@ -82,6 +91,8 @@ export default function SettingsPage() {
       const result = await api.refreshMasterData()
       clearStocksCache() // stock search and import pick up the refreshed list (new stocks and ETFs)
       setRefreshResult(result)
+      // the sheet now has today's NAVs: load the funds again so the app shows them (and "Last" updates)
+      await Promise.all([refreshData(true), refreshSettings?.()])
     } catch (err) {
       setRefreshResult({ error: err.message })
     } finally {
@@ -228,14 +239,17 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-[var(--text-primary)]">Daily updates</p>
+                <p className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-2">Daily updates
+                  {daily === true && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">ON</span>}
+                  {daily === false && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">OFF</span>}
+                </p>
                 <p className="text-xs text-[var(--text-dim)] mt-0.5">Updates your fund prices and sends your summary email every day, even when the app is closed</p>
               </div>
               <button
                 onClick={() => api.installUserTriggers()}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                Turn on
+                {daily ? 'Turn on again' : 'Turn on'}
               </button>
             </div>
           </div>
