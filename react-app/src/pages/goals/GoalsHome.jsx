@@ -55,11 +55,22 @@ function useCurve(dep) {
     const draw = () => {
       if (window.innerWidth < 900) { setD(''); return }
       const box = el.getBoundingClientRect()
-      const pts = [...el.querySelectorAll('.g2-yr,.g2-now')].map((n) => { const r = n.getBoundingClientRect(); return [r.left + r.width / 2 - box.left, r.top + r.height / 2 - box.top] })
-      if (!pts.length) { setD(''); return }
-      const all = [[pts[0][0], 0], ...pts, [pts[pts.length - 1][0], box.height]]
-      let path = `M${all[0][0]},${all[0][1]}`
-      for (let i = 1; i < all.length; i++) { const [x1, y1] = all[i - 1], [x2, y2] = all[i], m = (y2 - y1) / 2; path += ` C${x1},${y1 + m} ${x2},${y2 - m} ${x2},${y2}` }
+      // nodes in page order: the Today pin, or a year circle (in) and the bottom of its cards (out)
+      const segs = []
+      for (const n of el.children) {
+        if (n.classList.contains('g2-now')) { const r = n.getBoundingClientRect(); const x = r.left + r.width / 2 - box.left; segs.push([x, r.top - box.top], [x, r.bottom - box.top]) }
+        else if (n.querySelector?.('.g2-yr')) {
+          const c = n.querySelector('.g2-yr').getBoundingClientRect(), g = n.querySelector('.g2-grp').getBoundingClientRect()
+          const x = c.left + c.width / 2 - box.left
+          segs.push([x, c.top + c.height / 2 - box.top], [x, g.bottom - box.top])
+        }
+      }
+      if (!segs.length) { setD(''); return }
+      const cx = box.width / 2
+      let path = `M${cx},0`, last = [cx, 0]
+      const curve = ([x2, y2]) => { const [x1, y1] = last, m = (y2 - y1) / 2; path += ` C${x1},${y1 + m} ${x2},${y2 - m} ${x2},${y2}`; last = [x2, y2] }
+      for (let i = 0; i < segs.length; i += 2) { curve(segs[i]); path += ` L${segs[i + 1][0]},${segs[i + 1][1]}`; last = segs[i + 1] }
+      curve([cx, box.height])
       setD(path)
     }
     draw()
@@ -256,15 +267,15 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   return (
     <div className="g2-rdy">
       <div><b>Date reached · {L(s.has)} ready to use</b><span>Withdraw it when you need it, then mark the goal.</span></div>
-      <button className="g2-pb g2-pulse" onClick={() => setOpen(true)}>Withdraw plan ›</button>
+      <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw plan ›</button>
       {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw: ${mt(s.goal.goalName)}`} wide>
         <div className="g2 g2-wdm">
           <p className="g2-wdmh"><b>{L(s.has)}</b> from {s.rows.length} investment{s.rows.length > 1 ? 's' : ''}. Redeem these when you pay, then tell the app what happened.</p>
           <div className="g2-wdl">{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}</div>
-          <div className="g2-wdf">
-            <button className="g2-pb p" onClick={() => done('used')}>✓ Withdrawn, mark completed</button>
-            <button className="g2-pb" onClick={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`) }}>Need more time</button>
-            <button className="g2-pb" onClick={() => done('not')}>Not needed</button>
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+            <button onClick={() => done('used')} className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">✓ Withdrawn, mark completed</button>
+            <button onClick={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`) }} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Need more time</button>
+            <button onClick={() => done('not')} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Not needed</button>
           </div>
           <p className="g2-hint">Anything left after you close the goal becomes free money for your other goals.</p>
         </div>
@@ -430,7 +441,7 @@ const CSS = `
 .g2-road.curvy{max-width:1040px}.g2-road.curvy:before,.g2-road.curvy:after{display:none}
 .g2-road.curvy .g2-grp{width:64%}.g2-road.curvy .side-r .g2-grp{margin-left:auto}
 .g2-road.curvy .side-l .g2-yr{margin-left:calc(32% - 32px)}.g2-road.curvy .side-r .g2-yr{margin-left:calc(68% - 32px)}
-.g2-road.curvy .g2-grp{margin-bottom:90px}
+.g2-road.curvy .g2-grp{margin-bottom:150px}.g2-road.curvy .g2-now{margin-bottom:110px}.g2-road.curvy{padding-top:60px}
 .g2-pulse{animation:g2p 2.2s ease-out 3;border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}
 @keyframes g2p{0%{box-shadow:0 0 0 0 color-mix(in srgb,#a78bfa 55%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
 @media(prefers-reduced-motion:reduce){.g2-pulse{animation:none}}

@@ -21,9 +21,9 @@ import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { DEMO_SCENARIOS, buildDemoData, applyDemoSwitch, applyDemoRedeem } from '../../data/bucketDemo'
 
 const BUCKET = {
-  b1: { name: 'Income', long: 'Income bucket', icon: Wallet, text: 'text-emerald-400', soft: 'bg-emerald-500/10', bar: 'bg-emerald-500', border: 'border-emerald-500/25', holds: 'Liquid and short-term debt funds' },
-  b2: { name: 'Stability', long: 'Stability bucket', icon: ShieldCheck, text: 'text-amber-400', soft: 'bg-amber-500/10', bar: 'bg-amber-500', border: 'border-amber-500/25', holds: 'Hybrid and medium-term debt funds' },
-  b3: { name: 'Growth', long: 'Growth bucket', icon: TrendingUp, text: 'text-violet-400', soft: 'bg-violet-500/10', bar: 'bg-violet-500', border: 'border-violet-500/25', holds: 'Equity funds' },
+  b1: { name: 'Income', long: 'Income bucket', icon: Wallet, text: 'text-emerald-400', soft: 'bg-emerald-500/10', bar: 'bg-emerald-500/60', border: 'border-emerald-500/40', holds: 'Liquid and short-term debt funds' },
+  b2: { name: 'Stability', long: 'Stability bucket', icon: ShieldCheck, text: 'text-amber-400', soft: 'bg-amber-500/10', bar: 'bg-amber-500/55', border: 'border-amber-500/40', holds: 'Hybrid and medium-term debt funds' },
+  b3: { name: 'Growth', long: 'Growth bucket', icon: TrendingUp, text: 'text-violet-400', soft: 'bg-violet-500/10', bar: 'bg-violet-500/60', border: 'border-violet-500/40', holds: 'Equity funds' },
 }
 
 const REASON = {
@@ -119,6 +119,7 @@ export default function RetirementBucketsPage() {
   const [session, setSession] = useState(null)
 
   const [showHelp, setShowHelp] = useState(false)
+  const [pickSel, setPickSel] = useState(null)
   const [forceShow, setForceShow] = useState(false)
 
   const goals = useMemo(() => (goalList || [])
@@ -165,7 +166,7 @@ export default function RetirementBucketsPage() {
       <div className="flex items-center gap-2">
         {!demo && (
           <button type="button" onClick={() => startDemo('good')}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border)] hover:text-[var(--text-primary)] transition-colors">
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
             <FlaskConical size={14} /> <span className="hidden sm:inline">Try sample data</span>
           </button>
         )}
@@ -176,30 +177,46 @@ export default function RetirementBucketsPage() {
           </select>
         )}
         <button type="button" onClick={() => setShowHelp(true)}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 transition-colors">
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
           <CircleHelp size={14} /> <span className="hidden sm:inline">How it works</span>
         </button>
       </div>
     </div>
   )
 
+  // Sample data: two simple choices (stage + market) pick the situation; the rarer cases sit under "More cases".
+  const STAGES = [['retired', 'Already retired'], ['soon', 'Retiring in 2–3 years'], ['far', '9 years to retire']]
+  const MARKETS = [['up', 'Market up', TrendingUp], ['down', 'Market down', TrendingDown], ['recov', 'Recovering', ArrowRight]]
+  const PICK = { retired: { up: 'good', down: 'down', recov: 'recov' }, soon: { up: 'build', down: 'buildwait', recov: 'build' }, far: { up: 'pre', down: 'pre', recov: 'pre' } }
+  const pickOf = (k) => { for (const [st, m] of Object.entries(PICK)) for (const [mk, v] of Object.entries(m)) if (v === k) return [st, mk]; return [null, null] }
+  const [stage, market] = pickSel && PICK[pickSel[0]]?.[pickSel[1]] === demoKey ? pickSel : demoKey ? pickOf(demoKey) : [null, null]
+  const choose = (st, mk) => { setPickSel([st, mk]); startDemo(PICK[st][mk]) }
+  const extraCases = Object.keys(DEMO_SCENARIOS).filter(k => !pickOf(k)[0])
+  const radio = (on, label, onClick, Icon, disabled) => (
+    <button key={label} type="button" disabled={disabled} onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${on ? 'border-violet-500/60 bg-violet-500/10 text-[var(--text-primary)]' : 'border-[var(--border)] bg-[var(--bg-inset)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${on ? 'border-violet-400' : 'border-[var(--text-dim)]'}`}>{on && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />}</span>
+      {Icon && <Icon size={14} />}{label}
+    </button>
+  )
   const demoBar = demo && (
-    <div className="rounded-xl border border-dashed border-violet-500/40 bg-violet-500/5 px-3 py-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <p className="text-xs font-semibold text-violet-400 flex items-center gap-1.5"><FlaskConical size={14} /> Sample data. Try any situation; nothing is saved to your account.</p>
-        <button type="button" onClick={exitDemo} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] shrink-0">
-          <X size={13} /> Exit
-        </button>
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-4">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <p className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><FlaskConical size={15} className="text-violet-400" /> Sample data · pick a situation</p>
+        <button type="button" onClick={exitDemo} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0"><X size={13} /> Exit sample</button>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {Object.entries(DEMO_SCENARIOS).map(([key, sc]) => (
-          <button key={key} type="button" onClick={() => startDemo(key)}
-            className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${demoKey === key ? 'bg-violet-500/15 text-violet-400 border-violet-500/30' : 'text-[var(--text-muted)] border-[var(--border-input)] hover:text-[var(--text-primary)]'}`}>
-            {sc.label}
-          </button>
-        ))}
+      <div className="grid sm:grid-cols-[auto_1fr] gap-x-4 gap-y-2 items-center">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">You are</span>
+        <div className="flex flex-wrap gap-2">{STAGES.map(([k, l]) => radio(stage === k, l, () => choose(k, market || 'up')))}</div>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">This year</span>
+        <div className="flex flex-wrap gap-2">{MARKETS.map(([k, l, I]) => radio(market === k && stage !== 'far', l, () => choose(stage || 'retired', k), I, stage === 'far'))}</div>
       </div>
-      <p className="text-[11px] text-[var(--text-dim)] mt-2">{DEMO_SCENARIOS[demoKey].note}</p>
+      <p className="text-xs text-[var(--text-muted)] mt-3">{DEMO_SCENARIOS[demoKey].note}{stage === 'far' ? ' The market does not matter yet: nothing moves until 5 years before retirement.' : ''}</p>
+      <details className="mt-2 text-xs">
+        <summary className="cursor-pointer text-[var(--text-dim)] hover:text-[var(--text-muted)]">More cases ({extraCases.length})</summary>
+        <div className="flex flex-wrap gap-1.5 mt-2">{extraCases.map(k => (
+          <button key={k} type="button" onClick={() => startDemo(k)} className={`px-2.5 py-1 rounded-lg text-xs border ${demoKey === k ? 'border-violet-500/60 text-[var(--text-primary)] bg-violet-500/10' : 'border-[var(--border)] text-[var(--text-muted)]'}`}>{DEMO_SCENARIOS[k].label}</button>))}</div>
+      </details>
     </div>
   )
 
