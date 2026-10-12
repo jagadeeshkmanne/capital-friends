@@ -95,6 +95,8 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
   const extra = pool.extra || 0, extraEq = extra > 0 ? Math.round(((pool.extraEq || 0) / extra) * 100) : 0
   const groups = [...new Set(live.map((p) => yearOf(p.goal)))].sort((a, b) => a - b).map((y) => { const ps = live.filter((p) => yearOf(p.goal) === y); return { y, ps, past: ps.every((p) => p.years <= 0) } })
 
+  const nPast = groups.filter((x) => x.past).length
+  const sideOf = (i) => (i === 0 ? 'side-c' : i % 2 ? 'side-r' : 'side-l')
   const [roadRef, curve] = useCurve(live.length + ':' + closed.length)
   if (!live.length) return <div className="g2 g2-card"><p className="g2-hint">No goals yet. <a className="g2-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p><style>{CSS}</style></div>
 
@@ -130,14 +132,14 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
       <div ref={roadRef} className={`g2-road ${curve ? 'curvy' : ''}`}>
         {curve && <svg className="g2-curve" aria-hidden="true"><path className="bed" d={curve} /><path className="mid" d={curve} /></svg>}
         {groups.filter((x) => x.past).map(({ y, ps }, gi) => (
-          <div key={y} className={gi % 2 ? 'side-r' : 'side-l'}>
+          <div key={y} className={sideOf(gi)}>
             <div className="g2-yr due"><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
             <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} closeGoal={closeGoal} navigate={navigate} />)}</div>
           </div>
         ))}
-        <div className="g2-now">📍 Today · {new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
+        <div className={`g2-now ${sideOf(nPast)} ${nPast ? "after" : ""}`}>📍 Today · {new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
         {groups.filter((x) => !x.past).map(({ y, ps }, gi) => (
-          <div key={y} className={(gi + groups.filter((x) => x.past).length) % 2 ? 'side-r' : 'side-l'}>
+          <div key={y} className={sideOf(gi + nPast)}>
             <div className={`g2-yr ${ps.some((p) => p.state === 'short') ? 'w' : ''} ${ps.some((p) => p.state === 'due' && !p.isRet) ? 'due' : ''}`}><i>{icon(ps[0].goal)}</i><b>{y}</b></div>
             <div className="g2-grp">{ps.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} pname={pname} renderBuckets={renderBuckets} ready={readyOf[p.goal.goalId]} closeGoal={closeGoal} navigate={navigate} />)}</div>
           </div>
@@ -439,9 +441,10 @@ const CSS = `
  .g2-curve{position:absolute;inset:0;width:100%;height:100%;z-index:0;overflow:visible;pointer-events:none}.g2-curve path{fill:none;stroke-linecap:round}
 .g2-curve .bed{stroke:color-mix(in srgb,var(--text-muted) 22%,transparent);stroke-width:18}.g2-curve .mid{stroke:color-mix(in srgb,var(--text-primary) 40%,transparent);stroke-width:2;stroke-dasharray:10 10}
 .g2-road.curvy{max-width:1040px}.g2-road.curvy:before,.g2-road.curvy:after{display:none}
-.g2-road.curvy .g2-grp{width:64%}.g2-road.curvy .side-r .g2-grp{margin-left:auto}
-.g2-road.curvy .side-l .g2-yr{margin-left:calc(32% - 32px)}.g2-road.curvy .side-r .g2-yr{margin-left:calc(68% - 32px)}
-.g2-road.curvy .g2-grp{margin-bottom:150px}.g2-road.curvy .g2-now{margin-bottom:110px}.g2-road.curvy{padding-top:60px}
+.g2-road.curvy .g2-grp{width:60%;margin-left:auto;margin-right:auto}.g2-road.curvy .side-l .g2-grp{margin-left:0}.g2-road.curvy .side-r .g2-grp{margin-right:0}
+.g2-road.curvy .side-l .g2-yr{margin-left:calc(30% - 32px)}.g2-road.curvy .side-r .g2-yr{margin-left:calc(70% - 32px)}
+.g2-road.curvy .g2-now{transform:translateX(-50%);margin-left:50%}.g2-road.curvy .g2-now.side-l{margin-left:30%}.g2-road.curvy .g2-now.side-r{margin-left:70%}
+.g2-road.curvy .g2-grp{margin-bottom:170px}.g2-road.curvy .g2-now{margin-bottom:40px}.g2-road.curvy .g2-now.after{margin-top:-60px}.g2-road.curvy{padding-top:40px}
 .g2-pulse{animation:g2p 2.2s ease-out 3;border-color:color-mix(in srgb,#a78bfa 55%,var(--border))}
 @keyframes g2p{0%{box-shadow:0 0 0 0 color-mix(in srgb,#a78bfa 55%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
 @media(prefers-reduced-motion:reduce){.g2-pulse{animation:none}}
