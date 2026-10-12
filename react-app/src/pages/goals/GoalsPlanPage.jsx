@@ -1,3 +1,4 @@
+import { Wallet, Pencil, Plus } from 'lucide-react'
 // Main Goals page (/goals, goal detail at /goals/plan/:goalId; the classic page is /goals/classic): one road for all goals, this month's steps from today's fund
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
 // All numbers come from utils/goalPlan.js (tested in goalPlan.test.js).
@@ -89,9 +90,9 @@ export default function GoalsPlanPage() {
           <p>Steps are worked out from your own funds and your glide path · <a className="gp-link" onClick={() => navigate('/goals/classic')}>Classic view</a></p>
         </div>
         <span className="gp-acts">
-          <button className="gp-btn gp-btn-s" onClick={() => setMoneyOpen(true)}>Money for goals</button>
-          <button className="gp-btn gp-btn-s" onClick={() => navigate('/goals/classic')}>Edit goals</button>
-          <button className="gp-btn gp-btn-s gp-btn-p" onClick={() => navigate('/goals/classic?add=1')}>+ Add goal</button>
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic')}><Pencil size={14} /> Edit goals</button>
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic?add=1')}><Plus size={14} /> Add Goal</button>
         </span>
       </div>
       {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)}

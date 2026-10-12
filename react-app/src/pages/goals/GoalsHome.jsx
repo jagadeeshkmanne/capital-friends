@@ -20,23 +20,19 @@ function mixOf(items) {
 }
 const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
 
-/** equity / debt (/ gold): now vs target, as small text tiles */
+/** equity / debt: now vs target, one calm line of text */
 function Mix({ m, plan, note }) {
   if (!m) return null
-  const tg = plan != null ? { e: plan, d: Math.max(0, 100 - plan) } : null
-  const tile = (k, label, v, t) => {
-    const off = t == null ? null : v - t
-    const mark = off == null ? null : Math.abs(off) <= 2 ? ['ok', '✓ on target'] : Math.abs(off) <= 10 ? ['ok', `✓ close · ${off > 0 ? '+' : ''}${off}`] : off > 0 ? ['warn', `${off} pts above`] : ['warn', `${-off} pts below`]
-    return (
-      <div className={`g2-mt ${k}`}><i /><span className="l">{label}</span>
-        <span className="v"><b>{v}%</b><small>now</small></span>
-        {t != null && <><span className="ar">→</span><span className="v"><b>{t}%</b><small>target</small></span><em className={mark[0]}>{mark[1]}</em></>}
-      </div>
-    )
-  }
+  const e = m.e + (m.g || 0)
+  const off = plan == null ? null : e - plan
+  const mark = off == null ? null : Math.abs(off) <= 2 ? ['ok', '✓ On target'] : Math.abs(off) <= 10 ? ['ok', '✓ Close to target'] : ['warn', off > 0 ? `${off} pts more equity than target` : `${-off} pts less equity than target`]
   return (
-    <div className="g2-mx">
-      <div className="g2-mts">{tile('e', m.g > 0 ? 'Equity + gold' : 'Equity', m.e + (m.g || 0), tg?.e)}{tile('d', 'Debt', m.d, tg?.d)}</div>
+    <div className="g2-mx2">
+      <span className="k">Mix</span>
+      <span>{m.g > 0 ? 'Equity + gold' : 'Equity'} <b>{e}%</b>{plan != null && <small> / {plan}% target</small>}</span>
+      <span className="sep" />
+      <span>Debt <b>{m.d}%</b>{plan != null && <small> / {Math.max(0, 100 - plan)}% target</small>}</span>
+      {mark && <em className={mark[0]}>{mark[1]}</em>}
       {note && <small className="g2-mxn">{note}</small>}
     </div>
   )
@@ -179,7 +175,7 @@ function GoalCard({ p, mt, pname, renderBuckets }) {
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
       </div>
       <Mix m={mixOf(items)} plan={due ? null : p.eqTarget} />
-      {(due || p.state === 'short') && <div className="g2-sip"><span>{due ? (mixOf(items)?.e > 10 ? `Kept for it (${mixOf(items).e}% still in equity: withdraw that part first). See To do.` : 'Kept in safe funds for it. See To do: withdraw, then tell the app.') : <b className="warn">Short: see the SIP / lump sum in To do</b>}</span></div>}
+      {due && <div className="g2-sip"><span>{due ? (mixOf(items)?.e > 10 ? `Kept for it (${mixOf(items).e}% still in equity: withdraw that part first). See To do.` : 'Kept in safe funds for it. See To do: withdraw, then tell the app.') : null}</span></div>}
       {items.length > 0 && (
         <details><summary>Investments in this goal ({items.length})</summary>
           {items.map((it, i) => { const t = tagOf(it); return (
@@ -299,8 +295,8 @@ const CSS = `
 .g2-lnk{font-size:13px;font-weight:600;border:1px solid var(--border);border-radius:10px;padding:7px 11px;background:transparent;color:var(--text-secondary);cursor:pointer}
 .g2-ready{padding-bottom:10px}
 .g2-acts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:12px}.g2-acts>span{font-size:12.5px;color:var(--text-muted);margin-right:4px}
-.g2-pb{height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:12.5px;font-weight:600;cursor:pointer}
-.g2-pb:hover{border-color:var(--text-muted);color:var(--text-primary)}.g2-pb.p{background:#7c3aed;border-color:#7c3aed;color:#fff}.g2-pb.p:hover{background:#6d28d9}
+.g2-pb{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:#a78bfa;font-size:12px;font-weight:600;cursor:pointer;transition:color .15s}[data-theme="light"] .g2-pb{color:#7c3aed}
+.g2-pb:hover{color:#c4b5fd}.g2-pb.p{color:var(--ok)}
 .g2-rh{display:flex;align-items:center;gap:12px}
 .g2-ri{width:38px;height:38px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:18px;background:color-mix(in srgb,var(--due) 14%,var(--bg-inset))}
 .g2-rt{flex:1;min-width:0}.g2-rt small{display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--due)}.g2-rt b{display:block;font-size:16px;color:var(--text-primary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -380,7 +376,17 @@ const CSS = `
 .g2-fd b{font-size:13.5px;font-weight:600;color:var(--text-primary)}.g2-fd .v{font-size:13.5px;font-weight:700;color:var(--text-primary);text-align:right}.g2-fd small{font-size:12px;color:var(--text-muted)}
 .g2-tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:6px}
 .g2-tag.e{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}.g2-tag.d{color:var(--dt);background:color-mix(in srgb,var(--dt) 14%,transparent)}.g2-tag.g{color:var(--gd);background:color-mix(in srgb,var(--gd) 14%,transparent)}.g2-tag.l{color:var(--text-secondary);background:var(--bg-inset)}
- @media(max-width:640px){
+ /* calm palette: neutral surfaces, one status colour per card */
+.g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
+.g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}
+.g2-stats>div,.g2-stats>div.gp.ok,.g2-stats>div.gp.warn{background:var(--bg-inset);border:1px solid var(--border);padding:11px 14px}
+.g2-stats>div:before{display:none}.g2-stats span i{display:none}.g2-stats span{font-size:11.5px;letter-spacing:.02em}
+.g2-stats b{font-size:16px;font-weight:600}.g2-stats b.ok{color:var(--ok)}.g2-stats b.warn{color:var(--warn)}
+.g2-badge.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}.g2-badge.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.g2-mx2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;color:var(--text-secondary);padding:2px 2px 0}.g2-mx2 .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+.g2-mx2 b{color:var(--text-primary);font-weight:600}.g2-mx2 small{color:var(--text-muted);font-size:12px}.g2-mx2 .sep{width:1px;height:14px;background:var(--border)}
+.g2-mx2 em{font-style:normal;font-size:12px;font-weight:600;margin-left:auto}.g2-mx2 em.ok{color:var(--ok)}.g2-mx2 em.warn{color:var(--warn)}
+@media(max-width:640px){
  .g2-gh{gap:10px;margin-top:34px}.g2-gt{padding-right:4px}.g2-gi{width:40px;height:40px;font-size:20px}.g2-ring{transform:scale(.85)}.g2-mt{padding:4px 7px;font-size:11.5px}
  .g2-two{grid-template-columns:1fr;margin-left:0}.g2-orw{text-align:center}
  .g2-sum3,.g2-sum3.one{grid-template-columns:1fr}.g2-sum3>div{padding:0;border-left:0}.g2-sum3>div+div{border-top:1px solid var(--border);margin-top:14px}.g2-sum3 .g2-lbl,.g2-sum3>div:first-child .g2-lbl,.g2-sum3>div:last-child .g2-lbl{margin:0 -16px 12px}
