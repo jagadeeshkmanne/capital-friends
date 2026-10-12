@@ -131,7 +131,7 @@ describe('money for goals', () => {
     for (const p of plans) { expect(p.state).toBe('achieved'); expect(p.eqTarget).toBeGreaterThan(0); expect(p.steps.some((s) => s.t === 'protect')).toBe(false) }
   })
   it('timeline: a goal 1 year away gets safe money, one 10 years away gets equity; no goal ahead while another is short', () => {
-    const items = [{ id: 'EQ', type: 'MF', value: 9000000, eq: 1, kind: 'pool', included: true }, { id: 'SAFE', type: 'Other', value: 9000000, eq: 0, kind: 'pool', included: true }]
+    const items = [{ id: 'EQ', type: 'MF', value: 25000000, eq: 1, kind: 'pool', included: true }, { id: 'SAFE', type: 'Other', value: 15000000, eq: 0, kind: 'pool', included: true }]
     const HOUSE = { goalId: 'HOUSE', goalType: 'House Purchase', targetDate: inY(1), targetAmount: 8000000, isActive: true }
     const R4 = { ...RET, targetDate: inY(4), targetAmount: 20000000 }
     const EDU = { goalId: 'EDU', goalType: 'Education', targetDate: inY(10), targetAmount: 15000000, isActive: true }
@@ -216,5 +216,39 @@ describe('money for goals', () => {
     const kid = { ...KID, targetDate: inY(1), familyMemberName: 'Visali' }
     const r2 = sharePool({ goals: [kid, RJ], items, now: NOW })
     expect(r2.byGoal.KID.got).toBeGreaterThan(500000)
+  })
+})
+
+describe('corner cases (ages, timelines, shortages)', () => {
+  const now = new Date('2026-10-12'); const inY = (y) => new Date(now.getTime() + y * 365.25 * 864e5).toISOString()
+  const g = (id, type, y, amt, who) => ({ goalId: id, goalType: type, targetDate: inY(y), targetAmount: amt, isActive: true, expectedCAGR: 0.11, familyMemberName: who })
+  const EQ = (v, o = '') => ({ id: 'EQ' + o, type: 'MF', value: v, eq: 1, kind: 'pool', included: true, owner: o })
+  const SF = (v, o = '') => ({ id: 'SF' + o, type: 'Other', value: v, eq: 0, kind: 'pool', included: true, owner: o })
+  const EPF = (v, o = '') => ({ id: 'EPF' + o, type: 'Other', value: v, eq: 0, kind: 'retirement', locked: true, included: true, owner: o })
+  it('money short: retirement is funded first (no loans for retirement)', () => {
+    const r = sharePool({ goals: [g('HOUSE', 'House Purchase', 1, 8e6), g('RET', 'Retirement', 4.3, 3.84e7), g('EDU', 'Education', 9.6, 1.5e7)], items: [EQ(2e6), SF(1e6)], now })
+    expect(r.byGoal.RET.got).toBeGreaterThan(r.byGoal.EDU.got)
+  })
+  it('no goal gets more than it needs (except EPF / PPF that only retirement can use)', () => {
+    const r = sharePool({ goals: [g('RJ', 'Retirement', 15, 6e7, 'J'), g('RV', 'Retirement', 18, 4e7, 'V')], items: [EQ(1e7, 'J'), EPF(3e6, 'J'), EQ(3e6, 'V'), EPF(1e6, 'V')], now })
+    for (const m of Object.values(r.byGoal)) expect(m.got).toBeLessThanOrEqual(Math.max(m.want, 3e6) + 1)
+  })
+  it('already retired: keeps a growth mix (not 0% equity) and no "withdraw" step', () => {
+    const r = sharePool({ goals: [g('RET', 'Retirement', -3, 3e7)], items: [EQ(1.5e7), SF(8e6), EPF(5e6)], now })
+    expect(r.byGoal.RET.eq).toBeGreaterThan(0.5)
+    const att = { RET: { total: 2.8e7, equity: 1.5e7, items: [] } }
+    const p = buildGoalPlan({ goals: [g('RET', 'Retirement', -3, 3e7)], attribution: att, mfHoldings: [], mappings: [], eqOf: () => 1, now, pool: true }).goals[0]
+    expect(p.eqTarget).toBeGreaterThan(0)
+    expect(p.steps.some((s) => s.t === 'ready')).toBe(false)
+  })
+  it('emergency fund with only equity available still gets money (the plan then moves it to safe)', () => {
+    const r = sharePool({ goals: [g('EF', 'Emergency Fund', 0.5, 6e5)], items: [EQ(1e6)], now })
+    expect(r.byGoal.EF.got).toBeCloseTo(6e5, -2)
+  })
+  it('no investments / no goals / bad data: no crash', () => {
+    expect(sharePool({ goals: [g('RET', 'Retirement', 20, 5e7)], items: [], now }).byGoal.RET.got).toBe(0)
+    expect(sharePool({ goals: [], items: [EQ(5e6)], now }).extra).toBe(5e6)
+    const r = sharePool({ goals: [{ goalId: 'BAD', goalType: 'Vehicle', targetDate: 'x', targetAmount: 1e6, isActive: true }, g('ZERO', 'Travel', 3, 0)], items: [EQ(5e6)], now })
+    expect(r.mappings.length).toBe(0)
   })
 })

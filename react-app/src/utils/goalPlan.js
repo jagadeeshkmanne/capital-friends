@@ -154,8 +154,8 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     const sip = Math.round((att.items || []).filter((it) => it.kind === 'mf').reduce((s2, it) => s2 + (Number(it.holding.ongoingSIP) || 0) * (it.fraction || 0), 0))
     const plannedSip = Number(g.monthlyInvestment) || 0
     const has = att.total > 0 ? att.total : (Number(g.currentValue) || 0)
-    const rec = { ...(years > 0 ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }) }
     const isRet = g.goalType === 'Retirement'
+    const rec = { ...(years > 0 || isRet ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }) }
     const bucketMode = isRet && followsBucketPlan(g.goalType, years)
     const eqNow = att.total > 0 ? Math.round(att.equity / att.total * 100) : null
     // the emergency fund is needed in full today (pool mode); other goals can grow towards their date
@@ -166,11 +166,11 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     // follows its timeline (glide path): a goal 10 years away keeps growing in equity, one 1 year away is safe.
     const achieved = pool && years > 0 && target > 0 && has >= target * 0.98
     const state = years <= 0 ? 'due' : achieved ? 'achieved' : gap < -tol ? 'short' : gap > tol ? 'extra' : 'onplan'
-    if (years <= 0) rec.equity = 0
+    if (years <= 0 && !isRet) rec.equity = 0 // a retired person's money keeps its bucket mix
     const steps = []
     if (pool) {
       // one family plan does the equity / safe moves; a goal only shows what is its own
-      if (state === 'due' && has > 0) steps.push({ t: 'ready' })
+      if (state === 'due' && has > 0 && !isRet) steps.push({ t: 'ready' }) // retired: the buckets pay income instead
     } else if (!bucketMode && years > 0 && eqNow !== null) {
       for (const sw of switchSteps({ att, targetEq: rec.equity / 100, mfHoldings, eqOf })) steps.push({ t: 'switch', ...sw })
     }
