@@ -1,20 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Settings, Info, Heart, Zap, Users, Landmark, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, Wallet, Target, FileUp } from 'lucide-react'
+import { Bell, Settings, Info, Heart, Zap, Users, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, FileUp } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
 import FollowCard from '../components/FollowCard'
 
 const navItems = [
   { label: 'Family Members', desc: 'Manage family profiles', icon: Users, path: '/family', color: 'bg-violet-500/15 text-violet-400' },
-  { label: 'Bank Accounts', desc: 'Savings & current accounts', icon: Landmark, path: '/accounts/bank', color: 'bg-slate-500/15 text-slate-400' },
   { label: 'Investment Accounts', desc: 'Demat & trading accounts', icon: Briefcase, path: '/accounts/investment', color: 'bg-blue-500/15 text-blue-400' },
   { label: 'Insurance', desc: 'Life & health policies', icon: Shield, path: '/insurance', color: 'bg-cyan-500/15 text-cyan-400' },
-  { label: 'Mutual Funds', desc: 'MF portfolios & holdings', icon: Wallet, path: '/investments/mutual-funds', color: 'bg-emerald-500/15 text-emerald-400' },
   { label: 'Import Statement', desc: 'All your mutual funds from a CAMS PDF', icon: FileUp, path: '/import', color: 'bg-violet-500/15 text-violet-400', badge: 'NEW' },
   { label: 'Stocks', desc: 'Stock portfolio holdings', icon: BarChart3, path: '/investments/stocks', color: 'bg-indigo-500/15 text-indigo-400' },
   { label: 'Other Investments', desc: 'FD, PPF, Gold, NPS & more', icon: Package, path: '/investments/other', color: 'bg-teal-500/15 text-teal-400' },
   { label: 'Liabilities', desc: 'Loans & outstanding balances', icon: CreditCard, path: '/liabilities', color: 'bg-rose-500/15 text-rose-400' },
-  { label: 'Goals', desc: 'Financial goals & tracking', icon: Target, path: '/goals', color: 'bg-amber-500/15 text-amber-400' },
   { label: 'Reminders', desc: 'View and manage reminders', icon: Bell, path: '/reminders', color: 'bg-amber-500/15 text-[var(--accent-amber)]' },
 ]
 

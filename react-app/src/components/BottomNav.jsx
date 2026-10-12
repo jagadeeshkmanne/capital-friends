@@ -3,7 +3,7 @@ import { LayoutDashboard, Wallet, CreditCard, Target, MoreHorizontal } from 'luc
 
 const tabs = [
   { label: 'Dashboard',  icon: LayoutDashboard,  path: '/dashboard' },
-  { label: 'Invest',     icon: Wallet,           path: '/investments/mutual-funds' },
+  { label: 'Mutual Funds', icon: Wallet,         path: '/investments/mutual-funds' },
   { label: 'Accounts',   icon: CreditCard,      path: '/accounts/bank' },
   { label: 'Goals',      icon: Target,           path: '/goals' },
   { label: 'More',       icon: MoreHorizontal,   path: '/more' },
@@ -29,7 +29,7 @@ export default function BottomNav() {
                 }`}>
                   <Icon size={19} strokeWidth={isActive ? 2.2 : 1.5} />
                 </div>
-                <span className={isActive ? 'font-semibold' : ''}>{label}</span>
+                <span className={`text-[11px] leading-tight whitespace-nowrap ${isActive ? 'font-semibold' : ''}`}>{label}</span>
               </>
             )}
           </NavLink>
