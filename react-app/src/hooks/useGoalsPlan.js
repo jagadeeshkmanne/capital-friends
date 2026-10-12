@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useData } from '../context/DataContext'
-import { attributeFamilyGoals, equityFraction } from '../utils/goalAttribution'
+import { attributeFamilyGoals, riskFraction } from '../utils/goalAttribution'
 import { buildGoalPlan } from '../utils/goalPlan'
 import { familyPlan } from '../utils/familyPlan'
 import { goalTodo } from '../utils/goalTodo'
@@ -17,7 +17,7 @@ export function useGoalsPlan() {
     const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
     const active = goalList.filter((g) => g.isActive !== false)
     const attribution = attributeFamilyGoals({ goals: active, mappings: goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap })
-    const eqOf = (h) => equityFraction(h, allocMap)
+    const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
     const plan = buildGoalPlan({ goals: active, attribution, mfHoldings, mappings: goalPortfolioMappings, eqOf, pool: true })
     const included = new Set(pool.items.filter((i) => i.included).map((i) => i.id))
     const efTake = new Set(goalPortfolioMappings.filter((m) => active.find((g) => g.goalId === m.goalId)?.goalType === 'Emergency Fund').map((m) => m.portfolioId))

@@ -20,14 +20,23 @@ function mixOf(items) {
 }
 const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
 
-function MixBar({ m, plan }) {
+/** equity / debt / gold as a small donut + text (no long bars) */
+function Mix({ m, plan, note }) {
   if (!m) return null
+  const r = 15, c = 2 * Math.PI * r
+  const seg = [[m.e, 'var(--e)'], [m.d, 'var(--dt)'], [m.g, 'var(--gd)']].filter((x) => x[0] > 0)
+  let off = 0
   return (
-    <>
-      <div className="g2-mixw"><div className="g2-mix"><i className="e" style={{ width: `${m.e}%` }} /><i className="d" style={{ width: `${m.d}%` }} /><i className="g" style={{ width: `${m.g}%` }} /></div>{plan != null && <span className="g2-plan" style={{ left: `${plan}%` }} />}</div>
-      <div className="g2-leg"><span className="e">Equity {m.e}%</span><span className="d">Debt {m.d}%</span>{m.g > 0 && <span className="g">Gold {m.g}%</span>}{plan != null && <span className="p">Plan {plan}%</span>}</div>
-    </>
+    <div className="g2-mx">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r={r} fill="none" stroke="var(--bg-inset)" strokeWidth="7" />
+        {seg.map(([v, col], i) => { const len = (v / 100) * c; const el = <circle key={i} cx="20" cy="20" r={r} fill="none" stroke={col} strokeWidth="7" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-off} transform="rotate(-90 20 20)" />; off += len; return el })}</svg>
+      <div><b>{m.e}% equity</b> · {m.d}% debt{m.g > 0 ? ` · ${m.g}% gold` : ''}{plan != null && <span> · plan {plan}% {m.g > 0 ? 'equity + gold' : 'equity'}</span>}{note && <small>{note}</small>}</div>
+    </div>
   )
+}
+function Ring({ pct, cls }) {
+  const r = 17, c = 2 * Math.PI * r, len = (Math.min(100, pct) / 100) * c
+  return <div className={`g2-ring ${cls}`}><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r={r} fill="none" stroke="var(--bg-inset)" strokeWidth="5" /><circle cx="22" cy="22" r={r} fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeDasharray={`${len} ${c}`} transform="rotate(-90 22 22)" /></svg><b>{pct}%</b></div>
 }
 
 export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
@@ -39,7 +48,6 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
   const fam = plan.family
   const famMix = fam && fam.P > 0 ? { e: Math.round(fam.haveEq), d: 100 - Math.round(fam.haveEq), g: 0 } : null
   const extra = pool.extra || 0, extraEq = extra > 0 ? Math.round(((pool.extraEq || 0) / extra) * 100) : 0
-  const shortStep = todo.steps.find((s) => s.t === 'short')
   const groups = [...new Set(live.map((p) => yearOf(p.goal)))].sort((a, b) => a - b).map((y) => { const ps = live.filter((p) => yearOf(p.goal) === y); return { y, ps, past: ps.every((p) => p.years <= 0) } })
 
   if (!live.length) return <div className="g2 g2-card"><p className="g2-hint">No goals yet. <a className="g2-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p><style>{CSS}</style></div>
@@ -48,58 +56,34 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
     <div className="g2">
       <style>{CSS}</style>
 
-      {todo.banner && (
-        <div className="g2-banner">
-          <b>⚠️ Your current SIPs and investments can't reach your goals.</b>
-          <span>Your SIPs today: <b>{L(todo.banner.runningSip)}/month</b>. Your goals need about <b>{L(todo.banner.needSip)}/month</b>, so <b>{L(todo.banner.extraSip)}/month more</b>. Raise your SIPs if you can, or grow your active income (upskill, a side income), or move a goal's date later.</span>
+      {/* 1. To do this month (only when there is something to do) */}
+      {todo.steps.length > 0 && (
+        <div className="g2-card g2-todo">
+          <div className="g2-lbl"><span>To do this month</span><span>{todo.steps.length} step{todo.steps.length > 1 ? 's' : ''}</span></div>
+          {todo.steps.map((s, i) => <Step key={i} s={s} n={i + 1} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />)}
         </div>
       )}
 
-      {/* 1. To do this month */}
-      <div className="g2-card g2-todo">
-        <div className="g2-lbl"><span>To do this month</span><span>{todo.steps.length ? `${todo.steps.length} step${todo.steps.length > 1 ? 's' : ''}` : ''}</span></div>
-        {!todo.steps.length && <div className="g2-ok">✓ Nothing to do this month. Keep your SIPs going.</div>}
-        {todo.steps.map((s, i) => <Step key={i} s={s} n={i + 1} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />)}
-      </div>
-
-      {/* 2. All goals together */}
-      <div className="g2-card g2-sum">
+      {/* 2. One compact row: all goals together · equity vs debt · free money */}
+      <div className={`g2-card g2-sum3 ${extra > 1000 ? '' : 'one'}`}>
         <div>
           <div className="g2-lbl"><span>All goals together</span></div>
-          <div className="g2-tot g2-tot3">
-            <div><span>Have today</span><b>{L(has)}</b></div>
-            <div><span>Need today</span><b>{L(need)}</b><small>with your SIPs</small></div>
-            <div><span>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b></div>
-          </div>
-          <div className="g2-opts g2-opts-sum">
-            <div className="g2-opt sip"><span>SIP / month</span><b>{shortStep ? `+${L(shortStep.sip)}` : '—'}</b><small>{shortStep ? 'more, on top of today\'s SIPs' : 'nothing more needed'}</small></div>
-            <em>OR</em>
-            <div className="g2-opt lump"><span>Lump sum today</span><b>{shortStep ? L(shortStep.lump) : '—'}</b><small>{shortStep ? 'one time' : 'nothing more needed'}</small></div>
-          </div>
-          <p className="g2-hint">SIPs running today: <b>{L(todo.runningSip)}/month</b> across your portfolios · Goal amounts {L(amounts)}</p>
-          <button className="g2-btn" onClick={onMoney}>Money for goals ›</button>
+          <div className="g2-kv"><span>Have today</span><b>{L(has)}</b></div>
+          <div className="g2-kv"><span>Need today <small>with your SIPs</small></span><b>{L(need)}</b></div>
+          <div className="g2-kv"><span>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b></div>
+          {!todo.steps.length && <p className="g2-okline">✓ Nothing to do this month. Keep your SIPs going.</p>}
+          <div className="g2-mixrow"><Mix m={famMix} plan={fam && fam.P > 0 ? Math.round(fam.needEq) : null} /><span className={`g2-okline ${fam?.status === 'steps' ? 'warn' : ''}`}>{fam?.status === 'steps' ? '! Mix more than 10 points off: see To do' : '✓ Mix close to your plan'}</span></div>
+          <p className="g2-hint">SIPs running: {L(todo.runningSip)}/month · <a className="g2-link" onClick={onMoney}>Money for goals ›</a></p>
         </div>
-        <div>
-          <div className="g2-lbl"><span>Equity vs debt · all goals</span></div>
-          <MixBar m={famMix} plan={fam && fam.P > 0 ? Math.round(fam.needEq) : null} />
-          {fam?.status === 'steps' ? <div className="g2-msg warn">Off the plan by more than 10 points: see To do.</div> : <div className="g2-msg ok">✓ Close to your plan. Nothing to move.</div>}
-          <p className="g2-hint">Checked for all goals together. Near goals hold the safe money and far goals the equity, so each goal's own bar can look different.</p>
-        </div>
+        {extra > 1000 && (
+          <div>
+            <div className="g2-lbl"><span>Free money</span></div>
+            <div className="g2-kv big"><span>Not needed by goals</span><b>{L(extra)}</b></div>
+            <Mix m={{ e: extraEq, d: 100 - extraEq, g: 0 }} />
+            <p className="g2-hint">Stays invested and covers a goal that falls short later. Or add a goal, or lower a SIP.</p>
+          </div>
+        )}
       </div>
-
-      {/* 3. Free money */}
-      {extra > 1000 && (
-        <div className="g2-card">
-          <div className="g2-lbl"><span>Free money · not needed by your goals</span></div>
-          <div className="g2-free"><div><b>{L(extra)}</b><span>Your goals need {L(need)} today. The rest is yours.</span></div>
-            <div style={{ flex: 1, minWidth: 200 }}><MixBar m={{ e: extraEq, d: 100 - extraEq, g: 0 }} /></div></div>
-          <div className="g2-ideas">
-            <div>📈 <b>Keep it growing</b><span>It stays invested. If a goal falls short later, it is covered from here first.</span></div>
-            <div>🎯 <b>Add a goal</b><span>A new goal takes its share from here.</span></div>
-            <div>💸 <b>Lower a SIP</b><span>Your goals don't need more money right now.</span></div>
-          </div>
-        </div>
-      )}
 
       {/* 4. The road: a year, then that year's goals */}
       <div className="g2-road">
@@ -182,15 +166,15 @@ function GoalCard({ p, mt, pname, renderBuckets }) {
   const items = (p.att?.items || []).filter((it) => it.value > 0.5).sort((a, b) => b.value - a.value)
   return (
     <div className={`g2-card g2-goal ${st[0]}`}>
-      <div className="g2-gh"><h3>{icon(g)} {mt(g.goalName)}</h3><p>{monthYear(g)} · {yrs}{g.familyMemberName ? ` · ${mt(g.familyMemberName)}` : ''}</p><span className={`g2-badge ${st[0]}`}>{st[1]}</span></div>
-      <div className="g2-prog"><div><i style={{ width: `${pct}%` }} /></div><b>{pct}%</b></div>
+      <div className="g2-gh"><h3>{icon(g)} {mt(g.goalName)}</h3><p>{monthYear(g)} · {yrs}{g.familyMemberName ? ` · ${mt(g.familyMemberName)}` : ''}</p>
+        <div className="g2-ghr"><span className={`g2-badge ${st[0]}`}>{st[1]}</span><Ring pct={pct} cls={st[0]} /></div></div>
       <div className="g2-stats">
         <div><span>Have today</span><b>{L(p.has)}</b></div>
         <div><span>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{due ? 'the goal amount' : 'with your SIP'}</small></div>
         <div><span>Gap</span><b className={gap[0]}>{gap[1]}</b></div>
         <div><span>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
       </div>
-      <MixBar m={mixOf(items)} plan={p.eqTarget} />
+      <Mix m={mixOf(items)} plan={due ? null : p.eqTarget} />
       {(due || p.state === 'short') && <div className="g2-sip"><span>{due ? (mixOf(items)?.e > 10 ? `Kept for it (${mixOf(items).e}% still in equity: withdraw that part first). See To do.` : 'Kept in safe funds for it. See To do: withdraw, then tell the app.') : <b className="warn">Short: see the SIP / lump sum in To do</b>}</span></div>}
       {items.length > 0 && (
         <details><summary>Investments in this goal ({items.length})</summary>
@@ -225,16 +209,18 @@ function Step({ s, n, mt, pname, closeGoal, navigate }) {
   ) }
   if (s.t === 'short') {
     const byPort = {}
-    for (const b of s.buys) (byPort[b.portfolioId] = byPort[b.portfolioId] || []).push(b)
+    for (const b of s.buys) byPort[b.portfolioId] = (byPort[b.portfolioId] || 0) + b.amount
+    const names = s.goals.map((g) => mt(g.goalName))
     return (
     <div className="g2-step">
-      <div className="g2-sh"><span className="g2-n">{n}</span><div><small>All goals together · {L(s.gap)} short</small><b>Raise your SIP, or invest once</b><p>Do one of these. It goes to the goals that are short ({s.goals.map((g) => mt(g.goalName)).join(', ')}).</p></div></div>
-      {s.sipRows.map((r, i) => <Row key={'p' + i} chip="sip" k="SIP" a={r.portfolioId ? pname(r.portfolioId) : 'Start a new SIP'} b={r.portfolioId ? 'Change the portfolio SIP. It splits by your fund targets.' : 'in an equity fund for these goals'} v={r.portfolioId ? `${L(r.sipFrom)} → ${L(r.sipFrom + r.sip)}` : `+${L(r.sip)}/mo`} />)}
-      <div className="g2-or">OR ONE TIME</div>
-      {Object.keys(byPort).length ? Object.entries(byPort).map(([pid, bs]) => <Row key={pid} chip="buy" k="BUY" a={`${pname(pid)} · ${L(bs.reduce((t, b) => t + b.amount, 0))}`} b="Split by your fund targets, worked out on today's values" v={L(bs.reduce((t, b) => t + b.amount, 0))} />)
-        : <Row chip="buy" k="BUY" a="An equity fund for these goals" b="one time" v={L(s.lump)} />}
-      {s.buys.length > 0 && <details className="g2-more"><summary>Show funds (changes with the market)</summary>{s.buys.map((b, i) => <Row key={i} chip="buy" k="BUY" a={fname(b.fund)} b={pname(b.portfolioId)} v={L(b.amount)} />)}</details>}
-      <p className="g2-how">Done it? Import your CAS later and the app checks it.</p>
+      <div className="g2-sh"><span className="g2-n">{n}</span><div><small>All goals together · {L(s.gap)} short</small><b>Add {L(s.sip)}/month, or {L(s.lump)} once</b>
+        <p>For {names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2} more` : names.join(' and ')}.</p></div></div>
+      <div className="g2-two">
+        <div><span className="g2-chip sip">SIP</span><div><b>+{L(s.sip)}/month</b><small>{s.sipRows.map((r) => (r.portfolioId ? `${pname(r.portfolioId)} ${L(r.sipFrom)} → ${L(r.sipFrom + r.sip)}` : `new SIP ${L(r.sip)}`)).join(' · ')}</small></div></div>
+        <em>or</em>
+        <div><span className="g2-chip buy">ONCE</span><div><b>{L(s.lump)}</b><small>{Object.keys(byPort).length ? Object.entries(byPort).map(([pid, v]) => `${pname(pid)} ${L(v)}`).join(' · ') : 'into an equity fund'}</small></div></div>
+      </div>
+      {s.buys.length > 0 && <details className="g2-wd"><summary>Which funds (split by your targets, today's values)</summary>{s.buys.map((b, i) => <Row key={i} chip="buy" k="BUY" a={fname(b.fund)} b={pname(b.portfolioId)} v={L(b.amount)} />)}</details>}
     </div>
   ) }
   if (s.t === 'cash') return (
@@ -322,6 +308,24 @@ const CSS = `
 .g2-done{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}.g2-done:first-of-type{border-top:0}
 .g2-done b{display:block;font-size:14px;color:var(--text-primary)}.g2-done small{font-size:12px;color:var(--text-muted)}
 .g2-flag{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;background:var(--bg-inset);color:var(--text-muted)}.g2-flag.ok{background:var(--ok);color:#06281d}
+.g2-mx{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-secondary);margin-top:4px}.g2-mx b{color:var(--text-primary)}.g2-mx span{color:var(--text-muted)}.g2-mx small{display:block;font-size:12px;color:var(--text-muted);margin-top:2px}
+.g2-ghr{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px}.g2-ghr .g2-badge{margin-top:0}
+.g2-ring{position:relative;width:44px;height:44px;color:var(--ok)}.g2-ring.warn{color:var(--warn)}.g2-ring.due{color:var(--due)}.g2-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;color:var(--text-primary)}
+.g2-goal.ok{background:color-mix(in srgb,var(--ok) 5%,var(--bg-card));border-color:color-mix(in srgb,var(--ok) 22%,var(--border))}
+.g2-goal.warn{background:color-mix(in srgb,var(--warn) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--warn) 28%,var(--border))}
+.g2-goal.due{background:color-mix(in srgb,var(--due) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--due) 28%,var(--border))}
+.g2-two{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin:12px 0 0 36px}.g2-two>em{font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
+.g2-two>div{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-inset)}.g2-two .g2-chip{padding:4px 7px;flex:none}
+.g2-two b{display:block;font-size:15px;color:var(--text-primary)}.g2-two small{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px;line-height:1.4}
+.g2-sum3{display:grid;grid-template-columns:1.4fr 1fr;padding-bottom:16px}.g2-sum3.one{grid-template-columns:1fr}
+.g2-mixrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}.g2-mixrow .g2-okline{margin:0}
+.g2-sum3>div{padding:0 20px;border-left:1px solid var(--border)}.g2-sum3>div:first-child{padding-left:0;border-left:0}.g2-sum3>div:last-child{padding-right:0}
+.g2-sum3 .g2-lbl{margin:0 -20px 12px}.g2-sum3>div:first-child .g2-lbl{margin-left:-24px}.g2-sum3>div:last-child .g2-lbl{margin-right:-24px}
+.g2-kv{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:4px 0;font-size:13px;color:var(--text-muted)}.g2-kv small{font-size:11px}
+.g2-kv b{font-size:16px;color:var(--text-primary);white-space:nowrap}.g2-kv b.ok{color:var(--ok)}.g2-kv b.warn{color:var(--warn)}.g2-kv.big b{font-size:20px}
+.g2-need{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--text-secondary);background:color-mix(in srgb,var(--warn) 9%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
+.g2-need b{color:var(--text-primary)}.g2-need em{font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
+.g2-okline{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--ok)}.g2-okline.warn{color:var(--warn)}
 .g2-sum{display:grid;grid-template-columns:1fr 1fr;gap:0;padding-top:0}.g2-sum .g2-lbl{margin:0 -24px 16px}.g2-sum>div:first-child .g2-lbl{margin-right:-20px}.g2-sum>div+div .g2-lbl{margin-left:-20px}.g2-sum>div+div{border-left:1px solid var(--border);padding-left:20px;margin-left:20px}
 .g2-tot{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}.g2-tot span{font-size:12px;color:var(--text-muted)}.g2-tot b{display:block;font-size:19px;color:var(--text-primary);margin-top:3px}.g2-tot small{font-size:11px;color:var(--text-muted)}
 .g2-mixw{position:relative}.g2-mix{height:12px;border-radius:7px;background:var(--bg-inset);display:flex;overflow:hidden;margin:6px 0 7px}
@@ -357,6 +361,8 @@ const CSS = `
 .g2-tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:6px}
 .g2-tag.e{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}.g2-tag.d{color:var(--dt);background:color-mix(in srgb,var(--dt) 14%,transparent)}.g2-tag.g{color:var(--gd);background:color-mix(in srgb,var(--gd) 14%,transparent)}.g2-tag.l{color:var(--text-secondary);background:var(--bg-inset)}
  @media(max-width:640px){
+ .g2-two{grid-template-columns:1fr;margin-left:0}.g2-two>em{text-align:center}
+ .g2-sum3,.g2-sum3.one{grid-template-columns:1fr}.g2-sum3>div{padding:0;border-left:0}.g2-sum3>div+div{border-top:1px solid var(--border);margin-top:14px}.g2-sum3 .g2-lbl,.g2-sum3>div:first-child .g2-lbl,.g2-sum3>div:last-child .g2-lbl{margin:0 -16px 12px}
  .g2-card{padding:0 16px 16px}.g2-lbl{margin:0 -16px 14px;padding:12px 16px;font-size:12.5px}.g2-sum .g2-lbl{margin:0 -16px 14px}.g2-sum>div:first-child .g2-lbl{margin-right:-16px}.g2-sum>div+div .g2-lbl{margin:0 -16px 14px}
  .g2-goal{padding-top:48px}.g2-ask{margin-left:0}.g2-acts>span{width:100%}.g2-pb{padding:0 10px}
  .g2-jars{grid-template-columns:1fr}.g2-jh{display:flex;align-items:center;gap:12px;text-align:left}.g2-jh svg{margin:0}.g2-flow{grid-template-columns:1fr;text-align:left}

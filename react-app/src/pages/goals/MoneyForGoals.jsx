@@ -33,7 +33,7 @@ export default function MoneyForGoals({ pool }) {
     catch (e) { showToast(e.message || 'Could not save', 'error') } finally { setSaving(false) }
   }
   const total = pool.items.filter(isOn).reduce((t, i) => t + i.value, 0)
-  const tag = (it) => (it.kind === 'retirement' ? 'Retirement only · never sold' : it.kid ? "Kids' own money · left out by default" : it.kind === 'out' ? 'Left out by default' : it.eq >= 0.5 ? 'Equity' : 'Safe')
+  const tag = (it) => (it.kind === 'retirement' ? 'Retirement only · never sold' : it.kid ? "Kids' own money · left out by default" : it.kind === 'out' ? 'Left out by default' : /gold|silver|sgb|sovereign/i.test(`${it.otherType || ''} ${it.name || ''}`) ? 'Gold · growth, not safe' : it.eq >= 0.5 ? 'Equity' : 'Safe')
   const goals = (goalList || []).filter((g) => g.isActive !== false)
 
   return (

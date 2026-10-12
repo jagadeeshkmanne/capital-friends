@@ -56,7 +56,7 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
   for (const i of (otherInvList || []).filter((x) => x.status === 'Active')) {
     const kind = otherKind(i)
     items.push({ id: i.investmentId, type: 'Other', name: i.investmentName || i.investmentType, owner: i.familyMemberName, value: Number(i.currentValue) || 0,
-      eq: norm(i.investmentCategory) === 'equity' ? 1 : 0, kind, otherType: i.investmentType, locked: kind === 'retirement',
+      eq: norm(i.investmentCategory) === 'equity' || /gold|silver|sgb|sovereign/i.test(`${i.investmentType} ${i.investmentCategory}`) ? 1 : 0, kind, otherType: i.investmentType, locked: kind === 'retirement',
       // cash that came from an EPF / PPF / NPS payout ("Received") stays retirement's money first
       fromRetirement: kind === 'pool' && /^from (epf|ppf|nps|vpf)/i.test(String(i.notes || '')) })
   }

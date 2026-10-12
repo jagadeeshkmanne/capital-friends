@@ -260,4 +260,11 @@ describe('corner cases (ages, timelines, shortages)', () => {
     expect(after.byGoal.EDU.got).toBeCloseTo(before.byGoal.EDU.got, -2)
     expect(after.byGoal.CAR.got).toBeLessThan(1000)
   })
+  it('gold / SGB is never used as safe money (not for the emergency fund or a 1-year goal)', () => {
+    const gold = { investmentId: 'SGB', investmentType: 'Sovereign Gold Bond', investmentCategory: 'Gold', currentValue: 1e6, status: 'Active' }
+    const items = poolItems({ otherInvList: [gold], eqOf, choice: { on: ['SGB'] } })
+    expect(items[0].eq).toBe(1)
+    const r = sharePool({ goals: [g('EF', 'Emergency Fund', 0.5, 5e5), g('RET', 'Retirement', 20, 5e7)], items, now })
+    expect(r.byGoal.RET.gotEq).toBeGreaterThan(0)
+  })
 })

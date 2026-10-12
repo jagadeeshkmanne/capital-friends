@@ -32,6 +32,15 @@ export function attributeFamilyGoals({ goals, mappings, mfHoldings, stockHolding
 }
 
 /** Share of a mutual fund holding that is equity (0..1), from the fund's breakdown or its category. */
+const GOLD_RX = /gold|silver|\bsgb\b|sovereign/i
+/** Gold / silver are not safe money: for goals they count with equity as "growth" money (they can fall 20-30%). */
+export function isGoldHolding(h) { return GOLD_RX.test(`${h?.category || ''} ${h?.fundName || ''} ${h?.schemeName || ''} ${h?.investmentType || ''} ${h?.investmentCategory || ''}`) }
+export function riskFraction(h, allocMap) {
+  if (isGoldHolding(h)) return 1
+  const detailed = allocMap?.[h.schemeCode || h.fundCode]
+  if (detailed) return Math.max(0, Math.min(1, ((Number(detailed.Equity) || 0) + (Number(detailed.Gold) || 0) + (Number(detailed.Commodities) || 0)) / 100))
+  return equityFraction(h, allocMap)
+}
 export function equityFraction(h, allocMap) {
   const detailed = allocMap?.[h.schemeCode || h.fundCode]
   if (detailed) return Math.max(0, Math.min(1, (Number(detailed.Equity) || 0) / 100))
@@ -67,14 +76,14 @@ export function attributeGoals({ goals, targetOf, mappings, mfHoldings, stockHol
   Object.keys(bySource).forEach((pid) => {
     // the holdings of this investment, each with its value and equity share
     let items = (mfHoldings || []).filter((h) => h.portfolioId === pid && Number(h.units) > 0)
-      .map((h) => ({ kind: 'mf', key: `${pid}::${h.schemeCode || h.fundCode}`, holding: h, value: Number(h.currentValue) || 0, eq: equityFraction(h, allocMap) }))
+      .map((h) => ({ kind: 'mf', key: `${pid}::${h.schemeCode || h.fundCode}`, holding: h, value: Number(h.currentValue) || 0, eq: riskFraction(h, allocMap) }))
     if (!items.length) {
       items = (stockHoldings || []).filter((h) => h.portfolioId === pid && Number(h.quantity) > 0)
         .map((h) => ({ kind: 'stock', key: `${pid}::${h.symbol}`, holding: h, value: Number(h.currentValue) || 0, eq: 1 }))
     }
     if (!items.length) {
       const inv = (otherInvList || []).find((i) => i.investmentId === pid)
-      if (inv) items = [{ kind: 'other', key: `${pid}::other`, holding: inv, value: Number(inv.currentValue) || 0, eq: inv.investmentCategory === 'Equity' ? 1 : 0 }]
+      if (inv) items = [{ kind: 'other', key: `${pid}::other`, holding: inv, value: Number(inv.currentValue) || 0, eq: inv.investmentCategory === 'Equity' || isGoldHolding(inv) ? 1 : 0 }]
     }
     items = items.filter((it) => it.value > 0)
     if (!items.length) return

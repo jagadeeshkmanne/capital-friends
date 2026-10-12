@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
-import { equityFraction, attributeFamilyGoals } from '../utils/goalAttribution'
+import { riskFraction, attributeFamilyGoals } from '../utils/goalAttribution'
 import { poolItems, sharePool, linksChanged } from '../utils/goalPool'
 import { resolvePortfolioOwners } from '../utils/fundsDashboard'
 
@@ -16,7 +16,7 @@ export function useGoalPool() {
   const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
   return useMemo(() => {
     const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
-    const eqOf = (h) => equityFraction(h, allocMap)
+    const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
     const choice = readPoolChoice(settings)
     const goals = (goalList || []).filter((g) => g.isActive !== false)
     // owners: MF portfolios get theirs from the investment account, stock portfolios from the member id
