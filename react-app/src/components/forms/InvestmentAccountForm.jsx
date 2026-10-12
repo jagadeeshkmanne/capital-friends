@@ -67,7 +67,7 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Account Name" required error={errors.accountName}>
-          <FormInput value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., Zerodha Demat" />
+          <FormInput sensitive value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., Zerodha Demat" />
         </FormField>
         <FormField label="Family Member" required error={errors.memberId}>
           <FormSelect value={form.memberId} onChange={setMember} options={memberOptions} placeholder="Select member..." />

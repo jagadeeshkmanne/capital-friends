@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, UserPlus } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { useMask } from '../context/MaskContext'
 
 // The CAS statement names people who are not in Family yet: add them here in one go, then check again.
 // The same person often appears twice ("Jagadeesh Kumar Manne" and "MANNE JAGADEESH KUMAR"): grouped by
@@ -47,6 +48,8 @@ export function groupHolders(missing, folios) {
 export default function AddMissingMembers({ missing, folios, statementEmail, onDone }) {
   const { addMember, members } = useData()
   const { user } = useAuth()
+  const { masked } = useMask()
+  const blur = masked ? ' sensitive-blur' : ''
   const me = String(user?.email || '').trim().toLowerCase()
   const people = useMemo(() => groupHolders(missing, folios), [missing, folios])
   const hasSelf = (members || []).some((m) => m.relationship === 'Self' && m.status !== 'Inactive')
@@ -97,15 +100,15 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
       {rows.map((r, i) => (
         <div key={r.key} className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr_1.4fr] gap-2 pb-3 border-b border-[var(--border-light)] last:border-0 last:pb-0">
           <div>
-            <input className={inp} value={r.name} onChange={(e) => set(i, { name: e.target.value })} aria-label="Name" />
-            {r.names.length > 1 && <p className="text-[11px] text-[var(--text-dim)] mt-1">Same person on the statement as: {r.names.join(' · ')}</p>}
+            <input className={inp + blur} value={r.name} onChange={(e) => set(i, { name: e.target.value })} aria-label="Name" />
+            {r.names.length > 1 && <p className={`text-[11px] text-[var(--text-dim)] mt-1${blur}`}>Same person on the statement as: {r.names.join(' · ')}</p>}
           </div>
           <select className={inp} value={r.rel} onChange={(e) => set(i, { rel: e.target.value })} aria-label="Relationship">
             <option value="">Relationship…</option>
             {RELS.map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
           <div>
-            <input className={inp} type="email" value={r.email} onChange={(e) => set(i, { email: e.target.value, emailEdited: true })} placeholder="Email" aria-label="Email" />
+            <input className={inp + blur} type="email" value={r.email} onChange={(e) => set(i, { email: e.target.value, emailEdited: true })} placeholder="Email" aria-label="Email" />
             {KIDS.includes(r.rel) && <p className="text-[11px] text-[var(--text-dim)] mt-1">Young kids can use your email. A grown-up child can use their own.</p>}
             {r.rel === 'Spouse' && <p className="text-[11px] text-[var(--text-dim)] mt-1">Their own email: they can also sign in and see the family.</p>}
             <label className="flex items-center gap-2 mt-1.5 text-xs text-[var(--text-primary)]">

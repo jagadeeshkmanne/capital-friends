@@ -79,7 +79,8 @@ function parseFormDate(value) {
   return isNaN(d.getTime()) ? null : d
 }
 
-export function FormDateInput({ value, onChange, ...props }) {
+export function FormDateInput({ value, onChange, sensitive, ...props }) {
+  const { masked } = useMask()
   // Convert date string to Date object for react-datepicker
   // Handles both YYYY-MM-DD and ISO strings (2045-12-31T00:00:00.000Z)
   // Also accepts dd/MM/yyyy (what some backend lists send); an unparseable value shows empty
@@ -105,7 +106,7 @@ export function FormDateInput({ value, onChange, ...props }) {
         showYearDropdown
         dropdownMode="select"
         placeholderText="Select date"
-        className="w-full px-3 py-2 pr-9 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors"
+        className={`w-full px-3 py-2 pr-9 text-sm bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--sidebar-active-text)] focus:ring-1 focus:ring-[var(--sidebar-active-text)] transition-colors ${sensitive && masked ? 'sensitive-blur' : ''}`}
         {...props}
       />
       <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />

@@ -219,7 +219,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Investment Name" required error={errors.investmentName}>
-          <FormInput value={form.investmentName} onChange={(v) => set('investmentName', v)} placeholder="e.g., HDFC FD - 7.5%" />
+          <FormInput sensitive value={form.investmentName} onChange={(v) => set('investmentName', v)} placeholder="e.g., HDFC FD - 7.5%" />
         </FormField>
         <FormField label="Family Member">
           <FormSelect value={form.familyMemberId} onChange={(v) => set('familyMemberId', v)} options={memberOptions} placeholder="Select member (optional)..." />

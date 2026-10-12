@@ -53,7 +53,7 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Account Name" required error={errors.accountName}>
-          <FormInput value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., HDFC Savings" />
+          <FormInput sensitive value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., HDFC Savings" />
         </FormField>
         <FormField label="Family Member" required error={errors.memberId}>
           <FormSelect value={form.memberId} onChange={(v) => set('memberId', v)} options={memberOptions} placeholder="Select member..." />

@@ -102,7 +102,7 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Member Name" required error={errors.memberName}>
-          <FormInput value={form.memberName} onChange={(v) => set('memberName', v)} placeholder="e.g., Jagadeesh" />
+          <FormInput sensitive value={form.memberName} onChange={(v) => set('memberName', v)} placeholder="e.g., Jagadeesh" />
         </FormField>
         <FormField label="Relationship" required error={errors.relationship}>
           <FormSelect value={form.relationship} onChange={(v) => set('relationship', v)} options={RELATIONSHIPS} placeholder="Select..." />
@@ -110,7 +110,7 @@ export default function MemberForm({ initial, onSave, onDelete, onCancel }) {
       </div>
 
       <FormField label="Date of Birth (optional)" error={errors.dob}>
-        <FormDateInput value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
+        <FormDateInput sensitive value={form.dob} onChange={(v) => set('dob', v)} maxDate={new Date().toISOString().split('T')[0]} />
       </FormField>
 
       <FamilySafetyNote kind="member" />
