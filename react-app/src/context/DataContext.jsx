@@ -511,15 +511,14 @@ export function DataProvider({ children }) {
   // ── Other Investments CRUD ──
   const addOtherInvestment = useCallback(async (data) => {
     const result = await api.createOtherInvestment(data)
-    await refreshOtherInvestments()
-    if (data.quickLoan) await refreshLiabilities()
+    // the loan is created in the same save: load both lists together so they appear at the same time
+    await Promise.all([refreshOtherInvestments(), data.quickLoan ? refreshLiabilities() : null])
     return result
   }, [refreshOtherInvestments, refreshLiabilities])
 
   const updateOtherInvestment = useCallback(async (id, data) => {
     await api.updateOtherInvestment({ investmentId: id, ...data })
-    await refreshOtherInvestments()
-    await refreshLiabilities() // linked liability may have changed
+    await Promise.all([refreshOtherInvestments(), refreshLiabilities()]) // linked liability may have changed
   }, [refreshOtherInvestments, refreshLiabilities])
 
   const deleteOtherInvestment = useCallback(async (id) => {
