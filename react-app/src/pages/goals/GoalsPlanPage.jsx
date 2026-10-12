@@ -17,6 +17,7 @@ import Modal from '../../components/Modal'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
+import GoalForm from '../../components/forms/GoalForm'
 
 const L = (v) => (v ? formatINR(Math.round(v)) : '—')
 const U = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -32,9 +33,9 @@ export default function GoalsPlanPage() {
   const navigate = useNavigate()
   const mt = useMaskText()
   const { selectedMember } = useFamily()
-  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList, updateGoal, updateGoalMappings } = useData()
+  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList, updateGoal, updateGoalMappings, addGoal, deleteGoal } = useData()
   const confirm = useConfirm()
-  const { showToast } = useToast()
+  const { showToast, showBlockUI, hideBlockUI } = useToast()
   const closing = useRef(false)
   // goals take their money from one shared pool (Money for goals): the links are worked out, not entered
   const pool = useGoalPool()
@@ -53,6 +54,8 @@ export default function GoalsPlanPage() {
   const { plan, todo } = useGoalsPlan()
   const active = useMemo(() => (goalList || []).filter((g) => g.isActive !== false), [goalList])
   const [rebal, setRebal] = useState(null)
+  // add / edit goals right here (no trip to the classic page): null | 'add' | 'list' | { edit: goal }
+  const [form, setForm] = useState(null)
 
   if (!plan) return <PageLoading title="Loading goals" />
   const shown = plan.goals.filter((p) => selectedMember === 'all' || p.goal.familyMemberId === selectedMember)
@@ -76,7 +79,29 @@ export default function GoalsPlanPage() {
     } catch (e) { showToast(e.message || 'Could not close the goal', 'error') }
     finally { closing.current = false }
   }
-  const ctx = { mt, navigate, pname, netWorth, openRebalance: setRebal, closeGoal }
+  // old links to /goals/classic?add=1 / ?edit=ID now open the form on this page
+  const go = (to, ...rest) => {
+    if (typeof to === 'string' && to.startsWith('/goals/classic')) {
+      const q = new URLSearchParams(to.split('?')[1] || '')
+      const eg = q.get('edit') && (goalList || []).find((x) => x.goalId === q.get('edit'))
+      return setForm(q.get('add') === '1' ? 'add' : eg ? { edit: eg } : 'list')
+    }
+    return navigate(to, ...rest)
+  }
+  const saveGoal = async (data) => {
+    showBlockUI('Saving...')
+    try {
+      if (form?.edit) { await updateGoal(form.edit.goalId, data); showToast('Goal updated') } else { await addGoal(data); showToast('Goal added') }
+      setForm(null)
+    } catch (e) { showToast(e.message || 'Failed to save goal', 'error') } finally { hideBlockUI() }
+  }
+  const removeGoal = async () => {
+    const g = form?.edit
+    if (!g || !(await confirm(`Delete "${g.goalName}"? Its money goes back to your other goals.`, { title: 'Delete Goal', confirmLabel: 'Delete' }))) return
+    showBlockUI('Deleting...')
+    try { await deleteGoal(g.goalId); setForm(null); showToast('Goal deleted') } catch (e) { showToast(e.message || 'Failed to delete goal', 'error') } finally { hideBlockUI() }
+  }
+  const ctx = { mt, navigate: go, pname, netWorth, openRebalance: setRebal, closeGoal }
   const sel = goalId ? plan.goals.find((p) => p.goal.goalId === goalId) : null
 
   return (
@@ -84,10 +109,25 @@ export default function GoalsPlanPage() {
       <style>{CSS}</style>
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
       <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} />}</Modal>
+      <Modal open={!!form && form !== 'list'} onClose={() => setForm(null)} title={form?.edit ? 'Edit Goal' : 'Add Goal'} wide>
+        {form && form !== 'list' && <GoalForm key={form?.edit?.goalId || 'new'} initial={form?.edit || undefined} onSave={saveGoal} onDelete={form?.edit ? removeGoal : undefined} onCancel={() => setForm(null)} />}
+      </Modal>
+      <Modal open={form === 'list'} onClose={() => setForm(null)} title="Edit goals">
+        <div className="space-y-2">
+          {(goalList || []).filter((g) => g.isActive !== false).map((g) => (
+            <button key={g.goalId} onClick={() => setForm({ edit: g })} className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:border-violet-400 text-left">
+              <span className="min-w-0"><span className="block text-sm font-semibold text-[var(--text-primary)] truncate">{icon(g)} {g.goalName}</span><span className="block text-xs text-[var(--text-muted)]">{g.familyMemberName || 'Family'} · {g.priority || 'Medium'} priority{g.targetDate ? ` · ${new Date(g.targetDate).getFullYear()}` : ''}</span></span>
+              <Pencil size={14} className="shrink-0 text-violet-400" />
+            </button>
+          ))}
+          {!active.length && <p className="text-sm text-[var(--text-muted)]">No goals yet.</p>}
+          <button onClick={() => setForm('add')} className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-semibold text-violet-400 border border-dashed border-[var(--border)] rounded-lg"><Plus size={14} /> Add Goal</button>
+        </div>
+      </Modal>
       {sel && <div className="gp-bar"><div><h1><a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a></h1></div></div>}
       {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome actions={<><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic')}><Pencil size={14} /> Edit goals</button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => navigate('/goals/classic?add=1')}><Plus size={14} /> Add Goal</button></>} plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('list')}><Pencil size={14} /> Edit goals</button>
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('add')}><Plus size={14} /> Add Goal</button></>} plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
       {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
     </div>
   )

@@ -472,6 +472,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
               ? <p className="text-sm font-semibold text-[var(--text-primary)] px-3 py-2 rounded-lg bg-[var(--bg-inset)]">{form.targetDate ? form.targetDate.split('T')[0] : '—'}</p>
               : <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />}
           </FormField>
+          {form.goalType === 'Child Education' && <ChildAgeHelper member={(activeMembers || []).find((m) => m.memberId === form.familyMemberId)} onDate={(v) => set('targetDate', v)} hasDate={!!initial?.targetDate} />}
         </div>
 
         {/* Type-specific fields */}
@@ -675,6 +676,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {form.goalType === 'Child Education' && <ChildAgeHelper member={(activeMembers || []).find((m) => m.memberId === form.familyMemberId)} onDate={(v) => set('targetDate', v)} hasDate={!!initial?.targetDate} />}
               <FormField label="Target Date" required error={errors.targetDate}>
                 <FormDateInput value={form.targetDate} onChange={(v) => set('targetDate', v)} maxDate={null} />
               </FormField>
@@ -811,6 +813,38 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 }
 
 /* ── Sub-components ── */
+
+// Child Education: work out the target date from the child's age today and when the course starts
+// (Indian academic year: courses start around June). Only the target date is saved.
+const COURSES = [
+  { value: '18', label: 'Graduation (B.Tech, MBBS, B.Com…) · starts at 18' },
+  { value: '22', label: 'Post-graduation (M.Tech, MBA, MS…) · starts at 22' },
+  { value: '15', label: 'Class 11–12 / coaching · starts at 15' },
+]
+function ChildAgeHelper({ member, onDate, hasDate }) {
+  const dobAge = (() => { const d = getMemberDOB(member); return d ? dobToAge(toDateInputValue(d)) : '' })()
+  const [age, setAge] = useState(dobAge || '')
+  const [start, setStart] = useState('18')
+  const [touched, setTouched] = useState(false) // an existing goal's date is changed only when you type here
+  useEffect(() => { if (dobAge) setAge(dobAge) }, [dobAge])
+  const years = Number(start) - Number(age)
+  const ok = age !== '' && Number(age) >= 0 && Number(age) < 30
+  const year = new Date().getFullYear() + Math.max(0, years)
+  useEffect(() => { if (ok && (touched || !hasDate)) onDate(`${year}-06-01`) }, [ok, year, touched]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-inset)] p-3">
+      <FormField label="Child's age today">
+        <FormInput type="number" value={age} onChange={(v) => { setTouched(true); setAge(v) }} placeholder="e.g., 8" />
+      </FormField>
+      <FormField label="Course">
+        <FormSelect value={start} onChange={(v) => { setTouched(true); setStart(v) }} options={COURSES} />
+      </FormField>
+      <p className="sm:col-span-2 text-xs text-[var(--text-muted)]">
+        {ok && (touched || !hasDate) ? (years > 0 ? `Starts in about ${years} year${years > 1 ? 's' : ''}: target date set to June ${year}. You can still change the date.` : 'The course starts this year or has already started: target date set to June this year.') : hasDate && ok ? 'Change the age or course to set a new target date.' : 'Enter the age to set the target date automatically, or pick the date yourself.'}
+      </p>
+    </div>
+  )
+}
 
 function InflatedInfo({ calc, inflation, isRetirement, isEmergency }) {
   if (isEmergency) {
