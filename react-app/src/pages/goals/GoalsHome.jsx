@@ -20,16 +20,23 @@ function mixOf(items) {
 }
 const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
 
-/** equity / debt / gold as small text tiles */
+/** equity / debt (/ gold): now vs target, as small text tiles */
 function Mix({ m, plan, note }) {
   if (!m) return null
-  const tile = (k, label, v) => <div className={`g2-mt ${k}`}><i />{label}<b>{v}%</b></div>
+  const tg = plan != null ? { e: plan, d: Math.max(0, 100 - plan) } : null
+  const tile = (k, label, v, t) => {
+    const off = t == null ? null : v - t
+    const mark = off == null ? null : Math.abs(off) <= 2 ? ['ok', '✓ on target'] : Math.abs(off) <= 10 ? ['ok', `✓ close · ${off > 0 ? '+' : ''}${off}`] : off > 0 ? ['warn', `${off} pts above`] : ['warn', `${-off} pts below`]
+    return (
+      <div className={`g2-mt ${k}`}><i /><span className="l">{label}</span>
+        <span className="v"><b>{v}%</b><small>now</small></span>
+        {t != null && <><span className="ar">→</span><span className="v"><b>{t}%</b><small>target</small></span><em className={mark[0]}>{mark[1]}</em></>}
+      </div>
+    )
+  }
   return (
     <div className="g2-mx">
-      <div className="g2-mts">
-        {tile('e', 'Equity', m.e)}{m.g > 0 && tile('g', 'Gold', m.g)}{tile('d', 'Debt', m.d)}
-        {plan != null && <div className="g2-mt p">Plan<b>{plan}%</b><small>equity</small></div>}
-      </div>
+      <div className="g2-mts">{tile('e', m.g > 0 ? 'Equity + gold' : 'Equity', m.e + (m.g || 0), tg?.e)}{tile('d', 'Debt', m.d, tg?.d)}</div>
       {note && <small className="g2-mxn">{note}</small>}
     </div>
   )
@@ -64,25 +71,19 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
         </div>
       )}
 
-      {/* 2. One compact row: all goals together · equity vs debt · free money */}
-      <div className={`g2-card g2-sum3 ${extra > 1000 ? '' : 'one'}`}>
-        <div>
-          <div className="g2-lbl"><span>All goals together</span></div>
-          <div className="g2-kv"><span>Have today</span><b>{L(has)}</b></div>
-          <div className="g2-kv"><span>Need today <small>with your SIPs</small></span><b>{L(need)}</b></div>
-          <div className="g2-kv"><span>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b></div>
-          {!todo.steps.length && <p className="g2-okline">✓ Nothing to do this month. Keep your SIPs going.</p>}
-          <div className="g2-mixrow"><Mix m={famMix} plan={fam && fam.P > 0 ? Math.round(fam.needEq) : null} /><span className={`g2-okline ${fam?.status === 'steps' ? 'warn' : ''}`}>{fam?.status === 'steps' ? '! Mix more than 10 points off: see To do' : '✓ Mix close to your plan'}</span></div>
-          <p className="g2-hint">SIPs running: {L(todo.runningSip)}/month · <a className="g2-link" onClick={onMoney}>Money for goals ›</a></p>
+      {/* 2. All goals together: the same small boxes as the goal cards */}
+      <div className="g2-card g2-all">
+        <div className="g2-lbl"><span>All goals together</span><span>{live.length} goal{live.length > 1 ? 's' : ''}</span></div>
+        <div className={`g2-stats ${extra > 1000 ? 'five' : ''}`}>
+          <div className="hv"><span><i>₹</i>Have today</span><b>{L(has)}</b><small>in Money for goals</small></div>
+          <div className="nd"><span><i>◎</i>Need today</span><b>{L(need)}</b><small>with your SIPs</small></div>
+          <div className={`gp ${short > 1000 ? 'warn' : 'ok'}`}><span><i>{short > 1000 ? '!' : '✓'}</i>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b><small>{short > 1000 ? 'see To do' : 'nothing to do this month'}</small></div>
+          <div className="tg"><span><i>↻</i>SIPs running</span><b>{L(todo.runningSip)}<em>/mo</em></b><small>all portfolios</small></div>
+          {extra > 1000 && <div className="fr"><span><i>+</i>Free money</span><b>{L(extra)}</b><small>{extraEq}% equity · covers future gaps</small></div>}
         </div>
-        {extra > 1000 && (
-          <div>
-            <div className="g2-lbl"><span>Free money</span></div>
-            <div className="g2-kv big"><span>Not needed by goals</span><b>{L(extra)}</b></div>
-            <Mix m={{ e: extraEq, d: 100 - extraEq, g: 0 }} />
-            <p className="g2-hint">Stays invested and covers a goal that falls short later. Or add a goal, or lower a SIP.</p>
-          </div>
-        )}
+        <div className="g2-sumf"><Mix m={famMix} plan={fam && fam.P > 0 ? Math.round(fam.needEq) : null} />
+          <a className="g2-link" onClick={onMoney}>Money for goals ›</a></div>
+        {fam?.status === 'steps' && <p className="g2-okline warn">! Mix more than 10 points off: see To do</p>}
       </div>
 
       {/* 4. The road: a year, then that year's goals */}
@@ -213,17 +214,22 @@ function Step({ s, n, mt, pname, closeGoal, navigate }) {
   if (s.t === 'short') {
     const byPort = {}
     for (const b of s.buys) byPort[b.portfolioId] = (byPort[b.portfolioId] || 0) + b.amount
-    const names = s.goals.map((g) => mt(g.goalName))
+    const once = Object.entries(byPort).sort((a, b) => b[1] - a[1])
     return (
     <div className="g2-step">
-      <div className="g2-sh"><span className="g2-n">{n}</span><div><small>All goals together · {L(s.gap)} short</small><b>Add {L(s.sip)}/month, or {L(s.lump)} once</b>
-        <p>For {names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2} more` : names.join(' and ')}.</p></div></div>
+      <div className="g2-sh"><span className="g2-n">{n}</span><div><b>Your goals are {L(s.gap)} short</b><p>Pick one of these two. Either one closes the gap.</p></div></div>
       <div className="g2-two">
-        <div><span className="g2-chip sip">SIP</span><div><b>+{L(s.sip)}/month</b><small>{s.sipRows.map((r) => (r.portfolioId ? `${pname(r.portfolioId)} ${L(r.sipFrom)} → ${L(r.sipFrom + r.sip)}` : `new SIP ${L(r.sip)}`)).join(' · ')}</small></div></div>
-        <em>or</em>
-        <div><span className="g2-chip buy">ONCE</span><div><b>{L(s.lump)}</b><small>{Object.keys(byPort).length ? Object.entries(byPort).map(([pid, v]) => `${pname(pid)} ${L(v)}`).join(' · ') : 'into an equity fund'}</small></div></div>
+        <div className="g2-pk sip">
+          <div className="g2-pkh"><span className="g2-chip sip">SIP</span><span>Raise monthly SIPs</span><b>+{L(s.sip)}<em>/mo</em></b></div>
+          {s.sipRows.map((r, i) => <div key={i} className="g2-pkr"><span>{r.portfolioId ? pname(r.portfolioId) : 'New SIP'}</span><span className="v">{r.portfolioId ? <><s>{L(r.sipFrom)}</s> → <b>{L(r.sipFrom + r.sip)}</b></> : <b>{L(r.sip)}</b>}</span></div>)}
+        </div>
+        <em className="g2-orw">or</em>
+        <div className="g2-pk buy">
+          <div className="g2-pkh"><span className="g2-chip buy">ONCE</span><span>Invest one time</span><b>{L(s.lump)}</b></div>
+          {once.length ? once.map(([pid, v]) => <div key={pid} className="g2-pkr"><span>{pname(pid)}</span><span className="v"><b>{L(v)}</b></span></div>) : <div className="g2-pkr"><span>Into an equity fund</span><span className="v"><b>{L(s.lump)}</b></span></div>}
+        </div>
       </div>
-      {s.buys.length > 0 && <details className="g2-wd"><summary>Which funds (split by your targets, today's values)</summary>{s.buys.map((b, i) => <Row key={i} chip="buy" k="BUY" a={fname(b.fund)} b={pname(b.portfolioId)} v={L(b.amount)} />)}</details>}
+      {s.buys.length > 0 && <details className="g2-wd"><summary>Which funds for the one-time amount</summary>{s.buys.map((b, i) => <Row key={i} chip="buy" k="BUY" a={fname(b.fund)} b={pname(b.portfolioId)} v={L(b.amount)} />)}<p className="g2-hint">Split by your fund targets at today's values, so it changes a little each month.</p></details>}
     </div>
   ) }
   if (s.t === 'cash') return (
@@ -276,7 +282,7 @@ const CSS = `
 .g2-opts{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin:12px 0 0 36px}.g2-opts em{font-style:normal;font-size:12px;font-weight:700;color:var(--text-muted)}
 .g2-opt{border-radius:14px;padding:12px 14px;text-align:center;border:1px solid var(--border)}
 .g2-opt span{display:block;font-size:12px;font-weight:700}.g2-opt b{display:block;font-size:21px;margin:4px 0 2px;color:var(--text-primary)}.g2-opt small{display:block;font-size:11.5px;color:var(--text-muted);line-height:1.4}
-.g2-opt.sip{background:color-mix(in srgb,var(--e) 11%,var(--bg-card));border-color:color-mix(in srgb,var(--e) 40%,transparent)}.g2-opt.sip span{color:var(--e)}
+.g2-pk.sip{background:color-mix(in srgb,var(--e) 11%,var(--bg-card));border-color:color-mix(in srgb,var(--e) 40%,transparent)}.g2-opt.sip span{color:var(--e)}
 .g2-opt.lump{background:color-mix(in srgb,var(--gd) 9%,var(--bg-card));border-color:color-mix(in srgb,var(--gd) 40%,transparent)}.g2-opt.lump span{color:var(--gd)}
 .g2-tot3{grid-template-columns:1fr 1fr 1fr!important}.g2-opts-sum{margin-left:0!important}.g2-or{display:flex;align-items:center;gap:10px;color:var(--text-muted);font-size:11px;font-weight:700;margin:2px 0 2px 36px}.g2-or:before,.g2-or:after{content:"";flex:1;height:1px;background:var(--border)}.g2-more{margin-left:36px;border-top:0!important;padding-top:0!important}
 .g2-bk{margin-top:10px}.g2-jars{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -313,18 +319,21 @@ const CSS = `
 .g2-flag{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;background:var(--bg-inset);color:var(--text-muted)}.g2-flag.ok{background:var(--ok);color:#06281d}
 .g2-mx{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;margin-top:4px}
 .g2-dn{position:relative;width:52px;height:52px;flex:none}.g2-dn span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}.g2-dn b{font-size:12.5px;color:var(--text-primary)}.g2-dn small{font-size:8px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
-.g2-mts{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}.g2-mt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);background:var(--bg-inset);border:1px solid var(--border);border-radius:8px;padding:5px 9px}
-.g2-mt i{width:8px;height:8px;border-radius:50%}.g2-mt.e i{background:var(--e)}.g2-mt.d i{background:var(--dt)}.g2-mt.g i{background:var(--gd)}.g2-mt b{color:var(--text-primary);font-size:12.5px}.g2-mt small{font-size:11px;color:var(--text-muted)}
+.g2-mts{display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:0}.g2-mt{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);background:var(--bg-inset);border:1px solid var(--border);border-radius:10px;padding:6px 10px}
+.g2-mt i{width:8px;height:8px;border-radius:50%;flex:none}.g2-mt.e i{background:var(--e)}.g2-mt.d i{background:var(--dt)}.g2-mt.g i{background:var(--gd)}.g2-mt .l{font-weight:600;color:var(--text-primary);min-width:40px}
+.g2-mt .v{display:flex;align-items:baseline;gap:3px}.g2-mt .v b{color:var(--text-primary);font-size:13px}.g2-mt .v small{font-size:10.5px;color:var(--text-muted)}.g2-mt .ar{color:var(--text-muted);font-size:11px}
+.g2-mt em{font-style:normal;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px}.g2-mt em.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 13%,transparent)}.g2-mt em.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent)}
 .g2-mt.p{border-style:dashed;background:transparent}.g2-mxn{flex-basis:100%;font-size:12px;color:var(--text-muted)}
-.g2-ring{position:relative;width:64px;height:64px;flex:none;color:var(--ok)}.g2-ring.warn{color:var(--warn)}.g2-ring.due{color:var(--due)}.g2-ring span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}.g2-ring b{font-size:14px;color:var(--text-primary)}.g2-ring small{font-size:8.5px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
-.g2-gh{display:flex!important;align-items:center;gap:16px;text-align:left!important;margin-top:24px}.g2-gh h3{margin:0;font-size:16.5px;color:var(--text-primary)}.g2-gh p{margin:3px 0 7px;font-size:12.5px;color:var(--text-muted)}.g2-gt{flex:1;min-width:0}.g2-gt .g2-badge{margin:0;display:inline-block}
+.g2-ring{position:relative;width:64px;height:64px;flex:none;color:var(--ok)}.g2-ring.warn{color:var(--warn)}.g2-ring.due{color:var(--due)}.g2-ring span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}.g2-ring b{font-size:12.5px;letter-spacing:-.02em;color:var(--text-primary)}.g2-ring small{font-size:7.5px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
+.g2-gh{display:flex!important;align-items:center;gap:16px;text-align:left!important;margin-top:4px}.g2-gh h3{margin:0;font-size:16.5px;color:var(--text-primary)}.g2-gh p{margin:3px 0 7px;font-size:12.5px;color:var(--text-muted)}.g2-gt{flex:1;min-width:0}.g2-gt .g2-badge{margin:0;display:inline-block}
 .g2-gi{width:46px;height:46px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;font-size:23px;background:color-mix(in srgb,var(--ok) 14%,var(--bg-inset));border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}.g2-gi.warn{background:color-mix(in srgb,var(--warn) 14%,var(--bg-inset));border-color:color-mix(in srgb,var(--warn) 30%,transparent)}.g2-gi.due{background:color-mix(in srgb,var(--due) 14%,var(--bg-inset));border-color:color-mix(in srgb,var(--due) 30%,transparent)}
 .g2-goal.ok{background:color-mix(in srgb,var(--ok) 5%,var(--bg-card));border-color:color-mix(in srgb,var(--ok) 22%,var(--border))}
 .g2-goal.warn{background:color-mix(in srgb,var(--warn) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--warn) 28%,var(--border))}
 .g2-goal.due{background:color-mix(in srgb,var(--due) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--due) 28%,var(--border))}
-.g2-two{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin:12px 0 0 36px}.g2-two>em{font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
-.g2-two>div{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-inset)}.g2-two .g2-chip{padding:4px 7px;flex:none}
-.g2-two b{display:block;font-size:15px;color:var(--text-primary)}.g2-two small{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px;line-height:1.4}
+.g2-two{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;margin:12px 0 0 36px}.g2-orw{align-self:center;font-style:normal;font-size:11px;font-weight:700;color:var(--text-muted)}
+.g2-pk{border:1px solid var(--border)!important;border-radius:12px;background:var(--bg-inset)!important;padding:4px 14px 8px}.g2-pk.sip{border-top:3px solid var(--e)}.g2-pk.buy{border-top:3px solid var(--ok)}
+.g2-pkh{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text-secondary)}.g2-pkh .g2-chip{padding:3px 7px;flex:none}.g2-pkh b{margin-left:auto;font-size:16px;color:var(--text-primary);white-space:nowrap}.g2-pkh b em{font-style:normal;font-size:11px;color:var(--text-muted)}
+.g2-pkr{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px;color:var(--text-secondary)}.g2-pkr .v{white-space:nowrap;color:var(--text-muted)}.g2-pkr .v b{color:var(--text-primary)}.g2-pkr s{opacity:.7}
 .g2-sum3{display:grid;grid-template-columns:1.4fr 1fr;padding-bottom:16px}.g2-sum3.one{grid-template-columns:1fr}
 .g2-mixrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}.g2-mixrow .g2-okline{margin:0}
 .g2-sum3>div{padding:0 20px;border-left:1px solid var(--border)}.g2-sum3>div:first-child{padding-left:0;border-left:0}.g2-sum3>div:last-child{padding-right:0}
@@ -356,7 +365,8 @@ const CSS = `
 .g2-badge.ok{background:color-mix(in srgb,var(--ok) 14%,transparent)}.g2-badge.warn{background:color-mix(in srgb,var(--warn) 14%,transparent)}.g2-badge.due{color:var(--due);background:color-mix(in srgb,var(--due) 14%,transparent)}
 .g2-prog{display:flex;align-items:center;gap:10px;margin:14px 0 4px}.g2-prog>div{flex:1;height:8px;border-radius:5px;background:var(--bg-inset);overflow:hidden}.g2-prog i{display:block;height:100%;border-radius:5px;background:var(--ok)}
 .g2-goal.warn .g2-prog i{background:var(--warn)}.g2-goal.due .g2-prog i{background:var(--due)}.g2-prog b{font-size:13px;color:var(--text-primary)}
-.g2-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.g2-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.g2-stats.five{grid-template-columns:repeat(5,1fr)}.g2-stats b em{font-style:normal;font-size:11.5px;color:var(--text-muted);margin-left:2px}
+.g2-stats>div.fr:before{background:var(--ok);opacity:1}.g2-all .g2-lbl{margin-bottom:0}.g2-sumf{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}.g2-sumf .g2-link{font-size:12.5px}
 .g2-stats>div{position:relative;background:var(--bg-inset);border:1px solid var(--border);border-radius:12px;padding:10px 12px 10px 14px;overflow:hidden}.g2-stats>div:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--text-muted);opacity:.5}
 .g2-stats>div.hv:before{background:var(--e);opacity:1}.g2-stats>div.nd:before{background:var(--dt);opacity:1}.g2-stats>div.gp.ok:before{background:var(--ok);opacity:1}.g2-stats>div.gp.warn:before{background:var(--warn);opacity:1}.g2-stats>div.tg:before{background:var(--gd);opacity:1}
 .g2-stats>div.gp.warn{background:color-mix(in srgb,var(--warn) 8%,var(--bg-inset))}.g2-stats>div.gp.ok{background:color-mix(in srgb,var(--ok) 7%,var(--bg-inset))}
@@ -372,14 +382,14 @@ const CSS = `
 .g2-tag.e{color:var(--e);background:color-mix(in srgb,var(--e) 14%,transparent)}.g2-tag.d{color:var(--dt);background:color-mix(in srgb,var(--dt) 14%,transparent)}.g2-tag.g{color:var(--gd);background:color-mix(in srgb,var(--gd) 14%,transparent)}.g2-tag.l{color:var(--text-secondary);background:var(--bg-inset)}
  @media(max-width:640px){
  .g2-gh{gap:10px;margin-top:34px}.g2-gt{padding-right:4px}.g2-gi{width:40px;height:40px;font-size:20px}.g2-ring{transform:scale(.85)}.g2-mt{padding:4px 7px;font-size:11.5px}
- .g2-two{grid-template-columns:1fr;margin-left:0}.g2-two>em{text-align:center}
+ .g2-two{grid-template-columns:1fr;margin-left:0}.g2-orw{text-align:center}
  .g2-sum3,.g2-sum3.one{grid-template-columns:1fr}.g2-sum3>div{padding:0;border-left:0}.g2-sum3>div+div{border-top:1px solid var(--border);margin-top:14px}.g2-sum3 .g2-lbl,.g2-sum3>div:first-child .g2-lbl,.g2-sum3>div:last-child .g2-lbl{margin:0 -16px 12px}
  .g2-card{padding:0 16px 16px}.g2-lbl{margin:0 -16px 14px;padding:12px 16px;font-size:12.5px}.g2-sum .g2-lbl{margin:0 -16px 14px}.g2-sum>div:first-child .g2-lbl{margin-right:-16px}.g2-sum>div+div .g2-lbl{margin:0 -16px 14px}
  .g2-goal{padding-top:48px}.g2-ask{margin-left:0}.g2-acts>span{width:100%}.g2-pb{padding:0 10px}
  .g2-jars{grid-template-columns:1fr}.g2-jh{display:flex;align-items:center;gap:12px;text-align:left}.g2-jh svg{margin:0}.g2-flow{grid-template-columns:1fr;text-align:left}
  .g2-tot3{grid-template-columns:1fr 1fr!important}.g2-or,.g2-more{margin-left:0}
  .g2-card{padding:14px;border-radius:16px}.g2-sum{grid-template-columns:1fr}.g2-sum>div+div{border-left:0;padding-left:0;margin-left:0;border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
- .g2-stats{grid-template-columns:1fr 1fr}.g2-ideas,.g2-choices{grid-template-columns:1fr}.g2-opts{grid-template-columns:1fr}.g2-opts em{text-align:center}
+ .g2-stats,.g2-stats.five{grid-template-columns:1fr 1fr}.g2-stats.five>div.fr{grid-column:span 2}.g2-ideas,.g2-choices{grid-template-columns:1fr}.g2-opts{grid-template-columns:1fr}.g2-opts em{text-align:center}
  .g2-row{grid-template-columns:70px 1fr;padding-left:0}.g2-v{grid-column:2;text-align:left}.g2-how,.g2-choices,.g2-opts{margin-left:0}
  .g2-yr{width:56px;height:56px}.g2-grp{margin-bottom:48px}.g2-grp .g2-goal+.g2-goal{margin-top:28px}.g2-now{margin-bottom:34px}
 }
