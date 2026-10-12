@@ -73,7 +73,7 @@ function Step({ n, title, children, active, step }) {
 }
 
 export default function ImportStatementPage() {
-  const { refreshData } = useData()
+  const { refreshData, refreshUntilSettled } = useData()
   const { showToast } = useToast()
   const draft = useMemo(loadDraft, [])
 
@@ -202,9 +202,8 @@ export default function ImportStatementPage() {
       setResult(r)
       setParsed(null); setPreview(null)
       showToast(`Imported: ${r.summary}`, 'success')
-      refreshData(true)
-      // the sheet finishes its NAV / P&L formulas a little after the save: load once more so XIRR and values are complete
-      setTimeout(() => refreshData(true), 20000)
+      // the sheet keeps working out NAVs / values for a while after the save: load until every fund has a value
+      refreshUntilSettled()
     } catch (e) {
       setCheckErr(e.message)
     } finally {

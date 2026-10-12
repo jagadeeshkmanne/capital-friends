@@ -130,6 +130,7 @@ export function DataProvider({ children }) {
       hydrateState(data)
       persistToIDB(data)
       setFreshLoad({ at: Date.now(), errors: (data && data._errors) || [] })
+      return data
     } catch (err) {
       setError(err.message)
     } finally {
@@ -137,6 +138,24 @@ export function DataProvider({ children }) {
       setIsRefreshing(false)
     }
   }, [hydrateState, persistToIDB])
+
+  // After an import the sheet keeps working out NAVs and values for a while (thousands of formulas), so the
+  // first load can still show zeros. Load again a few times until every held fund has a value.
+  const [settling, setSettling] = useState(false)
+  const settleRef = useRef(0)
+  const refreshUntilSettled = useCallback(async () => {
+    const run = ++settleRef.current
+    setSettling(true)
+    const unsettled = (d) => (d?.mfHoldings || []).some((h) => (Number(h.units) || 0) > 0.0005 && !((Number(h.currentValue) || 0) > 0))
+    try {
+      for (const wait of [0, 8000, 15000, 25000, 40000, 60000]) {
+        if (wait) await new Promise((r) => setTimeout(r, wait))
+        if (run !== settleRef.current) return
+        const d = await refreshData(true)
+        if (d && !unsettled(d)) break
+      }
+    } finally { if (run === settleRef.current) setSettling(false) }
+  }, [refreshData])
 
   // ── Section refresh functions (each writes to IDB) ──
   const refreshMembers = useCallback(async () => {
@@ -782,7 +801,7 @@ export function DataProvider({ children }) {
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
       investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, restoreOriginalTargets, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
       // Settings
-      settings, updateSettings, refreshSettings, updateManyGoalMappings,
+      settings, updateSettings, refreshSettings, updateManyGoalMappings, settling, refreshUntilSettled,
       // Health Check
       healthCheckCompleted, healthCheckAnswers, completeHealthCheck,
     }}>

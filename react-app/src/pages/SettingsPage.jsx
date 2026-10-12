@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [daily, setDaily] = useState(null) // null = checking, true / false
   useEffect(() => {
     let alive = true
-    const check = () => api.checkTriggers().then((r) => { if (alive) setDaily(!!(r && r.hasDailySync)) }).catch(() => { if (alive) setDaily(null) })
+    const check = () => api.getDailyJobsStatus().then((r) => { if (alive) setDaily(r && !r.unknown ? !!r.sync : null) }).catch(() => { if (alive) setDaily(null) })
     check()
     window.addEventListener('focus', check)
     return () => { alive = false; window.removeEventListener('focus', check) }

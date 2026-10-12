@@ -20,7 +20,7 @@ export default function Layout() {
   useGoalPoolSync()
   useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname])
 
-  const { loading, error } = useData()
+  const { loading, error, settling } = useData()
   const [showDonate, setShowDonate] = useState(false)
 
   // Show donate banner once per browser session
@@ -60,6 +60,12 @@ export default function Layout() {
 
       <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-y-contain pb-20 lg:pb-0">
         <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
+          {settling && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-[var(--text-primary)]">
+              <span className="inline-block h-3 w-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+              Updating your fund values. After an import your sheet needs up to a minute to work out every NAV and value.
+            </div>
+          )}
           <DailyUpdatesBanner />
           <GoalsReachBanner />
           <Outlet />
