@@ -115,8 +115,6 @@ export default function GoalsHome({ plan, todo, pool, plans, closed = [], mfHold
         </div>
       )}
 
-      {live.filter((p) => p.isRet).map((p) => <RetirementActions key={p.goal.goalId} goal={p.goal} part="refill" />)}
-
       {/* 2. All goals together: the same small boxes as the goal cards */}
       <div className="g2-card g2-all">
         <div className="g2-lbl"><span>All goals together</span><span>{live.length} goal{live.length > 1 ? 's' : ''}</span></div>
@@ -198,8 +196,7 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
         : retired ? null : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Until {yearOf(p.goal) - 5}: one growth mix</div><div className={p.bucketMode ? 'on' : ''}>{yearOf(p.goal) - 5}–{yearOf(p.goal)}: fill the jars</div><div>From {yearOf(p.goal)} (retirement): live from them</div></div>}
       <div className="g2-jars">{jar('gro', 'Growth', 'the rest · equity')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('inc', 'Income', '2 years of expenses · safe')}</div>
       <div className="g2-flow"><div>→ refills Stability after good years</div><div>→ refills Income once a year</div><div>↓ pays your monthly income</div></div>
-      {retired && <RetirementActions goal={p.goal} part="income" />}
-      <p className="g2-hint">{retired ? 'You spend only from Income. Once a year the refill shows at the top of this page (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown at the top of this page).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
+      <p className="g2-hint">{retired ? 'You spend only from Income. Once a year a Refill plan shows on this card (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown on this card).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
     </div>
   )
 }
@@ -242,6 +239,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
               <small>{it.kind === 'other' ? (/epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? 'retirement only · never sold' : 'other investments') : pname(it.portfolioId)}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% of it for this goal` : ''}</small></div>) })}
         </details>
       )}
+      {p.isRet && <div className="g2-ract"><RetirementActions goal={p.goal} part="refill" /><RetirementActions goal={p.goal} part="income" /></div>}
       {p.isRet && <div className="g2-hiw"><div className="g2-hiwh">How your retirement buckets work</div><BucketHowItWorks compact /></div>}
       {p.isRet && <details open={p.bucketMode}><summary>Your buckets today {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
     </div>
@@ -493,6 +491,7 @@ const CSS = `
 .g2-mva{text-align:right}.g2-mva b{display:block;font-size:18px;color:var(--text-primary)}.g2-mva small{font-size:11px;color:var(--text-muted)}
 .g2-mv .g2-two{margin-left:0}.g2-pk.sell{border-top:3px solid var(--sell)!important}.g2-pkr small{display:block;font-size:11px;color:var(--text-muted);margin-top:1px}
 .g2-hiw{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}.g2-hiwh{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
+.g2-ract{display:flex;flex-direction:column;gap:8px;margin-top:12px}.g2-ract:empty{display:none}
 /* calm palette: neutral surfaces, one status colour per card */
 .g2-goal.ok,.g2-goal.warn,.g2-goal.due{background:var(--bg-card);border-color:var(--border)}
 .g2-gi,.g2-gi.warn,.g2-gi.due{background:var(--bg-inset);border:1px solid var(--border)}

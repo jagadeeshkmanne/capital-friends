@@ -380,6 +380,7 @@ export function RetirementActions({ goal, part }) {
   const [switchDraft, setSwitchDraft] = useState(null)
   const [redeemDraft, setRedeemDraft] = useState(null)
   const [session, setSession] = useState(null)
+  const [open, setOpen] = useState(false)
   const goalAttribution = useMemo(() => {
     const allocMap = {}
     for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
@@ -403,8 +404,20 @@ export function RetirementActions({ goal, part }) {
   const showRefill = part === 'refill' && (!!active || (ops.length > 0 && plan.status !== 'not-due'))
   const showIncome = part === 'income' && plan.schedule.retired && plan.totals.b1 > 1
   if (!showRefill && !showIncome) return null
+  const refillTotal = ops.reduce((t, op) => t + (op.fundedAmount || 0), 0)
+  const monthly = plan.expense?.monthlyExpense || 0
+  // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{showRefill ? `Yearly refill due · ${formatINR(Math.round(refillTotal))}` : `This month's income · ${formatINR(Math.round(monthly))}`}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{showRefill ? `${ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ')} · sell and buy inside your funds` : 'Sell from the Income bucket only, and send it to your bank.'}</p>
+        </div>
+        <button type="button" onClick={() => setOpen(true)} className={`${showRefill ? 'g2-pulse ' : ''}px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors`}>{showRefill ? 'Refill plan ›' : 'Income plan ›'}</button>
+      </div>
+      {open && createPortal(<Modal open onClose={() => setOpen(false)} title={showRefill ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
+        <div className="space-y-3">
       {showRefill && (
         <RefillSteps key={goal.goalId} plan={plan} operations={ops} canRecord={canRecord} recorded={recorded}
           onRecordSwitch={({ lineKey, op, allocation, dest }) => setSwitchDraft({
@@ -419,6 +432,8 @@ export function RetirementActions({ goal, part }) {
         <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan}
           onRecordRedeem={a => setRedeemDraft({ portfolioId: a.portfolioId, fundCode: a.schemeCode, initial: { units: unitsDown(a.units), notes: `Retirement monthly income (${goal.goalName})` } })} />
       )}
+        </div>
+      </Modal>, document.body)}
       {createPortal(<>
         <Modal open={!!switchDraft} onClose={() => setSwitchDraft(null)} title="Record switch" wide>
           {switchDraft && (
