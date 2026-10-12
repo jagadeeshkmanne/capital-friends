@@ -5,7 +5,6 @@ import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
 import { createPortal } from 'react-dom'
 import { RetirementActions } from './RetirementBucketsPage'
-import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -239,8 +238,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
               <small>{it.kind === 'other' ? (/epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? 'retirement only · never sold' : 'other investments') : pname(it.portfolioId)}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% of it for this goal` : ''}</small></div>) })}
         </details>
       )}
-      {p.isRet && <div className="g2-ract"><RetirementActions goal={p.goal} part="refill" /><RetirementActions goal={p.goal} part="income" /></div>}
-      {p.isRet && <div className="g2-hiw"><div className="g2-hiwh">How your retirement buckets work</div><BucketHowItWorks compact /></div>}
+      {p.isRet && <div className="g2-ract"><RetirementActions goal={p.goal} /></div>}
       {p.isRet && <details open={p.bucketMode}><summary>Your buckets today {retired ? '· living from them' : p.bucketMode ? '· filling now' : `· from ${yearOf(g) - 5}`}</summary><Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} onOpen={renderBuckets} /></details>}
     </div>
   )

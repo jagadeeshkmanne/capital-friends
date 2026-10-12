@@ -369,18 +369,17 @@ function MonthlyWithdrawal({ plan, onRecordRedeem }) {
 
 /**
  * The retirement buckets' actions, shown on the Goals page (the separate buckets page is gone):
- *   part="refill"  this year's refill / build steps (only when due), with Record switch
- *   part="income"  after retirement: this month's income from the Income bucket, with Record redemption
- * Returns null when there is nothing to show.
+ * One row on the retirement card: "How it works", plus "Refill now" when this year's refill / build step is due
+ * (with Record switch) and "Income plan" after retirement (with Record redemption). Each opens in a window.
  */
-export function RetirementActions({ goal, part }) {
+export function RetirementActions({ goal }) {
   const data = useData()
   const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF } = data
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const [switchDraft, setSwitchDraft] = useState(null)
   const [redeemDraft, setRedeemDraft] = useState(null)
   const [session, setSession] = useState(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(null) // 'refill' | 'income' | 'how'
   const goalAttribution = useMemo(() => {
     const allocMap = {}
     for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
@@ -394,31 +393,33 @@ export function RetirementActions({ goal, part }) {
       targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity, lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
       otherInvestments: otherInvList || [], attribution: goalAttribution[goal.goalId] })
   }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution])
-  if (!plan || plan.noExpenses) return null
-  // before the last 5 years nothing moves (the Goals page's own rebalance covers the glide path)
-  if (plan.status === 'not-started') return null
-  const canRecord = plan.schedule.retired || BUILD_STATUSES.has(plan.status)
+  const noPlan = !plan || plan.noExpenses || plan.status === 'not-started'
+  const canRecord = !noPlan && (plan.schedule.retired || BUILD_STATUSES.has(plan.status))
   const active = session && session.goalId === goal.goalId ? session : null
-  const ops = active?.ops || plan.operations
+  const ops = active?.ops || (noPlan ? [] : plan.operations)
   const recorded = active?.done || EMPTY_SET
-  const showRefill = part === 'refill' && (!!active || (ops.length > 0 && plan.status !== 'not-due'))
-  const showIncome = part === 'income' && plan.schedule.retired && plan.totals.b1 > 1
-  if (!showRefill && !showIncome) return null
+  const showRefill = !noPlan && (!!active || (ops.length > 0 && plan.status !== 'not-due'))
+  const showIncome = !noPlan && plan.schedule.retired && plan.totals.b1 > 1
   const refillTotal = ops.reduce((t, op) => t + (op.fundedAmount || 0), 0)
-  const monthly = plan.expense?.monthlyExpense || 0
+  const monthly = plan?.expense?.monthlyExpense || 0
   // a short line on the retirement card; the full steps open in a window (like the Withdraw plan)
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">{showRefill ? `Yearly refill due · ${formatINR(Math.round(refillTotal))}` : `This month's income · ${formatINR(Math.round(monthly))}`}</p>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">{showRefill ? `${ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ')} · sell and buy inside your funds` : 'Sell from the Income bucket only, and send it to your bank.'}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{showRefill ? `Yearly refill due · ${formatINR(Math.round(refillTotal))}` : showIncome ? `Monthly income · ${formatINR(Math.round(monthly))}` : 'Your 3 retirement buckets'}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{showRefill ? ops.map(op => `${BUCKET[op.from].name} → ${BUCKET[op.to].name}`).join(' · ') : showIncome ? 'Paid from the Income bucket. Nothing else to do this year.' : 'Growth → Stability → Income: see how money moves between them.'}</p>
         </div>
-        <button type="button" onClick={() => setOpen(true)} className={`${showRefill ? 'g2-pulse ' : ''}px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors`}>{showRefill ? 'Refill plan ›' : 'Income plan ›'}</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => setOpen('how')} className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"><CircleHelp size={15} /> How it works</button>
+          {showRefill && <button type="button" onClick={() => setOpen('refill')} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Refill now ›</button>}
+          {showIncome && <button type="button" onClick={() => setOpen('income')} className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${showRefill ? 'border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]' : 'bg-violet-600 hover:bg-violet-500 text-white'}`}>Income plan ›</button>}
+        </div>
       </div>
-      {open && createPortal(<Modal open onClose={() => setOpen(false)} title={showRefill ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
+      {open === 'how' && createPortal(<Modal open onClose={() => setOpen(null)} title="How the 3 buckets work" maxWidth="max-w-2xl" maxHeight="max-h-[90vh]"><BucketHowItWorks /></Modal>, document.body)}
+      {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
         <div className="space-y-3">
-      {showRefill && (
+      {open === 'refill' && (
         <RefillSteps key={goal.goalId} plan={plan} operations={ops} canRecord={canRecord} recorded={recorded}
           onRecordSwitch={({ lineKey, op, allocation, dest }) => setSwitchDraft({
             lineKey, opsSnapshot: ops, portfolioId: allocation.portfolioId,
@@ -428,7 +429,7 @@ export function RetirementActions({ goal, part }) {
               notes: `${op.reason === 'build-step' ? 'Retirement bucket build' : 'Retirement bucket refill'}: ${BUCKET[op.from].name} to ${BUCKET[op.to].name} (${goal.goalName})` },
           })} />
       )}
-      {showIncome && (
+      {open === 'income' && (
         <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan}
           onRecordRedeem={a => setRedeemDraft({ portfolioId: a.portfolioId, fundCode: a.schemeCode, initial: { units: unitsDown(a.units), notes: `Retirement monthly income (${goal.goalName})` } })} />
       )}
