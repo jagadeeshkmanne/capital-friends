@@ -97,6 +97,8 @@ export default function ImportStatementPage() {
   const [checking, setChecking] = useState(false)
   const [checkErr, setCheckErr] = useState('')
   const [saving, setSaving] = useState(false)
+  const [phase, setPhase] = useState('save') // overlay step: 'wait' (background update) | 'save' | 'values'
+  const [rowsToAdd, setRowsToAdd] = useState(0)
   const [result, setResult] = useState(null)
   const [confirm, setConfirm] = useState(false)
   const [open, setOpen] = useState({})
@@ -185,25 +187,25 @@ export default function ImportStatementPage() {
 
   // ---- step 3: import
   async function doImport() {
-    setConfirm(false); setSaving(true); setCheckErr('')
+    setConfirm(false); setSaving(true); setCheckErr(''); setPhase('save'); setRowsToAdd(preview?.totals?.newRows || 0)
     try {
       // The app may be updating NAVs / goal links in the background (it holds the same lock for a minute or
       // two, e.g. right after sign-in). Wait and try again by itself instead of asking the user to retry.
       let r = null
       for (let tries = 0; ; tries++) {
-        try { r = await api.importSave(parsed, mapping, preview.token, accounts); break }
+        try { setPhase('save'); r = await api.importSave(parsed, mapping, preview.token, accounts); break }
         catch (e) {
           if (!/another import or update is running/i.test(e.message || '') || tries >= 10) throw e
-          setCheckErr('')
-          showToast('The app is finishing a background update (fund prices). Your import starts as soon as it is done…', 'warning')
+          setCheckErr(''); setPhase('wait')
           await new Promise((res) => setTimeout(res, 15000))
         }
       }
+      // keep the loading screen until the sheet has worked out every NAV and value, then show the result
+      setPhase('values')
+      try { await refreshUntilSettled() } catch { /* the values still load on the next open */ }
       setResult(r)
       setParsed(null); setPreview(null)
       showToast(`Imported: ${r.summary}`, 'success')
-      // the sheet keeps working out NAVs / values for a while after the save: load until every fund has a value
-      refreshUntilSettled()
     } catch (e) {
       setCheckErr(e.message)
     } finally {
@@ -496,10 +498,28 @@ export default function ImportStatementPage() {
       {/* full-screen wait while saving (the save takes up to a minute or two) */}
       {saving && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="p-6 max-w-sm w-full text-center space-y-3 shadow-2xl">
+          <Card className="p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
             <Loader2 size={32} className="animate-spin text-violet-400 mx-auto" />
-            <p className="text-base font-semibold text-[var(--text-primary)]">Importing your transactions…</p>
-            <p className="text-xs text-[var(--text-dim)]">Saving a backup, adding {preview?.totals?.newRows || ''} transactions and checking every fund against the statement. This can take a minute or two.</p>
+            <p className="text-base font-semibold text-[var(--text-primary)]">
+              {phase === 'wait' ? 'Waiting for a background update…' : phase === 'save' ? 'Importing your transactions…' : 'Updating your fund values…'}
+            </p>
+            <p className="text-xs text-[var(--text-dim)]">
+              {phase === 'wait' ? 'The app is updating fund prices in the background. Your import starts by itself as soon as it is done.'
+                : phase === 'save' ? `Saving a backup, adding ${rowsToAdd || ''} transactions and checking every fund against the statement.`
+                  : 'Saved. Your sheet is now working out every NAV, value and profit. This takes up to a minute.'}
+            </p>
+            <div className="flex items-center justify-center gap-2 text-[11px]">
+              {[['save', 'Import'], ['values', 'Fund values'], ['done', 'Done']].map(([k, label], i) => {
+                const order = { wait: 0, save: 0, values: 1 }[phase]
+                const state = i < order ? 'done' : i === order ? 'now' : 'next'
+                return (
+                  <span key={k} className="flex items-center gap-2">
+                    {i > 0 && <span className="w-4 h-px bg-[var(--border)]" />}
+                    <span className={state === 'done' ? 'text-emerald-400 font-semibold' : state === 'now' ? 'text-violet-300 font-semibold' : 'text-[var(--text-dim)]'}>{state === 'done' ? '✓ ' : ''}{label}</span>
+                  </span>
+                )
+              })}
+            </div>
             <p className="text-xs font-medium text-amber-400">Please keep this page open.</p>
           </Card>
         </div>
