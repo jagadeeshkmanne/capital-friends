@@ -13,7 +13,7 @@ const GROUPS = [
   { key: 'Other', title: 'Other investments' },
 ]
 
-export default function MoneyForGoals({ pool }) {
+export default function MoneyForGoals({ pool, onSaved }) {
   const mt = useMaskText()
   const { updateSettings, goalList } = useData()
   const { showToast } = useToast()
@@ -29,7 +29,7 @@ export default function MoneyForGoals({ pool }) {
   }
   const save = async () => {
     setSaving(true)
-    try { await updateSettings({ GoalsPool: JSON.stringify(choice) }); showToast('Saved. Your goals now use the money you included.') }
+    try { await updateSettings({ GoalsPool: JSON.stringify(choice) }); showToast('Saved. Your goals now use the money you included.'); onSaved?.() }
     catch (e) { showToast(e.message || 'Could not save', 'error') } finally { setSaving(false) }
   }
   const total = pool.items.filter(isOn).reduce((t, i) => t + i.value, 0)

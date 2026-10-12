@@ -108,7 +108,7 @@ export default function GoalsPlanPage() {
     <div className="gp space-y-4">
       <style>{CSS}</style>
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
-      <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} />}</Modal>
+      <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} onSaved={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} />}</Modal>
       <Modal open={!!form && form !== 'list'} onClose={() => setForm(null)} title={form?.edit ? 'Edit Goal' : 'Add Goal'} wide>
         {form && form !== 'list' && <GoalForm key={form?.edit?.goalId || 'new-' + (form?.type || '')} initial={form?.edit || undefined} defaultType={form?.type} onSave={saveGoal} onDelete={form?.edit ? removeGoal : undefined} onCancel={() => setForm(null)} />}
       </Modal>

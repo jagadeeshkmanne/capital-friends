@@ -251,8 +251,12 @@ export function DataProvider({ children }) {
     })
   }, [])
 
+  // only the newest settings read is applied: an older read finishing later must not undo a save just made
+  const settingsSeq = useRef(0)
   const refreshSettings = useCallback(async () => {
+    const seq = ++settingsSeq.current
     const data = await api.getSettings()
+    if (seq !== settingsSeq.current) return
     setSettings(data || {})
     setSettingsAt(Date.now())
     if (data) idb.put('settings', data)
@@ -261,6 +265,9 @@ export function DataProvider({ children }) {
 
   const updateSettings = useCallback(async (data) => {
     await api.saveSettings(data)
+    // show the saved values at once (and keep them if an older read is still on its way)
+    settingsSeq.current++
+    setSettings((prev) => ({ ...(prev || {}), ...data }))
     await refreshSettings()
   }, [refreshSettings])
 
