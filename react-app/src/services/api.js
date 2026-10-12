@@ -78,6 +78,10 @@ export function setFilePickerHandler(fn) {
 
 // ── API Call (Apps Script Execution API) ──
 
+// A save can send back the updated lists it changed ('fresh'); DataContext shows them at once.
+let _freshHandler = null
+export function setFreshHandler(fn) { _freshHandler = fn }
+
 export async function callAPI(action, params = {}, retry = true, pickerTried = false) {
   const token = getStoredToken()
   if (!token) {
@@ -151,6 +155,7 @@ export async function callAPI(action, params = {}, retry = true, pickerTried = f
       throw err
     }
     const returnedData = result ? result.data : null
+    if (result && result.fresh && _freshHandler) { try { _freshHandler(result.fresh) } catch { /* the normal reload still runs */ } }
     // GAS CRUD functions return { success: false, message } inside data — check inner result
     if (returnedData && returnedData.success === false) {
       throw new Error(returnedData.error || returnedData.message || 'Operation failed')

@@ -1025,13 +1025,8 @@ function setupMutualFundDataSheet() {
   // Set tab color (Yellow for mutual fund data)
   sheet.setTabColor('#eab308');
 
-  // Copy data from master DB
-  try {
-    copyMFDataFromMasterDB(sheet);
-  } catch (e) {
-    log('Warning: Could not copy MF data from master DB: ' + e.message);
-    // Sheet created with headers — data can be populated later via refreshMutualFundData()
-  }
+  // No copy of all ~15,000 funds any more: this tab lists only the funds the family uses (added when a fund
+  // is bought / imported, refreshed daily). Searching funds reads the shared master list.
 
   // Hide the sheet (users don't need to see reference data)
   sheet.hideSheet();

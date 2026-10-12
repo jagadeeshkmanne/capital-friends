@@ -70,6 +70,9 @@ export function DataProvider({ children }) {
   // read must not wipe what is on screen.
   const touchedAt = useRef({})
   const hasData = useRef({})
+  // when a save last sent back a section ('fresh'): the reload right after that save is then skipped
+  const freshAt = useRef({})
+  const justFresh = (...keys) => keys.every((k) => Date.now() - (freshAt.current[k] || 0) < 4000)
   const touch = (...keys) => { const t = Date.now(); keys.forEach((k) => { touchedAt.current[k] = t; hasData.current[k] = true }) }
 
   // ── Hydrate state from a data object (IDB or API response) ──
@@ -95,6 +98,19 @@ export function DataProvider({ children }) {
     if ('assetAllocations' in data) setAssetAllocations(data.assetAllocations || [])
     if ('settings' in data) setSettings(data.settings || {})
   }, [])
+
+  // Lists a save sent back: show them now, cache them, and mark them so the follow-up reload is skipped
+  useEffect(() => {
+    api.setFreshHandler((fresh) => {
+      const { settings: st, ...lists } = fresh || {}
+      hydrateState(lists)
+      const keys = Object.keys(lists)
+      if (keys.length) { idb.putMany(Object.fromEntries(keys.map((k) => [k, lists[k] || []]))); touch(...keys) }
+      if (st && typeof st === 'object') { settingsSeq.current++; setSettings(st); setSettingsAt(Date.now()); idb.put('settings', st); keys.push('settings') }
+      const t = Date.now(); keys.forEach((k) => { freshAt.current[k] = t })
+    })
+    return () => api.setFreshHandler(null)
+  }, [hydrateState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Save all data to IDB (after API load) ──
   const persistToIDB = useCallback((data) => {
@@ -159,6 +175,7 @@ export function DataProvider({ children }) {
 
   // ── Section refresh functions (each writes to IDB) ──
   const refreshMembers = useCallback(async () => {
+    if (justFresh('members')) return // the save already sent this list back
     const data = await api.getMembers()
     setMembers(data || [])
     touch('members')
@@ -166,6 +183,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshBanks = useCallback(async () => {
+    if (justFresh('bankAccounts')) return // the save already sent this list back
     const data = await api.getBanks()
     setBanks(data || [])
     touch('bankAccounts')
@@ -173,6 +191,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshInvestmentAccounts = useCallback(async () => {
+    if (justFresh('investments')) return // the save already sent this list back
     const data = await api.getInvestmentAccounts()
     setInvestmentAccounts(data || [])
     touch('investments')
@@ -180,6 +199,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshInsurance = useCallback(async () => {
+    if (justFresh('insurancePolicies')) return // the save already sent this list back
     const data = await api.getInsurance()
     setInsurance(data || [])
     touch('insurancePolicies')
@@ -187,6 +207,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshLiabilities = useCallback(async () => {
+    if (justFresh('liabilities')) return // the save already sent this list back
     const data = await api.getLiabilities()
     setLiabilities(data || [])
     touch('liabilities')
@@ -194,6 +215,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshOtherInvestments = useCallback(async () => {
+    if (justFresh('otherInvestments')) return // the save already sent this list back
     const data = await api.getOtherInvestments()
     setOtherInvestments(data || [])
     touch('otherInvestments')
@@ -201,6 +223,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshGoals = useCallback(async () => {
+    if (justFresh('goals', 'goalPortfolioMappings')) return // the save already sent this list back
     const [goals, mappings] = await Promise.all([api.getGoals(), api.getGoalMappings()])
     setGoals(goals || [])
     setGoalPortfolioMappings(mappings || [])
@@ -210,6 +233,7 @@ export function DataProvider({ children }) {
   }, [])
 
   const refreshReminders = useCallback(async () => {
+    if (justFresh('reminders')) return // the save already sent this list back
     const data = await api.getReminders()
     setReminders(data || [])
     touch('reminders')
@@ -254,6 +278,7 @@ export function DataProvider({ children }) {
   // only the newest settings read is applied: an older read finishing later must not undo a save just made
   const settingsSeq = useRef(0)
   const refreshSettings = useCallback(async () => {
+    if (justFresh('settings')) return // the save already sent the settings back
     const seq = ++settingsSeq.current
     const data = await api.getSettings()
     if (seq !== settingsSeq.current) return

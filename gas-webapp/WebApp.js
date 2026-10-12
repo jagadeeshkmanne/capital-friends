@@ -86,16 +86,68 @@ function apiRouter(request) {
 
     // Route to action handler
     var result = routeAction(action, params, userRecord);
+    // a fund just bought / switched into / imported gets its row in the family's small fund list
+    if (FUND_WRITE_ACTIONS_[action]) { try { ensureHeldFundsListed_(); } catch (e) { log('ensureHeldFundsListed_ after ' + action + ': ' + e.message); } }
     flushSheets_(); // send all queued sheet writes in one go
 
+    // A save also sends back the updated lists it changed, so the app shows them without a second call
+    // (and a separate reload can't race with the save). Old app versions simply ignore 'fresh'.
+    var fresh = freshAfterWrite_(action);
+
     // Sanitize: strip non-serializable types (Date, Range, Sheet) for Execution API
-    return JSON.parse(JSON.stringify({ success: true, data: result }));
+    return JSON.parse(JSON.stringify(fresh ? { success: true, data: result, fresh: fresh } : { success: true, data: result }));
 
   } catch (error) {
     try { if (_ssAdapter) _ssAdapter.flush(); } catch (e2) { log('flush after error failed: ' + e2); }
     log('apiRouter error: ' + error.toString());
     return { success: false, error: error.message || 'Internal server error', stack: error.stack, code: 500 };
   }
+}
+
+var FUND_WRITE_ACTIONS_ = { 'mf:invest': 1, 'mf:switch': 1, 'mf:plan-batch': 1, 'mf:allocations-update': 1, 'portfolio:create': 1, 'portfolio:update': 1, 'import:save': 1, 'import:undo': 1, 'import:move-fund': 1 };
+
+// Lists a save sends back: action prefix -> { app key: reader }. Mutual funds and stocks are not here
+// (their values come from sheet formulas; the app reloads them as before).
+var FRESH_AFTER_WRITE_ = {
+  'member:': { members: 'getAllFamilyMembers' },
+  'bank:': { bankAccounts: 'getAllBankAccounts' },
+  'invacct:': { investments: 'getAllInvestmentAccounts' },
+  'insurance:': { insurancePolicies: 'getAllInsurancePolicies' },
+  'liability:': { liabilities: 'getAllLiabilities', otherInvestments: 'getAllInvestments' },
+  'otherinv:': { otherInvestments: 'getAllInvestments', liabilities: 'getAllLiabilities' },
+  'goal:create': { goals: 'getAllGoals', goalPortfolioMappings: 'getGoalPortfolioMappings' },
+  'goal:update': { goals: 'getAllGoals', goalPortfolioMappings: 'getGoalPortfolioMappings' },
+  'goal:delete': { goals: 'getAllGoals', goalPortfolioMappings: 'getGoalPortfolioMappings' },
+  'goal:mappings-update': { goalPortfolioMappings: 'getGoalPortfolioMappings' },
+  'reminder:': { reminders: 'getAllReminders' },
+  'settings:update': { settings: 'getAllSettings' }
+};
+
+function FRESH_READERS_() {
+  return {
+    getAllFamilyMembers: getAllFamilyMembers, getAllBankAccounts: getAllBankAccounts, getAllInvestmentAccounts: getAllInvestmentAccounts,
+    getAllInsurancePolicies: getAllInsurancePolicies, getAllLiabilities: getAllLiabilities, getAllInvestments: getAllInvestments,
+    getAllGoals: getAllGoals, getGoalPortfolioMappings: getGoalPortfolioMappings, getAllReminders: getAllReminders, getAllSettings: getAllSettings
+  };
+}
+
+/** The updated lists for a save (null for reads and for actions not listed). A failed read is just left out. */
+function freshAfterWrite_(action) {
+  var spec = null;
+  for (var k in FRESH_AFTER_WRITE_) {
+    if (k.charAt(k.length - 1) === ':' ? action.indexOf(k) === 0 && !/:list$/.test(action) : action === k) { spec = FRESH_AFTER_WRITE_[k]; break; }
+  }
+  if (!spec) return null;
+  var out = {}, any = false;
+  for (var key in spec) {
+    try {
+      var fn = FRESH_READERS_()[spec[key]];
+      if (typeof fn !== 'function') continue;
+      var v = fn();
+      if (v !== undefined && v !== null) { out[key] = v; any = true; }
+    } catch (e) { log('freshAfterWrite_ ' + key + ': ' + e.message); }
+  }
+  return any ? out : null;
 }
 
 // ============================================================================
@@ -653,6 +705,26 @@ function buildFundCategoryMap() {
   return map;
 }
 
+/** scheme code -> 'YYYY-MM-DD' of the NAV in the user's own MutualFundData tab ({} if it can't be read). */
+function userNavDates_() {
+  try {
+    var res = casRetry_(function () {
+      return Sheets.Spreadsheets.Values.batchGet(_currentUserSpreadsheetId, { ranges: ["'" + CONFIG.mutualFundDataSheet + "'!A2:A", "'" + CONFIG.mutualFundDataSheet + "'!E2:E"], valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' });
+    });
+    var a = (res.valueRanges[0] && res.valueRanges[0].values) || [], e = (res.valueRanges[1] && res.valueRanges[1].values) || [];
+    var out = {};
+    for (var i = 0; i < a.length; i++) {
+      var code = a[i] && a[i][0], d = e[i] && e[i][0];
+      if (code === undefined || code === '' || d === undefined || d === '') continue;
+      var iso = '';
+      if (typeof d === 'number') iso = new Date(Math.round((d - 25569) * 86400000)).toISOString().slice(0, 10);
+      else { var t = new Date(d); if (!isNaN(t.getTime())) iso = Utilities.formatDate(t, Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
+      if (iso) out[String(parseInt(String(code), 10))] = iso;
+    }
+    return out;
+  } catch (err) { log('userNavDates_: ' + err.message); return {}; }
+}
+
 /**
  * Get all MF holdings across all portfolios
  */
@@ -661,6 +733,7 @@ function getAllMFHoldings() {
   log('getAllMFHoldings: found ' + portfolios.length + ' portfolios');
 
   var categoryMap = buildFundCategoryMap();
+  var navDates = userNavDates_(); // the date of the NAV in the family's own fund list (shows if it is up to date)
 
   var allHoldings = [];
   for (var i = 0; i < portfolios.length; i++) {
@@ -673,6 +746,8 @@ function getAllMFHoldings() {
         if (holdings && holdings.length) {
           for (var j = 0; j < holdings.length; j++) {
             holdings[j].category = categoryMap[holdings[j].fundCode] || 'Other';
+            var nd = navDates[String(parseInt(String(holdings[j].fundCode), 10))];
+            if (nd) holdings[j].navDate = nd;
           }
           allHoldings = allHoldings.concat(holdings);
         }

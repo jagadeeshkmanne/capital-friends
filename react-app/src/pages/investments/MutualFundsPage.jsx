@@ -79,6 +79,15 @@ function parseDate(d) {
   return isNaN(parsed.getTime()) ? null : parsed
 }
 
+// NAV date as a small "10 Oct"; amber when it is more than 4 days old (weekends and holidays have no new NAV)
+function navDateBit(h) {
+  if (!h?.navDate) return null
+  const d = new Date(h.navDate + 'T00:00:00')
+  if (isNaN(d)) return null
+  const old = (Date.now() - d.getTime()) / 864e5 > 4
+  return { text: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), old }
+}
+
 // XIRR calculator — Newton-Raphson on cash flows [{ date, amount }]
 function computeXIRR(cashFlows) {
   if (cashFlows.length < 2) return null
@@ -1222,7 +1231,7 @@ export default function MutualFundsPage() {
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] divide-y divide-[var(--border-light)]">
                   <DetailRow label="Invested" value={formatINR(h.investment)} />
                   <DetailRow label="Units" value={h.units.toFixed(3)} />
-                  <DetailRow label="NAV (Current / Avg)" value={`₹${h.currentNav.toFixed(2)} / ₹${h.avgNav.toFixed(2)}`} />
+                  <DetailRow label="NAV (Current / Avg)" value={`₹${h.currentNav.toFixed(2)} / ₹${h.avgNav.toFixed(2)}${navDateBit(h) ? ` · ${navDateBit(h).text}` : ''}`} />
                   <DetailRow label="Allocation (Current / Target)" value={`${h.currentAllocationPct.toFixed(1)}% / ${h.targetAllocationPct.toFixed(1)}%`} />
                   {h.athNav > 0 && (
                     <DetailRow
@@ -1629,7 +1638,7 @@ export default function MutualFundsPage() {
                                   <span className="text-xs text-[var(--text-dim)]">—</span>
                                 ) : (
                                   <>
-                                    <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">₹{h.currentNav.toFixed(2)}</p>
+                                    <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">₹{h.currentNav.toFixed(2)}{navDateBit(h) && <span className={`ml-1 text-[10px] font-normal ${navDateBit(h).old ? 'text-amber-400' : 'text-[var(--text-dim)]'}`} title={navDateBit(h).old ? 'NAV not updated for a few days: Settings → Refresh Market Data' : 'Date of this NAV'}>{navDateBit(h).text}</span>}</p>
                                     <p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">₹{h.avgNav.toFixed(2)}</p>
                                   </>
                                 )}

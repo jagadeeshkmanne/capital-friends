@@ -176,6 +176,90 @@ function ensureRows_(sheet, rows) {
   if (need > 0) sheet.insertRowsAfter(sheet.getMaxRows(), need + 100);
 }
 
+// ============================================================================
+// HELD-ONLY FUND LISTS
+// The user's MutualFundData / MF_ATH_Data tabs only feed the portfolio sheets' VLOOKUP formulas, so they
+// keep just the funds this family uses (a few dozen rows instead of ~15,000): refreshes take seconds and the
+// sheet recalculates fast. Searching and checking funds read the shared master copy (see MasterSource.js).
+// ============================================================================
+
+/** Scheme codes used in any portfolio sheet (column A from row 4), as strings. Throws if it can't tell. */
+function heldFundCodes_() {
+  var codes = {};
+  getAllPortfolios().forEach(function (p) {
+    var sh = getSheet(p.portfolioId);
+    if (!sh) return;
+    var n = sh.getLastRow();
+    if (n < 4) return;
+    sh.getRange(4, 1, n - 3, 1).getValues().forEach(function (r) {
+      var c = String(r[0] === null || r[0] === undefined ? '' : r[0]).trim();
+      if (/^\d+(\.0+)?$/.test(c)) codes[String(parseInt(c, 10))] = true;
+    });
+  });
+  return codes;
+}
+var HELD_ONLY_TABS_ = { MutualFundData: 8, MF_ATH_Data: 7 };
+
+/** Master rows (shared cached copy) for the given codes only. */
+function masterRowsForCodes_(userTab, codes) {
+  var rows = userMasterTabSource_(userTab) || [];
+  return rows.filter(function (r) { return codes[String(parseInt(String(r[0]).trim(), 10))]; });
+}
+
+/** Codes actually present in the user's own tab (raw Sheets read: the adapter serves these tabs from the master copy). */
+function userTabCodes_(userTab) {
+  var res = casRetry_(function () { return Sheets.Spreadsheets.Values.get(_currentUserSpreadsheetId, "'" + userTab + "'!A2:A", { valueRenderOption: 'UNFORMATTED_VALUE' }); });
+  var have = {}, vals = (res && res.values) || [];
+  vals.forEach(function (r) { var c = String(r && r[0] !== undefined ? r[0] : '').trim(); if (c) have[String(parseInt(c, 10))] = true; });
+  return { have: have, rows: vals.length }; // rows = last used row - 1 (the API stops at the last value)
+}
+
+/**
+ * Rewrite the user's tab with today's master rows for the held funds only.
+ * If the held funds can't be read, the full list is copied as before (never leave formulas without data).
+ */
+function replaceHeldTabFromMaster_(sheet, userTab, masterTab, numCols, label) {
+  var codes;
+  try { codes = heldFundCodes_(); } catch (e) { log('held funds unreadable (' + e.message + '): full ' + label + ' copy'); return replaceTabFromMaster_(sheet, masterTab, numCols, label); }
+  var data = masterRowsForCodes_(userTab, codes);
+  var all = userMasterTabSource_(userTab);
+  if (!all || !all.length) { log('Master ' + masterTab + ' empty or unreadable: kept existing ' + label); return 0; }
+  var cols = numCols;
+  data = data.map(function (r) { var x = r.slice(0, cols); while (x.length < cols) x.push(''); return x; });
+  if (data.length) { ensureRows_(sheet, data.length + 1); sheet.getRange(2, 1, data.length, cols).setValues(data); }
+  var extra = sheet.getMaxRows() - (data.length + 1);
+  if (extra > 0) sheet.getRange(data.length + 2, 1, extra, Math.min(cols, sheet.getMaxColumns())).clearContent();
+  log('Refreshed ' + data.length + ' held ' + label + ' rows (of ' + all.length + ' in master)');
+  return data.length;
+}
+
+/**
+ * Add any held fund missing from the user's tabs (a fund just bought, switched into or imported).
+ * Cheap: one small read per tab, writes only the missing rows. Returns the number of rows added.
+ */
+function ensureHeldFundsListed_() {
+  var added = 0, codes;
+  try { codes = heldFundCodes_(); } catch (e) { log('ensureHeldFundsListed_: ' + e.message); return 0; }
+  Object.keys(HELD_ONLY_TABS_).forEach(function (userTab) {
+    try {
+      var sheet = getSheet(userTab);
+      if (!sheet) return;
+      var got = userTabCodes_(userTab), have = got.have, missing = {};
+      Object.keys(codes).forEach(function (c) { if (!have[c]) missing[c] = true; });
+      if (!Object.keys(missing).length) return;
+      var cols = HELD_ONLY_TABS_[userTab];
+      var rows = masterRowsForCodes_(userTab, missing).map(function (r) { var x = r.slice(0, cols); while (x.length < cols) x.push(''); return x; });
+      if (!rows.length) return;
+      var start = got.rows + 2; // first empty row after the last listed fund
+      ensureRows_(sheet, start + rows.length);
+      sheet.getRange(start, 1, rows.length, cols).setValues(rows);
+      added += rows.length;
+      log('Added ' + rows.length + ' fund rows to ' + userTab);
+    } catch (e) { log('ensureHeldFundsListed_ ' + userTab + ': ' + e.message); }
+  });
+  return added;
+}
+
 function replaceTabFromMaster_(sheet, masterTab, numCols, label) {
   var data = masterRows_(masterTab, numCols);
   if (!data || !data.length) { log('Master ' + masterTab + ' empty or unreadable: kept existing ' + label); return 0; }
@@ -203,8 +287,8 @@ function refreshMutualFundData() {
   if (!sheet) {
     throw new Error('MutualFundData sheet not found');
   }
-  var count = replaceTabFromMaster_(sheet, CONFIG.masterMFDataSheet, 8, 'MF') || 0;
-  return { success: count > 0, count: count };
+  var count = replaceHeldTabFromMaster_(sheet, CONFIG.mutualFundDataSheet, CONFIG.masterMFDataSheet, 8, 'MF') || 0;
+  return { success: true, count: count };
 }
 
 /**
@@ -216,8 +300,8 @@ function refreshATHData() {
   if (!sheet) {
     throw new Error('MF_ATH_Data sheet not found');
   }
-  var count = replaceTabFromMaster_(sheet, CONFIG.masterATHSheet, 7, 'ATH') || 0;
-  return { success: count > 0, count: count };
+  var count = replaceHeldTabFromMaster_(sheet, CONFIG.mfATHDataSheet, CONFIG.masterATHSheet, 7, 'ATH') || 0;
+  return { success: true, count: count };
 }
 
 /**
@@ -423,7 +507,8 @@ function userMasterTabsIncomplete_() {
     var gridRows = {};
     (meta.sheets || []).forEach(function (sh) { gridRows[sh.properties.title] = (sh.properties.gridProperties || {}).rowCount || 0; });
     Object.keys(USER_MASTER_TABS_).forEach(function (userTab) {
-      if (!(userTab in gridRows)) return;                       // tab not set up for this user: nothing to heal here
+      if (!(userTab in gridRows)) return;
+      if (HELD_ONLY_TABS_[userTab]) return;                    // holds only this family's funds: checked by ensureHeldFundsListed_                       // tab not set up for this user: nothing to heal here
       var n = +masterRowCount_(USER_MASTER_TABS_[userTab][0], cache);
       if (!(n > 0)) return;
       if (gridRows[userTab] < n + 1) { missing.push(userTab); return; } // tab too small to hold the master rows
@@ -454,7 +539,7 @@ function syncMasterDataIfStale() {
   // Self-heal: a user's copy that is empty or shorter than the master (a refresh that failed half-way,
   // or the master gained funds / stocks / ETFs) is refreshed even when the timestamps say "up to date".
   if (!stale) { var gap = userMasterTabsIncomplete_(); if (gap) { stale = true; reason = 'incomplete: ' + gap; } }
-  if (!stale) return { refreshed: false, reason: reason };
+  if (!stale) { var addedRows = ensureHeldFundsListed_(); return { refreshed: false, reason: reason, addedFunds: addedRows }; }
 
   // One refresh at a time per user (two open tabs must not both copy 15,000 rows)
   var lock = LockService.getUserLock();
