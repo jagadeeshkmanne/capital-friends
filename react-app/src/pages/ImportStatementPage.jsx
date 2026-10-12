@@ -77,7 +77,8 @@ export default function ImportStatementPage() {
   const { showToast } = useToast()
   const draft = useMemo(loadDraft, [])
 
-  const [enabled, setEnabled] = useState(null)
+  // Open the page at once: the "is import on?" answer is remembered from the last visit (assumed on the first time)
+  const [enabled, setEnabled] = useState(() => { try { return localStorage.getItem('cf_import_enabled') !== '0' } catch { return true } })
   const [showHelp, setShowHelp] = useState(false) // step-by-step guide, in a dialog
   const [status, setStatus] = useState(null)
   const [statusErr, setStatusErr] = useState('')
@@ -107,10 +108,14 @@ export default function ImportStatementPage() {
     try { setStatus(await api.importStatus()) } catch (e) { setStatusErr(e.message) }
   }
   useEffect(() => {
+    // ask both at once (the history needs no separate wait); the history call fails by itself if import is off
+    loadStatus()
     api.importEnabled().then((r) => {
-      setEnabled(!!r?.enabled)
-      if (r?.enabled) loadStatus()
-    }).catch(() => setEnabled(false))
+      const on = !!r?.enabled
+      setEnabled(on)
+      try { localStorage.setItem('cf_import_enabled', on ? '1' : '0') } catch { /* fine */ }
+      if (!on) setStatusErr('')
+    }).catch(() => { /* keep the page usable; a real problem shows when checking the statement */ })
   }, [])
 
   // keep the read statement if the page is refreshed during the check
@@ -235,7 +240,6 @@ export default function ImportStatementPage() {
     setParsed(null); setPreview(null); setResult(null); setFile(null); setReadErr(''); setCheckErr(''); setMapping({}); setAccounts({})
   }
 
-  if (enabled === null) return <div className="p-6 flex items-center gap-2 text-sm text-[var(--text-dim)]"><Loader2 size={16} className="animate-spin" /> Loading…</div>
   if (!enabled) {
     return (
       <div className="max-w-2xl mx-auto p-4">
