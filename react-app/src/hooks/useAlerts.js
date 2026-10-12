@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useData } from '../context/DataContext'
 import { useFamily } from '../context/FamilyContext'
 import { formatINR } from '../data/familyData'
+import { useGoalsPlan } from './useGoalsPlan'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../utils/buyOpportunities'
 
 export default function useAlerts() {
@@ -10,6 +11,8 @@ export default function useAlerts() {
     mfPortfolios, mfHoldings,
     insurancePolicies, goalList, reminderList,
   } = useData()
+  // goal alerts use the same live numbers as the Goals page (not the old values saved on each goal)
+  const { plan: goalsPlan } = useGoalsPlan()
 
   const filterOwner = (items, key) => {
     const arr = items || []
@@ -61,15 +64,15 @@ export default function useAlerts() {
       items.push({ type: 'warning', title: 'Inadequate Health Insurance', badge: formatINR(healthCover), navigateTo: '/insurance' })
     }
 
-    // Emergency fund
-    const emergencyGoals = filterOwner((goalList || []).filter((g) => g.isActive !== false && g.goalType === 'Emergency Fund'), 'familyMemberId')
-    emergencyGoals.forEach((g) => {
-      const pct = g.targetAmount > 0 ? (g.currentValue / g.targetAmount) * 100 : 0
-      if (pct < 100) {
+    // Emergency fund (its share of Money for goals, as on the Goals page)
+    const efPlans = (goalsPlan?.goals || []).filter((p) => p.goal.goalType === 'Emergency Fund' && (selectedMember === 'all' || p.goal.familyMemberId === selectedMember))
+    efPlans.forEach((p) => {
+      const pct = p.target > 0 ? (p.has / p.target) * 100 : 0
+      if (pct < 98) {
         items.push({
           type: pct >= 75 ? 'info' : 'warning',
           title: `Emergency Fund at ${pct.toFixed(0)}%`,
-          badge: formatINR(g.targetAmount - g.currentValue) + ' left',
+          badge: formatINR(Math.round(p.target - p.has)) + ' left',
           navigateTo: '/goals',
         })
       }
@@ -82,14 +85,14 @@ export default function useAlerts() {
       items.push({ type: 'critical', title: r.title, badge: `${days}d overdue`, navigateTo: '/reminders' })
     })
 
-    // Goals needing attention
-    const needsAttention = filterOwner((goalList || []).filter((g) => g.isActive !== false && g.status === 'Needs Attention'), 'familyMemberId')
-    needsAttention.forEach((g) => {
-      items.push({ type: 'warning', title: `${g.goalName} needs attention`, badge: g.priority, navigateTo: '/goals' })
+    // Goals that are short or whose date has come (same states as the Goals page)
+    ;(goalsPlan?.goals || []).filter((p) => p.goal.goalType !== 'Emergency Fund' && (selectedMember === 'all' || p.goal.familyMemberId === selectedMember)).forEach((p) => {
+      if (p.state === 'short') items.push({ type: 'warning', title: `${p.goal.goalName} is short`, badge: formatINR(Math.round(-p.gap)), navigateTo: '/goals' })
+      else if (p.state === 'due' && !p.isRet) items.push({ type: 'info', title: `${p.goal.goalName}: date reached`, badge: 'Withdraw plan', navigateTo: '/goals' })
     })
 
     return items
-  }, [selectedMember, insurancePolicies, goalList, reminderList])
+  }, [selectedMember, insurancePolicies, goalList, reminderList, goalsPlan])
 
   // ── Upcoming Reminders (next 30 days) ──
   const upcomingReminders = useMemo(() => {
