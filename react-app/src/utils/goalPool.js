@@ -71,6 +71,8 @@ export const validDate = (d) => !!d && Number.isFinite(new Date(d).getTime())
 const yearsTo = (g, now) => (new Date(g.targetDate) - now) / YEAR_MS
 const isEF = (g) => g.goalType === 'Emergency Fund'
 const isRet = (g) => g.goalType === 'Retirement'
+// the goal's own Priority (High / Medium / Low) decides who is funded first when money is short
+const prio = (g) => ({ high: 0, medium: 1, low: 2 })[norm(g.priority)] ?? 1
 
 /** What a goal should hold today, and the equity share its glide path wants (0..1). */
 export function goalWant(g, now = new Date(), sip = 0) {
@@ -90,7 +92,7 @@ export function goalWant(g, now = new Date(), sip = 0) {
  * @param items  poolItems(...) (only included ones are used)
  * @returns { mappings: [{ goalId, portfolioId, allocationPct, investmentType }], byGoal: { [goalId]: { want, got, eq } }, left: ₹ not used }
  */
-export function sharePool({ goals, items, now = new Date(), sipOf = {} }) {
+export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved = [] }) {
   const live = (goals || []).filter((g) => g.isActive !== false && validDate(g.targetDate) && Number(g.targetAmount) > 0)
   const its = (items || []).filter((i) => i.included && i.value > 0).map((i) => ({ ...i, left: i.value }))
   const take = {} // goalId -> itemId -> ₹
@@ -103,11 +105,15 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {} }) {
     const m = meta[g.goalId]; m.got += v; m.gotSafe += v * (1 - it.eq); m.gotEq += v * it.eq
     return v
   }
-  const byDate = live.slice().sort((a, b) => (isEF(b) - isEF(a)) || (yearsTo(a, now) - yearsTo(b, now)))
+  // a goal whose date has passed (not retirement) waits for you to confirm it: it never takes money ahead of the
+  // other goals, it only keeps what is left after them (so after you withdraw, the others are not touched)
+  const past = (g) => !isRet(g) && yearsTo(g, now) <= 0
+  const pastLast = () => 0 // (a past goal with saved shares keeps them; without, it is simply the nearest goal)
+  const byDate = live.slice().sort((a, b) => pastLast(a, b) || (isEF(b) - isEF(a)) || (yearsTo(a, now) - yearsTo(b, now)))
   // equity goes to the goals with the most time first (they can ride out a fall); when equity is short,
   // the near goals hold the safe money
-  const farFirst = live.slice().sort((a, b) => (isRet(b) - isRet(a)) || (yearsTo(b, now) - yearsTo(a, now)))
-  const retFirst = live.slice().sort((a, b) => (isEF(b) - isEF(a)) || (isRet(b) - isRet(a)) || (yearsTo(a, now) - yearsTo(b, now)))
+  const farFirst = live.slice().sort((a, b) => pastLast(a, b) || (prio(a) - prio(b)) || (isRet(b) - isRet(a)) || (yearsTo(b, now) - yearsTo(a, now)))
+  const retFirst = live.slice().sort((a, b) => pastLast(a, b) || (isEF(b) - isEF(a)) || (prio(a) - prio(b)) || (isRet(b) - isRet(a)) || (yearsTo(a, now) - yearsTo(b, now)))
   const pool = its.filter((i) => i.kind !== 'retirement')
   const safeItems = pool.filter((i) => i.eq < 0.5).sort((a, b) => a.eq - b.eq)
   const eqItems = pool.filter((i) => i.eq >= 0.5).sort((a, b) => b.eq - a.eq)
@@ -118,6 +124,17 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {} }) {
   let ownOnly = false // first round: each goal only takes its own member's money; second round: everything left
   const from = (g, list, amount) => { let need = Math.min(amount, room(g)); for (const it of mineFirst(g, list)) { if (need <= 0.5) break; if (ownOnly && !own(g, it)) break; need -= give(g, it, need) } }
 
+  // a goal whose date has passed keeps exactly the shares it already had (its money is kept for it until you
+  // confirm). After you withdraw, those funds are smaller, so it simply gets less: nothing moves from other goals.
+  const kept = new Set()
+  for (const g of live.filter(past)) {
+    const ms = (reserved || []).filter((m) => m.goalId === g.goalId && Number(m.allocationPct) > 0)
+    if (!ms.length) continue
+    kept.add(g.goalId)
+    for (const m of ms) { const it = its.find((i) => i.id === m.portfolioId); if (it) give(g, it, Math.min(it.left, it.value * Number(m.allocationPct) / 100)) }
+  }
+  const open = (g) => !kept.has(g.goalId)
+
   // retirement-only money (EPF, PPF, NPS) belongs to the owner's retirement goal in full (the first retirement
   // goal when its owner has none); with no retirement goal it is not used
   const rets = retFirst.filter(isRet)
@@ -126,16 +143,16 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {} }) {
   for (const it of its.filter((i) => i.fromRetirement)) { const g = retOf(it); if (g) { const m = meta[g.goalId]; give(g, it, Math.max(0, m.want - m.got)) } }
 
   // A. safe part, nearest goal first (the emergency fund and near goals come first, whoever owns the money)
-  for (const g of byDate) { const m = meta[g.goalId]; from(g, safeItems, m.want * (1 - m.eq) - m.gotSafe) }
+  for (const g of byDate) { if (!open(g)) continue; const m = meta[g.goalId]; from(g, safeItems, m.want * (1 - m.eq) - m.gotSafe) }
   // B. equity part, farthest goal first; the emergency fund never takes equity.
   //    First each goal takes only its own member's equity (Priya's retirement takes Priya's portfolio), then the rest.
   for (const round of [true, false]) {
     ownOnly = round
-    for (const g of farFirst) { if (isEF(g)) continue; const m = meta[g.goalId]; from(g, eqItems, m.want * m.eq - m.gotEq) }
+    for (const g of farFirst) { if (isEF(g) || !open(g)) continue; const m = meta[g.goalId]; from(g, eqItems, m.want * m.eq - m.gotEq) }
   }
   ownOnly = false
   // C. whatever a goal still needs, from what is left (near goals prefer safe money)
-  for (const g of retFirst) { const m = meta[g.goalId]; from(g, isEF(g) ? [...safeItems, ...eqItems] : m.eq < 0.5 ? [...safeItems, ...eqItems] : [...eqItems, ...safeItems], m.want - m.got) }
+  for (const g of retFirst) { if (!open(g)) continue; const m = meta[g.goalId]; from(g, isEF(g) ? [...safeItems, ...eqItems] : m.eq < 0.5 ? [...safeItems, ...eqItems] : [...eqItems, ...safeItems], m.want - m.got) }
   // money left over is NOT pushed into goals: each goal holds what it needs today (with its SIP), and the rest is
   // "extra" — shown once for the family (lower a SIP, or start a new goal). So no goal is ahead while another is
   // short; only EPF / PPF / NPS (retirement only, never moved) can leave retirement ahead.
@@ -147,8 +164,10 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {} }) {
     const pct = Math.round(v / it.value * 10000) / 100
     if (pct >= 0.01) mappings.push({ goalId: g.goalId, portfolioId: id, allocationPct: pct, investmentType: it.type })
   }
-  const extra = its.filter((i) => i.kind !== 'retirement').reduce((t, i) => t + i.left, 0)
-  return { mappings, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra }
+  const freeIts = its.filter((i) => i.kind !== 'retirement' && i.left > 0.5)
+  const extra = freeIts.reduce((t, i) => t + i.left, 0)
+  const extraEq = freeIts.reduce((t, i) => t + i.left * i.eq, 0)
+  return { mappings, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra, extraEq, extraItems: freeIts.map((i) => ({ id: i.id, name: i.name, type: i.type, value: i.left, eq: i.eq })) }
 }
 
 /** True when two sets of links differ enough to be worth saving (a new / dropped link, or a share 2+ points off). */

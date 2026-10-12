@@ -55,6 +55,13 @@ export default function GoalsPage() {
   useEffect(() => {
     if (searchParams.get('add') === '1') { setModal('add'); const p = new URLSearchParams(searchParams); p.delete('add'); setSearchParams(p, { replace: true }) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // /goals/classic?edit=GOAL-ID ("Need more time" on the goals page) opens that goal's Edit form once goals are loaded
+  useEffect(() => {
+    const editId = searchParams.get('edit')
+    if (!editId || !goalList) return
+    const eg = goalList.find((x) => x.goalId === editId); if (eg) setModal({ edit: eg })
+    const p = new URLSearchParams(searchParams); p.delete('edit'); setSearchParams(p, { replace: true })
+  }, [goalList]) // eslint-disable-line react-hooks/exhaustive-deps
   const [withdrawalGoal, setWithdrawalGoal] = useState(null)
   const [rebalanceGoal, setRebalanceGoal] = useState(null)
   const [showCelebration, setShowCelebration] = useState(null)

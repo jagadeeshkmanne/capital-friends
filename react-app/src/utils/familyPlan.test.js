@@ -14,12 +14,14 @@ describe('family plan', () => {
   it('inside the band: nothing to do', () => {
     expect(familyPlan({ plans: plan(77), mfHoldings: H, included: new Set(['P']), eqOf }).status).toBe('ok')
   })
-  it('too much equity: redirect SIPs first, from the fund most above target, into the liquid fund you hold', () => {
-    const r = familyPlan({ plans: plan(70), mfHoldings: H, included: new Set(['P']), eqOf })
+  it('too much equity (20 points): no SIP steps (SIPs are per portfolio); one switch into the liquid fund you hold', () => {
+    const r = familyPlan({ plans: plan(60), mfHoldings: H, included: new Set(['P']), eqOf })
     expect(r.status).toBe('steps')
-    expect(r.steps[0].t).toBe('sip-cut'); expect(r.steps[0].fund.schemeCode).toBe('PP')
-    const add = r.steps.find((s) => s.t === 'sip-add'); expect(add.fund.schemeCode).toBe('LIQ')
-    expect(r.steps.some((s) => s.t === 'sell')).toBe(false) // ₹1 L gap is covered by 6 months of SIP
+    expect(r.steps.some((s) => s.t === 'sip-cut' || s.t === 'sip-add')).toBe(false)
+    expect(r.steps.find((s) => s.t === 'buy').fund.schemeCode).toBe('LIQ')
+  })
+  it('10 points or less off: nothing to do (new SIPs close it)', () => {
+    expect(familyPlan({ plans: plan(71), mfHoldings: H, included: new Set(['P']), eqOf }).status).toBe('ok')
   })
   it('a big gap: also one switch, units of the over-target fund, buy the liquid fund in the same portfolio', () => {
     const r = familyPlan({ plans: plan(30), mfHoldings: H, included: new Set(['P']), eqOf })
@@ -44,17 +46,6 @@ describe('family plan', () => {
   // ---- regression: review findings ----
   const fund = (pid, code, cat, v, extra = {}) => ({ portfolioId: pid, schemeCode: code, fundName: code, category: cat, units: v / 10, currentNav: 10, currentValue: v, ...extra })
   const mine = (hs, fraction = 1) => hs.map((h) => ({ kind: 'mf', portfolioId: h.portfolioId, holding: h, value: h.currentValue * fraction, fraction }))
-  it('SIP steps show the fund\'s real SIP (not the goals\' part of it), in ₹500 steps', () => {
-    const E = fund('P', 'E', 'Equity', 1000000, { ongoingSIP: 30000 }), D = fund('P', 'D', 'Debt', 100000, { ongoingSIP: 10000 })
-    // the near goal owns only half of each fund
-    const near = { has: 550000, eqTarget: 0, years: 1, att: { equity: 500000, items: mine([E, D], 0.5) } }
-    const r = familyPlan({ plans: [near], mfHoldings: [E, D], included: new Set(['P']), eqOf })
-    const cut = r.steps.find((s) => s.t === 'sip-cut'), add = r.steps.find((s) => s.t === 'sip-add')
-    expect(cut.from).toBe(30000)
-    expect((cut.from - cut.to) % 500).toBe(0)
-    expect(cut.from - cut.to).toBeLessThanOrEqual(15000) // never more than the goal's half of the SIP
-    expect(add.from).toBe(10000); expect(add.to).toBe(10000 + add.amount)
-  })
   it('ELSS is never sold, even when its name has no "ELSS" in it', () => {
     const E = fund('P', 'AXIS LONG TERM EQUITY', 'ELSS', 3000000), D = fund('P', 'D', 'Debt', 300000)
     const r = familyPlan({ plans: [{ has: 3300000, eqTarget: 30, years: 2, att: { equity: 3000000, items: mine([E, D]) } }], mfHoldings: [E, D], included: new Set(['P']), eqOf })
@@ -92,8 +83,8 @@ describe('family plan', () => {
     expect(r.after).toBeGreaterThan(600000) // HOME's own shortfall is left to its SIP
   })
   it('two members: every sell and its buy stay in that member\'s own portfolio', () => {
-    const JE = fund('JM', 'JE', 'Equity', 4000000), JD = fund('JM', 'JD', 'Debt', 500000), VE = fund('VM', 'VE', 'Equity', 1500000), VD = fund('VM', 'VD', 'Debt', 300000)
-    const rj = { has: 7500000, eqTarget: 85, years: 18, att: { equity: 4000000, items: [...mine([JE, JD]), { kind: 'other', portfolioId: 'JEPF', value: 3000000 }] } }
+    const JE = fund('JM', 'JE', 'Equity', 4000000), JD = fund('JM', 'JD', 'Debt', 1500000), VE = fund('VM', 'VE', 'Equity', 1500000), VD = fund('VM', 'VD', 'Debt', 300000)
+    const rj = { has: 8500000, eqTarget: 85, years: 18, att: { equity: 4000000, items: [...mine([JE, JD]), { kind: 'other', portfolioId: 'JEPF', value: 3000000 }] } }
     const rv = { has: 2600000, eqTarget: 85, years: 22, att: { equity: 1500000, items: [...mine([VE, VD]), { kind: 'other', portfolioId: 'VEPF', value: 800000 }] } }
     const r = familyPlan({ plans: [rj, rv], mfHoldings: [JE, JD, VE, VD], included: new Set(['JM', 'VM', 'JEPF', 'VEPF']), eqOf, lockedIds: new Set(['JEPF', 'VEPF']) })
     expect(r.status).toBe('steps')

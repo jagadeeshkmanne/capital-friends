@@ -10,7 +10,7 @@
  * Never sells and buys the same kind of fund in two places; locked money (EPF, PPF, NPS, ELSS) is never sold.
  * Funds and amounts are exact (sell in units, buy in ₹), so there is nothing to work out by hand.
  */
-export const FAMILY_BAND = 5 // points of the goals' money
+export const FAMILY_BAND = 10 // points of the goals' money: smaller drifts fix themselves with new SIPs
 const MONTHS = 6
 const ceil500 = (v) => Math.ceil(v / 500) * 500
 const isLocked = (h) => /elss/i.test(h.category || '') || /\b(elss|tax ?saver)\b/i.test(h.fundName || '')
@@ -75,7 +75,9 @@ export function familyPlan({ plans, mfHoldings, included, cashItems = [], eqOf, 
   // 1. redirect SIPs for the next months
   const sipFrom = F.filter((f) => fromKind(f) && f.sip >= 500).sort((a, b) => (b.over - a.over) || (b.sip - a.sip))
   const sipTotal = sipFrom.reduce((t, f) => t + f.sip, 0)
-  if (sipTotal >= 500) {
+  // SIPs are set per portfolio (split by your targets), so there are no fund-level SIP steps: new money already
+  // follows your targets. Only idle cash and, last, one switch.
+  if (false && sipTotal >= 500) {
     let monthly = Math.min(sipTotal, ceil500(left / MONTHS))
     const cuts = []
     // cut in steps of ₹500, never more than the goals' share of that SIP

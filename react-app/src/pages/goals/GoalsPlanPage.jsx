@@ -8,11 +8,10 @@ import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { useMaskText } from '../../hooks/useMaskText'
 import PageLoading from '../../components/PageLoading'
-import { attributeFamilyGoals, equityFraction } from '../../utils/goalAttribution'
-import { buildGoalPlan } from '../../utils/goalPlan'
-import { familyPlan } from '../../utils/familyPlan'
 import { useGoalPool } from '../../hooks/useGoalPoolSync'
+import { useGoalsPlan } from '../../hooks/useGoalsPlan'
 import MoneyForGoals from './MoneyForGoals'
+import GoalsHome from './GoalsHome'
 import Modal from '../../components/Modal'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
@@ -50,22 +49,8 @@ export default function GoalsPlanPage() {
       + sum(act(otherInvList), 'currentValue') + sum(act(banks), 'balance') - sum(act(liabilityList), 'outstandingBalance')
   }, [mfHoldings, stockHoldings, otherInvList, banks, liabilityList, mfPortfolios, stockPortfolios])
 
-  const allocMap = useMemo(() => { const m = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) m[a.fundCode] = a.assetAllocation }); return m }, [assetAllocations])
+  const { plan, todo } = useGoalsPlan()
   const active = useMemo(() => (goalList || []).filter((g) => g.isActive !== false), [goalList])
-  const plan = useMemo(() => {
-    if (!goalList) return null
-    // every active goal takes part, so shared portfolios are split the same way for all members
-    const attribution = attributeFamilyGoals({ goals: active, mappings: goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap })
-    const eqOf = (h) => equityFraction(h, allocMap)
-    const plan0 = buildGoalPlan({ goals: active, attribution, mfHoldings, mappings: goalPortfolioMappings, eqOf, pool: true })
-    // one family plan for the equity / safe moves of all goals together
-    const included = new Set(pool.items.filter((i) => i.included).map((i) => i.id))
-    const efTake = new Set(goalPortfolioMappings.filter((m) => active.find((g) => g.goalId === m.goalId)?.goalType === 'Emergency Fund').map((m) => m.portfolioId))
-    const cashItems = pool.items.filter((i) => i.included && i.type === 'Other' && /cash|saving/i.test(i.otherType || '') && !efTake.has(i.id))
-    plan0.family = familyPlan({ plans: plan0.goals, mfHoldings, included, cashItems, eqOf, lockedIds: new Set(pool.items.filter((i) => i.locked).map((i) => i.id)) })
-    plan0.extra = pool.extra || 0
-    return plan0
-  }, [goalList, active, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, allocMap, pool.items])
   const [rebal, setRebal] = useState(null)
 
   if (!plan) return <PageLoading title="Loading goals" />
@@ -109,8 +94,9 @@ export default function GoalsPlanPage() {
           <button className="gp-btn gp-btn-s gp-btn-p" onClick={() => navigate('/goals/classic?add=1')}>+ Add goal</button>
         </span>
       </div>
-      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalList plans={shown} all={plan} ctx={ctx} />}
-      <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. A switch shows only when a goal is 5 points or more away from its target equity. No fund recommendations.</p>
+      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome plan={plan} todo={todo} pool={pool} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)}
+        renderBuckets={(p) => navigate(`/retirement-buckets?goal=${encodeURIComponent(p.goal.goalId)}`)} />}
+      {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
     </div>
   )
 }
@@ -229,7 +215,7 @@ function BucketsPanel({ p, onOpen }) {
   const box = (cls, name, sub, v) => <div className={`gp-bk ${cls}`}><Jar cls={cls} f={fill[cls]} /><span>{name}</span><b>{v ? L(v) : '—'}</b><small>{sub}</small></div>
   return (
     <div className="gp-panel">
-      <div className="gp-ph"><h2>Retirement buckets</h2><span className="gp-hs">{p.bucketMode ? 'You are in the last 5 years: your money now follows the 3 buckets.' : `Your money moves into 3 buckets from ${start || 'the last 5 years'}, 5 years before you retire. Until then it follows the road below.`}</span></div>
+      <div className="gp-ph"><h2>Retirement buckets</h2><span className="gp-hs">{p.years <= 0 ? 'You are retired: your monthly income comes from the Income jar, Stability refills it each year, and Growth refills Stability after good years.' : p.bucketMode ? 'You are in the last 5 years: your money now follows the 3 buckets.' : `Your money moves into 3 buckets from ${start || 'the last 5 years'}, 5 years before you retire. Until then it follows the road below.`}</span></div>
       <div className="gp-bks">
         {box('inc', 'Income', '2 years of expenses · safe', b?.income)}
         {box('stb', 'Stability', '5 years of expenses · hybrid / debt', b?.stability)}
@@ -520,7 +506,7 @@ function Road({ items }) {
 const CSS = `
 .gp{--gp-road:color-mix(in srgb,var(--text-muted) 22%,transparent);--gp-roadln:color-mix(in srgb,var(--text-primary) 40%,transparent);--gp-in:var(--bg-inset)}
 .gp>*+*{margin-top:16px}.gp a{cursor:pointer}.gp-link{color:var(--accent-violet);font-weight:600}
-.gp-bar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.gp-bar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .gp-bar h1{font-size:22px;font-weight:800;color:var(--text-primary);margin:0}.gp-bar p{font-size:12.5px;color:var(--text-muted);margin:3px 0 0}
 .gp-back{font-size:14px;color:var(--accent-violet)}
 .gp-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gp-btn.gp-btn-p{background:var(--accent-violet);color:#fff;border-color:transparent}

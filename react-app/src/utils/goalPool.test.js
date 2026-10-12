@@ -251,4 +251,13 @@ describe('corner cases (ages, timelines, shortages)', () => {
     const r = sharePool({ goals: [{ goalId: 'BAD', goalType: 'Vehicle', targetDate: 'x', targetAmount: 1e6, isActive: true }, g('ZERO', 'Travel', 3, 0)], items: [EQ(5e6)], now })
     expect(r.mappings.length).toBe(0)
   })
+  it('a goal past its date never takes money ahead of the others (after you withdraw, they are untouched)', () => {
+    const items = [SF(1e6), EQ(5e6)]
+    const goals = [g('CAR', 'Vehicle', -0.2, 1e6), g('EDU', 'Education', 6, 6e6)]
+    const before = sharePool({ goals, items, now })
+    // the links saved in the sheet keep the car's share; after the ₹10 L FD is withdrawn the car simply has less
+    const after = sharePool({ goals, items: [SF(0), EQ(5e6)], now, reserved: before.mappings })
+    expect(after.byGoal.EDU.got).toBeCloseTo(before.byGoal.EDU.got, -2)
+    expect(after.byGoal.CAR.got).toBeLessThan(1000)
+  })
 })

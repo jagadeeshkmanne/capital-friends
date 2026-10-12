@@ -8,6 +8,7 @@ import BottomNav from './BottomNav'
 import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
 import DailyUpdatesBanner from './DailyUpdatesBanner'
+import GoalsReachBanner from './GoalsReachBanner'
 import { useData } from '../context/DataContext'
 import { Heart, X } from 'lucide-react'
 
@@ -60,6 +61,7 @@ export default function Layout() {
       <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-y-contain pb-20 lg:pb-0">
         <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
           <DailyUpdatesBanner />
+          <GoalsReachBanner />
           <Outlet />
         </div>
 
