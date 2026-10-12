@@ -145,7 +145,8 @@ export default function BucketHowItWorks({ compact = false }) {
   )
 }
 
-const JX = { b1: 200, b2: 340, b3: 480 }
+// left to right in the order money flows: Growth → Stability → Income → your bank
+const JX = { b3: 110, b2: 250, b1: 390 }
 const JC = { b1: '#34d399', b2: '#fbbf24', b3: '#a78bfa' }
 const NAME = { b1: 'Income', b2: 'Stability', b3: 'Growth' }
 const TOP = 96, BOT = 206, JW = 76
@@ -156,7 +157,7 @@ const arc = (from, to) => {
   // long jump: label above its arc; short jump: label just under its arc (so two arcs never overlap)
   return { d: `M${x1},${TOP - 8} Q${(x1 + x2) / 2},${TOP - 8 - h} ${x2 + (x1 > x2 ? 10 : -10)},${TOP - 10}`, lx: (x1 + x2) / 2, ly: h > 60 ? apex - 16 : apex + 18 }
 }
-const OUT = `M${JX.b1 - JW / 2 - 4},${BOT - 30} Q140,${BOT + 6} 104,174`
+const OUT = `M${JX.b1 + JW / 2 + 4},${BOT - 30} Q${JX.b1 + JW / 2 + 50},${BOT + 6} 494,174`
 const FLOW = { b3b1: ['b3', 'b1'], b3b2: ['b3', 'b2'], b2b1: ['b2', 'b1'] }
 
 function Stage({ scene, levels, phase }) {
@@ -174,9 +175,9 @@ function Stage({ scene, levels, phase }) {
 
         {/* bank */}
         <g opacity={flows.includes('out') ? 1 : 0.45}>
-          <rect x="44" y="150" width="56" height="44" rx="10" fill="var(--bg-card)" stroke={flows.includes('out') ? JC.b1 : 'var(--border)'} strokeWidth="2" />
-          <text x="72" y="178" textAnchor="middle" fontSize="20">🏦</text>
-          <text x="72" y="212" textAnchor="middle" fontSize="12" fill="var(--text-muted)">Your bank</text>
+          <rect x="500" y="150" width="56" height="44" rx="10" fill="var(--bg-card)" stroke={flows.includes('out') ? JC.b1 : 'var(--border)'} strokeWidth="2" />
+          <text x="528" y="178" textAnchor="middle" fontSize="20">🏦</text>
+          <text x="528" y="212" textAnchor="middle" fontSize="12" fill="var(--text-muted)">Your bank</text>
         </g>
 
         {/* jars */}
@@ -226,8 +227,8 @@ function Stage({ scene, levels, phase }) {
                 {moving && <animate attributeName="stroke-dashoffset" from="24" to="0" dur="0.8s" repeatCount="indefinite" />}
               </path>
               
-              <rect x="24" y="118" width="96" height="20" rx="10" fill="var(--bg-card)" stroke={JC.b1} strokeOpacity=".5" />
-              <text x="72" y="132" textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">{phase === 'done' ? '✓ paid' : '1 month → bank'}</text>
+              <rect x="480" y="118" width="96" height="20" rx="10" fill="var(--bg-card)" stroke={JC.b1} strokeOpacity=".5" />
+              <text x="528" y="132" textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-primary)">{phase === 'done' ? '✓ paid' : '1 month → bank'}</text>
             </g>
           )
         })()}
