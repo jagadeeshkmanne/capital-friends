@@ -153,7 +153,8 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     // (goal.monthlyInvestment is the SIP the plan NEEDS, not money that is really going in.)
     const sip = Math.round((att.items || []).filter((it) => it.kind === 'mf').reduce((s2, it) => s2 + (Number(it.holding.ongoingSIP) || 0) * (it.fraction || 0), 0))
     const plannedSip = Number(g.monthlyInvestment) || 0
-    const has = att.total > 0 ? att.total : (Number(g.currentValue) || 0)
+    // pool mode: a goal has only what the pool gives it (the old saved currentValue would count money twice)
+    const has = att.total > 0 || pool ? att.total : (Number(g.currentValue) || 0)
     const isRet = g.goalType === 'Retirement'
     const rec = { ...(years > 0 || isRet ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }) }
     const bucketMode = isRet && followsBucketPlan(g.goalType, years)

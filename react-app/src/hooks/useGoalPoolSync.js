@@ -11,50 +11,54 @@ export function readPoolChoice(settings) {
 }
 
 /** Pool + its share per goal, computed live from today's data (used by the goals page and the sync below). */
+/** The pool share for all goals, from plain data (no React): used by useGoalPool and by the validation tests. */
+export function computeGoalPool(d) {
+  const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
+  const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
+  const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
+  const choice = readPoolChoice(settings)
+  const goals = (goalList || []).filter((g) => g.isActive !== false)
+  // owners: MF portfolios get theirs from the investment account, stock portfolios from the member id
+  const people = members || []
+  const mfP = resolvePortfolioOwners(mfPortfolios, investmentAccounts, people)
+  const stP = (stockPortfolios || []).map((p) => ({ ...p, ownerName: p.ownerName || people.find((m) => m.memberId === p.ownerId)?.memberName || '' }))
+  const withGoal = new Set(goals.map((g) => String(g.familyMemberName || '').trim().toLowerCase()))
+  const kidNames = people.filter((m) => /^(son|daughter)$/i.test(String(m.relationship || '').trim()) && !withGoal.has(String(m.memberName || '').trim().toLowerCase())).map((m) => m.memberName)
+  const items = poolItems({ mfPortfolios: mfP, mfHoldings, stockPortfolios: stP, stockHoldings, otherInvList, eqOf, choice, kidNames })
+  // pass 1 without SIPs tells which funds (and so which running SIPs) each goal gets; pass 2 counts those SIPs,
+  // so a goal's share is what it needs today with its SIP (same "Need today" the goal shows). Both passes
+  // use today's data only, so the result is stable.
+  // which SIPs a goal gets depends on which funds it gets, and that depends on its SIP: repeat until the SIPs
+  // settle (each round moves halfway, so it cannot swing back and forth)
+  const sipFrom = (mappings) => {
+    const att = attributeFamilyGoals({ goals, mappings, mfHoldings, stockHoldings, otherInvList, allocMap })
+    return Object.fromEntries(goals.map((g) => [g.goalId, ((att[g.goalId]?.items) || []).filter((it) => it.kind === 'mf').reduce((t, it) => t + (Number(it.holding?.ongoingSIP) || 0) * (it.fraction || 0), 0)]))
+  }
+  const reserved = savedLinks || [] // goals past their date keep the shares saved in the sheet
+  let shared = sharePool({ goals, items, reserved }), sipOf = null
+  for (let k = 0; k < 8; k++) {
+    const next = sipFrom(shared.mappings)
+    const merged = sipOf ? Object.fromEntries(Object.keys(next).map((id) => [id, (next[id] + sipOf[id]) / 2])) : next
+    const same = sipOf && Object.keys(merged).every((id) => Math.abs(merged[id] - sipOf[id]) < 100)
+    sipOf = merged
+    shared = sharePool({ goals, items, sipOf, reserved })
+    if (same) break
+  }
+  // last pass: a goal is never left short while money is free — count only the SIP it surely gets
+  for (let k = 0; k < 3; k++) {
+    const act = sipFrom(shared.mappings)
+    const short = goals.some((g) => (act[g.goalId] || 0) < (sipOf[g.goalId] || 0) - 100)
+    if (!short) break
+    sipOf = Object.fromEntries(Object.keys(act).map((id) => [id, Math.min(act[id], sipOf[id])]))
+    shared = sharePool({ goals, items, sipOf, reserved })
+  }
+  return { items, choice, eqOf, allocMap, ...shared }
+}
+
 export function useGoalPool() {
   const d = useData()
   const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
-  return useMemo(() => {
-    const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
-    const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
-    const choice = readPoolChoice(settings)
-    const goals = (goalList || []).filter((g) => g.isActive !== false)
-    // owners: MF portfolios get theirs from the investment account, stock portfolios from the member id
-    const people = members || []
-    const mfP = resolvePortfolioOwners(mfPortfolios, investmentAccounts, people)
-    const stP = (stockPortfolios || []).map((p) => ({ ...p, ownerName: p.ownerName || people.find((m) => m.memberId === p.ownerId)?.memberName || '' }))
-    const withGoal = new Set(goals.map((g) => String(g.familyMemberName || '').trim().toLowerCase()))
-    const kidNames = people.filter((m) => /^(son|daughter)$/i.test(String(m.relationship || '').trim()) && !withGoal.has(String(m.memberName || '').trim().toLowerCase())).map((m) => m.memberName)
-    const items = poolItems({ mfPortfolios: mfP, mfHoldings, stockPortfolios: stP, stockHoldings, otherInvList, eqOf, choice, kidNames })
-    // pass 1 without SIPs tells which funds (and so which running SIPs) each goal gets; pass 2 counts those SIPs,
-    // so a goal's share is what it needs today with its SIP (same "Need today" the goal shows). Both passes
-    // use today's data only, so the result is stable.
-    // which SIPs a goal gets depends on which funds it gets, and that depends on its SIP: repeat until the SIPs
-    // settle (each round moves halfway, so it cannot swing back and forth)
-    const sipFrom = (mappings) => {
-      const att = attributeFamilyGoals({ goals, mappings, mfHoldings, stockHoldings, otherInvList, allocMap })
-      return Object.fromEntries(goals.map((g) => [g.goalId, ((att[g.goalId]?.items) || []).filter((it) => it.kind === 'mf').reduce((t, it) => t + (Number(it.holding?.ongoingSIP) || 0) * (it.fraction || 0), 0)]))
-    }
-    const reserved = savedLinks || [] // goals past their date keep the shares saved in the sheet
-    let shared = sharePool({ goals, items, reserved }), sipOf = null
-    for (let k = 0; k < 8; k++) {
-      const next = sipFrom(shared.mappings)
-      const merged = sipOf ? Object.fromEntries(Object.keys(next).map((id) => [id, (next[id] + sipOf[id]) / 2])) : next
-      const same = sipOf && Object.keys(merged).every((id) => Math.abs(merged[id] - sipOf[id]) < 100)
-      sipOf = merged
-      shared = sharePool({ goals, items, sipOf, reserved })
-      if (same) break
-    }
-    // last pass: a goal is never left short while money is free — count only the SIP it surely gets
-    for (let k = 0; k < 3; k++) {
-      const act = sipFrom(shared.mappings)
-      const short = goals.some((g) => (act[g.goalId] || 0) < (sipOf[g.goalId] || 0) - 100)
-      if (!short) break
-      sipOf = Object.fromEntries(Object.keys(act).map((id) => [id, Math.min(act[id], sipOf[id])]))
-      shared = sharePool({ goals, items, sipOf, reserved })
-    }
-    return { items, choice, eqOf, allocMap, ...shared }
-  }, [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, savedLinks])
+  return useMemo(() => computeGoalPool(d), [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, savedLinks]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /**
