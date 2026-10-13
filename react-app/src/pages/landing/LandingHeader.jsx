@@ -20,7 +20,7 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
           {families ? (
             <span className="lh-fam" title="Families using Capital Friends">
               <svg width={isMobile ? 52 : 64} height={isMobile ? 26 : 30} viewBox="-16 -16 84 32" aria-hidden="true">
-                {['mother', 'spouse', 'you'].map((k, n) => <g key={k} transform={`translate(${n * 24} 0)`}><circle r="15.5" fill="#0b1120" /><Bust k={k} r={14} /></g>)}
+                {['mother', 'spouse', 'you'].map((k, n) => <g key={k} transform={`translate(${n * 24} 0)`}><circle r="15.5" fill="#25215e" /><Bust k={k} r={14} /></g>)}
               </svg>
               <span className="lh-famt"><b>{families.toLocaleString('en-IN')}</b>{!isMobile && <> families</>}<i className="lh-live" /></span>
             </span>
@@ -36,12 +36,15 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
 }
 
 const CSS = `
-.lh{position:sticky;top:0;z-index:100;padding:12px 24px 0;background:linear-gradient(180deg,#f6f8fc 60%,rgba(246,248,252,0));pointer-events:none}
-.lh-in{pointer-events:auto;position:relative;overflow:hidden;max-width:1240px;margin:0 auto;height:56px;padding:0 10px 0 18px;border-radius:18px;background:rgba(11,17,32,.94);backdrop-filter:blur(12px);box-shadow:0 16px 36px -20px rgba(11,17,32,.7),inset 0 0 0 1px rgba(255,255,255,.06);transition:box-shadow .25s;display:flex;align-items:center;justify-content:space-between;gap:16px;box-sizing:border-box}
+.lh{position:sticky;top:0;z-index:100;overflow:hidden;background:linear-gradient(100deg,#1e1b4b 0%,#25215e 45%,#123d48 100%);box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:box-shadow .25s}
+.lh.sc{box-shadow:0 12px 30px -18px rgba(30,27,75,.75)}
+.lh::before{content:'';position:absolute;inset:0;background:radial-gradient(40% 140% at 15% 0%,rgba(124,58,237,.35),transparent 70%),radial-gradient(35% 140% at 85% 100%,rgba(20,184,166,.28),transparent 70%);animation:lhGlow 14s ease-in-out infinite alternate;pointer-events:none}
+@keyframes lhGlow{to{transform:translateX(4%)}}
+.lh-in{position:relative;max-width:1360px;margin:0 auto;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-sizing:border-box}
 .lh-logo{text-decoration:none;display:inline-flex;align-items:center;gap:10px}
 .lh-wm{font-family:Inter,system-ui,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#fff;white-space:nowrap}.lh-wm em{font-style:normal;color:#34d399}
 .lh-r{display:flex;align-items:center;gap:6px}
-.lh-fam{display:inline-flex;align-items:center;gap:8px;margin-right:8px;padding:3px 14px 3px 4px;border-radius:999px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.lh-fam{display:inline-flex;align-items:center;gap:8px;margin-right:8px;padding:3px 14px 3px 4px;border-radius:999px;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
 .lh-famt{display:inline-flex;align-items:center;gap:6px;font-family:Inter,system-ui,sans-serif;font-size:13px;font-weight:500;color:#cbd5e1;white-space:nowrap}.lh-famt b{color:#fff;font-weight:800;font-size:14px}
 .lh-live{width:7px;height:7px;border-radius:50%;background:#34d399;animation:lhLive 1.8s infinite}
 @keyframes lhLive{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
@@ -51,8 +54,8 @@ const CSS = `
 .lh-ic:hover{color:#fff;background:rgba(255,255,255,.08)}
 .lh-go{display:inline-flex;align-items:center;height:36px;padding:0 16px;margin-left:6px;border-radius:999px;border:0;cursor:pointer;color:#0b1120;font-family:Inter,system-ui,sans-serif;font-weight:700;font-size:13.5px;background:#fff;opacity:0;width:0;padding:0;margin:0;overflow:hidden;pointer-events:none;transition:opacity .25s,width .25s,padding .25s,margin .25s}
 .lh-go.on{opacity:1;width:auto;padding:0 16px;margin-left:6px;pointer-events:auto}
-.lh-line{position:absolute;left:18px;right:18px;bottom:0;height:2px;border-radius:2px;background:linear-gradient(90deg,#14b8a6,#7c3aed,#0ea5e9,#f59e0b,#10b981,#14b8a6);background-size:200% 100%;animation:lhLine 12s linear infinite;opacity:.9}
+.lh-line{display:none;background:linear-gradient(90deg,#14b8a6,#7c3aed,#0ea5e9,#f59e0b,#10b981,#14b8a6);background-size:200% 100%;animation:lhLine 12s linear infinite;opacity:.9}
 @keyframes lhLine{to{background-position:200% 0}}
-.lh.m{padding:8px 10px 0}.lh.m .lh-in{height:52px;padding:0 8px 0 12px;border-radius:16px}.lh.m .lh-wm{font-size:15.5px}
+.lh.m .lh-in{height:54px;padding:0 12px}.lh.m .lh-wm{font-size:15.5px}
 @media (prefers-reduced-motion:reduce){.lh-line{animation:none}}
 `

@@ -197,7 +197,7 @@ function SceneAll() {
 
 /* 3 · CAS statement → read for you → every fund in the app */
 function SceneCas() {
-  const funds = [[C.violet, 'Parag Parikh Flexi Cap', '₹6.4 L', '+18%'], [C.teal, 'HDFC Balanced Advantage', '₹4.1 L', '+13%'], [C.amber, 'Nippon Multi-Asset FoF', '₹2.9 L', '+15%'], [C.sky, 'ICICI Liquid', '₹1.2 L', '+7%'], [C.emerald, 'UTI Nifty 50 Index', '₹3.6 L', '+16%']]
+  const funds = [[C.violet, 'Flexi Cap Fund', '₹6.4 L', '+18%'], [C.teal, 'Balanced Advantage Fund', '₹4.1 L', '+13%'], [C.amber, 'Multi-Asset FoF', '₹2.9 L', '+15%'], [C.sky, 'Liquid Fund', '₹1.2 L', '+7%'], [C.emerald, 'Nifty 50 Index Fund', '₹3.6 L', '+16%']]
   return (
     <svg viewBox={VB} className="st-svg" aria-label="A CAS statement PDF turning into the family's funds in the app">
       <g transform="translate(90 70) scale(1.15)"><g className="st-rise">
@@ -236,50 +236,70 @@ function SceneCas() {
   )
 }
 
-/* 4 · alerts: a fund falls below its all-time high → Buy / Strong Buy alerts, plus rebalance alerts */
+/* 4 · alerts: a fund falls 5% / 10% below its peak (all-time high), and a rebalance alert — facts by colour, no buy/sell calls */
 G.bell = <path d="M-8 5 V-2 A8 8 0 0 1 8 -2 V5 L11 8 H-11 Z M-3.2 10 A3.2 3.2 0 0 0 3.2 10 Z" fill="currentColor" />
 function SceneAlerts() {
-  const y = (pct) => 80 + pct * 11      // 0% below the high at y 80, each 1% lower = 11px
-  const line = 'M40 262 C90 240 120 205 160 172 S220 92 262 80 S330 118 372 136 S442 150 472 176 S522 206 548 212'
+  const y = (pct) => 96 + pct * 12          // 0% below the high at y 96, every 1% lower = 12px
+  const line = 'M70 300 C120 280 150 240 196 200 S270 104 320 96 S400 132 444 156 S520 172 556 210 S612 236 640 240'
+  const area = `${line} V350 H70 Z`
+  // how far below its peak, by colour: amber 5–10%, rose 10%+; violet for a rebalance
+  const NOTE = [['Small cap fund', '12%', 'below its peak', '#e11d48', 4.3, 'down'],
+    ['Flexi cap fund', '6%', 'below its peak', '#d97706', 5.0, 'down'],
+    ['Equity vs. your target', '8%', 'above target · rebalance', C.violet, 5.7, 'up']]
   return (
-    <svg viewBox={VB} className="st-svg" aria-label="The app watches each fund's all-time high and alerts you when it falls 5% or 10% below it">
-      <g transform="translate(64 40)"><g className="st-rise" style={T(0.1)}>
-        <rect width="604" height="340" rx="20" fill="#fff" stroke={C.line} strokeWidth="1.5" />
-        <Tx x={28} y={38} s={14} w={800} c={C.navy}>Axis Small Cap Fund</Tx>
-        <Tx x={28} y={56} s={11} w={600} c={C.slate}>NAV · last 2 years</Tx>
-        {/* zones */}
-        <rect x="40" y={y(5)} width="520" height={y(10) - y(5)} fill="#eff6ff" />
-        <rect x="40" y={y(10)} width="520" height={y(20) - y(10)} fill="#ecfdf5" />
-        <Tx x={52} y={y(5) + 18} s={10.5} w={800} c="#2563eb">5% below the high · Buy</Tx>
-        <Tx x={52} y={y(20) - 12} s={10.5} w={800} c="#059669">10% below the high · Strong Buy</Tx>
-        {/* the all-time high */}
-        <line x1="40" x2="560" y1={y(0)} y2={y(0)} stroke="#c62828" strokeWidth="1.5" strokeDasharray="6 6" />
-        <path className="st-line2" style={T(0.5)} d={line} fill="none" stroke={C.navy} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-        <g transform={`translate(262 ${y(0)})`}><g className="st-pop" style={T(1.4)}>
-          <circle r="7" fill="#fff" stroke="#c62828" strokeWidth="3" />
-          <rect x="-58" y="-38" width="116" height="24" rx="12" fill="#fee2e2" />
-          <Tx y={-21.5} s={10.5} w={800} c="#c62828" a="middle">All-time high ₹52.10</Tx>
-        </g></g>
-        <g transform={`translate(548 212)`}><g className="st-pop" style={T(2.6)}>
-          <circle className="st-halo" r="16" fill={C.emerald} opacity=".25" />
-          <circle r="7" fill={C.emerald} stroke="#fff" strokeWidth="2.5" />
-          <rect x="-150" y="14" width="140" height="26" rx="13" fill={C.navy} />
-          <Tx x={-80} y={31} s={11} w={800} c="#fff" a="middle">₹45.80 · ▼ 12%</Tx>
-        </g></g>
+    <svg viewBox={VB} className="st-svg" aria-label="The app watches each fund's peak (all-time high) and alerts you on your phone when it falls 5% or 10% below it">
+      <defs><linearGradient id="st-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={C.navy} stopOpacity=".14" /><stop offset="1" stopColor={C.navy} stopOpacity="0" /></linearGradient></defs>
+      {/* the fund and its all-time high */}
+      <Tx x={70} y={44} s={15} w={800} c={C.navy}>A fund you hold</Tx>
+      <Tx x={70} y={64} s={11.5} w={600} c={C.slate}>NAV, last 2 years</Tx>
+      <line x1="70" x2="660" y1={y(0)} y2={y(0)} stroke={C.navy} strokeOpacity=".5" strokeWidth="1.5" strokeDasharray="6 6" />
+      <line x1="70" x2="660" y1={y(5)} y2={y(5)} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 6" />
+      <line x1="70" x2="660" y1={y(10)} y2={y(10)} stroke="#e11d48" strokeOpacity=".7" strokeWidth="1.5" strokeDasharray="3 6" />
+      <Tx x={664} y={y(0) + 4} s={10.5} w={800} c={C.navy}>Peak</Tx>
+      <Tx x={664} y={y(5) + 4} s={10.5} w={800} c="#d97706">−5%</Tx>
+      <Tx x={664} y={y(10) + 4} s={10.5} w={800} c="#e11d48">−10%</Tx>
+      <path d={area} fill="url(#st-area)" className="st-pop" style={T(1.8)} />
+      <path className="st-line2" style={T(0.4)} d={line} fill="none" stroke={C.navy} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* the crown at the top */}
+      <g transform={`translate(320 ${y(0)})`}><g className="st-pop" style={T(1.3)}>
+        <circle r="7" fill="#fff" stroke={C.navy} strokeWidth="3" />
+        <path d="M-12 -18 L-12 -30 L-6 -24 L0 -32 L6 -24 L12 -30 L12 -18 Z" fill="#f59e0b" />
+        <Tx y={-40} s={11} w={800} c={C.navy} a="middle">Peak ₹52.10</Tx>
       </g></g>
-      <Flow d="M690 210 H720" c={C.rose} t={2.6} dot={false} />
-      {[['Axis Small Cap Fund', '▼ 12% below its high', 'Strong Buy', '#059669', '#ecfdf5', 2.8],
-        ['Parag Parikh Flexi Cap', '▼ 6% below its high', 'Buy', '#2563eb', '#eff6ff', 3.4],
-        ['Rebalance', 'Equity 8% above target', 'Review', '#b45309', '#fef3c7', 4.0]].map(([n, sub, tag, tc, tb, t], i) => (
-        <g key={n} transform={`translate(730 ${66 + i * 104})`}><g className="st-notif" style={T(t)}>
-          <rect width="336" height="86" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
-          <g transform="translate(40 43)"><circle r="22" fill={`color-mix(in srgb, ${C.rose} 12%, #fff)`} /><g className={i === 0 ? 'st-ring' : ''} style={{ color: C.rose }}>{G.bell}</g></g>
-          <Tx x={76} y={38} s={13} w={800} c={C.navy}>{n}</Tx>
-          <Tx x={76} y={58} s={11.5} w={600} c={C.slate}>{sub}</Tx>
-          <rect x={318 - tag.length * 7 - 20} y="31" width={tag.length * 7 + 20} height="24" rx="12" fill={tb} />
-          <Tx x={318 - (tag.length * 7 + 20) / 2} y={47} s={11} w={800} c={tc} a="middle">{tag}</Tx>
+      {/* today's price walks down the line; each line it crosses sends an alert */}
+      <g className="st-walk" style={{ offsetPath: `path('${line}')`, animationDelay: '.6s' }}>
+        <circle className="st-halo" r="14" fill={C.rose} opacity=".25" /><circle r="7" fill={C.rose} stroke="#fff" strokeWidth="2.5" />
+      </g>
+      {[[412, y(5), '5% below peak', '#d97706', 3.3], [556, y(10), '10% below peak', '#e11d48', 4.1]].map(([x, yy, l, c, t]) => (
+        <g key={l} transform={`translate(${x + 96} ${yy - 30})`}><g className="st-pop" style={T(t)}>
+          <rect x={-(l.length * 3.2) - 24} y="-14" width={l.length * 6.4 + 48} height="26" rx="13" fill={c} />
+          <g transform={`translate(${-(l.length * 3.2) - 10} -1) scale(.55)`} style={{ color: '#fff' }}>{G.bell}</g>
+          <Tx x={6} y={4} s={11} w={800} c="#fff" a="middle">{l}</Tx>
         </g></g>
       ))}
+      {/* …and lands on your phone */}
+      <Flow d="M690 220 C720 220 730 220 770 220" c={C.rose} t={4.1} />
+      <g transform="translate(784 18)"><g className="st-rise" style={T(0.2)}>
+        <rect width="236" height="388" rx="36" fill={C.navy} />
+        <rect x="9" y="9" width="218" height="370" rx="28" fill="#f8fafc" />
+        <rect x="88" y="18" width="60" height="16" rx="8" fill={C.navy} />
+        <Tx x={28} y={30} s={10.5} w={800} c={C.navy}>9:41</Tx>
+        <Tx x={118} y={70} s={30} w={300} c={C.navy} a="middle">9:41</Tx>
+        <Tx x={118} y={88} s={10} w={600} c={C.slate} a="middle">Monday, 13 October</Tx>
+        {NOTE.map(([n, pct, sub, c, t, dir], i) => (
+          <g key={n} transform={`translate(20 ${108 + i * 84})`}><g className="st-drop" style={T(t)}>
+            <rect width="196" height="74" rx="16" fill="#fff" stroke={C.line} />
+            <rect x="0" y="14" width="4" height="46" rx="2" fill={c} />
+            <Tx x={16} y={22} s={8.5} w={700} c="#94a3b8" letterSpacing=".05em">CAPITAL FRIENDS</Tx>
+            <Tx x={182} y={22} s={8.5} w={600} c="#94a3b8" a="end">now</Tx>
+            <Tx x={16} y={40} s={11.5} w={700} c={C.navy}>{n}</Tx>
+            <g transform="translate(16 60)">
+              <path d={dir === 'down' ? 'M0 -8 L9 -8 L4.5 -1 Z' : 'M0 -1 L9 -1 L4.5 -8 Z'} fill={c} />
+              <Tx x={14} s={11.5} w={800} c={c}>{pct}<tspan dx="4" fontSize="10" fontWeight="500" fill={C.slate}>{sub}</tspan></Tx>
+            </g>
+          </g></g>
+        ))}
+      </g></g>
     </svg>
   )
 }
@@ -447,7 +467,7 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
 }
 
 const CSS = `
-.st{position:relative;overflow:hidden;background:linear-gradient(180deg,#f6f8fc 0%,#ffffff 70%);height:calc(100vh - 68px);min-height:600px;max-height:940px;display:flex;flex-direction:column}
+.st{position:relative;overflow:hidden;background:linear-gradient(180deg,#f6f8fc 0%,#ffffff 70%);height:calc(100vh - 60px);min-height:600px;max-height:940px;display:flex;flex-direction:column}
 .st-legal{position:absolute;z-index:4;right:32px;bottom:22px;display:flex;gap:16px}
 .st-legal a{font-family:Inter,system-ui,sans-serif;font-size:12px;font-weight:500;color:#94a3b8;text-decoration:none}.st-legal a:hover{color:#0b1120;text-decoration:underline}
 .st-glow{position:absolute;left:10%;top:6%;width:80%;height:80%;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--c) 16%,transparent),transparent 72%);transition:background .8s ease;pointer-events:none}
@@ -541,6 +561,10 @@ const CSS = `
 @keyframes stNotif{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
 .st-ring{transform-box:fill-box;transform-origin:50% 0;animation:stRingB 1s ease-in-out 3.2s 2}
 @keyframes stRingB{0%,100%{transform:rotate(0)}20%{transform:rotate(16deg)}40%{transform:rotate(-14deg)}60%{transform:rotate(9deg)}80%{transform:rotate(-5deg)}}
+.st-walk{offset-rotate:0deg;animation:stWalk 4.4s cubic-bezier(.4,0,.6,1) both}
+@keyframes stWalk{from{offset-distance:0%;opacity:0}6%{opacity:1}to{offset-distance:100%;opacity:1}}
+.st-drop{animation:stDrop .55s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes stDrop{from{transform:translateY(-22px);opacity:0}to{transform:none;opacity:1}}
 @keyframes stPress{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
 @keyframes stCursor{from{offset-distance:0%;opacity:0}20%{opacity:1}to{offset-distance:100%;opacity:1}}
 @keyframes stDraw{to{stroke-dashoffset:0}}
