@@ -4,7 +4,8 @@ import { useToast } from '../context/ToastContext'
 import { riskFraction, attributeFamilyGoals } from '../utils/goalAttribution'
 import { poolItems, sharePool, linksChanged } from '../utils/goalPool'
 import { resolvePortfolioOwners } from '../utils/fundsDashboard'
-import { withPortfolioSip } from '../utils/portfolioSip'
+import { withPortfolioSip, itemsMonthly } from '../utils/portfolioSip'
+import { withGoalExtras } from '../utils/goalExtras'
 
 /** The person's "Money for goals" switches, kept in the Settings tab as JSON { off: [ids], on: [ids] }. */
 export function readPoolChoice(settings) {
@@ -19,7 +20,7 @@ export function computeGoalPool(d) {
   const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
   const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
   const choice = readPoolChoice(settings)
-  const goals = (goalList || []).filter((g) => g.isActive !== false)
+  const goals = (withGoalExtras(goalList, settings) || []).filter((g) => g.isActive !== false)
   // owners: MF portfolios get theirs from the investment account, stock portfolios from the member id
   const people = members || []
   const mfP = resolvePortfolioOwners(mfPortfolios, investmentAccounts, people)
@@ -34,7 +35,7 @@ export function computeGoalPool(d) {
   // settle (each round moves halfway, so it cannot swing back and forth)
   const sipFrom = (mappings) => {
     const att = attributeFamilyGoals({ goals, mappings, mfHoldings, stockHoldings, otherInvList, allocMap })
-    return Object.fromEntries(goals.map((g) => [g.goalId, ((att[g.goalId]?.items) || []).filter((it) => it.kind === 'mf').reduce((t, it) => t + (Number(it.holding?.ongoingSIP) || 0) * (it.fraction || 0), 0)]))
+    return Object.fromEntries(goals.map((g) => [g.goalId, itemsMonthly(att[g.goalId]?.items)]))
   }
   const reserved = savedLinks || [] // goals past their date keep the shares saved in the sheet
   let shared = sharePool({ goals, items, reserved }), sipOf = null

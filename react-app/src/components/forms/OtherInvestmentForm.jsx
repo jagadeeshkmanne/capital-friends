@@ -4,6 +4,7 @@ import { formatINR } from '../../data/familyData'
 import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton, FormDateInput } from '../Modal'
 import { useMask } from '../../context/MaskContext'
 import { useMetalPrices, metalLiveValue } from '../../utils/metals'
+import { CONTRIB_TYPES_RE } from '../../utils/portfolioSip'
 
 const INVESTMENT_TYPES = [
   { value: 'Cash / Savings', category: 'Cash' },
@@ -17,6 +18,7 @@ const INVESTMENT_TYPES = [
   { value: 'Digital Gold', category: 'Gold' },
   { value: 'Real Estate', category: 'Property' },
   { value: 'Bonds', category: 'Debt' },
+  { value: 'Recurring Deposit', category: 'Debt' },
   { value: 'Physical Silver', category: 'Silver' },
   { value: 'Digital Silver', category: 'Silver' },
   { value: 'Equity', category: 'Equity' },              // shares held elsewhere, foreign equity, PMS… (counted as equity)
@@ -103,6 +105,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
   // Metal-specific fields
   const [weightGrams, setWeightGrams] = useState(initDynamic.weightGrams || '')
   const [maturityDate, setMaturityDate] = useState(initDynamic.maturityDate || '')
+  const [monthly, setMonthly] = useState(initDynamic.monthlyContribution ? String(initDynamic.monthlyContribution) : '')
   const [purity, setPurity] = useState(initDynamic.purity || '')
   const [calculatedValue, setCalculatedValue] = useState(null)
   const [showQuickLoan, setShowQuickLoan] = useState(false)
@@ -189,6 +192,8 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
     }
     // FD maturity date: the retirement buckets use it ("matures in March, it refills Income")
     if (/fixed deposit|^fd$/i.test(form.investmentType) && maturityDate) data.dynamicFields = { ...(data.dynamicFields || {}), maturityDate }
+    // EPF / PPF / NPS / RD: the money that goes in every month counts like a SIP for its goal
+    if (CONTRIB_TYPES_RE.test(form.investmentType || '')) data.dynamicFields = { ...initDynamic, ...(data.dynamicFields || {}), monthlyContribution: Number(monthly) || 0 }
     if (showQuickLoan && quickLoan.lenderName) {
       data.quickLoan = {
         liabilityType: LOAN_SUGGESTIONS[form.investmentType] || 'Personal Loan',
@@ -241,6 +246,13 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
           <FormInput type="number" value={form.currentValue} onChange={(v) => set('currentValue', v)} placeholder="e.g., 537500" />
         </FormField>
       </div>
+
+      {CONTRIB_TYPES_RE.test(form.investmentType || '') && (
+        <FormField label="Monthly contribution (optional)">
+          <FormInput type="number" value={monthly} onChange={setMonthly} placeholder={/epf|vpf/i.test(form.investmentType) ? 'yours + employer, e.g., 7200' : 'e.g., 5000'} />
+          <p className="text-[11px] text-[var(--text-dim)] mt-1">What goes in every month. Your goals count it like a SIP, so retirement doesn't look short when it isn't.</p>
+        </FormField>
+      )}
 
       {/fixed deposit|^fd$/i.test(form.investmentType) && (
         <FormField label="Maturity date (optional)">

@@ -17,7 +17,7 @@
  *    dashboard, email report and everything else keep working unchanged.
  */
 import { getRecommendedAllocation } from '../data/glidePath'
-import { needToday } from './goalPlan'
+import { needTodayN } from './goalPlan'
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
 const RET_ONLY = ['epf', 'ppf', 'nps', 'vpf', 'sukanya samriddhi', 'sukanya', 'ssy']
@@ -81,7 +81,7 @@ export function goalWant(g, now = new Date(), sip = 0) {
   const r = Number(g.expectedCAGR) || 0.12
   // the emergency fund must be there in full today (it is not invested to grow)
   // what it should hold today so that this + its running SIP reaches the amount (the same "Need today" the goal shows)
-  const want = years > 0 && !isEF(g) ? needToday({ target, years, annualReturn: r, sip: Number(sip) || 0 }) : target
+  const want = years > 0 && !isEF(g) ? needTodayN({ target, years, annualReturn: r, sip: Number(sip) || 0, payYears: g.payYears }) : target
   // a retirement goal keeps its mix after the date (the money must last for decades); other goals are spent then
   const eq = isEF(g) || (years <= 0 && !isRet(g)) ? 0 : getRecommendedAllocation(g.goalType, years).equity / 100
   return { want, eq, years, target }

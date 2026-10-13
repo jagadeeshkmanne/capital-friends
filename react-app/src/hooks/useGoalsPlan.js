@@ -6,17 +6,19 @@ import { familyPlan } from '../utils/familyPlan'
 import { goalTodo } from '../utils/goalTodo'
 import { useGoalPool } from './useGoalPoolSync'
 import { withPortfolioSip } from '../utils/portfolioSip'
+import { withGoalExtras } from '../utils/goalExtras'
 
 /** The goals plan for all active goals (pool mode), the one family plan, and "To do this month" — shared by the
  *  Goals page and the app-wide "can't reach your goals" banner. */
 export function useGoalsPlan() {
-  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios } = useData()
+  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, settings } = useData()
   const pool = useGoalPool()
-  return useMemo(() => computeGoalsPlan({ goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios }, pool), [goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, pool])
+  return useMemo(() => computeGoalsPlan({ goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, settings }, pool), [goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, settings, pool])
 }
 
 /** Same, from plain data and a computeGoalPool() result (used by the validation tests). */
-export function computeGoalsPlan({ goalList, mfHoldings: rawHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios }, pool) {
+export function computeGoalsPlan({ goalList: rawGoals, mfHoldings: rawHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, settings }, pool) {
+  const goalList = withGoalExtras(rawGoals, settings) // repeat / paid-over-years settings
   const mfHoldings = withPortfolioSip(rawHoldings, mfPortfolios) // a portfolio SIP with no fund targets set still counts
   const goalPortfolioMappings = pool.mappings
   if (!goalList) return { plan: null, todo: null, pool }
@@ -31,6 +33,6 @@ export function computeGoalsPlan({ goalList, mfHoldings: rawHoldings, stockHoldi
   // goals whose date has passed are waiting to be withdrawn: they take no part in the equity / safe moves
   plan.family = familyPlan({ plans: plan.goals.filter((p) => !(p.years <= 0 && !p.isRet)), mfHoldings, included, cashItems, eqOf, lockedIds: new Set(pool.items.filter((i) => i.locked).map((i) => i.id)) })
   plan.extra = pool.extra || 0
-  const todo = goalTodo({ plans: plan.goals, family: plan.family, poolItems: pool.items, mfHoldings, mfPortfolios })
+  const todo = goalTodo({ plans: plan.goals, family: plan.family, poolItems: pool.items, mfHoldings, mfPortfolios, otherInvList })
   return { plan, todo, pool, active, allocMap }
 }

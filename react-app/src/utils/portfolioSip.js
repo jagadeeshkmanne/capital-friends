@@ -24,3 +24,25 @@ export function withPortfolioSip(mfHoldings, mfPortfolios) {
   if (!changed) return mfHoldings
   return mfHoldings.map((h) => { const v = fill[h.portfolioId + '::' + (h.schemeCode || h.fundCode)]; return v != null ? { ...h, ongoingSIP: Math.round(v) } : h })
 }
+
+// Monthly money going into an Other Investment (EPF, PPF, NPS, VPF, Sukanya, RD): saved as
+// dynamicFields.monthlyContribution. It counts like a SIP for the goal that investment belongs to.
+export const CONTRIB_TYPES_RE = /^(epf|vpf|ppf|nps|sukanya|ssy|recurring deposit|rd)\b/i
+export function monthlyContribution(inv) {
+  if (!inv) return 0
+  let d = inv.dynamicFields
+  if (typeof d === 'string') { try { d = JSON.parse(d || '{}') } catch { d = {} } }
+  const v = Number(d && d.monthlyContribution) || 0
+  return v > 0 ? v : 0
+}
+/** a goal's monthly money: its share of the MF SIPs + of the monthly contributions to its Other Investments */
+export function itemsMonthly(items) {
+  return (items || []).reduce((t, it) => {
+    if (it.kind === 'mf') return t + (Number(it.holding?.ongoingSIP) || 0) * (it.fraction || 0)   // same as before
+    if (it.kind !== 'other') return t
+    const c = monthlyContribution(it.holding)
+    if (!c) return t
+    const cur = Number(it.holding?.currentValue) || 0
+    return t + c * (it.fraction ?? (cur > 0 ? Math.min(1, (Number(it.value) || 0) / cur) : 1))   // its share of the investment
+  }, 0)
+}

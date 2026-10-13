@@ -1,3 +1,4 @@
+import { itemsMonthly } from './portfolioSip'
 /**
  * Goal plan: the numbers and steps behind the new Goals view (pages/goals/GoalsPlanPage.jsx).
  *
@@ -30,6 +31,21 @@ export function needToday({ target, years, annualReturn, sip }) {
   const rm = monthlyRate(annualReturn), n = Math.round(years * 12)
   const pvTarget = target / Math.pow(1 + annualReturn, years)
   const pvSip = rm > 0 ? sip * (1 - Math.pow(1 + rm, -n)) / rm : sip * n
+  return Math.max(0, pvTarget - pvSip)
+}
+
+/**
+ * Same as needToday, for an amount paid over several years (payYears equal parts, the first on the goal date):
+ * each part needs less today because it is spent later. payYears 1 = needToday exactly.
+ */
+export function needTodayN({ target, years, annualReturn, sip, payYears = 1 }) {
+  const n = Math.max(1, Math.round(Number(payYears) || 1))
+  if (n === 1 || !(years > 0)) return needToday({ target, years, annualReturn, sip })
+  const part = target / n
+  let pvTarget = 0
+  for (let k = 0; k < n; k++) pvTarget += part / Math.pow(1 + annualReturn, years + k)
+  const rm = monthlyRate(annualReturn), m = Math.round(years * 12)
+  const pvSip = rm > 0 ? sip * (1 - Math.pow(1 + rm, -m)) / rm : sip * m
   return Math.max(0, pvTarget - pvSip)
 }
 
@@ -151,7 +167,8 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     const att = attribution?.[g.goalId] || { total: 0, equity: 0, items: [] }
     // SIP actually running today = the goal's share of the ongoing SIPs in its linked funds.
     // (goal.monthlyInvestment is the SIP the plan NEEDS, not money that is really going in.)
-    const sip = Math.round((att.items || []).filter((it) => it.kind === 'mf').reduce((s2, it) => s2 + (Number(it.holding.ongoingSIP) || 0) * (it.fraction || 0), 0))
+    // + monthly contributions to its EPF / PPF / NPS / RD (when the person entered them)
+    const sip = Math.round(itemsMonthly(att.items))
     const plannedSip = Number(g.monthlyInvestment) || 0
     // pool mode: a goal has only what the pool gives it (the old saved currentValue would count money twice)
     const has = att.total > 0 || pool ? att.total : (Number(g.currentValue) || 0)
@@ -160,7 +177,7 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     const bucketMode = isRet && followsBucketPlan(g.goalType, years)
     const eqNow = att.total > 0 ? Math.round(att.equity / att.total * 100) : null
     // the emergency fund is needed in full today (pool mode); other goals can grow towards their date
-    const need = pool && g.goalType === 'Emergency Fund' ? target : needToday({ target, years, annualReturn: r, sip })
+    const need = pool && g.goalType === 'Emergency Fund' ? target : needTodayN({ target, years, annualReturn: r, sip, payYears: g.payYears })
     const gap = has - need
     const tol = Math.max(1000, 0.02 * need)
     // pool mode: a goal that already holds its full amount before its date is "achieved" (covered). Its mix still
@@ -187,7 +204,7 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
       steps.push({ t: 'sip', amount: addSip, lump: -gap, sipFrom: sip, sipTo: sip + addSip, fund: sipFund, wantEq, split })
     }
     // the monthly SIP this goal needs from today, given what it already holds (0 when it is already covered)
-    const sipNeeded = years > 0 ? sipForAmount({ amountToday: Math.max(0, needToday({ target, years, annualReturn: r, sip: 0 }) - has), years, annualReturn: r }) : 0
+    const sipNeeded = years > 0 ? sipForAmount({ amountToday: Math.max(0, needTodayN({ target, years, annualReturn: r, sip: 0, payYears: g.payYears }) - has), years, annualReturn: r }) : 0
     return { goal: g, plannedSip, sipNeeded, years, yearsLeft: Math.ceil(years - 1e-9), r, sip, target, has, need, gap, state, eqNow, eqTarget: rec.equity, bucketMode, isRet, steps, addSip, lumpToday: state === 'short' ? -gap : 0, att }
   })
   // extra in one goal can pay for another goal's SIP: suggest moving SIP, never more than the goal's own SIP

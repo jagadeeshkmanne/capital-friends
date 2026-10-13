@@ -149,7 +149,7 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
           <div className="hv"><span><i>₹</i>Have today</span><b>{L(has)}</b><small>in Money for goals</small></div>
           <div className="nd"><span><i>◎</i>Need today</span><b>{L(need)}</b><small>with your SIPs</small></div>
           <div className={`gp ${short > 1000 ? 'warn' : 'ok'}`}><span><i>{short > 1000 ? '!' : '✓'}</i>Gap</span><b className={short > 1000 ? 'warn' : 'ok'}>{short > 1000 ? `${L(short)} short` : 'On track'}</b><small>{short > 1000 ? 'see below' : 'nothing to add'}</small></div>
-          <div className="tg"><span><i>↻</i>SIPs running</span><b>{L(todo.runningSip)}<em>/mo</em></b><small>all portfolios</small></div>
+          <div className="tg"><span><i>↻</i>SIPs running</span><b>{L(todo.runningSip)}<em>/mo</em></b><small>{todo.runningContrib > 0 ? `+ ${L(todo.runningContrib)}/mo into EPF / PPF / NPS` : 'all portfolios'}</small></div>
           {extra > 1000 && <div className="fr"><span><i>+</i>Free money</span><b>{L(extra)}</b><small>{extraEq}% equity · covers future gaps</small></div>}
         </div>
         <div className="g2-sumf"><Mix m={famMix} plan={fam && fam.P > 0 ? Math.round(fam.needEq) : null} /></div>

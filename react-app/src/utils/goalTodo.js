@@ -1,3 +1,4 @@
+import { monthlyContribution } from './portfolioSip'
 /**
  * "To do this month" for the Goals page: one list of exact steps (withdraw / SIP / buy / sell), worked out
  * from the goals plan (buildGoalPlan, pool mode) and the one family plan (familyPlan). Nothing to enter:
@@ -30,7 +31,7 @@ function portfolioFor(p, { mfHoldings, poolItems }) {
   return (own || mf.sort((a, b) => b.value - a.value)[0])?.id || null
 }
 
-export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPortfolios = [] }) {
+export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPortfolios = [], otherInvList = [] }) {
   const steps = []
   const included = new Set(poolItems.filter((i) => i.included).map((i) => i.id))
   const portSip = (pid) => Number((mfPortfolios || []).find((x) => x.portfolioId === pid)?.sipTarget) || 0
@@ -117,5 +118,7 @@ export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPor
   const runningSip = Math.round((mfHoldings || []).filter((h) => included.has(h.portfolioId) && Number(h.units) > 0).reduce((t, h) => t + (Number(h.ongoingSIP) || 0), 0))
   // a small top-up is just a step; the banner is for SIPs that clearly can't reach the goals
   const banner = short.length && extraSip >= Math.max(5000, runningSip * 0.25) ? { runningSip, extraSip, needSip: runningSip + extraSip, shortBy: short.reduce((t, p) => t - p.gap, 0) } : null
-  return { steps, banner, runningSip }
+  // monthly contributions to EPF / PPF / NPS / RD that are in Money for goals (shown next to the SIPs)
+  const runningContrib = Math.round((otherInvList || []).filter((i) => included.has(i.investmentId)).reduce((t, i) => t + monthlyContribution(i), 0))
+  return { steps, banner, runningSip, runningContrib }
 }
