@@ -6,6 +6,7 @@ import Modal from '../../components/Modal'
 import { List, Layers } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { RetirementActions } from './RetirementBucketsPage'
+import { bucketCheck, lastsYears } from '../../utils/bucketCheck'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -171,13 +172,19 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
   )
 }
 
+const ageNow = (g) => {
+  const d = g?.dob ? new Date(g.dob) : null
+  if (d && !isNaN(d)) return Math.floor((Date.now() - d.getTime()) / (365.25 * 864e5))
+  const ra = Number(g?.retirementAge), ty = new Date(g?.targetDate).getFullYear()
+  return ra > 0 && ty ? ra + (new Date().getFullYear() - ty) : null
+}
 const JC = { inc: '#34d399', stb: '#fbbf24', gro: '#a78bfa' }
 function JarSvg({ c, f }) {
   const y = 66 - Math.max(4, Math.min(1, f || 0) * 52)
   return <svg width="46" height="60" viewBox="0 0 54 70" aria-hidden="true"><rect x="15" y="2" width="24" height="7" rx="3" fill={c} /><path d="M12 12Q8 12 8 18L8 60Q8 66 14 66L40 66Q46 66 46 60L46 18Q46 12 42 12Z" fill="none" stroke={c} strokeWidth="2.4" /><rect x="10" y={y} width="34" height={64 - y} rx="4" fill={c} opacity=".55" /></svg>
 }
 /** Which jar an investment sits in today: liquid / short debt / cash → Income, other debt / hybrid → Stability, equity & gold → Growth */
-const LOCK_RE = /\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation|gratuity/i
+const LOCK_RE = /\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation/i
 /** EPF / PPF / NPS and similar: money you can't move today; it comes out only by its own rules (EPF at retirement or later, PPF at maturity). */
 const isLocked = (it) => it.kind === 'other' && LOCK_RE.test(`${it.holding?.investmentType || ''} ${it.holding?.investmentName || ''}`)
 const jarOf = (it) => {
@@ -188,22 +195,21 @@ const jarOf = (it) => {
   if (/cash|savings|fixed deposit|\bfd\b/i.test(t)) return 'inc'
   return 'stb'
 }
-/** Income should hold 2 years of expenses, Stability the next 5, Growth the rest. Shows what is extra or short
- *  in each jar and the move that fixes it. EPF / PPF / NPS are not counted as movable money. */
-function BucketGaps({ tgt, sum, lockedSum }) {
-  const inc = sum('inc'), stbFree = Math.max(0, sum('stb') - lockedSum), stb = sum('stb'), gro = sum('gro')
-  const extraInc = Math.max(0, inc - tgt.inc), shortInc = Math.max(0, tgt.inc - inc)
-  const shortStb = Math.max(0, tgt.stb - stb), shortGro = Math.max(0, tgt.gro - gro)
-  const lines = []
-  if (shortInc > 0) lines.push(`Income is ${L(shortInc)} short of 2 years of expenses. Move ${L(Math.min(shortInc, stbFree || shortInc))} from Stability to a liquid fund${stbFree < shortInc ? ' (EPF / PPF / NPS are not used for this)' : ''}.`)
-  if (extraInc > 0) {
-    const toStb = Math.min(extraInc, shortStb), toGro = Math.min(extraInc - toStb, shortGro)
-    lines.push(`Income has ${L(extraInc)} more than 2 years of expenses.${toStb > 0 ? ` Move ${L(toStb)} to Stability (a hybrid or debt fund).` : ''}${toGro > 0 ? ` Move ${L(toGro)} to Growth (an equity fund).` : ''}${toStb + toGro < extraInc ? ' The rest can stay as extra safety, or go to Growth.' : ''}`)
-  }
-  if (shortStb - Math.min(extraInc, shortStb) > 0) lines.push(`Stability is ${L(shortStb - Math.min(extraInc, shortStb))} short of 5 years of expenses.`)
-  if (shortGro - Math.max(0, Math.min(extraInc - Math.min(extraInc, shortStb), shortGro)) > 0) lines.push(`Growth is ${L(shortGro - Math.max(0, Math.min(extraInc - Math.min(extraInc, shortStb), shortGro)))} below the plan.`)
-  if (!lines.length) return <p className="g2-hint">✓ Every jar is on plan.</p>
-  return <div className="g2-hint">{lines.map((t, i) => <div key={i}>⚠ {t}</div>)}</div>
+function BucketGaps({ tgt, sum, lockedSum, monthly, age, inflation }) {
+  const { steps, warn } = bucketCheck({ tgt, inc: sum('inc'), stb: sum('stb'), gro: sum('gro'), locked: lockedSum, monthly })
+  const total = sum('inc') + sum('stb') + sum('gro')
+  const yrs = lastsYears(total, monthly, inflation)
+  const lastsLow = age && age + yrs < 85
+  const what = 'What to do: spend a little less each month, add some income (part-time work, rent), keep EPF / PPF / NPS as the last backup, and talk to a fee-only adviser.'
+  return (
+    <div className="g2-hint">
+      {!steps.length && !warn.length && <div>✓ Every jar is on plan.</div>}
+      {steps.map((t, i) => <div key={`s${i}`}>→ {t}</div>)}
+      {warn.map((t, i) => <div key={`w${i}`} style={{ color: '#fbbf24' }}>⚠ {t}</div>)}
+      {monthly > 0 && <div style={lastsLow ? { color: '#fbbf24' } : null}>{lastsLow ? '⚠ ' : ''}At {L(monthly)} a month (rising with inflation), your money lasts {yrs >= 60 ? '60+ years' : `about ${yrs} years`}{age ? `, until about age ${age + yrs}` : ''}. Assumes about 8% a year average return.</div>}
+      {(warn.length > 0 || lastsLow) && <div style={{ color: '#fbbf24' }}>{what}</div>}
+    </div>
+  )
 }
 function Buckets({ p, items, retired, mt, pname, onOpen }) {
   const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal') || (p.road || []).find((r) => r.k === 'spend')
@@ -213,12 +219,15 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   const locked = items.filter(isLocked)
   for (const it of items) hold[jarOf(it)].push(it)
   const sum = (k) => hold[k].reduce((t, it) => t + it.value, 0)
+  const live = (retired || p.bucketMode) && tgt
+  const free = live ? Math.max(0, sum('inc') - tgt.inc) : 0
+  const shown = (k) => (k === 'inc' && live ? Math.min(sum('inc'), tgt.inc) : sum(k))
   const tot = sum('inc') + sum('stb') + sum('gro') || 1
   const name = (it) => (it.kind === 'mf' ? fname(it.holding) : `${isLocked(it) ? '🔒 ' : ''}${mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}`)
   const payFund = [...hold.inc].sort((a, c) => c.value - a.value)[0]
   const jar = (k, label, sub) => (
     <div className={`g2-jar ${k}`}>
-      <div className="g2-jh"><JarSvg c={JC[k]} f={retired || p.bucketMode ? (tgt?.[k] ? sum(k) / tgt[k] : sum(k) / tot) : sum(k) / tot} /><div><div className="nm">{label}</div><div className="amt">{L(sum(k))}</div><div className="of">{tgt?.[k] && (retired || p.bucketMode) ? `of ${L(tgt[k])} · ` : ''}{sub}</div></div></div>
+      <div className="g2-jh"><JarSvg c={JC[k]} f={retired || p.bucketMode ? (tgt?.[k] ? shown(k) / tgt[k] : sum(k) / tot) : sum(k) / tot} /><div><div className="nm">{label}</div><div className="amt">{L(shown(k))}</div><div className="of">{tgt?.[k] && (retired || p.bucketMode) ? `of ${L(tgt[k])} · ` : ''}{sub}</div></div></div>
       <div className="g2-jf">{hold[k].length ? hold[k].sort((a, c) => c.value - a.value).slice(0, 4).map((it, i) => <div key={i}><span>{name(it)}</span><b>{L(it.value)}</b></div>) : <div><span>{k === 'inc' ? 'A liquid fund will hold this' : 'Nothing here yet'}</span><b /></div>}</div>
     </div>
   )
@@ -227,7 +236,8 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
       {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
         : retired ? null : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Until {yearOf(p.goal) - 5}: one growth mix</div><div className={p.bucketMode ? 'on' : ''}>{yearOf(p.goal) - 5}–{yearOf(p.goal)}: fill the jars</div><div>From {yearOf(p.goal)} (retirement): live from them</div></div>}
       <div className="g2-jars">{jar('gro', 'Growth', 'the rest · equity')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('inc', 'Income', '2 years of expenses · safe')}</div>
-      {(retired || p.bucketMode) && tgt && <BucketGaps tgt={tgt} sum={sum} lockedSum={locked.reduce((t, it) => t + it.value, 0)} />}
+      {free > 0 && <div className="g2-pay"><b>{L(free)} free money</b><span>Cash above 2 years of expenses. It is not part of Income: it fills Stability first, then Growth (see below).</span></div>}
+      {(retired || p.bucketMode) && tgt && <BucketGaps tgt={tgt} sum={sum} lockedSum={locked.reduce((t, it) => t + it.value, 0)} monthly={b.monthly} age={ageNow(p.goal)} inflation={Number(p.goal.expectedInflation) || 0.06} />}
       {locked.length > 0 && <p className="g2-hint">🔒 EPF / PPF / NPS ({L(locked.reduce((t, it) => t + it.value, 0))}) count in Stability but are never switched and never pay your income: they stay where they are, earning interest, until you withdraw them by their own rules (EPF at retirement or later, PPF at maturity). When you do, put the money in a liquid or debt fund.</p>}
       <div className="g2-flow"><div>→ refills Stability after good years</div><div>→ refills Income once a year</div><div>↓ pays your monthly income</div></div>
       <p className="g2-hint">{retired ? 'You spend only from Income. Once a year a Refill plan shows on this card (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown on this card).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
