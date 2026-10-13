@@ -408,7 +408,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
       </div>
       <div className={`g2-stats ${p.isRet ? 'g2-st5' : ''}`}>
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
-        <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{gs.needNote}</small></div>
+        <div className="nd"><span><i>◎</i>Need today</span><b>{L(due && !(g.payYears > 1) ? p.target : p.need)}</b><small>{gs.needNote}</small></div>
         <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gs.gapNote}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>{g.payYears > 1 ? `over ${g.payYears} years from ${yearOf(g)}` : `in ${yearOf(g)}`}{g.repeatYears ? ` · repeats every ${g.repeatYears > 1 ? `${g.repeatYears} years` : 'year'}` : ''}</small></div>
         {p.isRet && <RetirementActions goal={p.goal} slot="stat" fallback={<RetMonthly p={p} retired={retired} />} />}

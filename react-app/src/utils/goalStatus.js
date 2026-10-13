@@ -28,11 +28,13 @@ export function goalStatus(p, now = new Date()) {
   const due = p.state === 'due' && !p.isRet
   const past = monthsPast(g, now)
   const tol = Math.max(1000, 0.02 * (p.target || 0))
-  const dueShort = due ? Math.max(0, (p.target || 0) - (p.has || 0)) : 0
+  // paid over several years: on the date it needs this year's part + the later parts (p.need), not all of it
+  const dueNeed = Number(g.payYears) > 1 && p.need > 0 ? p.need : (p.target || 0)
+  const dueShort = due ? Math.max(0, dueNeed - (p.has || 0)) : 0
   const retShort = retired ? Math.max(0, (p.target || 0) - (p.has || 0)) : 0
   let tone = 'ok', badge = 'On track', gap = ['ok', 'On track'], gapNote = 'nothing to add', short = 0
   if (due) {
-    if ((p.has || 0) < 1) { tone = 'warn'; badge = 'Date reached · nothing saved'; gap = ['warn', `${L(p.target)} short`]; gapNote = 'move the date or the amount'; short = p.target || 0 }
+    if ((p.has || 0) < 1) { tone = 'warn'; badge = 'Date reached · nothing saved'; gap = ['warn', `${L(dueNeed)} short`]; gapNote = 'move the date or the amount'; short = dueNeed }
     else if (dueShort > tol) { tone = 'warn'; badge = `Date reached · ${L(dueShort)} short`; gap = ['warn', `${L(dueShort)} short`]; gapNote = 'use it, or move the date'; short = dueShort }
     else { tone = 'due'; badge = 'Money ready'; gap = ['ok', 'Ready']; gapNote = 'nothing to add' }
   } else if (retired) {

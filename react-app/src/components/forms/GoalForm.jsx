@@ -444,7 +444,8 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         initialCost: (!isRetirement && !isEmergency) ? calc.todaysCost : undefined,
         retirementAge: isRetirement ? (Number(form.retirementAge) || undefined) : undefined,
         dob: isRetirement ? (form.dob || undefined) : undefined,
-        _extras: isRetirement || isEmergency ? { repeat: 0, payYears: 1 } : { repeat: Number(repeat) || 0, payYears: Number(payYears) || 1 },
+        // (only when the saved settings are loaded, so an early save can't wipe a goal's Repeats / Paid)
+        _extras: initial && !settings ? undefined : isRetirement || isEmergency ? { repeat: 0, payYears: 1 } : { repeat: Number(repeat) || 0, payYears: Number(payYears) || 1, ...(initEx.orig ? { orig: initEx.orig } : {}) },
       })
     } finally { setSaving(false) }
   }

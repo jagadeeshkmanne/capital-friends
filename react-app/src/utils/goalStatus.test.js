@@ -24,6 +24,10 @@ describe('goal status', () => {
   })
 })
 describe('paid over several years', () => {
+  it("on the date: this year's part + the later parts discounted", () => {
+    expect(needTodayN({ target: 400, years: 0, annualReturn: 0, sip: 0, payYears: 4 })).toBe(400)
+    expect(needTodayN({ target: 400, years: 0, annualReturn: 0.1, sip: 0, payYears: 4 })).toBeLessThan(400)
+  })
   it('needs less today than all at once, and the same for 1 year', () => {
     const a = { target: 2000000, years: 10, annualReturn: 0.1, sip: 0 }
     expect(needTodayN({ ...a, payYears: 1 })).toBeCloseTo(needToday(a), 6)
@@ -58,6 +62,7 @@ describe('withdraw window', () => {
   ]
   it('part of the FD, all of one fund, none of the other', () => {
     const a = withdrawActions(rows, ['3,00,000', '17,000', '0'], '2026-10-13')
+    expect(a[0].update.patch).toMatchObject({ currentValue: 238000 })
     expect(a).toHaveLength(2)
     expect(a[0].update).toMatchObject({ currentValue: 238000, status: 'Active' })
     expect(a[1].redeem).toMatchObject({ fundCode: '111', units: 100, price: 170 })
@@ -66,5 +71,15 @@ describe('withdraw window', () => {
     const a = withdrawActions(rows, ['5,38,000', '0', '2,000'])
     expect(a[0].update).toMatchObject({ currentValue: 0, status: 'Matured' })
     expect(a[1].redeem.units).toBe(20)
+  })
+  it('all of a fund sends the exact units held (never rounded up)', () => {
+    const r = [{ kind: 'mf', name: 'F', portfolioId: 'P', units: 123.45666, all: true, value: 12345, holding: { fundCode: '9', units: 123.45666, currentNav: 100 } }]
+    expect(withdrawActions(r, ['12,345'])[0].redeem.units).toBe(123.45666)
+    expect(withdrawActions(r, ['10,000'])[0].redeem.units).toBe(100)
+  })
+  it('gold by weight: grams go down with the value; invested too', () => {
+    const r = [{ kind: 'other', name: 'Gold', value: 200000, holding: { investmentId: 'G', investmentType: 'Physical Gold', currentValue: 200000, investedAmount: 100000, dynamicFields: { weightGrams: 20 } } }]
+    const p = withdrawActions(r, ['50,000'])[0].update.patch
+    expect(p).toMatchObject({ currentValue: 150000, investedAmount: 75000, dynamicFields: { weightGrams: 15 } })
   })
 })

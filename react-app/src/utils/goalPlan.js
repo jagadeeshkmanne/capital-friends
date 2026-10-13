@@ -40,10 +40,12 @@ export function needToday({ target, years, annualReturn, sip }) {
  */
 export function needTodayN({ target, years, annualReturn, sip, payYears = 1 }) {
   const n = Math.max(1, Math.round(Number(payYears) || 1))
-  if (n === 1 || !(years > 0)) return needToday({ target, years, annualReturn, sip })
+  if (n === 1) return needToday({ target, years, annualReturn, sip })
+  const y = Math.max(0, years || 0)   // on the date: this year's part now, the later parts still need less today
   const part = target / n
   let pvTarget = 0
-  for (let k = 0; k < n; k++) pvTarget += part / Math.pow(1 + annualReturn, years + k)
+  for (let k = 0; k < n; k++) pvTarget += part / Math.pow(1 + annualReturn, y + k)
+  if (!(y > 0)) return pvTarget
   const rm = monthlyRate(annualReturn), m = Math.round(years * 12)
   const pvSip = rm > 0 ? sip * (1 - Math.pow(1 + rm, -m)) / rm : sip * m
   return Math.max(0, pvTarget - pvSip)

@@ -68,62 +68,81 @@ export default function GoalsPlanPage() {
     // withdrawn / not needed: the goal stops taking money from the pool (its money goes back to the other goals)
     // part: one year's payment of a goal paid over several years — the goal moves to next year with the rest
     if (closing.current) return
-    const { repeatYears = 0, payYears = 1, ...g } = g0
+    const { repeatYears = 0, payYears = 1, origAmount, origPayYears, ...g } = g0
     const used = how === 'used' || how === 'part'
     const amount = Number(opts.amount) > 0 ? Number(opts.amount) : 0
     const fmt = (v) => '₹' + Math.round(v).toLocaleString('en-IN')
-    const nextDate = (years) => { const d = new Date(g.targetDate); d.setFullYear(d.getFullYear() + years); return d.toISOString().slice(0, 10) }
-    const left = Math.max(0, (Number(g.targetAmount) || 0) - amount)
-    // what the withdraw window will record first (FD value down, fund units redeemed, shares sold)
+    // dates as the person's own calendar day (toISOString would give the UTC day: 1 Jan → 31 Dec in India)
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const plusYears = (years) => { const d = new Date(g.targetDate); d.setFullYear(d.getFullYear() + years); return d }
+    const nextDate = (years) => ymd(plusYears(years))
+    // a repeat closed late: move on in steps until the date is ahead (yearly trip of Mar 2025 closed in Oct 2026 → Mar 2027)
+    let steps = repeatYears
+    if (repeatYears > 0) while (plusYears(steps) <= new Date() && steps < repeatYears * 50) steps += repeatYears
+    const target = Number(g.targetAmount) || 0
+    const left = Math.max(0, target - amount)
     const acts = Array.isArray(opts.actions) ? opts.actions : []
-    const actTxt = acts.length ? `\n\nThe app will record:\n${acts.map((a) => `• ${a.kind === 'mf' ? `Redeem ${a.redeem.units} units of ${a.label} ≈ ${fmt(a.amount)}` : a.kind === 'stock' ? `Sell ${a.sell.quantity} ${a.label} ≈ ${fmt(a.amount)}` : `${a.label}: take ${fmt(a.amount)}, its value becomes ${fmt(a.update.currentValue)}${a.update.currentValue < 1 ? ` (${a.update.status})` : ''}`}`).join('\n')}` : ''
+    const actTxt = acts.length ? `\n\nThe app will record:\n${acts.map((a) => `• ${a.kind === 'mf' ? `Redeem ${Number(a.redeem.units).toLocaleString('en-IN', { maximumFractionDigits: 4 })} units of ${a.label} ≈ ${fmt(a.amount)}` : a.kind === 'stock' ? `Sell ${a.sell.quantity} ${a.label} ≈ ${fmt(a.amount)}` : `${a.label}: take ${fmt(a.amount)}, its value becomes ${fmt(a.update.currentValue)}${a.update.currentValue < 1 ? ` (${a.update.status})` : ''}`}`).join('\n')}` : ''
+    const nextY = repeatYears ? plusYears(steps).getFullYear() : null
     const ok = await confirm((how === 'part'
-      ? `Mark this year's payment${amount ? ` of ${fmt(amount)}` : ''} as done? "${g.goalName}" moves to ${new Date(nextDate(1)).getFullYear()} with ${fmt(left)} for the remaining ${payYears - 1} year${payYears - 1 > 1 ? 's' : ''}.${acts.length ? '' : ' Also record the redemption in Mutual Funds, otherwise the money you took out still counts.'}`
+      ? `Mark this year's payment${amount ? ` of ${fmt(amount)}` : ''} as done? "${g.goalName}" moves to ${plusYears(1).getFullYear()} with ${fmt(left)} for the remaining ${payYears - 1} year${payYears - 1 > 1 ? 's' : ''}.${acts.length ? '' : ' Also record the redemption in Mutual Funds, otherwise the money you took out still counts.'}`
       : used
-        ? `Close "${g.goalName}" as withdrawn${amount ? ` (${fmt(amount)} used)` : ''}?${acts.length ? '' : ' Also record the redemption in Mutual Funds (or update the holding), otherwise the money you took out still counts for your other goals.'}${repeatYears ? ` The next one is added for ${new Date(nextDate(repeatYears)).getFullYear()}.` : ''}`
-        : `Close "${g.goalName}" as not needed? Its money goes back to your other goals.${repeatYears ? ` The next one is still added for ${new Date(nextDate(repeatYears)).getFullYear()}.` : ''}`) + actTxt,
+        ? `Close "${g.goalName}" as withdrawn${amount ? ` (${fmt(amount)} used)` : ''}?${acts.length ? '' : ' Also record the redemption in Mutual Funds (or update the holding), otherwise the money you took out still counts for your other goals.'}${repeatYears ? ` The next one is added for ${nextY}.` : ''}`
+        : `Close "${g.goalName}" as not needed? Its money goes back to your other goals.${repeatYears ? ` The next one is still added for ${nextY}.` : ''}`) + actTxt,
     { title: how === 'part' ? "This year's payment" : used ? 'Money withdrawn' : 'Goal not needed', confirmLabel: how === 'part' ? 'Yes, move to next year' : 'Close goal', destructive: false })
     if (!ok) return
     closing.current = true
     const today = new Date().toLocaleDateString('en-IN')
+    const failed = []
     try {
-      // 1. record what was taken (stops at the first failure, before the goal is touched)
+      // 1. record what was taken. Each part on its own: one that fails is reported, the rest still go through, and
+      //    the goal is closed / moved anyway — so trying again can never record the same withdrawal twice.
       if (acts.length) {
         showBlockUI('Recording the withdrawal...')
         try {
           const red = acts.filter((a) => a.kind === 'mf').map((a) => ({ ...a.redeem, notes: `For goal: ${g.goalName}` }))
-          if (red.length) await redeemMFBulk(red)
-          for (const a of acts.filter((x) => x.kind === 'stock')) await sellStock({ ...a.sell, notes: `For goal: ${g.goalName}` })
+          if (red.length) { try { await redeemMFBulk(red) } catch (e) { failed.push(`Fund redemptions (${e.message}) — check Mutual Funds, some may be recorded`) } }
+          for (const a of acts.filter((x) => x.kind === 'stock')) { try { await sellStock({ ...a.sell, notes: `For goal: ${g.goalName}` }) } catch (e) { failed.push(`${a.label}: ${e.message}`) } }
           for (const a of acts.filter((x) => x.kind === 'other')) {
             const inv = a.update.inv
-            await updateOtherInvestment(inv.investmentId, { ...inv, familyMember: inv.familyMemberId || '', currentValue: a.update.currentValue, status: a.update.status,
-              notes: [inv.notes, `${fmt(a.amount)} used for ${g.goalName} on ${today}`].filter(Boolean).join(' · ') })
+            try {
+              await updateOtherInvestment(inv.investmentId, { ...inv, ...a.update.patch, familyMember: inv.familyMemberId || '',
+                notes: [inv.notes, `${fmt(a.amount)} used for ${g.goalName} on ${today}`].filter(Boolean).join(' · ') })
+            } catch (e) { failed.push(`${a.label}: ${e.message}`) }
           }
         } finally { hideBlockUI() }
       }
+      const failTxt = failed.length ? ` Not recorded — please do these by hand: ${failed.join('; ')}.` : ''
       if (how === 'part' && payYears > 1) {
         const note = `Paid ${amount ? fmt(amount) : "this year's part"} on ${today}`
-        await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', targetDate: nextDate(1), targetAmount: left, notes: [g.notes, note].filter(Boolean).join(' · '), _extras: { repeat: repeatYears, payYears: payYears - 1 } })
-        showToast(`${g.goalName}: next payment in ${new Date(nextDate(1)).getFullYear()}.`)
+        const scale = target > 0 ? left / target : 1
+        await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', targetDate: nextDate(1), targetAmount: left,
+          ...(Number(g.initialCost) > 0 ? { initialCost: Math.round(Number(g.initialCost) * scale) } : {}),
+          notes: [g.notes, note].filter(Boolean).join(' · '),
+          _extras: { repeat: repeatYears, payYears: payYears - 1, orig: { amount: origAmount || target, payYears: origPayYears || payYears } } })
+        showToast(`${g.goalName}: next payment in ${plusYears(1).getFullYear()}.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
         return
       }
       const note = `${used ? 'Withdrawn' : 'Not needed'} on ${today}${used && amount ? ` · used ${fmt(amount)}` : ''}`
       // close first, then free its links (an open goal would just be given its share again)
-      await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', isActive: false, notes: [g.notes, note].filter(Boolean).join(' · ') })
+      await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', isActive: false, notes: [g.notes, note].filter(Boolean).join(' · '), _extras: { repeat: 0, payYears: 1 } })
       await updateGoalMappings(g.goalId, [])
       if (repeatYears > 0) {
-        // the next one: same goal, its date moved on, the amount grown by the goal's inflation
+        // the next one: same goal (its full amount and years again), date moved on, amount grown by its inflation
         const infl = Number(g.expectedInflation) || 0.06
-        const y0 = new Date(g.targetDate).getFullYear(), y1 = new Date(nextDate(repeatYears)).getFullYear()
-        await addGoal({
-          goalType: g.goalType, goalName: String(g.goalName || '').replace(String(y0), String(y1)), familyMemberId: g.familyMemberId || '', familyMember: g.familyMemberName || 'Family',
-          targetAmount: Math.round((Number(g.targetAmount) || 0) * Math.pow(1 + infl, repeatYears)), targetDate: nextDate(repeatYears), priority: g.priority || 'Medium', notes: '',
-          expectedInflation: infl, expectedCAGR: Number(g.expectedCAGR) || 0.12, monthlyInvestment: 0, lumpsumInvested: 0, isRetirement: false,
-          _extras: { repeat: repeatYears, payYears },
-        })
-        showToast(`${g.goalName} closed. The next one is added for ${y1}.`)
-      } else showToast(`${g.goalName} closed. Its money now goes to your other goals.`)
-    } catch (e) { showToast(e.message || 'Could not close the goal', 'error') }
+        const y0 = new Date(g.targetDate).getFullYear()
+        const base = origAmount || target, years = origPayYears || payYears
+        try {
+          await addGoal({
+            goalType: g.goalType, goalName: String(g.goalName || '').replace(String(y0), String(nextY)), familyMemberId: g.familyMemberId || '', familyMember: g.familyMemberName || 'Family',
+            targetAmount: Math.round(base * Math.pow(1 + infl, steps)), targetDate: nextDate(steps), priority: g.priority || 'Medium', notes: '',
+            expectedInflation: infl, expectedCAGR: Number(g.expectedCAGR) || 0.12, monthlyInvestment: 0, lumpsumInvested: 0, isRetirement: false,
+            _extras: { repeat: repeatYears, payYears: years },
+          })
+          showToast(`${g.goalName} closed. The next one is added for ${nextY}.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
+        } catch (e) { showToast(`${g.goalName} is closed, but the next one could not be added (${e.message}). Add it in Edit goals.${failTxt}`, 'error', 12000) }
+      } else showToast(`${g.goalName} closed. Its money now goes to your other goals.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
+    } catch (e) { showToast(`${e.message || 'Could not close the goal'}${failed.length ? '' : acts.length ? ' (the withdrawal was recorded: untick "Record these" if you try again)' : ''}`, 'error', 12000) }
     finally { closing.current = false }
   }
   // old links to /goals/classic?add=1 / ?edit=ID now open the form on this page

@@ -585,23 +585,29 @@ export function DataProvider({ children }) {
     let all = {}
     try { all = JSON.parse(settingsRef.current?.GoalExtras || '{}') || {} } catch { all = {} }
     const e = { repeat: Math.max(0, Number(extras.repeat) || 0), payYears: Math.max(1, Number(extras.payYears) || 1) }
+    // orig: the full amount and years of a goal paid over several years, so a repeat starts again from them
+    if (extras.orig && Number(extras.orig.amount) > 0) e.orig = { amount: Math.round(Number(extras.orig.amount)), payYears: Math.max(1, Number(extras.orig.payYears) || 1) }
     const had = !!all[goalId]
-    if (e.repeat === 0 && e.payYears === 1) { if (!had) return; delete all[goalId] } else all[goalId] = e
+    if (e.repeat === 0 && e.payYears === 1 && !e.orig) { if (!had) return; delete all[goalId] } else all[goalId] = e
     await updateSettings({ GoalExtras: JSON.stringify(all) })
   }, [updateSettings])
   const addGoal = useCallback(async (data) => {
     const { _extras, ...goal } = data || {}
     const result = await api.createGoal(goal)
-    if (_extras) { try { await saveGoalExtras(result?.goalId, _extras) } catch (e) { console.warn('goal extras', e) } }
+    let exErr = null
+    if (_extras) { try { await saveGoalExtras(result?.goalId, _extras) } catch (e) { exErr = e } }
     await refreshGoals()
+    if (exErr) throw new Error(`Goal saved, but its Repeats / Paid setting was not: ${exErr.message}. Edit the goal to set it again.`)
     return result
   }, [refreshGoals, saveGoalExtras])
 
   const updateGoal = useCallback(async (id, data) => {
     const { _extras, ...goal } = data || {}
     await api.updateGoal(id, goal)
-    if (_extras) { try { await saveGoalExtras(id, _extras) } catch (e) { console.warn('goal extras', e) } }
+    let exErr = null
+    if (_extras) { try { await saveGoalExtras(id, _extras) } catch (e) { exErr = e } }
     await refreshGoals()
+    if (exErr) throw new Error(`Goal saved, but its Repeats / Paid setting was not: ${exErr.message}. Edit the goal to set it again.`)
   }, [refreshGoals, saveGoalExtras])
 
   const deleteGoal = useCallback(async (id) => {

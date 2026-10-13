@@ -19,27 +19,47 @@ const KIND = {
 const navOf = (h) => Number(h?.currentNav) || ((Number(h?.currentValue) || 0) / (Number(h?.units) || 1)) || 0
 const priceOf = (h) => Number(h?.currentPrice) || ((Number(h?.currentValue) || 0) / (Number(h?.quantity) || 1)) || 0
 
-/** What to record for the amounts taken: [{ kind, label, amount, ... }] (rows taking 0 are skipped). */
-export function withdrawActions(rows, taken, today = new Date().toISOString().slice(0, 10)) {
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const parseDyn = (v) => { if (v && typeof v === 'object') return v; try { return JSON.parse(v || '{}') || {} } catch { return {} } }
+/** a stable key per row, so typed amounts stay on their investment even if the list re-sorts */
+export const rowKey = (r) => `${r.kind}:${r.portfolioId || ''}:${r.holding?.fundCode || r.holding?.schemeCode || r.holding?.symbol || r.holding?.investmentId || r.name}`
+
+/** What to record for the amounts taken: [{ kind, label, amount, ... }] (rows taking 0 are skipped).
+ *  taken: { [rowKey]: '1,23,000' } (an array by row index works too) */
+export function withdrawActions(rows, taken, today = localDay()) {
   const out = []
+  const val = (r, i) => (Array.isArray(taken) ? taken[i] : taken[rowKey(r)])
   rows.forEach((r, i) => {
-    const amt = Math.min(num(taken[i]), r.value * 1.0001)
+    const amt = Math.min(num(val(r, i)), r.value * 1.0001)
     if (!(amt >= 1) || !r.holding) return
     const allOfIt = amt >= r.value - 1
     if (r.kind === 'mf') {
       const nav = navOf(r.holding)
       if (!(nav > 0)) return
-      const units = allOfIt ? r.units : Math.min(r.units, amt / nav)
-      out.push({ kind: 'mf', label: splitFundName(r.name).main, amount: units * nav, redeem: { portfolioId: r.portfolioId, fundCode: r.holding.fundCode || r.holding.schemeCode, units: Math.round(units * 1000) / 1000, price: nav, date: today } })
+      // all of it: the exact units (never rounded up past what is held); part: rounded DOWN to 4 decimals
+      const held = Number(r.holding.units) || 0
+      const units = allOfIt ? (r.all ? held : Math.min(held, r.units)) : Math.floor(Math.min(r.units, amt / nav) * 10000) / 10000
+      if (!(units > 0)) return
+      out.push({ kind: 'mf', label: splitFundName(r.name).main, amount: units * nav, redeem: { portfolioId: r.portfolioId, fundCode: r.holding.fundCode || r.holding.schemeCode, units, price: nav, date: today } })
     } else if (r.kind === 'stock') {
       const px = priceOf(r.holding)
-      const qty = allOfIt ? Math.floor(r.units + 1e-9) : Math.min(Math.floor(r.units + 1e-9), Math.round(amt / (px || 1)))
+      const maxQ = Math.floor(r.units + 1e-9)
+      const qty = allOfIt ? maxQ : Math.min(maxQ, Math.floor(amt / (px || 1) + 1e-9))   // never more than typed
       if (!(px > 0) || !(qty > 0)) return
       out.push({ kind: 'stock', label: r.name, amount: qty * px, sell: { portfolioId: r.portfolioId, symbol: r.holding.symbol, quantity: qty, price: px, date: today } })
     } else {
-      const cur = Number(r.holding.currentValue) || 0
+      const inv = r.holding
+      const cur = Number(inv.currentValue) || 0
       const left = Math.max(0, Math.round(cur - amt))
-      out.push({ kind: 'other', label: r.name, amount: amt, update: { inv: r.holding, currentValue: left, status: left < 1 ? (/fixed deposit|fd|bond/i.test(r.holding.investmentType || '') ? 'Matured' : 'Sold') : r.holding.status || 'Active' } })
+      const scale = cur > 0 ? left / cur : 0
+      const patch = { currentValue: left, status: left < 1 ? (/fixed deposit|\bfd\b|bond|recurring|\brd\b|deposit/i.test(inv.investmentType || '') ? 'Matured' : 'Sold') : inv.status || 'Active' }
+      // invested shrinks in the same proportion (else the rest shows a big loss)
+      if (Number(inv.investedAmount) > 0) patch.investedAmount = Math.round(Number(inv.investedAmount) * scale)
+      // gold / silver held by weight: the value comes from the grams, so the grams go down too
+      const dyn = parseDyn(inv.dynamicFields)
+      if (Number(dyn.weightGrams) > 0) patch.dynamicFields = { ...dyn, weightGrams: Math.round(Number(dyn.weightGrams) * scale * 1000) / 1000 }
+      else if (inv.dynamicFields) patch.dynamicFields = dyn
+      out.push({ kind: 'other', label: r.name, amount: amt, update: { inv, currentValue: left, status: patch.status, patch } })
     }
   })
   return out
@@ -51,17 +71,18 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
   const rows = s.rows
   // multi-year goal: this year's part is taken from the safest money first (cash, then debt funds)
   const fill = useMemo(() => {
-    if (n === 1) return rows.map((r) => fmtIn(r.value))
+    if (n === 1) return Object.fromEntries(rows.map((r) => [rowKey(r), fmtIn(r.value)]))
     let want = Math.min(s.has, Math.round((Number(g.targetAmount) || 0) / n))
     const order = rows.map((r, i) => i).sort((a, b) => ({ other: 0, mf: 1, stock: 2 }[rows[a].kind] - { other: 0, mf: 1, stock: 2 }[rows[b].kind]))
-    const v = rows.map(() => '0')
-    for (const i of order) { if (want < 1) break; const t = Math.min(want, rows[i].value); v[i] = fmtIn(t); want -= t }
+    const v = Object.fromEntries(rows.map((r) => [rowKey(r), '0']))
+    for (const i of order) { if (want < 1) break; const t = Math.min(want, rows[i].value); v[rowKey(rows[i])] = fmtIn(t); want -= t }
     return v
   }, [rows, n, s.has, g.targetAmount])
-  const [taken, setTaken] = useState(fill)
+  const [typed, setTyped] = useState({})
+  const taken = { ...fill, ...typed }   // a row the list gains later starts filled; typed amounts stay on their row
   const [record, setRecord] = useState(true)
-  const set = (i, v) => setTaken((t) => t.map((x, k) => (k === i ? v : x)))
-  const total = taken.reduce((t, v, i) => t + Math.min(num(v), rows[i].value), 0)
+  const set = (i, v) => { const k = rowKey(rows[i]); setTyped((t) => ({ ...t, [k]: v })) }
+  const total = rows.reduce((t, r) => t + Math.min(num(taken[rowKey(r)]), r.value), 0)
   const leftover = Math.max(0, s.has - total)
   const groups = ['other', 'mf', 'stock'].map((k) => ({ k, items: rows.map((r, i) => ({ r, i })).filter((x) => x.r.kind === k) })).filter((x) => x.items.length)
   const finish = (how) => onDone(how, { amount: Math.round(total), actions: record ? withdrawActions(rows, taken) : [] })
@@ -79,7 +100,7 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
         <div key={k} className="wdp-grp">
           <p className="wdp-gt"><K.icon size={13} style={{ color: K.c }} /> {K.t}</p>
           {items.map(({ r, i }) => {
-            const v = num(taken[i]), all = v >= r.value - 1, none = v < 1
+            const v = num(taken[rowKey(r)]), all = v >= r.value - 1, none = v < 1
             return (
               <div key={i} className={`wdp-row ${none ? 'off' : ''}`}>
                 <div className="wdp-n">
@@ -87,7 +108,7 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
                   <small>{k === 'other' ? `${r.holding?.investmentType || 'Investment'} · update its value` : `${pname(r.portfolioId)} · ${r.all ? 'all ' : ''}${Number(r.units).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${k === 'stock' ? 'shares' : 'units'}`}</small>
                 </div>
                 <div className="wdp-in">
-                  <label><span>₹</span><input inputMode="decimal" value={taken[i]} onChange={(e) => set(i, e.target.value)} onBlur={() => set(i, fmtIn(Math.min(num(taken[i]), r.value)))} onFocus={(e) => e.target.select()} aria-label={`Taking from ${r.name}`} /></label>
+                  <label><span>₹</span><input inputMode="decimal" value={taken[rowKey(r)] ?? ''} onChange={(e) => set(i, e.target.value)} onBlur={() => set(i, fmtIn(Math.min(num(taken[rowKey(r)]), r.value)))} onFocus={(e) => e.target.select()} aria-label={`Taking from ${r.name}`} /></label>
                   <div className="wdp-q"><small>of {L(r.value)}</small>
                     <button type="button" className={all ? 'on' : ''} onClick={() => set(i, fmtIn(r.value))}>All</button>
                     <button type="button" className={none ? 'on' : ''} onClick={() => set(i, '0')}>None</button>

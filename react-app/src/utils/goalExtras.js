@@ -16,7 +16,8 @@ export function withGoalExtras(goalList, settings) {
     const e = ex[g.goalId]
     if (!e) return g
     const repeatYears = Math.max(0, Math.round(Number(e.repeat) || 0)), payYears = Math.max(1, Math.round(Number(e.payYears) || 1))
-    return repeatYears || payYears > 1 ? { ...g, repeatYears, payYears } : g
+    const orig = e.orig && Number(e.orig.amount) > 0 ? { origAmount: Number(e.orig.amount), origPayYears: Math.max(1, Number(e.orig.payYears) || 1) } : {}
+    return repeatYears || payYears > 1 || orig.origAmount ? { ...g, repeatYears, payYears, ...orig } : g
   })
 }
 
