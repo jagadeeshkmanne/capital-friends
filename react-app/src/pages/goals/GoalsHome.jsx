@@ -318,7 +318,7 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   const jar = (k, label, sub) => (
     <div className={`g2-jar ${k}`}>
       <div className="g2-jh"><JarSvg c={JC[k]} f={retired || p.bucketMode ? (tgt?.[k] ? shown(k) / tgt[k] : sum(k) / tot) : sum(k) / tot} /><div><div className="nm">{label}</div><div className="amt">{L(shown(k))}</div><div className="of">{tgt?.[k] && (retired || p.bucketMode) ? `of ${L(tgt[k])} · ` : ''}{sub}</div></div></div>
-      <div className="g2-jf">{hold[k].length ? hold[k].sort((a, c) => c.value - a.value).slice(0, 4).map((it, i) => <div key={i}><span>{name(it)}</span><b>{L(it.value)}</b></div>) : <div><span>{k === 'inc' ? 'A liquid fund will hold this' : 'Nothing here yet'}</span><b /></div>}</div>
+      <div className="g2-jf">{hold[k].length ? hold[k].sort((a, c) => c.value - a.value).map((it, i) => <div key={i}><span>{name(it)}{it.fraction != null && it.fraction < 0.995 && <small style={{ display: 'block', opacity: 0.7, fontSize: 11 }}>{Math.round(it.fraction * 100)}% of it for this goal{it.kind === 'mf' ? ` · ${Math.round((it.eq || 0) * 100)}% equity` : ''}</small>}{(it.fraction == null || it.fraction >= 0.995) && it.kind === 'mf' && <small style={{ display: 'block', opacity: 0.7, fontSize: 11 }}>{Math.round((it.eq || 0) * 100)}% equity</small>}</span><b>{L(it.value)}</b></div>) : <div><span>{k === 'inc' ? 'A liquid fund will hold this' : 'Nothing here yet'}</span><b /></div>}</div>
     </div>
   )
   return (
