@@ -25,6 +25,9 @@ export function readHoldingNumbers(text) {
   return { qty, price, value }
 }
 
+const HEADER_RE = /ISIN|Security|\bBal\b|^Bal|Value$|^Value|Pledge|^Market|Current|^Page \d|Central Depository|CONSOLIDATED ACCOUNT|FORM AND INVESTMENTS|Summary of|Account Details|^Investments|[\u0900-\u097F\uFFFD]|CIN\s*:/   // page headers (bilingual lines)
+// a line that finishes the previous holding's name ("AFTER SPLIT", "SHARES", "OF RS.2/-…", "FUND-DIRECT-GROWTH")
+const CONT_RE = /^(LIMITED|LTD|EQUITY|ASSET|AFTER|SHARES\b|OF R[SE]|RS\.?\s?\d|RE\.?\s?\d|CAPITAL REDUCTION|CONSOLIDATION|SUB-?DIVISION|SPLIT|FUND-|PLAN-|\(I\) LTD\]|1\/-|WITH FACE VALUE|\[FORMERLY)/i
 const DEPOSITORY_RE = /(CDSL|NSDL)\s+Demat\s+Account/i
 const ENTER_RE = /HOLDING STATEMENT AS ON|^\s*(Equities|Equity Shares|Equity)\s*(\(E\))?\s*$/i
 const LEAVE_RE = /Other Details|Portfolio Value|MUTUAL FUND UNITS HELD|STATEMENT OF TRANSACTIONS|Mutual Fund Folios \(F\)|^\s*Total\b/i
@@ -34,7 +37,7 @@ const LEAVE_RE = /Other Details|Portfolio Value|MUTUAL FUND UNITS HELD|STATEMENT
  */
 export function parseDematCas(lines) {
   const out = { holder: '', pan: '', asOf: '', depository: '', accounts: [] }
-  let acc = null, inHold = false, depo = '', prevText = ''
+  let acc = null, inHold = false, depo = '', buf = []   // buf: text lines since the last holding (name parts, ** / !! marks)
   for (let i = 0; i < lines.length; i++) {
     const line = String(lines[i] || '')
     if (!out.pan) {
@@ -58,25 +61,29 @@ export function parseDematCas(lines) {
       inHold = false
       continue
     }
-    if (!acc) { prevText = line; continue }
-    if (LEAVE_RE.test(line)) { inHold = false; prevText = line; continue }
-    if (ENTER_RE.test(line)) { inHold = true; prevText = ''; continue }
-    if (!inHold) { prevText = line; continue }
+    if (!acc) continue
+    if (LEAVE_RE.test(line)) { inHold = false; buf = []; continue }
+    if (ENTER_RE.test(line)) { inHold = true; buf = []; continue }
+    if (!inHold) continue
 
     const im = line.match(ISIN_RE)
-    if (!im) { prevText = line; continue }
+    if (!im) { if (!HEADER_RE.test(line) && line.trim().toUpperCase() !== out.holder.toUpperCase()) buf.push(line); continue }   // the holder's name repeats on every page
     const isin = im[1]
     let rest = line.slice(line.indexOf(isin) + isin.length)
     let nums = readHoldingNumbers(rest)
     if (!nums && lines[i + 1] && !ISIN_RE.test(lines[i + 1])) { rest += ' ' + lines[i + 1]; nums = readHoldingNumbers(rest) }
-    if (!nums || !(nums.value > 0)) { prevText = line; continue }   // lock-in / pledge sub-tables have no value
+    if (!nums || !(nums.value > 0)) { buf = []; continue }   // lock-in / pledge sub-tables have no value
     const nameOnLine = rest.split(/\s{2,}/).map((t) => t.trim()).filter((t) => t && !NUM_RE.test(t) && t !== '--')[0] || ''
-    const before = /ISIN|Security|Bal|Value|Pledge|Market|Current/i.test(prevText) ? '' : prevText.replace(/^[*!$@#\s]+/, '').trim()
-    const name = [before, nameOnLine].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+    // the statement's own marks: ** under liquidation / winding up, !! no trade for over a year (valued at face value)
+    const marks = [...buf, line].join(' ')
+    const flag = /\*\*/.test(marks) ? 'liquidation' : /!!/.test(marks) ? 'notTraded' : ''
+    const parts = buf.map((t) => t.replace(/[*!$@#]{2,}/g, ' ').trim()).filter((t) => t && !CONT_RE.test(t))
+    const name = [...parts, nameOnLine.replace(/[*!$@#]{2,}/g, ' ')].join(' ').replace(/\s+/g, ' ').trim()
+    const rights = /RIGHTS|ENTITLEMENT/i.test(`${buf.join(' ')} ${nameOnLine}`)
     const prev = acc.holdings.find((h) => h.isin === isin)
     if (prev) { prev.qty += nums.qty; prev.value += nums.value }
-    else acc.holdings.push({ isin, name, qty: nums.qty, price: nums.price, value: nums.value })
-    prevText = ''
+    else acc.holdings.push({ isin, name, qty: nums.qty, price: nums.price, value: nums.value, flag: rights ? 'rights' : flag })
+    buf = []
   }
   out.accounts = out.accounts.filter((a) => a.holdings.length || a.broker)
   return out

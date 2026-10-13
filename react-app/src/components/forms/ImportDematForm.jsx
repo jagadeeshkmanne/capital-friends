@@ -14,6 +14,15 @@ import { shortBroker } from '../../utils/cas/dematParser'
 // The statement has no buy price: the statement price is used unless the user types their own.
 
 const NEW = '__new__'
+const rs = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+// why a holding can't be imported as a stock (the statement's own marks)
+function whyNot(r) {
+  if (r.fund) return 'mutual fund — use the Mutual Funds import'
+  if (r.flag === 'liquidation') return 'company under liquidation (marked ** in the statement) — no market price'
+  if (r.flag === 'notTraded') return 'not traded for over a year (marked !! — valued at face value) — no market price'
+  if (r.flag === 'rights') return 'rights entitlement — temporary, not a share yet'
+  return 'not in the stock list (suspended or delisted?)'
+}
 const isoFromDmy = (s) => { const m = String(s || '').match(/^(\d{2})-(\d{2})-(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : '' }
 const tokens = (s) => new Set(String(s || '').toUpperCase().split(/[^A-Z]+/).filter((t) => t.length > 1))  // in order
 function nameScore(a, b) { const A = tokens(a), B = tokens(b); let n = 0; A.forEach((t) => { if (B.has(t)) n++ }); return n }
@@ -96,7 +105,7 @@ export default function ImportDematForm({ onCancel }) {
     try {
       for (const a of accts) {
         const rows = take(a)
-        a.rows.filter((r) => !rows.includes(r)).forEach((r) => skipped.push({ symbol: r.stock?.symbol || r.name || r.isin, reason: r.fund ? 'Mutual fund units — import them on the Mutual Funds page' : !r.stock ? 'Not in the stock list (delisted, suspended or rights)' : 'Left out by you' }))
+        a.rows.filter((r) => !rows.includes(r)).forEach((r) => skipped.push({ symbol: r.stock?.symbol || r.name || r.isin, reason: !r.stock ? whyNot(r) : 'Left out by you' }))
         if (!rows.length) continue
         let pid = a.portfolioId
         if (pid === NEW) {
@@ -227,8 +236,8 @@ export default function ImportDematForm({ onCancel }) {
                           {r.stock ? <>{r.stock.symbol} <span className="font-normal text-[var(--text-dim)]">— {r.stock.companyName}</span></> : <span className="text-[var(--text-muted)]">{r.name || r.isin}</span>}
                         </p>
                         <p className="text-xs text-[var(--text-dim)] tabular-nums">
-                          {r.qty} shares · statement price {formatINR(r.price)}
-                          {!r.stock && <span className="text-rose-400"> · {r.fund ? 'mutual fund — use the Mutual Funds import' : 'not in the stock list'}</span>}
+                          {r.qty} shares · statement price {rs(r.price)}
+                          {!r.stock && <span className="text-rose-400"> · {whyNot(r)}</span>}
                           {isHeld && <span className="text-amber-500"> · already in this portfolio{r.include ? ' — ticked: will be added on top' : ''}</span>}
                         </p>
                       </div>
