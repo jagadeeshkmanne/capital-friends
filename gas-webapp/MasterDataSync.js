@@ -497,6 +497,8 @@ function dailyUserSync() {
 
     // Monthly retirement income: take this month's amount from savings / sweep-in FD (IncomePlan.js)
     try { var inc = applyMonthlyIncome(); if (inc.applied.length) log('Monthly income: ' + JSON.stringify(inc.applied)); } catch (e) { log('applyMonthlyIncome error: ' + e); }
+    // Retirement buckets: email the family once when a refill / income action first comes up (IncomePlan.js)
+    try { var al = sendBucketAlerts_(); if (al.sent) log('Bucket alerts sent: ' + JSON.stringify(al)); } catch (e) { log('sendBucketAlerts_ error: ' + e); }
 
   } catch (e) {
     log('dailyUserSync error: ' + e.toString());

@@ -353,27 +353,38 @@ function MonthlyWithdrawal({ plan }) {
  * One row on the retirement card: "How it works", plus "Refill now" when this year's refill / build step is due
  * and "Income plan" after retirement. Each opens in a window. Nothing is recorded here: the next CAS import shows the switch.
  */
-export function RetirementActions({ goal, slot = 'alert', fallback }) {
-  const data = useData()
-  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF, settings } = data
-  const incomePlan = goal ? readIncomePlan(settings, goal.goalId) : null
-  const refillLog = goal ? readRefillLog(settings, goal.goalId) : []
-  const [open, setOpen] = useState(null) // 'refill' | 'income' | 'how'
-  const goalAttribution = useMemo(() => {
+/** The refill plan for one retirement goal (shared by the goal card, the dashboard and the email snapshot). */
+export function computeRetirementPlan({ goal, data, goalAttribution }) {
+  if (!goal) return null
+  const { goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, settings } = data
+  const incomePlan = readIncomePlan(settings, goal.goalId)
+  const refillLog = readRefillLog(settings, goal.goalId)
+  // SWPs paid since the last CAS import: the refill sees Income as lower by that much (same estimate as the card)
+  const b1Pending = (incomePlan?.sources || []).filter(src => src.kind === 'swp').reduce((t, src) => t + swpPending(incomePlan, src, mfTransactions || []) * (Number(src.amount) || 0), 0)
+  const yearsLeft = goal.targetDate ? Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 864e5)) : 0
+  return buildBucketRefillPlan({ goal, mappings: goalPortfolioMappings, holdings: mfHoldings, portfolios: mfPortfolios, assetAllocations,
+    targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity, lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
+    otherInvestments: otherInvList || [], attribution: goalAttribution?.[goal.goalId], refillLog, b1Pending })
+}
+
+export function useGoalAttribution() {
+  const { goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations } = useData()
+  return useMemo(() => {
     const allocMap = {}
     for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
     return attributeFamilyGoals({ goals: (goalList || []).filter(g => g.isActive !== false), mappings: goalPortfolioMappings,
       mfHoldings, stockHoldings, otherInvList: (otherInvList || []).filter(i => i.status !== 'Inactive'), allocMap })
   }, [goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations])
-  // SWPs paid since the last CAS import: the refill sees Income as lower by that much (same estimate as the card)
-  const b1Pending = (incomePlan?.sources || []).filter(src => src.kind === 'swp').reduce((t, src) => t + swpPending(incomePlan, src, mfTransactions || []) * (Number(src.amount) || 0), 0)
-  const plan = useMemo(() => {
-    if (!goal) return null
-    const yearsLeft = goal.targetDate ? Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 864e5)) : 0
-    return buildBucketRefillPlan({ goal, mappings: goalPortfolioMappings, holdings: mfHoldings, portfolios: mfPortfolios, assetAllocations,
-      targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity, lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
-      otherInvestments: otherInvList || [], attribution: goalAttribution[goal.goalId], refillLog, b1Pending })
-  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution, JSON.stringify(refillLog), b1Pending]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+export function RetirementActions({ goal, slot = 'alert', fallback }) {
+  const data = useData()
+  const { goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, settings } = data
+  const incomePlan = goal ? readIncomePlan(settings, goal.goalId) : null
+  const [open, setOpen] = useState(null) // 'refill' | 'income' | 'how'
+  const goalAttribution = useGoalAttribution()
+  const plan = useMemo(() => computeRetirementPlan({ goal, data, goalAttribution }),
+    [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution, settings]) // eslint-disable-line react-hooks/exhaustive-deps
   const noPlan = !plan || plan.noExpenses || plan.status === 'not-started'
   const ops = noPlan ? [] : plan.operations
   const showRefill = !noPlan && ops.length > 0 && plan.status !== 'not-due'

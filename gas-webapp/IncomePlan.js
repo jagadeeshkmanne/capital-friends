@@ -150,3 +150,143 @@ function incomeEmailItems_() {
   } catch (err) { log('incomeEmailItems_: ' + err); }
   return items;
 }
+
+// ============================================================================
+// ACTION REQUIRED: what the family has to do for the retirement buckets
+// ============================================================================
+
+var APP_GOALS_URL_ = 'https://capitalfriends.in/goals';
+
+function incomeFmtDate_(d) { return Utilities.formatDate(d, Session.getScriptTimeZone(), 'd MMM yyyy'); }
+
+/**
+ * Retirement bucket action items for the email: the app's own list (saved when it opens, with amounts and steps)
+ * plus the checks this job can do by itself, so the email still asks even if nobody opened the app:
+ *  - yearly refill date reached (retirement anniversary, 45-day window) and not marked done
+ *  - a savings / sweep-in FD source has 12 months of income or less left (3 or less: critical)
+ *  - this month's income came up short, or the source is gone
+ *  - a regular FD has matured and is still not marked Received
+ * Each item: { key, type: 'critical' | 'warning', title, description }
+ */
+function bucketActionItems_(today) {
+  today = today || new Date();
+  var items = [], seen = {};
+  var add = function (it) { var k = it.title + '|' + it.description; if (seen[k]) return; seen[k] = true; items.push(it); };
+  var settings = getAllSettings();
+  var goals = [];
+  try { goals = (getAllGoals() || []).filter(function (g) { return g.isActive !== false && g.goalType === 'Retirement'; }); } catch (e) { log('bucketActionItems_ goals: ' + e); }
+  var month = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM');
+
+  goals.forEach(function (g) {
+    var gid = g.goalId, gname = g.goalName || 'Retirement';
+    var snap = incomeJson_(settings['BucketActions:' + gid], null);
+    var refills = incomeJson_(settings['RefillLog:' + gid], []);
+    var lastDone = refills.reduce(function (mx, e) { var d = new Date(e.at); return !isNaN(d) && (!mx || d > mx) ? d : mx; }, null);
+    var hasAppRefill = false;
+    // 1. the app's list (dropped once a refill is marked done after it was saved)
+    if (snap && snap.items) snap.items.forEach(function (it) {
+      if ((it.code === 'refill' || it.code === 'build') && lastDone && new Date(snap.at) <= lastDone) return;
+      if (it.code === 'refill' || it.code === 'build') hasAppRefill = true;
+      add({ key: gid + ':' + it.code + ':' + month, type: it.type === 'critical' ? 'critical' : 'warning', title: it.title, description: it.description });
+    });
+    // 2. yearly refill date
+    var start = new Date(g.targetDate);
+    var retired = !isNaN(start) && (start <= today || g.status === 'Achieved');
+    if (retired && !isNaN(start) && start <= today) {
+      var anniv = new Date(start); anniv.setFullYear(today.getFullYear());
+      if (anniv > today) anniv.setFullYear(anniv.getFullYear() - 1);
+      var since = (today - anniv) / 864e5;
+      var doneThisYear = lastDone && lastDone >= new Date(anniv.getTime() - 45 * 864e5);
+      if (since <= 45 && !doneThisYear && !hasAppRefill) add({ key: gid + ':yearly:' + anniv.getFullYear(), type: 'warning', title: gname + ': yearly bucket refill',
+        description: 'Your yearly refill date was ' + incomeFmtDate_(anniv) + '. Open Goals → Refill now to see the switches, do them in your fund app, then press Mark done.' });
+    }
+    // 3. monthly income sources
+    var plan = incomeJson_(settings['IncomePlan:' + gid], null);
+    var ilog = incomeJson_(settings['IncomeLog:' + gid], []);
+    if (plan && plan.sources) plan.sources.forEach(function (s) {
+      if (s.kind !== 'cash') return;
+      var amt = Number(s.amount) || 0;
+      var mine = ilog.filter(function (e) { return e.ref === s.ref; });
+      var last = mine[mine.length - 1];
+      if (last && last.m === month && (last.short > 0 || last.skip)) {
+        add({ key: gid + ':short:' + month + ':' + s.ref, type: 'critical', title: gname + ': this month\'s income is short',
+          description: last.skip ? 'This month\'s income was not taken: ' + last.skip + '. Open Goals and pick another place to pay from.'
+            : (s.name || 'Savings') + ' had only ' + formatCurrency(last.amt) + '. ' + formatCurrency(last.short) + ' of this month\'s income is still to pay: refill Income now (Goals → Refill now).' });
+        return;
+      }
+      var inv = getInvestmentById(s.ref);
+      var bal = inv ? parseFloat(inv.currentValue) || 0 : (last ? last.bal : null);
+      if (!(amt > 0) || bal === null || bal === undefined) return;
+      var months = Math.floor(bal / amt);
+      if (months <= 12 && !hasAppRefill) add({ key: gid + ':low:' + month + ':' + s.ref, type: months <= 3 ? 'critical' : 'warning', title: gname + ': Income running low',
+        description: (s.name || 'Savings') + ' has about ' + months + ' month' + (months === 1 ? '' : 's') + ' of income left (' + formatCurrency(bal) + '). Refill it from Stability: open Goals → Refill now.' });
+    });
+  });
+
+  // 4. FDs that matured but are still open
+  try {
+    (getAllInvestments() || []).forEach(function (inv) {
+      if (inv.status === 'Inactive' || !/fixed deposit|^fd$/i.test(inv.investmentType || '')) return;
+      var dyn = incomeJson_(inv.dynamicFields, {});
+      var md = dyn && dyn.maturityDate ? new Date(dyn.maturityDate) : null;
+      if (!md || isNaN(md) || md > today) return;
+      add({ key: 'fd:' + inv.investmentId, type: 'warning', title: (inv.investmentName || 'FD') + ' has matured',
+        description: 'It matured on ' + incomeFmtDate_(md) + '. When the money reaches your bank, press Received on it in Other investments so it refills Income.' });
+    });
+  } catch (e) { log('bucketActionItems_ FDs: ' + e); }
+
+  items.sort(function (a, b) { return (a.type === 'critical' ? 0 : 1) - (b.type === 'critical' ? 0 : 1); });
+  return items;
+}
+
+/**
+ * A short alert email the day an action first appears (the daily report also shows it, but someone on a weekly
+ * report would see it too late). Each action is sent once ('BucketAlertsSent' remembers it).
+ */
+function sendBucketAlerts_() {
+  var items = bucketActionItems_();
+  if (!items.length) return { sent: 0 };
+  var sentMap = incomeJson_(getSetting('BucketAlertsSent'), {});
+  var fresh = items.filter(function (it) { return !sentMap[it.key]; });
+  if (!fresh.length) return { sent: 0 };
+  var recipients = getEmailRecipients();
+  if (!recipients.length) return { sent: 0 };
+  var crit = fresh.some(function (it) { return it.type === 'critical'; });
+  var subject = (crit ? 'Action needed today: ' : 'Action needed: ') + fresh[0].title + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ' more)' : '');
+  var html = buildBucketAlertHTML_(fresh);
+  var n = 0;
+  recipients.forEach(function (r) {
+    try { GmailApp.sendEmail(r.email, subject, fresh.map(function (it) { return it.title + ': ' + it.description; }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_, { htmlBody: html, name: 'Capital Friends' }); n++; }
+    catch (e) { log('sendBucketAlerts_ to ' + r.email + ': ' + e); }
+  });
+  if (n) {
+    var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    fresh.forEach(function (it) { sentMap[it.key] = now; });
+    var keys = Object.keys(sentMap).sort(function (a, b) { return sentMap[a] < sentMap[b] ? -1 : 1; });
+    while (keys.length > 200) delete sentMap[keys.shift()];
+    updateSetting('BucketAlertsSent', JSON.stringify(sentMap));
+  }
+  return { sent: n, items: fresh.length };
+}
+
+/** The Action Required block (used by the alert email and the daily / weekly report). */
+function bucketActionsHTML_(items) {
+  var h = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #fecaca;border-radius:12px;margin:0 0 16px 0"><tbody><tr><td style="padding:20px">';
+  h += '<div style="font-size:15px;font-weight:800;color:#dc2626;margin-bottom:10px">&#9888; Action required (' + items.length + ')</div>';
+  items.forEach(function (it, i) {
+    var col = it.type === 'critical' ? '#dc2626' : '#d97706';
+    h += '<div style="padding:10px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '"><div style="font-size:13px;font-weight:700;color:' + col + '">' + escHtml_(it.title) + '</div>';
+    h += '<div style="font-size:13px;color:#475569;line-height:1.5;margin-top:2px">' + escHtml_(it.description) + '</div></div>';
+  });
+  h += '<div style="margin-top:14px"><a href="' + APP_GOALS_URL_ + '" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:10px 18px;border-radius:8px">Open Capital Friends &rsaquo;</a></div>';
+  h += '<div style="font-size:11px;color:#94a3b8;margin-top:10px">Do the switches in your fund-house or broker app, then press Mark done in Capital Friends. Not investment advice.</div>';
+  h += '</td></tr></tbody></table>';
+  return h;
+}
+
+function buildBucketAlertHTML_(items) {
+  return '<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:20px"><div style="max-width:600px;margin:0 auto">'
+    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:12px">Capital Friends</div>' + bucketActionsHTML_(items) + '</div></div>';
+}
+
+function escHtml_(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }

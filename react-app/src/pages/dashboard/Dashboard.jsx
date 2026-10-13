@@ -13,6 +13,7 @@ import { formatINR, splitFundName } from '../../data/familyData'
 import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { useGoalsPlan } from '../../hooks/useGoalsPlan'
+import { useBucketActions } from '../goals/useBucketActions'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
 const STEADY_CATS = new Set(['Debt', 'Liquid', 'Gilt', 'Cash', 'Money Market', 'Overnight', 'Arbitrage'])
@@ -495,9 +496,12 @@ export default function Dashboard() {
     }
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, goalPortfolioMappings, reminderList, assetAllocations, activeMembers, goalAttribution])
 
+  const bucketItems = useBucketActions()
   // ── Action Items (computed from real data) ──
   const actionItems = useMemo(() => {
     const items = []
+    // retirement buckets first: a refill due / income running low is money the family lives on
+    for (const b of bucketItems || []) items.push({ type: b.type, title: b.title, description: b.description, action: b.code === 'refill' || b.code === 'build' ? 'Refill now' : 'Open', navigateTo: '/goals' })
     const activeInsurance = filterOwner((insurancePolicies || []).filter((p) => p.status === 'Active'), 'memberId')
 
     if (healthCheckCompleted === false) {
@@ -592,7 +596,7 @@ export default function Dashboard() {
     })
 
     return items.slice(0, 6)
-  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, goalAttribution, healthCheckCompleted, healthCheckAnswers, goalsTodo])
+  }, [selectedMember, insurancePolicies, goalList, reminderList, goalPortfolioMappings, goalAttribution, healthCheckCompleted, healthCheckAnswers, goalsTodo, bucketItems])
 
   // ── Upcoming Reminders (sorted by due date) ──
   const upcomingReminders = useMemo(() => {

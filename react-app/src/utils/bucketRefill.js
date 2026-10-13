@@ -238,7 +238,8 @@ export function buildBucketRefillPlan({
     const quarterStart = new Date(planDate.getFullYear(), Math.floor(planDate.getMonth() / 3) * 3, 1)
     const nextQuarter = new Date(quarterStart.getFullYear(), quarterStart.getMonth() + 3, 1)
     const lastMove = validDate(lastBucketMoveDate)
-    const doneThisQuarter = !!lastMove && lastMove >= quarterStart && lastMove <= planDate
+    const markedThisQuarter = logged.some(e => e.date >= quarterStart) // "Mark done" also counts (before the CAS import shows the switch)
+    const doneThisQuarter = (!!lastMove && lastMove >= quarterStart && lastMove <= planDate) || markedThisQuarter
 
     let status
     if (gap <= monthly * 0.5) status = 'built'
