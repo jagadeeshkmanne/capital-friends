@@ -14,10 +14,16 @@ test('retired with lots of cash: Income capped at 2 years, the rest is free mone
   assert.equal(48 + lastsYears(6167000, 30000), 71)
 })
 
-test('Income short: refilled from Stability funds, never from locked EPF / NPS', () => {
-  const r = bucketCheck({ tgt: tgt(30000), inc: 200000, stb: 1800000, gro: 3000000, locked: 1500000, monthly: 30000 })
-  assert.match(r.steps[0], /3,00,000|3\.00 L/)
-  assert.ok(r.warn.some((w) => /Income is .* short/.test(w)))
+test('Income spent month by month is normal: no warning until it drops to 12 months', () => {
+  const r = bucketCheck({ tgt: tgt(30000), inc: 690000, stb: 1800000, gro: 3000000, locked: 0, monthly: 30000 })
+  assert.deepEqual([r.steps.length, r.warn.length], [0, 0])
+  assert.match(r.info[0], /23 months.*yearly refill/)
+})
+
+test('Income at 12 months: refill now from Stability funds, never from locked EPF / NPS', () => {
+  const r = bucketCheck({ tgt: tgt(30000), inc: 360000, stb: 1800000, gro: 3000000, locked: 1500000, monthly: 30000 })
+  assert.match(r.steps[0], /refill it now.*3\.00 L from Stability/)
+  assert.ok(r.warn.some((w) => /short even after using Stability.*Received/.test(w)))
 })
 
 test('not enough money for Income + Stability: clear warning', () => {

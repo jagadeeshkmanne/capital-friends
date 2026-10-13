@@ -196,14 +196,15 @@ const jarOf = (it) => {
   return 'stb'
 }
 function BucketGaps({ tgt, sum, lockedSum, monthly, age, inflation }) {
-  const { steps, warn } = bucketCheck({ tgt, inc: sum('inc'), stb: sum('stb'), gro: sum('gro'), locked: lockedSum, monthly })
+  const { steps, warn, info } = bucketCheck({ tgt, inc: sum('inc'), stb: sum('stb'), gro: sum('gro'), locked: lockedSum, monthly })
   const total = sum('inc') + sum('stb') + sum('gro')
   const yrs = lastsYears(total, monthly, inflation)
   const lastsLow = age && age + yrs < 85
   const what = 'What to do: spend a little less each month, add some income (part-time work, rent), keep EPF / PPF / NPS as the last backup, and talk to a fee-only adviser.'
   return (
     <div className="g2-hint">
-      {!steps.length && !warn.length && <div>✓ Every jar is on plan.</div>}
+      {!steps.length && !warn.length && !info.length && <div>✓ Every jar is on plan.</div>}
+      {info.map((t, i) => <div key={`i${i}`}>{t}</div>)}
       {steps.map((t, i) => <div key={`s${i}`}>→ {t}</div>)}
       {warn.map((t, i) => <div key={`w${i}`} style={{ color: '#fbbf24' }}>⚠ {t}</div>)}
       {monthly > 0 && <div style={lastsLow ? { color: '#fbbf24' } : null}>{lastsLow ? '⚠ ' : ''}At {L(monthly)} a month (rising with inflation), your money lasts {yrs >= 60 ? '60+ years' : `about ${yrs} years`}{age ? `, until about age ${age + yrs}` : ''}. Assumes about 8% a year average return.</div>}
