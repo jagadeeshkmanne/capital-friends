@@ -5,7 +5,8 @@ import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR } from '../../data/familyData'
 import { FormField, FormDateInput, FormSelect, FormActions } from '../Modal'
-import StockSearchInput, { loadStocks, clearStocksCache, stocksFromCache } from './StockSearchInput'
+import StockSearchInput, { loadStocks, clearStocksCache, stocksFromCache, loadUsStocks } from './StockSearchInput'
+import { fmtLocal } from '../../utils/currency'
 import { readTableFile, extractHoldings, buildStockIndex, matchStock } from '../../utils/holdingsImport'
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -46,7 +47,10 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
       if (ex.error) { setError(ex.error); return }
       if (!ex.items.length && !ex.invalid.length) { setError('No holdings found in this file.'); return }
       const idx = buildStockIndex(stocks)
-      setRows(ex.items.map((it, k) => ({ ...it, key: k, stock: matchStock(it, idx), include: true })))
+      // US list only when the file has foreign rows (a currency, or EXCHANGE:TICKER symbols)
+      const needUs = ex.items.some((it) => it.currency || /^[A-Za-z]{2,14}:/.test(String(it.sourceSymbol || '')))
+      const us = needUs ? await loadUsStocks() : []
+      setRows(ex.items.map((it, k) => ({ ...it, key: k, stock: matchStock(it, idx, us), include: true })))
       setInvalid(ex.invalid)
     } catch (e) {
       setError(e.message || 'Could not read this file')
@@ -74,7 +78,7 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
     try {
       const res = await onImport({
         portfolioId: pid, date,
-        rows: toImport.map((r) => ({ symbol: r.stock.symbol, quantity: r.quantity, avgPrice: Math.round(r.avgPrice * 10000) / 10000, sourceSymbol: r.sourceSymbol })),
+        rows: toImport.map((r) => ({ symbol: r.stock.symbol, quantity: r.quantity, avgPrice: Math.round(r.avgPrice * 10000) / 10000, sourceSymbol: r.sourceSymbol, isin: r.isin || undefined, currency: r.currency || undefined, date: r.date || undefined })),
       })
       const notTaken = (rows || []).filter((r) => !toImport.includes(r)).map((r) => ({ symbol: r.sourceSymbol, reason: !r.stock ? 'Not found in the stock list' : status(r) === 'held' ? 'Already in this portfolio' : 'Left out by you' }))
       setResult({ imported: res?.imported || [], skipped: [...(res?.skipped || []), ...notTaken, ...invalid.map((i) => ({ symbol: i.sourceSymbol, reason: 'Quantity or price missing in the file' }))] })
@@ -122,7 +126,7 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
         <FormField label="Import into portfolio" required>
           <FormSelect value={pid} onChange={setPid} options={portfolioOptions} placeholder="Select portfolio..." />
         </FormField>
-        <FormField label="Bought on (used for every row)">
+        <FormField label="Bought on (rows without a Buy date)">
           <FormDateInput value={date} onChange={setDate} />
         </FormField>
       </div>
@@ -136,7 +140,8 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
           {fileName && <span className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]"><FileSpreadsheet size={14} /> {fileName}</span>}
           <button type="button" onClick={downloadSample} className="ml-auto flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"><Download size={12} /> Download Excel template</button>
         </div>
-        <p className="text-xs text-[var(--text-dim)] mt-2">Needs 3 columns: <strong>Symbol</strong> (or Instrument), <strong>Quantity</strong> and <strong>Avg price</strong>. Zerodha, Groww and most broker holdings downloads work as they are (.xlsx or .csv). US stocks and ETFs: write the symbol as <strong>NASDAQ:AAPL</strong>, <strong>NYSE:KO</strong> or <strong>NYSEARCA:VOO</strong> and the average price in <strong>$</strong>; it is turned into ₹ at today's dollar rate.</p>
+        <p className="text-xs text-[var(--text-dim)] mt-2">Needs 3 columns: <strong>Symbol</strong> (or Instrument), <strong>Quantity</strong> and <strong>Avg price</strong>. Zerodha, Groww and most broker holdings downloads work as they are (.xlsx or .csv).</p>
+        <p className="text-xs text-[var(--text-dim)] mt-1">US / foreign stocks: add a <strong>Currency</strong> column (USD) and the price in that currency, e.g. AAPL · 5 · 182.50 · USD. Other markets: write the symbol as on Google Finance (LON:VOD). An optional <strong>Buy date</strong> column uses that day's rupee rate (otherwise today's).</p>
         <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
       </div>
 
@@ -162,7 +167,10 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
                     <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
                       {r.stock ? <>{r.stock.symbol} <span className="font-normal text-[var(--text-dim)]">— {r.stock.companyName}</span></> : r.sourceSymbol}
                     </p>
-                    <p className="text-xs text-[var(--text-dim)] tabular-nums">{r.quantity} × {formatINR(r.avgPrice)} = {mv(formatINR(r.quantity * r.avgPrice), 'amount')}</p>
+                    <p className="text-xs text-[var(--text-dim)] tabular-nums">{r.stock?.foreign
+                      ? <>{r.quantity} × {r.currency ? fmtLocal(r.avgPrice, r.currency) : `${r.avgPrice} (in its own currency)`} · turned into ₹ at the rate on {r.date || date}</>
+                      : <>{r.quantity} × {formatINR(r.avgPrice)} = {mv(formatINR(r.quantity * r.avgPrice), 'amount')}</>}
+                      {r.date && !r.stock?.foreign && <> · bought {r.date}</>}</p>
                   </div>
                   {st === 'ready' && <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />}
                   {st === 'held' && <span className="flex items-center gap-1 text-xs text-amber-400 shrink-0" title="Tick to add these shares on top of what is already there"><AlertTriangle size={14} /> Already held</span>}

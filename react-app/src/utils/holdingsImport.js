@@ -8,6 +8,28 @@ const SYMBOL_HEADERS = ['symbol', 'tradingsymbol', 'instrument', 'stocksymbol', 
 const QTY_HEADERS = ['quantity', 'qty', 'quantityavailable', 'availableqty', 'totalquantity', 'totalqty', 'netqty', 'holdingqty', 'holdingquantity', 'shares', 'noofshares', 'units', 'freeqty']
 const PRICE_HEADERS = ['avgprice', 'averageprice', 'avgcost', 'averagecost', 'avgbuyprice', 'averagebuyprice', 'buyavg', 'buyaverage', 'buyprice', 'avgrate', 'averagerate', 'purchaseprice', 'costprice', 'avgpurchaseprice', 'price']
 const ISIN_HEADERS = ['isin', 'isincode']
+// optional: the currency of the average price (blank = ₹) and the buy date (blank = the date picked in the form)
+const CCY_HEADERS = ['currency', 'ccy', 'curr', 'pricecurrency']
+const DATE_HEADERS = ['buydate', 'boughton', 'purchasedate', 'dateofpurchase', 'tradedate', 'date']
+
+// ── dates: Excel serial numbers, 2024-03-15, 15-03-2024, 15/03/2024, 15 Mar 2024 → "2024-03-15" ──
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 }
+export function toIsoDate(v) {
+  if (v == null || v === '') return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  const ok = (y, m, d) => y > 1970 && y < 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${y}-${pad(m)}-${pad(d)}` : ''
+  const n = typeof v === 'number' ? v : (/^\d{5}(\.\d+)?$/.test(String(v).trim()) ? Number(v) : NaN)
+  if (n > 20000 && n < 80000) { const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000); return ok(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()) }
+  const s = String(v).trim()
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (m) return ok(+m[1], +m[2], +m[3])
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/)          // Indian order: day first
+  if (m) return ok(+m[3], +m[2], +m[1])
+  m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{4})/)
+  if (m && MONTHS[m[2].toLowerCase()]) return ok(+m[3], MONTHS[m[2].toLowerCase()], +m[1])
+  return ''
+}
+const normCcy = (v) => { const c = String(v ?? '').trim().toUpperCase().replace(/[^A-Z]/g, ''); return c === 'RS' || c === 'INR' || c === '' ? '' : c === 'GBP' && /p$/.test(String(v).trim()) ? 'GBX' : c }
 
 const key = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
@@ -144,7 +166,8 @@ export function findColumns(rows) {
   for (let r = 0; r < Math.min(rows.length, 25); r++) {
     const h = rows[r].map(key)
     const symbol = pick(h, SYMBOL_HEADERS), qty = pick(h, QTY_HEADERS), price = pick(h, PRICE_HEADERS), isin = pick(h, ISIN_HEADERS)
-    if ((symbol >= 0 || isin >= 0) && qty >= 0 && price >= 0) return { headerRow: r, symbol, qty, price, isin }
+    const ccy = pick(h, CCY_HEADERS), date = pick(h, DATE_HEADERS)
+    if ((symbol >= 0 || isin >= 0) && qty >= 0 && price >= 0) return { headerRow: r, symbol, qty, price, isin, ccy: ccy ?? -1, date: date ?? -1 }
   }
   return null
 }
@@ -161,11 +184,14 @@ export function extractHoldings(rows) {
     if (!sym && !isin) continue
     if (/^(total|grand total|net)/i.test(sym)) continue
     const qty = toNumber(row[cols.qty]), price = toNumber(row[cols.price])
-    const id = normalizeSymbol(sym) || isin
+    const currency = cols.ccy >= 0 ? normCcy(row[cols.ccy]) : ''
+    const date = cols.date >= 0 ? toIsoDate(row[cols.date]) : ''
+    // same stock twice is merged — unless the rows have different buy dates (then each keeps its own)
+    const id = [normalizeSymbol(sym) || isin, currency, date].join('|')
     if (!(qty > 0) || !(price > 0)) { bad.push({ sourceSymbol: sym || isin, isin, quantity: qty, avgPrice: price, line: r + 1 }); continue }
     const prev = out.get(id)
     if (prev) { const q = prev.quantity + qty; prev.avgPrice = (prev.avgPrice * prev.quantity + price * qty) / q; prev.quantity = q }
-    else out.set(id, { sourceSymbol: sym || isin, isin, quantity: qty, avgPrice: price, line: r + 1 })
+    else out.set(id, { sourceSymbol: sym || isin, isin, quantity: qty, avgPrice: price, currency, date, line: r + 1 })
   }
   return { items: [...out.values()], invalid: bad, columns: cols }
 }
@@ -182,11 +208,27 @@ export function buildStockIndex(stocks) {
   }
   return { bySym, byIsin, byLoose, byBse }
 }
-const US_RE = /^(NASDAQ|NYSE|NYSEARCA|NYSEAMERICAN|NYSEMKT|BATS|CBOE):[A-Z0-9.\-]{1,12}$/
-export function matchStock(item, idx) {
-  // US stocks / ETFs written as EXCHANGE:TICKER: their average price is in $ (the server converts it to ₹)
-  const raw = String(item.sourceSymbol || '').trim().toUpperCase()
-  if (US_RE.test(raw)) return { symbol: raw, companyName: raw.split(':')[1] + ' (US)', exchange: 'US' }
+const US_EX = new Set(['NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEAMERICAN', 'NYSEMKT', 'BATS', 'CBOE'])
+const DIRECT_RE = /^([A-Z]{2,14}):([A-Z0-9][A-Z0-9.\-&]{0,19})$/
+/**
+ * Find the stock for one file row. Indian rows (no currency) use the app's list: symbol → ISIN → loose symbol
+ * → BSE code. EXCHANGE:TICKER is any market (NASDAQ:AAPL, LON:VOD, BOM:517015). A plain ticker with a
+ * foreign currency (AAPL + USD) is looked up in the US list (usList, optional).
+ */
+export function matchStock(item, idx, usList) {
+  const raw = String(item.sourceSymbol || '').trim().toUpperCase().replace(/^BSE:(\d{6})$/, 'BOM:$1')
+  const dm = raw.match(DIRECT_RE)
+  if (dm && dm[1] === 'NSE') return idx.bySym.get(dm[2]) || { symbol: raw, companyName: dm[2], exchange: 'NSE', direct: true }
+  if (dm && dm[1] === 'BOM') return idx.byBse.get(dm[2]) || idx.bySym.get(raw) || { symbol: raw, companyName: `BSE ${dm[2]}`, exchange: 'BSE', direct: true }
+  if (dm) {
+    const u = (usList || []).find((s) => s.symbol === raw)
+    return { symbol: raw, companyName: u ? u.companyName : dm[2], exchange: u || US_EX.has(dm[1]) ? 'US' : dm[1], foreign: true, direct: true }
+  }
+  if (item.currency && item.currency !== 'INR') {
+    const t = raw.replace(/\.(US|O|N)$/, '').replace(/-/g, '.')
+    const u = (usList || []).find((s) => s.ticker === t)
+    return u ? { symbol: u.symbol, companyName: u.companyName, exchange: 'US', foreign: true } : null
+  }
   const sym = normalizeSymbol(item.sourceSymbol)
   return idx.bySym.get(sym) || (item.isin && idx.byIsin.get(item.isin)) || idx.byLoose.get(loose(sym)) || (/^\d{6}$/.test(sym) && idx.byBse.get(sym)) || null
 }

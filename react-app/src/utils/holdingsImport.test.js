@@ -50,3 +50,24 @@ describe('US stocks and ETFs', () => {
     expect(matchStock({ sourceSymbol: 'AAPL' }, empty)).toBe(null)
   })
 })
+
+describe('currency and buy date columns', () => {
+  it('reads Currency and Buy date, keeps rows with different dates apart', () => {
+    const r = extractHoldings([['Symbol', 'Quantity', 'Avg price', 'Currency', 'Buy date'], ['INFY', '10', '1450', '', ''], ['AAPL', '5', '182.50', 'USD', '2024-03-15'], ['AAPL', '2', '190', 'USD', '15/01/2025'], ['VOO', '3', '455', 'usd', 45667]])
+    expect(r.items.map((i) => [i.sourceSymbol, i.currency, i.date])).toEqual([['INFY', '', ''], ['AAPL', 'USD', '2024-03-15'], ['AAPL', 'USD', '2025-01-15'], ['VOO', 'USD', '2025-01-10']])
+  })
+  it('old 3-column files work as before', () => {
+    const r = extractHoldings([['Symbol', 'Qty', 'Avg Price'], ['INFY', '10', '100']])
+    expect(r.items[0]).toMatchObject({ sourceSymbol: 'INFY', currency: '', date: '' })
+  })
+  it('matches plain US tickers with a currency through the US list, and any EXCHANGE:TICKER', () => {
+    const us = [{ symbol: 'NASDAQ:AAPL', ticker: 'AAPL', companyName: 'Apple Inc.' }, { symbol: 'NYSE:BRK.B', ticker: 'BRK.B', companyName: 'Berkshire' }]
+    expect(matchStock({ sourceSymbol: 'AAPL', currency: 'USD' }, idx, us)).toMatchObject({ symbol: 'NASDAQ:AAPL', foreign: true })
+    expect(matchStock({ sourceSymbol: 'BRK-B', currency: 'USD' }, idx, us)).toMatchObject({ symbol: 'NYSE:BRK.B' })
+    expect(matchStock({ sourceSymbol: 'LON:VOD' }, idx, us)).toMatchObject({ symbol: 'LON:VOD', foreign: true })
+    expect(matchStock({ sourceSymbol: 'BSE:500209' }, idx, us)).toMatchObject({ symbol: 'INFY' })
+    expect(matchStock({ sourceSymbol: 'BOM:517015' }, idx, us)).toMatchObject({ symbol: 'BOM:517015', exchange: 'BSE' })
+    expect(matchStock({ sourceSymbol: 'INFY' }, idx, us)).toMatchObject({ symbol: 'INFY' })
+    expect(matchStock({ sourceSymbol: 'ZZZZ', currency: 'USD' }, idx, us)).toBe(null)
+  })
+})

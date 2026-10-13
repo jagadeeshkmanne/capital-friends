@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { getUsQuote } from '../../services/api'
-import { isUsSymbol } from './StockSearchInput'
+import { getQuote } from '../../services/api'
+import { isForeignSymbol } from './StockSearchInput'
+import { ccyPrefix } from '../../utils/currency'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
@@ -27,8 +28,9 @@ export default function SellStockForm({ portfolioId, initialData, signalDetail, 
     notes: initialData?.notes || '',
   })
   const [errors, setErrors] = useState({})
-  // US stocks / ETFs: enter the $ price; the app turns it into ₹ with the dollar rate on that day
-  const us = isUsSymbol(form.symbol)
+  // Foreign stocks (US, UK …): enter the price in its own currency; the app turns it into ₹ with that day's rate
+  const us = isForeignSymbol(form.symbol)
+  const [ccy, setCcy] = useState('USD')
   const [usd, setUsd] = useState('')
   const [fx, setFx] = useState('')
   const [fxBusy, setFxBusy] = useState(false)
@@ -36,7 +38,7 @@ export default function SellStockForm({ portfolioId, initialData, signalDetail, 
     if (!us || !form.date) return
     let alive = true
     setFxBusy(true)
-    getUsQuote(form.symbol, form.date).then((q) => { if (alive && q?.fxOnDate > 0) setFx(String(Math.round(q.fxOnDate * 100) / 100)) }).catch(() => {}).finally(() => alive && setFxBusy(false))
+    getQuote(form.symbol, form.date).then((q) => { if (!alive) return; if (q?.currency) setCcy(q.currency); if (q?.fxOnDate > 0) setFx(String(Math.round(q.fxOnDate * 10000) / 10000)) }).catch(() => {}).finally(() => alive && setFxBusy(false))
     return () => { alive = false }
   }, [us, form.symbol, form.date])
   useEffect(() => {
@@ -122,7 +124,7 @@ export default function SellStockForm({ portfolioId, initialData, signalDetail, 
   async function handleSubmit() {
     if (!validate()) return
     setSaving(true)
-    const usNote = us && Number(usd) > 0 && Number(fx) > 0 ? `$${usd} at ₹${fx}/$` : ''
+    const usNote = us && Number(usd) > 0 && Number(fx) > 0 ? `${ccy} ${usd} at ₹${fx} per ${ccy}` : ''
     try { await onSave(usNote ? { ...form, notes: [usNote, form.notes].filter(Boolean).join(' · ') } : form) } finally { setSaving(false) }
   }
 
@@ -208,10 +210,10 @@ export default function SellStockForm({ portfolioId, initialData, signalDetail, 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {us && (<>
-          <FormField label={'Price per share ($)'} required>
+          <FormField label={`Price per share (${ccyPrefix(ccy)})`} required>
             <FormInput type="number" value={usd} onChange={setUsd} placeholder="e.g., 185.20" />
           </FormField>
-          <FormField label={fxBusy ? 'Dollar rate (₹ per $) · checking…' : 'Dollar rate (₹ per $) that day'}>
+          <FormField label={fxBusy ? `${ccy} rate (₹ per ${ccy}) · checking…` : `${ccy} rate (₹ per ${ccy}) that day`}>
             <FormInput type="number" value={fx} onChange={setFx} placeholder="e.g., 83.10" />
           </FormField>
         </>)}

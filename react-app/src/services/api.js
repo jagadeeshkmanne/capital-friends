@@ -269,6 +269,12 @@ export const getAllStocks = () => callAPI('stocks:all')
 export const getStockPrice = (symbol) => callAPI('stock:price', { symbol })
 // US stocks / ETFs (EXCHANGE:TICKER): name, $ price, today's dollar rate and the rate on a date
 export const getUsQuote = (symbol, date) => callAPI('stock:us-quote', { symbol, date })
+// Any Google Finance symbol (NASDAQ:AAPL, LON:VOD, BOM:517015): name, price in its currency, rupee rate (today / on a date)
+export const getQuote = (symbol, date) => callAPI('stock:quote', { symbol, date })
+// US stocks and ETFs for the search: [[symbol, ticker, name, exchange, type]]
+export const getUsStocks = () => callAPI('stocks:us-list')
+// Testing clean-up: removes every stock portfolio, transaction and holding of this family
+export const deleteAllStocks = () => callAPI('stocks:delete-all', { confirm: 'DELETE' })
 
 // Stock Transactions
 export const buyStock = (data) => callAPI('stock:buy', data)
