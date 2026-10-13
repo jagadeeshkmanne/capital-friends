@@ -3,6 +3,7 @@ import { Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Lock, Info } fr
 import { useData } from '../../context/DataContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR } from '../../data/familyData'
+import * as api from '../../services/api'
 import { FormField, FormDateInput, FormSelect, FormInput, FormActions } from '../Modal'
 import { loadStocks, clearStocksCache, stocksFromCache } from './StockSearchInput'
 import { buildStockIndex } from '../../utils/holdingsImport'
@@ -14,6 +15,7 @@ import { shortBroker } from '../../utils/cas/dematParser'
 // The statement has no buy price: the statement price is used unless the user types their own.
 
 const NEW = '__new__'
+const titleCase = (s) => String(s || '').replace(/\s*[-#]\s*(NEW )?EQUITY.*$|\s*-\s*$/i, '').trim().toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\bLtd\b/g, 'Ltd')
 const rs = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 // why a holding can't be imported as a stock (the statement's own marks)
 function whyNot(r) {
@@ -28,7 +30,7 @@ const tokens = (s) => new Set(String(s || '').toUpperCase().split(/[^A-Z]+/).fil
 function nameScore(a, b) { const A = tokens(a), B = tokens(b); let n = 0; A.forEach((t) => { if (B.has(t)) n++ }); return n }
 
 export default function ImportDematForm({ onCancel }) {
-  const { stockPortfolios, stockHoldings, activeMembers, activeInvestmentAccounts, addStockPortfolio, importStocks } = useData()
+  const { stockPortfolios, stockHoldings, activeMembers, activeInvestmentAccounts, addStockPortfolio, importStocks, otherInvList, addOtherInvestment } = useData()
   const { mv } = useMask()
   const fileRef = useRef(null)
   const [file, setFile] = useState(null)
@@ -64,7 +66,7 @@ export default function ImportDematForm({ onCancel }) {
         const rows = a.holdings.map((h, k) => {
           const stock = idx.byIsin.get(h.isin) || null
           const fund = !stock && h.isin.startsWith('INF')
-          return { key: k, ...h, stock, fund, include: !!stock, avgPrice: String(h.price) }
+          return { key: k, ...h, stock, fund, include: !!stock, unlisted: !stock && !fund && h.flag !== 'rights', avgPrice: String(h.price) }
         })
         return withIncludes({ ...a, ownerId, ...pickPortfolio(ownerId, a), rows })
       }))
@@ -96,16 +98,31 @@ export default function ImportDematForm({ onCancel }) {
 
   const heldIn = (pid) => new Set((stockHoldings || []).filter((h) => h.portfolioId === pid).map((h) => String(h.symbol).toUpperCase()))
   const take = (a) => a.rows.filter((r) => r.stock && r.include && Number(r.avgPrice) > 0)
-  const total = accts.reduce((s, a) => s + take(a).length, 0)
-  const ready = accts.every((a) => !take(a).length || (a.ownerId && (a.portfolioId !== NEW || (a.newName.trim() && a.iaId))))
+  // holdings with no market price, ticked to go to Other Investments → Unlisted Shares (value kept by hand)
+  const already = (r) => (otherInvList || []).some((o) => String(o.notes || '').includes(r.isin))
+  const takeUnlisted = (a) => a.rows.filter((r) => !r.stock && !r.fund && r.unlisted && !already(r))
+  const nStocks = accts.reduce((s, a) => s + take(a).length, 0), nUnl = accts.reduce((s, a) => s + takeUnlisted(a).length, 0)
+  const total = nStocks + nUnl
+  const ready = accts.every((a) => (!take(a).length || (a.ownerId && (a.portfolioId !== NEW || (a.newName.trim() && a.iaId)))) && (!takeUnlisted(a).length || a.ownerId))
 
   async function handleImport() {
     setSaving(true); setError('')
     const done = [], skipped = []
     try {
+      const unl = accts.flatMap((a) => takeUnlisted(a).map((r) => ({ a, r })))
+      for (let k = 0; k < unl.length; k++) {
+        const { a, r } = unl[k]
+        const data = {
+          investmentType: 'Unlisted Shares', investmentCategory: 'Equity', investmentName: titleCase(r.name) || r.isin,
+          familyMember: a.ownerId, investedAmount: 0, currentValue: Math.round(r.value * 100) / 100,
+          notes: `${r.qty} shares · ISIN ${r.isin} · ${a.broker} demat · from ${cas.depository || 'CDSL'} statement ${cas.asOf || ''} (${whyNot(r).split(' — ')[0]}). No market price: update the value by hand.`,
+        }
+        await (k === unl.length - 1 ? addOtherInvestment(data) : api.createOtherInvestment(data))   // the last one reloads the list
+      }
+      if (unl.length) done.push({ name: 'Other Investments → Unlisted Shares', count: unl.length, unit: 'holding' })
       for (const a of accts) {
-        const rows = take(a)
-        a.rows.filter((r) => !rows.includes(r)).forEach((r) => skipped.push({ symbol: r.stock?.symbol || r.name || r.isin, reason: !r.stock ? whyNot(r) : 'Left out by you' }))
+        const rows = take(a), unlRows = takeUnlisted(a)
+        a.rows.filter((r) => !rows.includes(r) && !unlRows.includes(r)).forEach((r) => skipped.push({ symbol: r.stock?.symbol || r.name || r.isin, reason: !r.stock ? (already(r) ? 'Already in Other Investments' : whyNot(r)) : 'Left out by you' }))
         if (!rows.length) continue
         let pid = a.portfolioId
         if (pid === NEW) {
@@ -138,7 +155,7 @@ export default function ImportDematForm({ onCancel }) {
       {result.done.map((d, i) => (
         <div key={i} className="flex items-center gap-3 rounded-lg px-4 py-3 bg-emerald-500/10 border border-emerald-500/30">
           <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
-          <p className="text-sm text-[var(--text-primary)]"><strong>{d.count}</strong> stock{d.count === 1 ? '' : 's'} imported into <strong>{mv(d.name, 'name')}</strong>.</p>
+          <p className="text-sm text-[var(--text-primary)]"><strong>{d.count}</strong> {d.unit || 'stock'}{d.count === 1 ? '' : 's'} added to <strong>{mv(d.name, 'name')}</strong>.</p>
         </div>
       ))}
       {result.skipped.length > 0 && (
@@ -201,18 +218,18 @@ export default function ImportDematForm({ onCancel }) {
                 <p className="text-sm font-bold text-[var(--text-primary)]">{a.broker} <span className="text-xs font-semibold text-[var(--text-dim)]">· {a.depository} · client …{String(a.clientId).slice(-4)}</span></p>
                 <p className="text-xs text-[var(--text-dim)] mt-0.5">{a.rows.length} holdings · {matched} found in the stock list · value {mv(formatINR(a.rows.reduce((s, r) => s + r.value, 0)), 'amount')}</p>
               </div>
-              {matched === 0 ? (
+              {matched === 0 && !a.rows.some((r) => !r.stock && !r.fund) ? (
                 <p className="px-4 py-2.5 text-xs text-[var(--text-dim)]">Nothing to import here as stocks{a.rows.some((r) => r.fund) ? ' — these are mutual fund units (import them on the Mutual Funds page)' : ''}.</p>
               ) : (<>
               <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField label="Whose account" required>
                   <FormSelect value={a.ownerId} onChange={(v) => updAcct(i, { ownerId: v, ...pickPortfolio(v, a) })} options={memberOptions} placeholder="Select family member…" />
                 </FormField>
-                <FormField label="Import into portfolio" required>
+                {matched > 0 && <FormField label="Import into portfolio" required>
                   <FormSelect value={a.portfolioId} onChange={(v) => updAcct(i, { portfolioId: v })}
                     options={[...pfs.map((p) => ({ value: p.portfolioId, label: mv(p.portfolioName, 'name') })), { value: NEW, label: '+ New portfolio' }]} />
-                </FormField>
-                {a.portfolioId === NEW && a.ownerId && (<>
+                </FormField>}
+                {matched > 0 && a.portfolioId === NEW && a.ownerId && (<>
                   <FormField label="New portfolio name" required>
                     <FormInput value={a.newName} onChange={(v) => updAcct(i, { newName: v })} />
                   </FormField>
@@ -229,7 +246,9 @@ export default function ImportDematForm({ onCancel }) {
                   const isHeld = r.stock && held.has(String(r.stock.symbol).toUpperCase())
                   return (
                     <div key={r.key} className="px-4 py-2 flex items-center gap-3">
-                      <input type="checkbox" checked={!!r.stock && r.include} disabled={!r.stock} onChange={(e) => updRow(i, r.key, { include: e.target.checked })}
+                      <input type="checkbox" checked={r.stock ? r.include : (!!r.unlisted && !already(r))} disabled={r.fund || (!r.stock && already(r))}
+                        title={r.stock ? 'Import this stock' : 'Add to Other Investments → Unlisted Shares (value by hand)'}
+                        onChange={(e) => updRow(i, r.key, r.stock ? { include: e.target.checked } : { unlisted: e.target.checked })}
                         className="w-4 h-4 rounded border-[var(--border-input)] text-violet-500 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
@@ -238,6 +257,9 @@ export default function ImportDematForm({ onCancel }) {
                         <p className="text-xs text-[var(--text-dim)] tabular-nums">
                           {r.qty} shares · statement price {rs(r.price)}
                           {!r.stock && <span className="text-rose-400"> · {whyNot(r)}</span>}
+                          {!r.stock && !r.fund && (already(r) ? <span className="block text-[var(--text-dim)]">Already in Other Investments</span>
+                            : r.unlisted ? <span className="block text-sky-400">Ticked: goes to Other Investments → Unlisted Shares at {rs(r.value)} (you update it)</span>
+                            : <span className="block text-[var(--text-dim)]">Tick to keep it in Other Investments → Unlisted Shares</span>)}
                           {isHeld && <span className="text-amber-500"> · already in this portfolio{r.include ? ' — ticked: will be added on top' : ''}</span>}
                         </p>
                       </div>
@@ -246,7 +268,7 @@ export default function ImportDematForm({ onCancel }) {
                           <input type="number" value={r.avgPrice} onChange={(e) => updRow(i, r.key, { avgPrice: e.target.value })} title="Your average buy price (₹)"
                             className="w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-2 py-1 text-xs text-right tabular-nums text-[var(--text-primary)]" />
                         </div>
-                      ) : r.fund ? <AlertTriangle size={15} className="text-amber-400 shrink-0" /> : <XCircle size={15} className="text-rose-400 shrink-0" />}
+                      ) : r.fund ? <AlertTriangle size={15} className="text-amber-400 shrink-0" /> : r.unlisted && !already(r) ? <Info size={15} className="text-sky-400 shrink-0" /> : <XCircle size={15} className="text-rose-400 shrink-0" />}
                     </div>
                   )
                 })}
@@ -258,7 +280,7 @@ export default function ImportDematForm({ onCancel }) {
       </>)}
 
       <FormActions onCancel={onCancel} onSubmit={handleImport} loading={saving} disabled={!cas || !total || !ready || !date}
-        submitLabel={total ? `Import ${total} stock${total === 1 ? '' : 's'}` : 'Import'} />
+        submitLabel={!total ? 'Import' : [nStocks && `Import ${nStocks} stock${nStocks === 1 ? '' : 's'}`, nUnl && `${nStocks ? '+ ' : 'Add '}${nUnl} unlisted`].filter(Boolean).join(' ')} />
     </div>
   )
 }
