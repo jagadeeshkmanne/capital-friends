@@ -34,12 +34,12 @@ export function Bust({ k, r = 28 }) {
 const DUR = 7500
 
 const CHAPTERS = [
-  { k: 'drive', ph: 'private, in your own Drive', icon: 'lock', c: C.teal, s: 'Your Drive', t: 'Your data stays in your own Google Drive', d: 'Sign in with Google and the app makes a private sheet in your Drive. Only you — and who you share it with — can see it.' },
-  { k: 'all', ph: 'all in one place', icon: 'chart', c: C.violet, s: 'Track', t: 'Everything in one place', d: 'Funds, stocks, FDs, PPF, gold, insurance and loans — for every family member.' },
-  { k: 'cas', ph: 'imported in a minute', icon: 'sheet', c: C.sky, s: 'Import', t: 'Import your CAS in a minute', d: 'Drop your CAMS / CDSL statement PDF: every fund, share and transaction comes in.' },
-  { k: 'ath', ph: 'watched for you every day', icon: 'bell', c: C.rose, s: 'Alerts', t: 'Alerts when a fund falls below its all-time high' },
-  { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
-  { k: 'family', ph: 'known to your family', icon: 'mail', c: C.emerald, s: 'Family', t: 'Your family is never in the dark', d: 'A regular summary email: where every rupee, policy and nominee is — even without you.' },
+  { k: 'drive', ph: 'private, in your own Drive', icon: 'lock', c: C.teal, s: 'Your Drive', t: 'Your data stays in your own Google Drive', dur: 7500, d: 'Sign in with Google and the app makes a private sheet in your Drive. Only you — and who you share it with — can see it.' },
+  { k: 'all', ph: 'all in one place', icon: 'chart', c: C.violet, s: 'Track', t: 'Everything in one place', dur: 6500, d: 'Funds, stocks, FDs, PPF, gold, insurance and loans — for every family member.' },
+  { k: 'cas', ph: 'imported in a minute', icon: 'sheet', c: C.sky, s: 'CAS import', t: 'Import your CAS in a minute', dur: 6000, d: 'Drop your CAMS / CDSL statement PDF: every fund, share and transaction comes in.' },
+  { k: 'ath', ph: 'watched for you every day', icon: 'bell', c: C.rose, s: 'Alerts', t: 'Alerts when a fund falls below its all-time high', dur: 7500 },
+  { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', dur: 14000, d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
+  { k: 'family', ph: 'known to your family', icon: 'mail', c: C.emerald, s: 'Family', t: 'Your family is never in the dark', dur: 6500, d: 'A regular summary email: where every rupee, policy and nominee is — even without you.' },
 ]
 
 function Glyph({ name, color, size = 18 }) {
@@ -119,7 +119,7 @@ function SceneDrive() {
 }
 
 /* 2 · everything in one place: every member → one net worth ring → growing over the years */
-const RING = [['chart', C.violet, 'Mutual funds', 34], ['stocks', C.emerald, 'Stocks', 16], ['bank', C.sky, 'FD & PPF', 18], ['gold', C.amber, 'Gold', 12], ['shield', C.rose, 'Insurance', 8], ['loan', '#64748b', 'Loans', 12]]
+const RING = [['chart', C.violet, 'Mutual funds', 30], ['stocks', C.emerald, 'Stocks', 14], ['home', '#ec4899', 'Real estate', 20], ['bank', C.sky, 'FD & PPF', 14], ['gold', C.amber, 'Gold', 10], ['shield', C.rose, 'Insurance', 4], ['loan', '#64748b', 'Loans', 8]]
 const ALLOC = [['Mutual Funds', 46, '#f97316', '₹53.8 L'], ['Real Estate', 20, '#ec4899', '₹23.4 L'], ['Stocks', 12, '#8b5cf6', '₹14.0 L'], ['Gold', 10, '#fbbf24', '₹11.7 L'], ['FD & PPF', 12, '#34d399', '₹14.1 L']]
 // a pie wedge starting at `from` % and spanning `p` %
 const wedge = (from, p, r) => {
@@ -288,14 +288,62 @@ function SceneAlerts() {
   )
 }
 
-/* 5 · goals on one road: Home moves to safe money as it nears; Retirement lives on three buckets */
-const GLIDE = [['2026', 0.8], ['2027', 0.62], ['2028', 0.36], ['2029', 0.1]]
+/* 5 · goals on one road: the car drives goal to goal. Near each goal its bucket moves from equity (violet)
+   to safe money (teal) — the glide path — and the goal is marked reached; at retirement the three buckets take over. */
+const GLIDE_HOME = [['2026', 0.8], ['2027', 0.6], ['2028', 0.34], ['2029', 0.1]]
+const GLIDE_EDU = [['2031', 0.8], ['2032', 0.6], ['2033', 0.34], ['2034', 0.1]]
 const BUCKET = 'M0 0 h64 v92 q0 12 -12 12 h-40 q-12 0 -12 -12 Z'
+// when the car is driving to each goal (seconds from the start of the scene)
+const LEG = { home: [1.0, 2.8], edu: [4.4, 2.6], retire: [7.6, 2.0] }
+
+function GlideBucket({ x, y, id, title, label, icon, c, years, at: [t0, len] }) {
+  const step = len / years.length
+  return (
+    <g transform={`translate(${x} ${y})`}><g className="st-rise" style={T(0.6)}>
+      <Tx x={0} y={0} s={10.5} w={800} c={c} letterSpacing=".06em">{title}</Tx>
+      <g transform="translate(0 30)">
+        <clipPath id={`st-gb-${id}`}><path d={BUCKET} /></clipPath>
+        <g clipPath={`url(#st-gb-${id})`}>
+          <rect width="64" height="104" fill={C.violet} opacity=".85" />
+          <g className="st-safe" style={{ animationDelay: `${t0}s`, animationDuration: `${len}s` }}><g className="st-wave"><path d="M-64 6 Q-48 0 -32 6 T0 6 T32 6 T64 6 T96 6 T128 6 V300 H-64 Z" fill={C.teal} opacity=".9" /></g></g>
+        </g>
+        <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
+        <g transform="translate(32 -14)"><circle r="12" fill="#fff" stroke={c} strokeWidth="2" /><g transform="scale(.44)" style={{ color: c }}>{G[icon]}</g></g>
+        <Tx x={32} y={122} s={11} c={C.ink} a="middle">{label}</Tx>
+      </g>
+      <g transform="translate(80 66)">
+        {years.map(([yr, e], n) => (
+          <g key={yr} className={n === years.length - 1 ? 'st-yr last' : 'st-yr'} style={{ animationDelay: `${t0 + n * step}s`, animationDuration: `${step}s` }}>
+            <Tx s={18} w={800} c={C.navy}>{yr}</Tx>
+            <g transform="translate(0 20)"><circle cx="4" cy="-4" r="4" fill={C.violet} /><Tx x={13} s={11} c={C.slate}>Equity <tspan fill={C.navy} fontWeight="800">{Math.round(e * 100)}%</tspan></Tx></g>
+            <g transform="translate(0 37)"><circle cx="4" cy="-4" r="4" fill={C.teal} /><Tx x={13} s={11} c={C.slate}>Safe <tspan fill={C.navy} fontWeight="800">{Math.round((1 - e) * 100)}%</tspan></Tx></g>
+          </g>
+        ))}
+      </g>
+    </g></g>
+  )
+}
+function Reached({ x, y, fx, fy, text, c, t }) {
+  return (
+    <g>
+      <g transform={`translate(${x} ${y})`}><g className="st-pop" style={T(t)}>
+        <rect x={-(text.length * 3.4) - 26} y="-15" width={text.length * 6.8 + 52} height="30" rx="15" fill={c} />
+        <g transform={`translate(${-(text.length * 3.4) - 8} 0)`}><circle r="8" fill="#fff" /><path d="M-3.5 0 L-1 2.6 L3.8 -2.6" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></g>
+        <Tx x={9} y={4.5} s={12} w={800} c="#fff" a="middle">{text}</Tx>
+      </g></g>
+      {[[-26, -30, C.amber], [24, -34, C.violet], [36, -6, C.rose], [-36, -4, C.sky], [0, -44, C.emerald]].map(([dx, dy, cc], n) => (
+        <circle key={n} className="st-confetti" style={{ ...T(t - 0.1 + n * 0.06), '--dx': `${dx}px`, '--dy': `${dy}px` }} cx={fx} cy={fy} r="4" fill={cc} />
+      ))}
+    </g>
+  )
+}
+
 function SceneGoals() {
   const road = 'M40 370 C220 370 260 260 420 260 S640 170 780 170 S980 110 1060 90'
   const stops = [[301, 284, 'home', '2029', 'Home', C.teal], [608, 215, 'target', '2034', 'Education', C.violet], [942, 138, 'gold', '2045', 'Retire', C.amber]]
+  const rt = LEG.retire[0] + LEG.retire[1] + 0.2
   return (
-    <svg viewBox={VB} className="st-svg" aria-label="Goals on a road; the home goal moves to safe money as it comes near, retirement lives on three buckets">
+    <svg viewBox={VB} className="st-svg" aria-label="The family car drives goal to goal; near each goal the money moves from equity to safe funds, and at retirement three buckets take over">
       <path d={road} fill="none" stroke="#cbd5e1" strokeWidth="28" strokeLinecap="round" />
       <path d={road} fill="none" stroke="#fff" strokeWidth="3" strokeDasharray="12 12" className="la-dash" />
       {stops.map(([x, y, g, yr, l, c], i) => (
@@ -308,53 +356,30 @@ function SceneGoals() {
           <Tx x={28} y={-59} s={11} c={C.slate}>{l}</Tx>
         </g></g>
       ))}
-      <g className="st-car2" style={{ offsetPath: `path('${road}')` }}>
+      <g className="st-car3" style={{ offsetPath: `path('${road}')` }}>
         <g transform="translate(-22 -18)"><rect x="0" y="6" width="44" height="16" rx="6" fill={C.rose} /><path d="M8 7 L14 -2 H30 L36 7 Z" fill="#fecdd3" /><circle cx="11" cy="23" r="5" fill={C.navy} /><circle cx="33" cy="23" r="5" fill={C.navy} /></g>
       </g>
 
-      {/* Home 2029: one bucket, like the retirement ones — safe money (teal) rises, equity (violet) drains as the date nears */}
-      <path className="la-dash" d="M174 262 Q230 256 282 228" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
-      <g transform="translate(60 112)"><g className="st-rise" style={T(0.6)}>
-        <Tx x={0} y={-22} s={11} w={800} c={C.teal} letterSpacing=".06em">HOME · MOVES TO SAFE</Tx>
-        <g transform="translate(0 16)">
-          <clipPath id="st-home"><path d={BUCKET} /></clipPath>
-          <g clipPath="url(#st-home)">
-            <rect width="64" height="104" fill={C.violet} opacity=".85" />
-            <g className="st-safe"><g className="st-wave"><path d="M-64 6 Q-48 0 -32 6 T0 6 T32 6 T64 6 T96 6 T128 6 V300 H-64 Z" fill={C.teal} opacity=".9" /></g></g>
-          </g>
-          <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
-          <g transform="translate(32 -16)"><circle r="13" fill="#fff" stroke={C.teal} strokeWidth="2" /><g transform="scale(.48)" style={{ color: C.teal }}>{G.home}</g></g>
-          <Tx x={32} y={124} s={11.5} c={C.ink} a="middle">Home · 2029</Tx>
-        </g>
-        <g transform="translate(80 58)">
-          {GLIDE.map(([y, e], n) => (
-            <g key={y} className={n === GLIDE.length - 1 ? 'st-yr last' : 'st-yr'} style={T(1 + n * 1.5)}>
-              <Tx s={18} w={800} c={C.navy}>{y}</Tx>
-              <g transform="translate(0 20)"><circle cx="4" cy="-4" r="4" fill={C.violet} /><Tx x={13} s={11} c={C.slate}>Equity <tspan fill={C.navy} fontWeight="800">{Math.round(e * 100)}%</tspan></Tx></g>
-              <g transform="translate(0 37)"><circle cx="4" cy="-4" r="4" fill={C.teal} /><Tx x={13} s={11} c={C.slate}>Safe <tspan fill={C.navy} fontWeight="800">{Math.round((1 - e) * 100)}%</tspan></Tx></g>
-            </g>
-          ))}
-        </g>
-      </g></g>
+      {/* Home 2029 */}
+      <path className="la-dash" d="M150 262 Q230 256 282 228" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
+      <GlideBucket x={60} y={110} id="home" title="HOME · MOVES TO SAFE" label="Home · 2029" icon="home" c={C.teal} years={GLIDE_HOME} at={LEG.home} />
+      <Reached x={392} y={150} fx={301} fy={214} text="Home goal reached" c={C.teal} t={LEG.home[0] + LEG.home[1] + 0.1} />
 
-      {/* reached! */}
-      <g transform="translate(372 150)"><g className="st-pop" style={T(5.6)}>
-        <rect x="-74" y="-15" width="148" height="30" rx="15" fill={C.teal} />
-        <Tx x={8} y={5} s={12} w={800} c="#fff" a="middle">Home goal reached</Tx>
-        <g transform="translate(-56 0)"><circle r="8" fill="#fff" /><path d="M-3.5 0 L-1 2.6 L3.8 -2.6" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></g>
-      </g></g>
-      {[[-26, -30, C.amber], [24, -34, C.violet], [36, -6, C.rose], [-36, -4, C.sky], [0, -44, C.emerald]].map(([dx, dy, c], n) => (
-        <circle key={n} className="st-confetti" style={{ ...T(5.5 + n * 0.06), '--dx': `${dx}px`, '--dy': `${dy}px` }} cx="301" cy="214" r="4" fill={c} />
-      ))}
-      {/* Retirement 2045: growth refills stability, stability refills income */}
-      <path className="la-dash" d="M942 156 Q942 200 900 222" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
-      <g transform="translate(700 236)"><g className="st-rise" style={T(1.2)}>
+      {/* Education 2034 */}
+      <path className="la-dash" d="M704 112 Q650 112 626 132" fill="none" stroke={C.violet} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
+      <GlideBucket x={712} y={14} id="edu" title="EDUCATION · MOVES TO SAFE" label="Education · 2034" icon="target" c={C.violet} years={GLIDE_EDU} at={LEG.edu} />
+      <Reached x={500} y={104} fx={608} fy={145} text="Education goal reached" c={C.violet} t={LEG.edu[0] + LEG.edu[1] + 0.1} />
+
+      {/* Retirement 2045: once there, three buckets take over */}
+      <g className="st-pop" style={T(rt)}><path className="la-dash" d="M942 156 Q942 200 900 222" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" /></g>
+      <Reached x={968} y={26} fx={942} fy={68} text="Retired" c={C.amber} t={rt} />
+      <g transform="translate(700 236)"><g className="st-rise" style={T(rt + 0.2)}>
         <Tx x={0} y={0} s={11} w={800} c="#b45309" letterSpacing=".06em">RETIREMENT · THREE BUCKETS</Tx>
-        {[['Income', C.sky, 46, 'spend'], ['Stability', C.teal, 58, '3–7 yrs'], ['Growth', C.violet, 70, '7+ yrs']].map(([l, c, h, sub], i) => (
+        {[['Income', C.sky, 46, 'spend now'], ['Stability', C.teal, 58, '3–7 yrs'], ['Growth', C.violet, 70, '7+ yrs']].map(([l, c, h, sub], i) => (
           <g key={l} transform={`translate(${i * 96} 16)`}>
-            <clipPath id={`st-b-${l}`}><path d="M0 0 h64 v92 q0 12 -12 12 h-40 q-12 0 -12 -12 Z" /></clipPath>
-            <g clipPath={`url(#st-b-${l})`}><rect width="64" height="104" fill="#f8fafc" /><g className="la-fill" style={T(1.5 + i * 0.3)}><rect y={104 - h} width="64" height={h} fill={c} opacity=".85" /></g></g>
-            <path d="M0 0 h64 v92 q0 12 -12 12 h-40 q-12 0 -12 -12 Z" fill="none" stroke="#94a3b8" strokeWidth="2.5" />
+            <clipPath id={`st-b-${l}`}><path d={BUCKET} /></clipPath>
+            <g clipPath={`url(#st-b-${l})`}><rect width="64" height="104" fill="#f8fafc" /><g className="la-fill" style={T(rt + 0.5 + i * 0.25)}><rect y={104 - h} width="64" height={h} fill={c} opacity=".85" /></g></g>
+            <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
             <Tx x={32} y={124} s={11.5} c={C.ink} a="middle">{l}</Tx>
             <Tx x={32} y={139} s={10} w={600} c={C.slate} a="middle">{sub}</Tx>
             {i > 0 && <path className="la-dash" d="M-6 34 Q-18 20 -28 34" fill="none" stroke={c} strokeWidth="3" strokeDasharray="4 5" strokeLinecap="round" />}
@@ -365,7 +390,7 @@ function SceneGoals() {
   )
 }
 
-/* 5 · you → the summary email → each family member */
+/* 6 · you → the summary email → each family member */
 function SceneFamily() {
   const people = [['spouse', 820, 80, 'Spouse'], ['mother', 940, 170, 'Mother'], ['father', 940, 290, 'Father'], ['son', 820, 370, 'Son']]
   const from = [610, 220]
@@ -579,6 +604,8 @@ const CSS = `
 @keyframes stCarHome{from{offset-distance:0%}to{offset-distance:26.6%}}
 .st-confetti{opacity:0;animation:stConf .9s ease-out both}
 @keyframes stConf{0%{opacity:0;transform:translate(0,0) scale(.4)}30%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1)}}
+.st-car3{offset-rotate:auto;animation:stCarTrip 8.6s linear both 1s}
+@keyframes stCarTrip{0%{offset-distance:0%;animation-timing-function:cubic-bezier(.45,0,.4,1)}32.6%{offset-distance:26.6%}39.5%{offset-distance:26.6%;animation-timing-function:cubic-bezier(.45,0,.4,1)}69.8%{offset-distance:55.7%}76.7%{offset-distance:55.7%;animation-timing-function:cubic-bezier(.45,0,.4,1)}100%{offset-distance:88.1%}}
 @keyframes stPress{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
 @keyframes stCursor{from{offset-distance:0%;opacity:0}20%{opacity:1}to{offset-distance:100%;opacity:1}}
 @keyframes stDraw{to{stroke-dashoffset:0}}
