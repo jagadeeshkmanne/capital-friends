@@ -218,11 +218,6 @@ function buildDashboardPDFHTML(data) {
   h += '</td></tr></tbody></table></td></tr></tbody></table>';
 
   // ══════════════════════════════════════════════════════════════════
-  // 1B2. ACTION REQUIRED: retirement buckets (refill due, income low, FD matured) - IncomePlan.js
-  // ══════════════════════════════════════════════════════════════════
-  if (d.bucketActions && d.bucketActions.length) h += bucketActionsHTML_(d.bucketActions);
-
-  // ══════════════════════════════════════════════════════════════════
   // 1C. CRITICAL ALERTS (Questionnaire "No" items)
   // ══════════════════════════════════════════════════════════════════
   if (questionnaireData && questionnaireData.hasData) {

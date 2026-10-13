@@ -240,8 +240,8 @@ function bucketActionItems_(today) {
 }
 
 /**
- * A short alert email the day an action first appears (the daily report also shows it, but someone on a weekly
- * report would see it too late). Each action is sent once ('BucketAlertsSent' remembers it).
+ * A separate alert email (not the family report) the day an action first appears, from the daily job.
+ * Each action is sent once ('BucketAlertsSent' remembers it).
  */
 function sendBucketAlerts_() {
   var items = bucketActionItems_();
@@ -269,7 +269,7 @@ function sendBucketAlerts_() {
   return { sent: n, items: fresh.length };
 }
 
-/** The Action Required block (used by the alert email and the daily / weekly report). */
+/** The Action Required block of the separate alert email (the family report email doesn't carry it). */
 function bucketActionsHTML_(items) {
   var h = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #fecaca;border-radius:12px;margin:0 0 16px 0"><tbody><tr><td style="padding:20px">';
   h += '<div style="font-size:15px;font-weight:800;color:#dc2626;margin-bottom:10px">&#9888; Action required (' + items.length + ')</div>';

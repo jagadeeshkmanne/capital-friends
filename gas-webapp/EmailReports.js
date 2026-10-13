@@ -411,7 +411,7 @@ function sendDashboardEmailReport(reportType, sendAsPDF = true) {
     const familyHeadName = familyHead ? familyHead.memberName : '';
 
     // Build email subject with family name
-    const subject = (dashData.bucketActions && dashData.bucketActions.length ? 'Action needed \u00B7 ' : '') + buildEmailSubject(reportType, dashData.netWorth, familyHeadName);
+    const subject = buildEmailSubject(reportType, dashData.netWorth, familyHeadName);
 
     // Build the full dashboard HTML report (matches ref.html design)
     const fullEmailHTML = buildDashboardPDFHTML(dashData);
@@ -1248,7 +1248,6 @@ function buildDashboardReportData() {
       // Action items
       actionItems: topActionItems,
       incomeItems: incomeEmailItems_().filter(function (it) { return it.type === 'info'; }), // monthly income paid (IncomePlan.js)
-      bucketActions: bucketActionItems_(), // retirement buckets: refill due / income low / FD matured (IncomePlan.js)
 
       // Buy opportunities
       buyOpportunities: buyOpportunities,
