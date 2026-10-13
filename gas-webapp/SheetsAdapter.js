@@ -35,7 +35,9 @@ var SheetsAdapter = (function () {
   var SMALL_TAB_ROWS_ = 3000;
   // Tabs that are large or rarely needed are read only when asked for, not with every first read:
   // the transaction log (thousands of rows after a statement import) and the import backup / log.
-  var BUNDLE_SKIP_ = { TransactionHistory: true, TransactionHistory_Backup: true, ImportLog: true };
+  // never bundled: big logs, and the fund / stock reference tabs (served from the shared master copy when read;
+  // a family's own MutualFundData / MF_ATH_Data is now small and must not be read in its place)
+  var BUNDLE_SKIP_ = { TransactionHistory: true, TransactionHistory_Backup: true, ImportLog: true, MutualFundData: true, MF_ATH_Data: true, StockMasterData: true };
 
   // ---------- helpers ----------
   function q_(name) { return "'" + String(name).replace(/'/g, "''") + "'"; }
