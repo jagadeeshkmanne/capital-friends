@@ -44,10 +44,16 @@ let items = ctx.bucketActionItems_(new Date('2027-02-01T10:00:00'))
 assert.ok(items.some(i => /yearly bucket refill/.test(i.title)), 'yearly refill due (15 Jan, not marked done)')
 assert.ok(items.some(i => i.type === 'critical' && /about 2 months of income left/.test(i.description)), 'income low')
 assert.ok(items.some(i => /SBI FD has matured/.test(i.title)), 'FD matured')
-let res = ctx.sendBucketAlerts_ ? (ctx.bucketActionItems_ = ((orig) => () => orig(new Date('2027-02-01T10:00:00')))(ctx.bucketActionItems_), ctx.sendBucketAlerts_()) : null
+const origItems = ctx.bucketActionItems_
+ctx.bucketActionItems_ = () => origItems(new Date('2027-02-01T10:00:00')) // same open actions on every day of this test
+ctx.sendBucketAlerts_(new Date('2027-02-01T10:00:00'))
 assert.strictEqual(mails.length, 2); assert.ok(/^Action needed today: /.test(mails[0].subject))
-mails = []; ctx.sendBucketAlerts_()
-assert.strictEqual(mails.length, 0, 'each action is emailed once')
+mails = []; ctx.sendBucketAlerts_(new Date('2027-02-01T18:00:00'))
+assert.strictEqual(mails.length, 0, 'not again the same day')
+mails = []; let rr = ctx.sendBucketAlerts_(new Date('2027-02-04T10:00:00'))
+assert.strictEqual(mails.length, 2, 'critical: reminder after 3 days'); assert.ok(/^Reminder: Action needed today: /.test(mails[0].subject)); assert.strictEqual(rr.items, 1)
+mails = []; rr = ctx.sendBucketAlerts_(new Date('2027-02-08T10:00:00'))
+assert.strictEqual(rr.items, 3, 'after 7 days: the warnings too (critical again as well)')
 // marked done after the yearly date: the yearly item goes away
 settings['RefillLog:G1'] = JSON.stringify([{ at: '2027-01-20', ops: [{ from: 'b2', to: 'b1', amount: 600000 }] }])
 assert.ok(!ctx.bucketActionItems_().some(i => /yearly/.test(i.title)))

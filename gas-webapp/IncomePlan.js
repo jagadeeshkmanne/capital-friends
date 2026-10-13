@@ -240,33 +240,49 @@ function bucketActionItems_(today) {
 }
 
 /**
- * A separate alert email (not the family report) the day an action first appears, from the daily job.
- * Each action is sent once ('BucketAlertsSent' remembers it).
+ * A separate alert email (not the family report) the day an action first appears, from the daily job, then a
+ * reminder every 3 days (critical) or 7 days (others) until it's done: Mark done / Received / refilled makes it
+ * leave the list. 'BucketAlertsSent' remembers when each one was first and last sent.
  */
-function sendBucketAlerts_() {
-  var items = bucketActionItems_();
-  if (!items.length) return { sent: 0 };
+var BUCKET_REMIND_DAYS_ = { critical: 3, warning: 7 }; // reminder until it's done (Mark done / Received clears it)
+
+function sendBucketAlerts_(today) {
+  today = today || new Date();
+  var items = bucketActionItems_(today);
   var sentMap = incomeJson_(getSetting('BucketAlertsSent'), {});
-  var fresh = items.filter(function (it) { return !sentMap[it.key]; });
-  if (!fresh.length) return { sent: 0 };
+  var todayKey = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var rec = function (k) { var v = sentMap[k]; return typeof v === 'string' ? { first: v, last: v, n: 1 } : v; };
+  var due = items.filter(function (it) {
+    var r = rec(it.key);
+    if (!r) return true; // first time
+    var days = (today - new Date(r.last + 'T00:00:00')) / 864e5;
+    return days >= (BUCKET_REMIND_DAYS_[it.type] || 7);
+  });
+  if (!due.length) return { sent: 0 };
   var recipients = getEmailRecipients();
   if (!recipients.length) return { sent: 0 };
-  var crit = fresh.some(function (it) { return it.type === 'critical'; });
-  var subject = (crit ? 'Action needed today: ' : 'Action needed: ') + fresh[0].title + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ' more)' : '');
-  var html = buildBucketAlertHTML_(fresh);
+  var isReminder = due.every(function (it) { return !!rec(it.key); });
+  var crit = due.some(function (it) { return it.type === 'critical'; });
+  var subject = (isReminder ? 'Reminder: ' : '') + (crit ? 'Action needed today: ' : 'Action needed: ') + due[0].title + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
+  var html = buildBucketAlertHTML_(due.map(function (it) {
+    var r = rec(it.key);
+    return r ? { type: it.type, title: it.title, description: it.description + ' (Still open since ' + incomeFmtDate_(new Date(r.first + 'T00:00:00')) + '.)' } : it;
+  }));
   var n = 0;
   recipients.forEach(function (r) {
-    try { GmailApp.sendEmail(r.email, subject, fresh.map(function (it) { return it.title + ': ' + it.description; }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_, { htmlBody: html, name: 'Capital Friends' }); n++; }
+    try { GmailApp.sendEmail(r.email, subject, due.map(function (it) { return it.title + ': ' + it.description; }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_, { htmlBody: html, name: 'Capital Friends' }); n++; }
     catch (e) { log('sendBucketAlerts_ to ' + r.email + ': ' + e); }
   });
   if (n) {
-    var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    fresh.forEach(function (it) { sentMap[it.key] = now; });
-    var keys = Object.keys(sentMap).sort(function (a, b) { return sentMap[a] < sentMap[b] ? -1 : 1; });
+    due.forEach(function (it) { var r = rec(it.key); sentMap[it.key] = { first: r ? r.first : todayKey, last: todayKey, n: (r ? r.n : 0) + 1 }; });
+    // forget actions that are done (no longer in the list) after a while, and keep the map small
+    var live = {}; items.forEach(function (it) { live[it.key] = true; });
+    Object.keys(sentMap).forEach(function (k) { var r = rec(k); if (!live[k] && (today - new Date(r.last + 'T00:00:00')) / 864e5 > 400) delete sentMap[k]; });
+    var keys = Object.keys(sentMap).sort(function (a, b) { return rec(a).last < rec(b).last ? -1 : 1; });
     while (keys.length > 200) delete sentMap[keys.shift()];
     updateSetting('BucketAlertsSent', JSON.stringify(sentMap));
   }
-  return { sent: n, items: fresh.length };
+  return { sent: n, items: due.length, reminder: isReminder };
 }
 
 /** The Action Required block of the separate alert email (the family report email doesn't carry it). */
