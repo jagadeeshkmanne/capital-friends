@@ -5,6 +5,7 @@ import { useScreenMask } from '../hooks/useScreenMask'
 import { useGoalPoolSync } from '../hooks/useGoalPoolSync'
 import Header from './Header'
 import BottomNav from './BottomNav'
+import MobileMenu from './MobileMenu'
 import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
 import DailyUpdatesBanner from './DailyUpdatesBanner'
@@ -15,10 +16,10 @@ import { Heart, X } from 'lucide-react'
 export default function Layout() {
   // pages scroll inside <main>, not the window: go back to the top whenever the page (path) changes
   const mainRef = useRefScroll(null)
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   useScreenMask()
   useGoalPoolSync()
-  useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname])
+  useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname, search])
 
   const { loading, error, settling } = useData()
   const [showDonate, setShowDonate] = useState(false)
@@ -58,7 +59,7 @@ export default function Layout() {
     <div className="cf-app flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">
       <Header />
 
-      <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-y-contain pb-20 lg:pb-0">
+      <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-y-contain pb-24 lg:pb-0">
         <div className="px-3 sm:px-4 py-3 sm:py-4 w-full max-w-7xl mx-auto">
           {settling && (
             <div className="mb-3 flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-[var(--text-primary)]">
@@ -72,7 +73,7 @@ export default function Layout() {
         </div>
 
         {/* Global footer — all pages */}
-        <footer className="border-t border-[var(--border-light)] mt-4">
+        <footer className="hidden lg:block border-t border-[var(--border-light)] mt-4">
           <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3">
             {/* Branding */}
             <div className="flex items-center gap-2.5 flex-wrap justify-center sm:justify-start">
@@ -105,6 +106,7 @@ export default function Layout() {
       </main>
 
       <BottomNav />
+      <MobileMenu />
 
       {/* Floating banner — shows on every session, dismiss hides for this session */}
       {!bannerDismissed && (

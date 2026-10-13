@@ -133,7 +133,7 @@ export default function OtherInvestmentsTab() {
           )}
 
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="cf-stats grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Invested" value={formatINR(totalInvested)} />
             <StatCard label="Current Value" value={formatINR(totalCurrent)} bold />
             {linkedLoanTotal > 0 && (

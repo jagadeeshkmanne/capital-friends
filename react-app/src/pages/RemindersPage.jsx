@@ -102,7 +102,7 @@ export default function RemindersPage() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="cf-stats grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Active" value={filtered.length} />
             {overdue > 0 && <StatCard label="Overdue" value={overdue} color="rose" />}
             {dueSoon > 0 && <StatCard label="Due This Week" value={dueSoon} color="amber" />}

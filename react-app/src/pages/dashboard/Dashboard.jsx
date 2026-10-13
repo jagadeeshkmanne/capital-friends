@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Trophy, Star, TrendingUp, TrendingDown, ChevronDown } from 'lucide-react'
+import { Trophy, Star, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useData } from '../../context/DataContext'
 import PageLoading from '../../components/PageLoading'
@@ -498,6 +498,7 @@ export default function Dashboard() {
   }, [selectedMember, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, banks, investmentAccounts, insurancePolicies, goalList, goalPortfolioMappings, reminderList, assetAllocations, activeMembers, goalAttribution])
 
   const bucketItems = useBucketActions()
+  const [allActions, setAllActions] = useState(false) // phones: first 3, then 'Show all'
   // ── Action Items (computed from real data) ──
   const actionItems = useMemo(() => {
     const items = []
@@ -642,9 +643,10 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* ═══ NET WORTH ═══ */}
-        <div className="md:col-span-2 rounded-xl border border-[var(--border)] p-7"
+        <div className="md:col-span-2 rounded-2xl lg:rounded-xl border border-[var(--border)] p-5 lg:p-7"
              style={{ background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card) 100%)' }}>
-          <div className="-mx-7 -mt-7 px-7 py-3.5 mb-4 flex items-center justify-between rounded-t-xl"
+          <div className="text-xs font-medium text-[var(--text-dim)] lg:hidden">Net worth</div>
+          <div className="hidden lg:flex -mx-7 -mt-7 px-7 py-3.5 mb-4 items-center justify-between rounded-t-xl"
                style={{ background: 'rgba(128,128,128,0.04)', borderBottom: '1px solid rgba(128,128,128,0.08)' }}>
             <div className="flex items-center gap-2">
               <span className="w-[3px] h-3.5 rounded-sm opacity-60" style={{ background: 'var(--text-muted)' }} />
@@ -658,9 +660,13 @@ export default function Dashboard() {
               <div className="text-[34px] font-bold text-[var(--text-primary)] tabular-nums leading-tight">
                 {formatINR(data.netWorth)}
               </div>
-
+              {/* phones: assets and loans on one line under the number */}
+              <div className="lg:hidden mt-1 flex items-center gap-3 text-[13px] tabular-nums">
+                <span className="text-[var(--text-dim)]">Assets <b className="text-[var(--text-secondary)] font-semibold">{formatINR(data.totalAssets)}</b></span>
+                {data.totalLiabilities > 0 && <span className="text-[var(--text-dim)]">Loans <b className="text-red-400 font-semibold">{formatINR(data.totalLiabilities)}</b></span>}
+              </div>
             </div>
-            <div className="text-right">
+            <div className="hidden lg:block text-right">
               <div className="text-xs text-[var(--text-dim)]">Total Assets</div>
               <div className="text-lg font-semibold text-[var(--text-secondary)] tabular-nums">{formatINR(data.totalAssets)}</div>
               {data.totalLiabilities > 0 && (
@@ -694,11 +700,11 @@ export default function Dashboard() {
 
         {/* ═══ ASSET ALLOCATION ═══ */}
         {data.allocByType.length > 0 && (
-          <div className="md:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6" style={{ padding: '20px' }}>
+          <div className="md:col-span-2 rounded-2xl lg:rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 md:p-6">
             <SectionHeader label="Asset Allocation" color="var(--text-muted)" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
-              {/* Donut chart */}
-              <div className="flex flex-col items-center justify-center">
+              {/* Donut chart (desktop / tablet; phones see the list, the hero card already has the totals) */}
+              <div className="hidden md:flex flex-col items-center justify-center">
                 <div className="relative w-[240px] h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -794,7 +800,27 @@ export default function Dashboard() {
           <div className="md:col-span-2 rounded-xl border bg-[var(--bg-card)] p-6"
                style={{ borderColor: 'rgba(244,63,94,0.12)' }}>
             <SectionHeader label="Action Required" color="#fb7185" badge={actionItems.length} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* phones: compact tappable rows, the first 3, then Show all */}
+            <div className="md:hidden -mx-1 divide-y divide-[var(--border-light)]">
+              {(allActions ? actionItems : actionItems.slice(0, 3)).map((item, idx) => {
+                const isCritical = item.type === 'critical'
+                const col = isCritical ? '#fb7185' : '#fbbf24'
+                return (
+                  <button key={idx} type="button" onClick={() => item.navigateTo && navigate(item.navigateTo)} className="w-full flex items-start gap-3 px-1 py-3 text-left active:bg-[var(--bg-hover)] rounded-lg">
+                    <span className="mt-0.5 w-7 h-7 rounded-full flex items-center justify-center text-[13px] shrink-0" style={{ background: isCritical ? 'rgba(244,63,94,0.12)' : 'rgba(251,191,36,0.1)', color: col }}>{isCritical ? '\u2717' : '\u26A0'}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold" style={{ color: col }}>{item.title}</span>
+                      {item.description && <span className="block text-[13px] text-[var(--text-muted)] leading-snug mt-0.5 line-clamp-2">{item.description}</span>}
+                    </span>
+                    {item.navigateTo && <ChevronRight size={16} className="mt-1.5 shrink-0 text-[var(--text-dim)]" />}
+                  </button>
+                )
+              })}
+              {actionItems.length > 3 && (
+                <button type="button" onClick={() => setAllActions((v) => !v)} className="w-full py-3 text-sm font-semibold text-[var(--text-secondary)]">{allActions ? 'Show less' : `Show all ${actionItems.length}`}</button>
+              )}
+            </div>
+            <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-3">
               {actionItems.map((item, idx) => {
                 const isCritical = item.type === 'critical'
                 const isLastOdd = actionItems.length % 2 === 1 && idx === actionItems.length - 1

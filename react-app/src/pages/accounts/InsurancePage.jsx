@@ -83,7 +83,7 @@ export default function InsurancePage() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="cf-stats grid grid-cols-2 sm:grid-cols-5 gap-3">
             <StatCard label="Policies" value={filtered.length} />
             <StatCard label="Total Cover" value={formatINR(totalCover)} bold />
             <StatCard label="Life Cover" value={formatINR(lifeCover)} />

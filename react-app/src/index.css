@@ -290,3 +290,35 @@ body {
   padding: 2px 4px !important;
   font-size: 0.75rem !important;
 }
+
+/* ── Native feel on phones (mobile-ui) ── */
+html, body { overscroll-behavior: none; }              /* no page bounce / pull-to-refresh of the whole site */
+* { -webkit-tap-highlight-color: transparent; }          /* no grey flash on tap */
+button, a, [role="button"], nav { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+header { padding-top: env(safe-area-inset-top); }        /* under the notch when opened as an app */
+@media (max-width: 1023px) {
+  /* iPhone zooms into inputs under 16px: keep form fields at 16px on phones */
+  input, select, textarea { font-size: 16px !important; }
+  main { -webkit-overflow-scrolling: touch; }
+}
+
+/* phones: buy / rebalance badges only on Dashboard and Mutual Funds, so page titles have room */
+@media (max-width: 1023.98px) { [data-signal="off"] { display: none !important; } }
+
+/* ── phones: dialogs as full pages ── */
+@keyframes slide-up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+.animate-slide-up { animation: slide-up .22s cubic-bezier(.2,.8,.2,1); }
+.cf-mpage .cf-form-actions { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 !important; padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px); background: var(--bg-base); border-top: 1px solid var(--border); gap: 12px; z-index: 5; }
+.cf-mpage .cf-form-actions > button { flex: 1; white-space: nowrap; height: 48px; font-size: 15px; border-radius: 12px; justify-content: center; }
+.cf-mpage .cf-form-actions > button:first-child { border: 1px solid var(--border-input); }
+.cf-mpage input:not([type=checkbox]):not([type=radio]), .cf-mpage select, .cf-mpage textarea { min-height: 46px; font-size: 16px; border-radius: 12px; }
+.cf-mpage label { font-size: 13px; }
+
+/* phones: summary tiles as one swipeable row instead of a tall grid */
+@media (max-width: 639.98px) {
+  .cf-stats { display: flex !important; overflow-x: auto; gap: 8px !important; margin: 0 -12px; padding: 0 12px 2px; scrollbar-width: none; }
+  .cf-stats::-webkit-scrollbar { display: none; }
+  .cf-stats > * { flex: 0 0 auto; min-width: 42%; padding: 10px 12px !important; }
+}
+
+.cf-mpage:has(.cf-form-actions) > .overflow-y-auto { padding-bottom: calc(env(safe-area-inset-bottom) + 96px); }
