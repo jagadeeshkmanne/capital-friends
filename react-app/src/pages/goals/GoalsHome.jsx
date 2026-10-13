@@ -10,6 +10,7 @@ import { bucketCheck, lastsYears, bucketReminders } from '../../utils/bucketChec
 import { readIncomePlan, readIncomeLog, readRefillLog, incomeStatus, defaultIncomePlan, lastRefill } from '../../utils/incomePlan'
 import { useData } from '../../context/DataContext'
 import * as api from '../../services/api'
+import { classifyRetirementHolding } from '../../utils/retirementBuckets'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -27,7 +28,7 @@ function mixOf(items) {
   const t = e + d + gd
   return t > 0 ? { e: Math.round((e / t) * 100), g: Math.round((gd / t) * 100), d: 100 - Math.round((e / t) * 100) - Math.round((gd / t) * 100) } : null
 }
-const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
+const tagOf = (it) => (isGold(it.holding) ? ['g', 'Gold'] : it.kind === 'other' && /epf|ppf|nps|vpf|sukanya/i.test(it.holding?.investmentType || '') ? ['l', it.holding.investmentType] : it.kind === 'mf' && /hybrid|balanced|multi.?asset|asset allocation|equity savings|dynamic/i.test(`${it.holding?.category || ''} ${it.holding?.fundName || ''}`) ? ['e', 'Hybrid'] : it.eq >= 0.65 ? ['e', 'Equity'] : it.eq >= 0.2 ? ['e', 'Hybrid'] : ['d', 'Debt'])
 
 /** equity / debt: now vs target, one calm line of text */
 function Mix({ m, plan, note, soft }) {
@@ -202,10 +203,17 @@ function JarSvg({ c, f }) {
 const LOCK_RE = /\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation/i
 /** EPF / PPF / NPS and similar: money you can't move today; it comes out only by its own rules (EPF at retirement or later, PPF at maturity). */
 const isLocked = (it) => it.kind === 'other' && LOCK_RE.test(`${it.holding?.investmentType || ''} ${it.holding?.investmentName || ''}`)
-const jarOf = (it) => {
+const JAR = { b1: 'inc', b2: 'stb', b3: 'gro' }
+const jarOf = (it, allocMap) => {
   if (isLocked(it)) return 'stb' // never Income: it is not in your hand until you withdraw it
-  if (isGold(it.holding) || (it.eq || 0) >= 0.65) return 'gro'
-  if (it.kind === 'mf') return /liquid|overnight|money market|ultra short|low duration/i.test(`${it.holding?.category || ''} ${it.holding?.fundName || ''}`) ? 'inc' : 'stb'
+  if (isGold(it.holding)) return 'gro'
+  // mutual funds: the same rule as the refill plan. Liquid / short debt → Income; balanced advantage, multi-asset,
+  // conservative / equity-savings hybrids and debt (30–70% equity) → Stability; equity, aggressive hybrid (70%+) → Growth
+  if (it.kind === 'mf') {
+    const c = classifyRetirementHolding(it.holding, allocMap?.[it.holding?.schemeCode || it.holding?.fundCode])
+    return JAR[c.bucket] || ((it.eq || 0) >= 0.7 ? 'gro' : 'stb')
+  }
+  if ((it.eq || 0) >= 0.65) return 'gro'
   const t = `${it.holding?.investmentType || ''} ${it.holding?.investmentCategory || ''}`
   if (/sweep|cash|savings/i.test(t)) return 'inc' // money you can draw every month
   return 'stb' // regular FDs, bonds, other debt: safe money that refills Income when it matures
@@ -288,13 +296,14 @@ const incomeOptions = (incItems, mt) => incItems.map((it) => it.kind === 'mf'
   .filter((o) => o.ref)
 
 function Buckets({ p, items, retired, mt, pname, onOpen }) {
-  const { settings, updateSettings, mfTransactions } = useData()
+  const { settings, updateSettings, mfTransactions, assetAllocations } = useData()
+  const allocMap = Object.fromEntries((assetAllocations || []).filter((a) => a.assetAllocation).map((a) => [a.fundCode, a.assetAllocation]))
   const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal') || (p.road || []).find((r) => r.k === 'spend')
   const b = stop?.bucket
   const tgt = b?.monthly ? { inc: b.income, stb: b.stability, gro: Math.max(0, p.target - b.income - b.stability) } : null
   const hold = { inc: [], stb: [], gro: [] }
   const locked = items.filter(isLocked)
-  for (const it of items) hold[jarOf(it)].push(it)
+  for (const it of items) hold[jarOf(it, allocMap)].push(it)
   // Monthly income plan (retired): where the money comes from, and SWPs estimated until the next CAS import
   const gid = p.goal.goalId
   const iplan = readIncomePlan(settings, gid)
