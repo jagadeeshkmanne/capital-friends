@@ -532,12 +532,6 @@ function GoalDetail({ p, ctx }) {
         </div> : <div className="gp-ok">No investments linked yet. Link them in <a className="gp-link" onClick={() => navigate('/goals/classic')}>Edit &amp; link goals</a>.</div>}
       </div>
 
-      <div className="gp-panel">
-        <div className="gp-ph"><h2>{p.isRet ? 'Your road to retirement' : `Your road to ${L(p.target)} · ${new Date(g.targetDate).getFullYear()}`}</h2><span className="gp-hs">{p.isRet ? 'Grow → ease → build 3 buckets → live from them. ' : ''}Big stops are years when money moves. Small dots are quiet years.</span></div>
-        <Road items={p.road.map((r, i) => r.k === 'quiet'
-          ? { key: i, small: true, node: <div className="gp-qs">{r.y0 === r.y ? r.y : `${r.y0}–${r.y}`} · {r.eq0 === r.eq ? `stays ${r.eq}% equity` : `target eases ${r.eq0}% → ${r.eq}%, nothing moves yet`} · keep SIP</div> }
-          : { key: i, icon: { today: '📍', safer: '⇄', ease: '📉', bucket: '🪣', goal: '🏁', spend: '💸' }[r.k], color: r.k === 'today' ? 'var(--accent-violet)' : r.k === 'goal' ? '#22c55e' : 'var(--accent-blue)', node: <StopCard r={r} p={p} /> })} alternate />
-      </div>
     </>
   )
 }
