@@ -551,10 +551,11 @@ export default function ImportStatementPage() {
       )}
 
       {/* history */}
-      {status?.history?.length > 0 && (
+      {/* only imports that are in your data now; undone / failed ones changed nothing, so they are not listed */}
+      {status?.history?.some((h) => h.status === 'DONE') && (
         <Card className="p-4 space-y-2">
           <p className="text-sm font-semibold text-[var(--text-primary)]">Past imports</p>
-          {status.history.map((h) => (
+          {status.history.filter((h) => h.status === 'DONE').map((h) => (
             <div key={h.importId} className="flex items-center gap-2 text-xs">
               <div className="flex-1 min-w-0">
                 <p className="text-[var(--text-primary)]">{h.started} · {{ DONE: 'Imported', UNDONE: 'Undone', ROLLED_BACK: 'Failed – nothing changed', RESTORED: 'Did not finish – restored' }[h.status] || h.status}</p>
