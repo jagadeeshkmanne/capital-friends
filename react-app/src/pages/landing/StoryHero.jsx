@@ -438,7 +438,13 @@ const SCENES = { drive: SceneDrive, all: SceneAll, cas: SceneCas, ath: SceneAler
 
 export default function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
   const [i, setI] = useState(0)
+  // the scenes play on by themselves; they only wait while the browser tab is hidden
   const [paused, setPaused] = useState(false)
+  useEffect(() => {
+    const f = () => setPaused(document.hidden)
+    document.addEventListener('visibilitychange', f)
+    return () => document.removeEventListener('visibilitychange', f)
+  }, [])
   useEffect(() => {
     if (paused) return
     const t = setTimeout(() => setI((x) => (x + 1) % CHAPTERS.length), CHAPTERS[i].dur || DUR)
@@ -474,7 +480,7 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
           ))}
         </ol>
         {/* the scene, edge to edge */}
-        <div className="st-r" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+        <div className="st-r">
           <div key={ch.k} className="st-scene" style={{ '--pd': `${ch.dur || DUR}ms` }}><Scene /></div>
         </div>
       </div>
