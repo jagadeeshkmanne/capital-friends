@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -137,6 +137,20 @@ function inferMFCategory(name) {
 }
 
 const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alerts' }
+
+// Phone app bar: the page's title, and a back arrow on pages that aren't one of the bottom tabs
+const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/accounts/bank', '/goals', '/more']
+const TITLES = [
+  ['/dashboard', 'Dashboard'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
+  ['/accounts/bank', 'Bank Accounts'], ['/accounts/investment', 'Investment Accounts'], ['/goals', 'Goals'], ['/more', 'More'], ['/family', 'Family'],
+  ['/insurance', 'Insurance'], ['/liabilities', 'Liabilities'], ['/reminders', 'Reminders'], ['/settings', 'Settings'], ['/import', 'Import Statement'],
+  ['/health-check', 'Health Check'], ['/about', 'About'],
+]
+export function mobileTitle(pathname) {
+  const hit = TITLES.filter(([p]) => pathname === p || pathname.startsWith(p + '/')).sort((a, b) => b[0].length - a[0].length)[0]
+  return hit ? hit[1] : ''
+}
+export const isTabPath = (pathname) => TAB_PATHS.some((p) => pathname === p)
 
 export default function Header() {
   const { theme, toggle } = useTheme()
@@ -297,9 +311,18 @@ export default function Header() {
     <header className="sticky top-0 z-30 shrink-0">
       {/* ── Top Bar ── */}
       <div className="relative z-10 bg-[var(--bg-header)]/95 backdrop-blur-sm border-b border-[var(--border)]">
-        <div className="flex items-center justify-between px-3 sm:px-4 h-14">
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-[52px] lg:h-14">
+          {/* Phone: back arrow on sub-pages, then the page title */}
+          <div className="flex lg:hidden items-center gap-1 min-w-0">
+            {!isTabPath(location.pathname) ? (
+              <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/more'))} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
+            ) : (
+              <Link to="/dashboard" className="shrink-0"><img src={LOGO_ICON} alt="Capital Friends" className="h-7 w-auto" /></Link>
+            )}
+            <h1 className="ml-1 text-[19px] font-bold tracking-tight text-[var(--text-primary)] truncate">{mobileTitle(location.pathname)}</h1>
+          </div>
           {/* Left: logo (clickable → Dashboard) */}
-          <Link to="/dashboard" className="flex items-center gap-2">
+          <Link to="/dashboard" className="hidden lg:flex items-center gap-2">
             <img src={LOGO_ICON} alt="Capital Friends" className="h-9 sm:h-12 w-auto" />
             <span className="hidden sm:flex items-baseline gap-1 text-lg tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>
               <span className="font-bold text-[var(--text-primary)]">Capital</span>
@@ -309,14 +332,14 @@ export default function Header() {
 
           {/* Right: icon buttons + avatar */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* YouTube + Instagram — eye-catching pills */}
-            <HeaderSocial />
+            {/* YouTube + Instagram — eye-catching pills (on phones they live in More) */}
+            <span className="hidden lg:contents"><HeaderSocial /></span>
 
             {/* Buy Opportunities — icon button with count badge */}
             {buyOppCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
-                className={`hidden sm:flex relative p-2 rounded-lg transition-colors ${
+                className={`flex relative p-2 rounded-lg transition-colors ${
                   dialogKey === 'buyopp'
                     ? 'text-emerald-300 bg-emerald-500/20'
                     : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
@@ -332,7 +355,7 @@ export default function Header() {
             {rebalanceCount > 0 && (
               <button
                 onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
-                className={`hidden sm:flex relative p-2 rounded-lg transition-colors ${
+                className={`flex relative p-2 rounded-lg transition-colors ${
                   dialogKey === 'rebalance'
                     ? 'text-violet-300 bg-violet-500/20'
                     : 'text-violet-400 hover:text-violet-300 hover:bg-violet-500/10'
@@ -573,7 +596,7 @@ export default function Header() {
       </nav>
 
       {/* ── Mobile Net Worth + Alert pills (since nav strip is hidden) ── */}
-      <div className="lg:hidden bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 py-1.5 flex items-center gap-2 justify-end">
+      <div className="hidden bg-[var(--bg-header)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 py-1.5 items-center gap-2 justify-end">
         {buyOppCount > 0 && (
           <button
             onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}

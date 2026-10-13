@@ -25,7 +25,7 @@ function NavItem({ item, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3.5 hover:bg-[var(--bg-hover)] transition-colors text-left"
+      className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-[var(--bg-hover)] active:bg-[var(--bg-hover)] transition-colors text-left"
     >
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${item.color}`}>
         <item.icon size={17} />
@@ -45,12 +45,12 @@ export default function MorePage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-base font-bold text-[var(--text-primary)]">More</h1>
+      <h1 className="hidden lg:block text-base font-bold text-[var(--text-primary)]">More</h1>
 
       {/* Navigate section */}
       <div className="space-y-1.5">
-        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Navigate</p>
-        <div className="space-y-1.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Your money</p>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden divide-y divide-[var(--border-light)]">
           {navItems.map((item) => (
             <NavItem key={item.label} item={item} onClick={() => navigate(item.path)} />
           ))}
@@ -59,8 +59,8 @@ export default function MorePage() {
 
       {/* Tools & Settings section */}
       <div className="space-y-1.5">
-        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Tools & Settings</p>
-        <div className="space-y-1.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)] px-1">Tools & settings</p>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden divide-y divide-[var(--border-light)]">
           {toolItems.map((item) => (
             <NavItem key={item.label} item={item} onClick={() => navigate(item.path)} />
           ))}
@@ -86,6 +86,13 @@ export default function MorePage() {
           <ChevronRight size={14} className="text-amber-400/60 shrink-0" />
         </div>
       </button>
+
+      {/* phones: the site footer lives here */}
+      <div className="lg:hidden flex items-center justify-center gap-4 pt-1 pb-2 text-xs text-[var(--text-dim)]">
+        <a href="#/privacy" onClick={(e) => { e.preventDefault(); navigate('/privacy') }}>Privacy</a>
+        <a href="#/terms" onClick={(e) => { e.preventDefault(); navigate('/terms') }}>Terms</a>
+        <span>Capital Friends v1.0</span>
+      </div>
 
       <DonateDialog open={showDonate} onClose={() => setShowDonate(false)} />
     </div>
