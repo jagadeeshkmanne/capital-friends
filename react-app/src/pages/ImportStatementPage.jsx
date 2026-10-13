@@ -122,6 +122,9 @@ export default function ImportStatementPage() {
 
   // keep the read statement if the page is refreshed during the check
   useEffect(() => { saveDraft(parsed ? { parsed } : null) }, [parsed])
+  // the draft is only for a page refresh during the check: leaving the import page (going to another page
+  // in the app) forgets it, so the next visit starts with an empty page. A refresh doesn't run this cleanup.
+  useEffect(() => () => saveDraft(null), [])
 
   // warn before leaving while saving (the save keeps running on the server anyway)
   useEffect(() => {
