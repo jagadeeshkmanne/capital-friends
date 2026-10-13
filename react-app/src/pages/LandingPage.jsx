@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Users, LockKeyhole, HardDrive, CodeXml, Target } from 'lucide-react'
-import HeaderSocial from '../components/HeaderSocial'
+import { Users, LockKeyhole, Target } from 'lucide-react'
+import LandingHeader from './landing/LandingHeader'
+import StoryHero from './landing/StoryHero'
 
 const LOGO_ICON = `${import.meta.env.BASE_URL}logo-new.png`
 
@@ -160,7 +161,7 @@ function Slide0() {
   )
 }
 
-// ─── Slide 1: ATH Buy Signals ───
+// ─── Slide 1: how far each fund is below its peak (ATH) ───
 function Slide1() {
   return (
     <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
@@ -171,7 +172,7 @@ function Slide1() {
             Growth Portfolio — Jagadeesh
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
           </div>
-          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(198,40,40,.12)', color: '#c62828' }}>3 buy signals</span>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(198,40,40,.12)', color: '#c62828' }}>3 below peak</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: 'rgba(255,255,255,.04)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
           {[['Invested','₹12.4L','#f1f5f9'],['Current Value','₹15.6L','#f1f5f9'],['Unrealized P&L','+₹3.2L +25.8%','#34d399'],['Monthly SIP','₹20,000','#34d399']].map(([label, val, color], i) => (
@@ -193,9 +194,9 @@ function Slide1() {
           ))}
         </div>
         {[
-          { name: 'Axis Small Cap Fund', sub: 'Dec 2024', pct: '▼26.6%', pctColor: '#c62828', ath: '₹52.10', cur: '₹38.22', signal: 'Strong Buy', sigBg: 'rgba(198,40,40,.12)', sigColor: '#c62828' },
-          { name: 'HDFC Mid-Cap Opp.', sub: 'Jan 2025', pct: '▼15.5%', pctColor: '#d84315', ath: '₹168.50', cur: '₹142.35', signal: 'Good Buy', sigBg: 'rgba(216,67,21,.1)', sigColor: '#d84315' },
-          { name: 'Kotak Emerging Eq.', sub: 'Feb 2025', pct: '▼3.6%', pctColor: '#b8860b', ath: '₹92.40', cur: '₹89.10', signal: 'Watch', sigBg: 'rgba(184,134,11,.1)', sigColor: '#b8860b' },
+          { name: 'Axis Small Cap Fund', sub: 'Dec 2024', pct: '▼26.6%', pctColor: '#c62828', ath: '₹52.10', cur: '₹38.22', signal: '20%+ below', sigBg: 'rgba(198,40,40,.12)', sigColor: '#c62828' },
+          { name: 'HDFC Mid-Cap Opp.', sub: 'Jan 2025', pct: '▼15.5%', pctColor: '#d84315', ath: '₹168.50', cur: '₹142.35', signal: '10–20% below', sigBg: 'rgba(216,67,21,.1)', sigColor: '#d84315' },
+          { name: 'Kotak Emerging Eq.', sub: 'Feb 2025', pct: '▼3.6%', pctColor: '#b8860b', ath: '₹92.40', cur: '₹89.10', signal: '5–10% below', sigBg: 'rgba(184,134,11,.1)', sigColor: '#b8860b' },
           { name: 'Parag Parikh Flexi Cap', sub: 'Mar 2025 · ▼0.4%', pct: null, pctColor: null, ath: '₹82.80', cur: '₹82.45', signal: 'Near ATH', sigBg: 'rgba(71,85,105,.1)', sigColor: '#475569' },
           { name: 'Mirae Asset Large Cap', sub: 'At all-time high today', pct: null, pctColor: null, ath: '₹105.80', curBold: true, cur: '₹105.80', curColor: '#34d399', signal: 'At ATH', sigBg: 'rgba(52,211,153,.1)', sigColor: '#34d399' },
         ].map((r, i, arr) => (
@@ -214,7 +215,7 @@ function Slide1() {
           </div>
         ))}
         <div style={{ padding: '5px 14px', background: 'rgba(0,0,0,.15)', borderTop: '1px solid rgba(255,255,255,.04)' }}>
-          <p style={{ fontSize: 9, color: '#475569' }}>Strong Buy ≥20% · Good Buy 10–20% · Watch 5–10% below ATH</p>
+          <p style={{ fontSize: 9, color: '#475569' }}>Colour shows how far below its all-time high (peak) · 20%+ · 10–20% · 5–10%</p>
         </div>
       </div>
     </div>
@@ -396,16 +397,16 @@ const SLIDES = [
   },
   {
     id: 1,
-    tabLabel: 'ATH Buy Signals',
+    tabLabel: 'ATH Alerts',
     dotColor: '#c62828',
     tag: 'ATH Tracking',
     tagStyle: { background: '#fff5f5', color: '#c62828', border: '1px solid #fecaca' },
-    heading: 'Know exactly when to buy your funds',
-    para: 'Daily NAV from AMFI. Color-coded buy signals for funds you actually hold — not random market noise.',
+    heading: 'See how far each fund is from its peak',
+    para: 'Daily NAV from AMFI. See, by colour, how far each fund you hold is below its all-time high — facts, not tips.',
     bullets: [
-      { ck: '▼', ckColor: '#c62828', text: 'Strong Buy — 20%+ below All-Time High' },
-      { ck: '▼', ckColor: '#d84315', text: 'Good Buy — 10–20% below ATH' },
-      { ck: '▼', ckColor: '#b8860b', text: 'Watch — 5–10% below ATH' },
+      { ck: '▼', ckColor: '#c62828', text: '20%+ below its all-time high' },
+      { ck: '▼', ckColor: '#d84315', text: '10–20% below its all-time high' },
+      { ck: '▼', ckColor: '#b8860b', text: '5–10% below its all-time high' },
       { ck: '✓', ckColor: '#16a34a', text: 'Updated daily from AMFI' },
     ],
     url: 'capitalfriends.in/investments/mutual-funds',
@@ -465,7 +466,7 @@ const SLIDES = [
 ]
 
 const TRACK_CARDS = [
-  { color: '#f97316', title: 'Mutual Funds', desc: 'Track all MF portfolios across AMCs. Units, NAV, current value, P&L, XIRR. SIP and lumpsum transactions. ATH buy signals per fund.' },
+  { color: '#f97316', title: 'Mutual Funds', desc: 'Track all MF portfolios across AMCs. Units, NAV, current value, P&L, XIRR. SIP and lumpsum transactions. How far each fund is below its all-time high.' },
   { color: '#8b5cf6', title: 'Stocks', desc: 'Equity holdings across brokers. Buy/sell transactions, average cost, unrealized and realized P&L per scrip and portfolio.' },
   { color: '#fbbf24', title: 'FDs, Gold & Other', desc: 'Fixed deposits, EPF, PPF, NPS, real estate, and gold: SGBs, gold and silver ETFs (like GoldBees), and physical gold at today\'s rate. For goals, gold counts as growth, not safe money.' },
   { color: '#f43f5e', title: 'Insurance Policies', desc: 'Term life, health, motor, home and travel policies. Sum assured, premium, maturity date — for every family member.' },
@@ -475,7 +476,7 @@ const TRACK_CARDS = [
 
 const SMART_CARDS = [
   { color: '#16a34a', title: 'Import from CAMS Statement', desc: 'Upload your CAMS + KFintech statement PDF and every purchase, SIP, switch and redemption since day one comes in — with true XIRR, CAGR and profit. Read on your device; undo anytime.', uniq: true },
-  { color: '#c62828', title: 'ATH Buy Signals', desc: 'See how far each fund is from its All-Time High NAV. Strong Buy / Good Buy / Watch — color-coded signals updated daily from AMFI.', uniq: true },
+  { color: '#c62828', title: 'ATH Alerts', desc: 'See how far each fund is below its All-Time High NAV, colour-coded by distance and updated daily from AMFI.', uniq: true },
   { color: '#7c3aed', title: 'Smart Rebalancing — 3 Modes', desc: 'Set target allocation per fund. Get exact SIP adjustment, lumpsum top-up, or buy/sell units when portfolio drifts beyond threshold.', uniq: true },
   { color: '#0891b2', title: 'Goals from one pool', desc: 'Your investments are shared across all goals by priority, each on its own glide path. Every month: the exact SIP, one-time amount or switch, and a withdraw plan when a goal\'s date comes.', uniq: true },
   { color: '#ea580c', title: 'Retirement Buckets', desc: 'Growth, Stability and Income buckets for a steady monthly income. Built step by step before you retire, refilled once a year, and Growth is never sold in a fall.', uniq: true },
@@ -516,58 +517,9 @@ function useFamiliesCount() {
   }, [])
   return n
 }
-function CountUp({ to }) {
-  const [v, setV] = useState(0)
-  useEffect(() => {
-    let raf, t0
-    const step = (t) => { t0 = t0 || t; const p = Math.min(1, (t - t0) / 1400); setV(Math.round(to * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(step) }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [to])
-  return v.toLocaleString('en-IN')
-}
-// Hero stats row: four matching stats, each with an icon. Big number + its word on one line, a short caption under it.
-// The first one is the live families count (from App_Stats), marked LIVE.
-// Hero social proof under the button: glowing pill, family icons pop in one by one, the live count counts up.
-function FamiliesProof({ isMobile }) {
-  const n = useFamiliesCount()
-  if (!n) return null
-  const cols = ['#7c3aed', '#0891b2', '#16a34a', '#f59e0b']
-  return (
-    <div className="cf-proof" style={{ display: 'inline-flex', alignItems: 'center', gap: 14, marginTop: 22, padding: isMobile ? '12px 16px 12px 12px' : '14px 26px 14px 16px', borderRadius: 20,
-      background: 'linear-gradient(135deg, rgba(74,222,128,.12), rgba(34,211,238,.08))', border: '1px solid rgba(74,222,128,.45)', position: 'relative', overflow: 'hidden' }}>
-      <style>{`
-        .cf-proof{animation:cfProofIn .7s cubic-bezier(.2,.8,.2,1) .5s both, cfProofGlow 2.6s ease-in-out 1.2s infinite}
-        .cf-proof::after{content:'';position:absolute;top:0;bottom:0;left:-40%;width:30%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.18),transparent);transform:skewX(-20deg);animation:cfShine 4s ease-in-out 1.4s infinite}
-        .cf-av{opacity:0;transform:scale(.4);animation:cfPop .45s cubic-bezier(.3,1.6,.5,1) forwards}
-        @keyframes cfProofIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
-        @keyframes cfProofGlow{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}50%{box-shadow:0 0 28px 2px rgba(74,222,128,.35)}}
-        @keyframes cfShine{0%,55%{left:-40%}100%{left:130%}}
-        @keyframes cfPop{to{opacity:1;transform:scale(1)}}
-        @media (prefers-reduced-motion:reduce){.cf-proof,.cf-proof::after,.cf-av{animation:none!important;opacity:1;transform:none}}
-      `}</style>
-      <div style={{ display: 'flex' }}>
-        {(isMobile ? cols.slice(0, 3) : cols).map((c, k) => (
-          <span key={k} className="cf-av" style={{ animationDelay: `${0.8 + k * 0.12}s`, width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: '50%', marginLeft: k ? -11 : 0, background: c, border: '2px solid #0b1120', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-            <Users size={isMobile ? 15 : 16} strokeWidth={2.4} />
-          </span>
-        ))}
-      </div>
-      <div style={{ textAlign: 'left', lineHeight: 1.15 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 34 : 42, fontWeight: 800, letterSpacing: '-.02em', lineHeight: 1, background: 'linear-gradient(135deg,#4ade80,#22d3ee)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}><CountUp to={n.families} /></span>
-          <span style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 16 : 23, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>{n.families === 1 ? 'family is' : 'families are'} using it</span>
-        </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, letterSpacing: '.12em', color: '#4ade80', marginTop: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', animation: 'cfLiveDot 1.6s infinite' }} />LIVE COUNT
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function LandingPage() {
   const { isAuthenticated, loading, signIn } = useAuth()
+  const families = useFamiliesCount()
   const navigate = useNavigate()
   const [activeSlide, setActiveSlide] = useState(0)
   const [featTab, setFeatTab] = useState(0)
@@ -575,8 +527,6 @@ export default function LandingPage() {
   const timerRef = useRef(null)
   const N = 5
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
-  // phones under 430px: logo only in the header, so YouTube/Instagram and Sign In fit on one line
-  const narrowPhone = isMobile && typeof window !== 'undefined' && window.innerWidth < 430
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', h)
@@ -611,91 +561,9 @@ export default function LandingPage() {
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#f8fafc', color: '#0f172a', WebkitFontSmoothing: 'antialiased' }}>
-      {/* ─── HEADER ─── */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(10,15,31,0.98)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 14px' : '0 20px', height: 56 }}>
-          <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-            <img src={LOGO_ICON} alt="" style={{ height: 44, width: 'auto' }}
-              onError={e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }} />
-            <div style={{ display: 'none', width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg,#6d28d9,#0284c7)', alignItems: 'center', justifyContent: 'center', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 12, color: '#fff', flexShrink: 0 }}>CF</div>
-            <span style={{ display: narrowPhone ? 'none' : 'inline', fontFamily: "'Poppins',sans-serif", fontSize: 17, letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
-              <b style={{ color: '#fff', fontWeight: 700 }}>Capital</b> <em style={{ color: '#34d399', fontWeight: 800, fontStyle: 'normal' }}>Friends</em>
-            </span>
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
-          <HeaderSocial outline />
-          <button onClick={signIn} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: isMobile ? '8px 12px' : '8px 18px', borderRadius: 8, whiteSpace: 'nowrap', background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
-            <GI s={14} />
-            Sign In
-          </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ─── HERO: dark, split — words + one button on the left, the real dashboard on the right (fintech-style) ─── */}
-      <section style={{ position: 'relative', overflow: 'hidden', padding: isMobile ? '34px 18px 40px' : '64px 32px 72px',
-        background: 'radial-gradient(ellipse 55% 70% at 10% 0%, rgba(124,58,237,.30), transparent 60%), radial-gradient(ellipse 50% 70% at 95% 90%, rgba(8,145,178,.26), transparent 60%), #0b1120' }}>
-        <style>{`
-          .cf-gbtn{transition:transform .18s ease, box-shadow .18s ease, filter .18s ease}
-          .cf-gbtn:hover{transform:translateY(-2px);box-shadow:0 16px 34px -12px rgba(124,58,237,.75);filter:brightness(1.08)}
-          .cf-gbtn:hover .cf-arrow{transform:translateX(3px)}
-          .cf-arrow{transition:transform .18s ease}
-          .cf-shot{transform:perspective(1600px) rotateY(-9deg) rotateX(4deg);transition:transform .6s ease}
-          .cf-shot:hover{transform:perspective(1600px) rotateY(-3deg) rotateX(1deg)}
-          .cf-float{animation:cfFloat 5s ease-in-out infinite}
-          .cf-float2{animation:cfFloat 6s ease-in-out infinite .8s}
-          .cf-in{opacity:0;animation:cfIn .7s cubic-bezier(.2,.8,.2,1) forwards}
-          @keyframes cfFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-          @keyframes cfIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-          @keyframes cfLiveDot{0%{box-shadow:0 0 0 0 rgba(74,222,128,.7)}70%{box-shadow:0 0 0 7px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
-          @media (max-width:767px){.cf-shot{transform:none}.cf-shot:hover{transform:none}}
-          @media (prefers-reduced-motion:reduce){.cf-float,.cf-float2,.cf-in{animation:none;opacity:1}}
-        `}</style>
-        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1.15fr)', gap: isMobile ? 34 : 56, alignItems: 'center' }}>
-          {/* words */}
-          <div className="cf-in" style={{ minWidth: 0, textAlign: isMobile ? 'center' : 'left' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)', fontSize: 12.5, fontWeight: 600, color: '#cbd5e1', marginBottom: 18 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80' }} /> Free · open source · made in India
-            </div>
-            <h1 style={{ fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 30 : 48, fontWeight: 700, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.1, margin: '0 0 16px' }}>
-              Your family knows where <span style={{ background: 'linear-gradient(90deg,#4ade80,#22d3ee)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>every rupee is</span>, even without you
-            </h1>
-            <p style={{ fontSize: isMobile ? 15 : 17.5, color: '#94a3b8', margin: isMobile ? '0 auto 24px' : '0 0 28px', maxWidth: 520, lineHeight: 1.6 }}>
-              Track mutual funds, stocks, FDs, gold, insurance and loans for every family member, get clear steps for each goal, and send your family a regular summary. Your data stays in <b style={{ color: '#4ade80', fontWeight: 700 }}>your own Google Sheet</b>.
-            </p>
-            <button onClick={signIn} className="cf-gbtn" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, padding: isMobile ? '8px 22px 8px 8px' : '9px 28px 9px 9px', borderRadius: 14,
-              background: 'linear-gradient(to right,#7c3aed,#0891b2)', color: '#fff', fontFamily: "'Poppins',sans-serif", fontSize: isMobile ? 15.5 : 17, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 14px 30px -12px rgba(124,58,237,.65)' }}>
-              <span style={{ width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, borderRadius: 10, background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><GI s={isMobile ? 19 : 21} /></span>
-              Sign in with Google — it's free
-              <svg className="cf-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-            </button>
-            <FamiliesProof isMobile={isMobile} />
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start', gap: isMobile ? '8px 16px' : '10px 22px', marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,.08)', maxWidth: 520, marginLeft: isMobile ? 'auto' : 0, marginRight: isMobile ? 'auto' : 0 }}>
-              {[[LockKeyhole, 'No bank logins'], [HardDrive, 'Data in your Google Sheet'], [CodeXml, 'Open source']].map(([Ic, l]) => (
-                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: '#cbd5e1' }}><Ic size={15} color="#4ade80" strokeWidth={2.3} />{l}</span>
-              ))}
-            </div>
-          </div>
-          {/* product preview */}
-          <div className="cf-in" style={{ position: 'relative', minWidth: 0, animationDelay: '.15s', padding: isMobile ? '6px 0 0' : 0 }}>
-            <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', inset: '8% 6%', background: 'radial-gradient(closest-side, rgba(124,58,237,.45), transparent)', filter: 'blur(30px)' }} />
-            <div className="cf-shot" style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)', boxShadow: '0 40px 80px -20px rgba(0,0,0,.8)', display: 'flex', flexDirection: 'column', height: isMobile ? 330 : 430, pointerEvents: 'none', userSelect: 'none' }}>
-              <WinBar url="capitalfriends.in/dashboard" />
-              <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}><Slide0 /></div>
-            </div>
-            <div className="cf-float2" style={{ position: 'absolute', right: isMobile ? 10 : -22, bottom: isMobile ? -18 : 28, zIndex: 3, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 14,
-              background: 'rgba(15,23,42,.92)', border: '1px solid rgba(255,255,255,.14)', boxShadow: '0 18px 40px -12px rgba(0,0,0,.7)' }}>
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(34,211,238,.14)', color: '#22d3ee', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><HardDrive size={17} strokeWidth={2.3} /></span>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Stored in your Google Sheet</div>
-                <div style={{ fontSize: 11.5, color: '#94a3b8' }}>in your own Google Drive</div>
-              </div>
-            </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ─── HEADER + HERO: logo, families count, socials; then the animated story of what the app does ─── */}
+      <LandingHeader signIn={signIn} isMobile={isMobile} youtube={YOUTUBE_URL} instagram={INSTAGRAM_URL} families={families?.families} />
+      <StoryHero signIn={signIn} isMobile={isMobile} GoogleIcon={<GI s={20} />} families={families?.families} videoUrl={YOUTUBE_URL} />
 
       {/* ─── 3 REASONS (right under the hero: what makes it different, in one look) ─── */}
       <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '22px 16px' : '30px 24px' }}>

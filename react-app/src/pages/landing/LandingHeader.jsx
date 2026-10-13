@@ -49,9 +49,11 @@ const CSS = `
 @keyframes lhLive{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
 .lh-tag{display:inline-flex;align-items:center;gap:8px;margin-right:10px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);font-family:Inter,system-ui,sans-serif;font-size:12.5px;font-weight:500;color:#cbd5e1;white-space:nowrap}
 .lh-tag i{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 3px rgba(52,211,153,.18)}
-.lh-ic{width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transition:transform .15s,background .15s}
-.lh-ic.yt{color:#ff4e45}.lh-ic.ig{color:#f472b6}
-.lh-ic:hover{transform:translateY(-1px);background:rgba(255,255,255,.18)}
+.lh-ic{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.18);transition:transform .15s,box-shadow .15s}
+/* filled brand circles with white marks, so they stand out on the dark bar */
+.lh-ic.yt{background:#ff0000}
+.lh-ic.ig{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
+.lh-ic:hover{transform:translateY(-1px);box-shadow:0 0 0 3px rgba(255,255,255,.35)}
 .lh-go{display:inline-flex;align-items:center;height:36px;padding:0 16px;margin-left:6px;border-radius:999px;border:0;cursor:pointer;color:#0b1120;font-family:Inter,system-ui,sans-serif;font-weight:700;font-size:13.5px;background:#fff;opacity:0;width:0;padding:0;margin:0;overflow:hidden;pointer-events:none;transition:opacity .25s,width .25s,padding .25s,margin .25s}
 .lh-go.on{opacity:1;width:auto;padding:0 16px;margin-left:6px;pointer-events:auto}
 .lh-line{display:none;background:linear-gradient(90deg,#14b8a6,#7c3aed,#0ea5e9,#f59e0b,#10b981,#14b8a6);background-size:200% 100%;animation:lhLine 12s linear infinite;opacity:.9}
