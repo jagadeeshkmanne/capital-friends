@@ -34,12 +34,12 @@ export function Bust({ k, r = 28 }) {
 const DUR = 7500
 
 const CHAPTERS = [
-  { k: 'drive', ph: 'private, in your own Drive', icon: 'lock', c: C.teal, s: 'Your Drive', t: 'Your data stays in your own Google Drive', dur: 7500, d: 'Sign in with Google and the app makes a private sheet in your Drive. Only you — and who you share it with — can see it.' },
-  { k: 'all', ph: 'all in one place', icon: 'chart', c: C.violet, s: 'Track', t: 'Everything in one place', dur: 6500, d: 'Funds, stocks, FDs, PPF, gold, insurance and loans — for every family member.' },
-  { k: 'cas', ph: 'imported in a minute', icon: 'sheet', c: C.sky, s: 'CAS import', t: 'Import your CAS in a minute', dur: 6000, d: 'Drop your CAMS / CDSL statement PDF: every fund, share and transaction comes in.' },
-  { k: 'ath', ph: 'watched for you every day', icon: 'bell', c: C.rose, s: 'Alerts', t: 'Alerts when a fund falls below its all-time high', dur: 7500 },
-  { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', dur: 14000, d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
-  { k: 'family', ph: 'known to your family', icon: 'mail', c: C.emerald, s: 'Family', t: 'Your family is never in the dark', dur: 6500, d: 'A regular summary email: where every rupee, policy and nominee is — even without you.' },
+  { k: 'drive', ph: 'private, in your own Drive', icon: 'lock', c: C.teal, s: 'Your Drive', t: 'Your data stays in your own Google Drive', dur: 7200, d: 'Sign in with Google and the app makes a private sheet in your Drive. Only you — and who you share it with — can see it.' },
+  { k: 'all', ph: 'all in one place', icon: 'chart', c: C.violet, s: 'Track', t: 'Everything in one place', dur: 4500, d: 'Funds, stocks, FDs, PPF, gold, insurance and loans — for every family member.' },
+  { k: 'cas', ph: 'imported in a minute', icon: 'sheet', c: C.sky, s: 'CAS import', t: 'Import your CAS in a minute', dur: 5000, d: 'Drop your CAMS / CDSL statement PDF: every fund, share and transaction comes in.' },
+  { k: 'ath', ph: 'watched for you every day', icon: 'bell', c: C.rose, s: 'Alerts', t: 'Alerts when a fund falls below its all-time high', dur: 7000 },
+  { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', dur: 11500, d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
+  { k: 'family', ph: 'known to your family', icon: 'mail', c: C.emerald, s: 'Family', t: 'Your family is never in the dark', dur: 5200, d: 'A regular summary email: where every rupee, policy and nominee is — even without you.' },
 ]
 
 function Glyph({ name, color, size = 18 }) {
@@ -290,11 +290,10 @@ function SceneAlerts() {
 
 /* 5 · goals on one road: the car drives goal to goal. Near each goal its bucket moves from equity (violet)
    to safe money (teal) — the glide path — and the goal is marked reached; at retirement the three buckets take over. */
-const GLIDE_HOME = [['2026', 0.8], ['2027', 0.6], ['2028', 0.34], ['2029', 0.1]]
 const GLIDE_EDU = [['2031', 0.8], ['2032', 0.6], ['2033', 0.34], ['2034', 0.1]]
 const BUCKET = 'M0 0 h64 v92 q0 12 -12 12 h-40 q-12 0 -12 -12 Z'
 // when the car is driving to each goal (seconds from the start of the scene)
-const LEG = { home: [1.0, 2.8], edu: [4.4, 2.6], retire: [7.6, 2.0] }
+const LEG = { edu: [1.0, 3.6], retire: [5.4, 3.0] }
 
 function GlideBucket({ x, y, id, title, label, icon, c, years, at: [t0, len] }) {
   const step = len / years.length
@@ -309,7 +308,7 @@ function GlideBucket({ x, y, id, title, label, icon, c, years, at: [t0, len] }) 
         </g>
         <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
         <g transform="translate(32 -14)"><circle r="12" fill="#fff" stroke={c} strokeWidth="2" /><g transform="scale(.44)" style={{ color: c }}>{G[icon]}</g></g>
-        <Tx x={32} y={122} s={11} c={C.ink} a="middle">{label}</Tx>
+        {label && <Tx x={32} y={122} s={11} c={C.ink} a="middle">{label}</Tx>}
       </g>
       <g transform="translate(80 66)">
         {years.map(([yr, e], n) => (
@@ -339,13 +338,17 @@ function Reached({ x, y, fx, fy, text, c, t }) {
 }
 
 function SceneGoals() {
-  const road = 'M40 370 C220 370 260 260 420 260 S640 170 780 170 S980 110 1060 90'
-  const stops = [[301, 284, 'home', '2029', 'Home', C.teal], [608, 215, 'target', '2034', 'Education', C.violet], [942, 138, 'gold', '2045', 'Retire', C.amber]]
+  const road = 'M40 250 C200 250 260 170 420 170 S700 120 860 120 S1040 96 1070 92'
+  const stops = [[380, 172, 'target', '2034', "Kids' education", C.violet], [880, 120, 'gold', '2045', 'Retirement', C.amber]]
   const rt = LEG.retire[0] + LEG.retire[1] + 0.2
   return (
-    <svg viewBox={VB} className="st-svg" aria-label="The family car drives goal to goal; near each goal the money moves from equity to safe funds, and at retirement three buckets take over">
+    <svg viewBox={VB} className="st-svg" aria-label="The family car drives to each goal; near the kids' education goal the money moves from equity to safe funds, and at retirement three buckets take over">
       <path d={road} fill="none" stroke="#cbd5e1" strokeWidth="28" strokeLinecap="round" />
       <path d={road} fill="none" stroke="#fff" strokeWidth="3" strokeDasharray="12 12" className="la-dash" />
+      <g transform="translate(70 290)"><g className="st-pop" style={T(0.2)}>
+        <rect x="-30" y="-14" width="96" height="28" rx="14" fill="#fff" stroke={C.line} />
+        <Tx x={18} y={5} s={11.5} w={800} c={C.navy} a="middle">Today · 2026</Tx>
+      </g></g>
       {stops.map(([x, y, g, yr, l, c], i) => (
         <g key={l} transform={`translate(${x} ${y})`}><g className="st-pop" style={T(0.3 + i * 0.3)}>
           <path d="M0 0 V-46" stroke={C.slate} strokeWidth="2.5" />
@@ -360,25 +363,20 @@ function SceneGoals() {
         <g transform="translate(-22 -18)"><rect x="0" y="6" width="44" height="16" rx="6" fill={C.rose} /><path d="M8 7 L14 -2 H30 L36 7 Z" fill="#fecdd3" /><circle cx="11" cy="23" r="5" fill={C.navy} /><circle cx="33" cy="23" r="5" fill={C.navy} /></g>
       </g>
 
-      {/* Home 2029 */}
-      <path className="la-dash" d="M150 262 Q230 256 282 228" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
-      <GlideBucket x={60} y={110} id="home" title="HOME · MOVES TO SAFE" label="Home · 2029" icon="home" c={C.teal} years={GLIDE_HOME} at={LEG.home} />
-      <Reached x={392} y={150} fx={301} fy={214} text="Home goal reached" c={C.teal} t={LEG.home[0] + LEG.home[1] + 0.1} />
-
-      {/* Education 2034 */}
-      <path className="la-dash" d="M704 112 Q650 112 626 132" fill="none" stroke={C.violet} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
-      <GlideBucket x={712} y={14} id="edu" title="EDUCATION · MOVES TO SAFE" label="Education · 2034" icon="target" c={C.violet} years={GLIDE_EDU} at={LEG.edu} />
-      <Reached x={500} y={104} fx={608} fy={145} text="Education goal reached" c={C.violet} t={LEG.edu[0] + LEG.edu[1] + 0.1} />
+      {/* Kids' education 2034: its bucket, under the road, moves from equity to safe money as the car gets there */}
+      <path className="la-dash" d="M380 196 Q380 222 356 236" fill="none" stroke={C.violet} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
+      <GlideBucket x={300} y={248} id="edu" title="KIDS' EDUCATION · MOVES TO SAFE" label="" icon="target" c={C.violet} years={GLIDE_EDU} at={LEG.edu} />
+      <Reached x={400} y={40} fx={380} fy={102} text="Education goal reached" c={C.violet} t={LEG.edu[0] + LEG.edu[1] + 0.1} />
 
       {/* Retirement 2045: once there, three buckets take over */}
-      <g className="st-pop" style={T(rt)}><path className="la-dash" d="M942 156 Q942 200 900 222" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" /></g>
-      <Reached x={968} y={26} fx={942} fy={68} text="Retired" c={C.amber} t={rt} />
-      <g transform="translate(700 236)"><g className="st-rise" style={T(rt + 0.2)}>
+      <g className="st-pop" style={T(rt)}><path className="la-dash" d="M880 146 Q880 180 850 204" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" /></g>
+      <Reached x={770} y={52} fx={880} fy={50} text="Retired" c={C.amber} t={rt} />
+      <g transform="translate(720 222)"><g className="st-rise" style={T(rt + 0.2)}>
         <Tx x={0} y={0} s={11} w={800} c="#b45309" letterSpacing=".06em">RETIREMENT · THREE BUCKETS</Tx>
         {[['Income', C.sky, 46, 'spend now'], ['Stability', C.teal, 58, '3–7 yrs'], ['Growth', C.violet, 70, '7+ yrs']].map(([l, c, h, sub], i) => (
           <g key={l} transform={`translate(${i * 96} 16)`}>
             <clipPath id={`st-b-${l}`}><path d={BUCKET} /></clipPath>
-            <g clipPath={`url(#st-b-${l})`}><rect width="64" height="104" fill="#f8fafc" /><g className="la-fill" style={T(rt + 0.5 + i * 0.25)}><rect y={104 - h} width="64" height={h} fill={c} opacity=".85" /></g></g>
+            <g clipPath={`url(#st-b-${l})`}><rect width="64" height="104" fill="#f8fafc" /><g className="la-fill st-quick" style={T(rt + 0.5 + i * 0.25)}><rect y={104 - h} width="64" height={h} fill={c} opacity=".85" /></g></g>
             <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
             <Tx x={32} y={124} s={11.5} c={C.ink} a="middle">{l}</Tx>
             <Tx x={32} y={139} s={10} w={600} c={C.slate} a="middle">{sub}</Tx>
@@ -477,13 +475,13 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
         </ol>
         {/* the scene, edge to edge */}
         <div className="st-r" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-          <div key={ch.k} className="st-scene"><Scene /></div>
+          <div key={ch.k} className="st-scene" style={{ '--pd': `${ch.dur || DUR}ms` }}><Scene /></div>
         </div>
       </div>
       {/* one dock at the bottom: start, watch, and how many families */}
       <div className="st-dock">
         <button onClick={signIn} className="st-btn"><span className="st-g">{GoogleIcon}</span>Sign in with Google<span className="st-free">FREE</span></button>
-        {videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch the 2-minute tour"><span className="st-play" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">2-min tour</span></a>}
+        {videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch the 2-minute tour"><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">Watch 2-min tour</span></a>}
       </div>
       {/* Google sign-in verification needs these on the home page */}
       <nav className="st-legal" aria-label="Legal"><a href="https://capitalfriends.in/privacy">Privacy Policy</a><a href="https://capitalfriends.in/terms">Terms &amp; Conditions</a></nav>
@@ -510,7 +508,7 @@ const CSS = `
 .st:not(.m) .st-path li.on button{background:#fff;box-shadow:0 8px 20px -12px rgba(15,23,42,.4);padding-right:14px}
 .st-h{position:relative;z-index:3;margin:0;padding:26px 24px 0;text-align:center;font-family:Inter,system-ui,sans-serif;font-weight:700;letter-spacing:-.025em;line-height:1.2;color:#0b1120;font-size:clamp(22px,2.1vw,32px)}
 .st-h1a{display:inline}
-.st-rot{display:inline-block;position:relative;overflow:hidden;vertical-align:bottom;padding-bottom:.08em}
+.st-rot{display:inline-block;position:relative;overflow:hidden;vertical-align:top;line-height:inherit}.st-rot>span{vertical-align:top}
 .st-rot>span{display:inline-block;animation:stWord .6s cubic-bezier(.2,.8,.2,1) both;color:var(--c)}
 @keyframes stWord{from{transform:translateY(60%);opacity:0;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
 .st-dock{position:relative;z-index:3;align-self:center;margin:0 0 24px;display:flex;align-items:center;gap:6px;padding:6px;border-radius:999px;background:rgba(255,255,255,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 0 0 1px rgba(15,23,42,.06),0 18px 40px -20px rgba(15,23,42,.35)}
@@ -519,9 +517,9 @@ const CSS = `
 @keyframes stFree{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.22)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.1)}}
 .st-btn:hover{transform:translateY(-1px);background:#1e293b;box-shadow:0 14px 28px -12px rgba(11,17,32,.6)}
 .st-g{width:36px;height:36px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center}
-.st-btn2{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 6px;color:#334155;font-weight:600;font-size:14.5px;text-decoration:none}
-.st-btn2:hover{color:#0b1120}
-.st-play{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:var(--c);box-shadow:0 0 0 1px #e2e8f0,0 4px 10px -6px rgba(15,23,42,.3);padding-left:2px;box-sizing:border-box;transition:color .6s,transform .18s}
+.st-btn2{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 18px 0 6px;border-radius:999px;color:#0b1120;font-weight:700;font-size:14.5px;text-decoration:none;background:#fff;box-shadow:inset 0 0 0 1.5px #e2e8f0;transition:box-shadow .2s}
+.st-btn2:hover{box-shadow:inset 0 0 0 1.5px var(--c)}
+.st-play{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--c);color:#fff;padding-left:2px;box-sizing:border-box;transition:background .6s,transform .18s}
 .st-btn2:hover .st-play{transform:scale(1.08)}
 .st-fam{display:flex;padding:0 16px 0 14px;border-left:1px solid #e2e8f0;height:26px;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#64748b}.st-fam b{color:#0b1120;font-weight:700}
 .st-avs{display:flex}
@@ -604,8 +602,9 @@ const CSS = `
 @keyframes stCarHome{from{offset-distance:0%}to{offset-distance:26.6%}}
 .st-confetti{opacity:0;animation:stConf .9s ease-out both}
 @keyframes stConf{0%{opacity:0;transform:translate(0,0) scale(.4)}30%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1)}}
-.st-car3{offset-rotate:auto;animation:stCarTrip 8.6s linear both 1s}
-@keyframes stCarTrip{0%{offset-distance:0%;animation-timing-function:cubic-bezier(.45,0,.4,1)}32.6%{offset-distance:26.6%}39.5%{offset-distance:26.6%;animation-timing-function:cubic-bezier(.45,0,.4,1)}69.8%{offset-distance:55.7%}76.7%{offset-distance:55.7%;animation-timing-function:cubic-bezier(.45,0,.4,1)}100%{offset-distance:88.1%}}
+.st-car3{offset-rotate:auto;animation:stCarTrip 7.4s linear both 1s}
+@keyframes stCarTrip{0%{offset-distance:0%;animation-timing-function:cubic-bezier(.45,0,.4,1)}48.6%{offset-distance:33.5%}59.5%{offset-distance:33.5%;animation-timing-function:cubic-bezier(.45,0,.4,1)}100%{offset-distance:81.5%}}
+.la-fill.st-quick{animation-duration:1.2s}
 @keyframes stPress{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
 @keyframes stCursor{from{offset-distance:0%;opacity:0}20%{opacity:1}to{offset-distance:100%;opacity:1}}
 @keyframes stDraw{to{stroke-dashoffset:0}}
@@ -626,8 +625,8 @@ const CSS = `
 .st.m .st-path{padding:12px 10px 0}.st.m .st-lb{display:none}.st.m .st-path li.on .st-lb{display:inline;font-size:12px}.st.m .st-ln{margin:0 4px}.st.m .st-dot{width:30px;height:30px}
 /* phones: the wide scene keeps its size and the camera pans slowly across it */
 .st.m .st-mid{flex-direction:column}.st.m .st-r{padding:0;display:flex;align-items:center;overflow:hidden}
-.st.m .st-scene{position:relative;inset:auto;height:min(340px,100%);width:100%;transform:none}
-.st.m .st-svg{height:100%;width:auto;max-width:none;animation:stPan 7.5s ease-in-out both}
+.st.m .st-scene{position:relative;inset:auto;height:min(400px,100%);width:100%;transform:none}
+.st.m .st-svg{height:100%;width:auto;max-width:none;animation:stPan var(--pd,7s) ease-in-out both}
 @keyframes stPan{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(calc(-100% + 100vw))}}
 .st.m .st-h{font-size:22px;padding:16px 16px 0}.st.m .st-rot{display:block}
 .st.m .st-legal{position:relative;right:auto;bottom:auto;justify-content:center;padding:0 0 14px}.st.m .st-dock{margin:0 0 10px;flex-wrap:nowrap}.st.m .st-btn{font-size:14px}.st.m .st-btn2t,.st.m .st-fam{display:none}
