@@ -63,3 +63,25 @@ assert.ok(ctx.bucketActionItems_().some(i => /refill your buckets/.test(i.title)
 settings['RefillLog:G1'] = JSON.stringify([{ at: '2027-03-05', ops: [{ from: 'b3', to: 'b2', amount: 750000 }] }])
 assert.ok(!ctx.bucketActionItems_().some(i => /refill your buckets/.test(i.title)))
 console.log('action required: ok')
+
+// ── keep Income real: CAS import reminder for SWPs, savings balance check every 3 months ──
+ctx.bucketActionItems_ = origItems
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+ctx.Utilities.formatDate = (d, tz, f) => f === 'yyyy-MM' ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : f === 'd MMM yyyy' ? `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}` : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+settings = { 'IncomePlan:G1': JSON.stringify({ start: '2026-11', day: 1, sources: [{ kind: 'cash', ref: 'S1', name: 'HDFC savings', amount: 30000 }, { kind: 'swp', ref: 'P1::L1', name: 'Liquid A', amount: 10000 }] }) }
+inv = { S1: { investmentId: 'S1', investmentType: 'Cash / Savings', currentValue: 2000000, status: 'Active' } }
+ctx.getAllInvestments = () => Object.values(inv)
+ctx.getAllMFTransactions = () => [{ portfolioId: 'P1', fundCode: 'L1', type: 'SELL', date: '01/11/2026' }]
+for (const day of ['2026-11-01', '2026-12-01', '2027-01-01', '2027-02-01']) ctx.applyMonthlyIncome({ today: day + 'T10:00:00' }) // the app deducts each month, nothing typed
+let it2 = ctx.bucketActionItems_(new Date('2027-02-10T10:00:00'))
+assert.ok(it2.some(i => /import your CAS/.test(i.title) && /estimated since 1 Nov 2026/.test(i.description)), 'CAS not imported for 60+ days')
+assert.ok(it2.some(i => /check your savings balance/.test(i.title) && /Since 1 Nov 2026/.test(i.description)), '3 months of auto deductions, balance never typed')
+// she types the real balance from her bank: the check goes away and counts 3 months from then
+inv.S1.currentValue = 1905000; inv.S1.lastUpdated = '15/02/2027'
+assert.ok(!ctx.bucketActionItems_(new Date('2027-02-16T10:00:00')).some(i => /check your savings/.test(i.title)))
+ctx.applyMonthlyIncome({ today: '2027-03-01T10:00:00' })
+assert.strictEqual(settings['BalanceChecked:S1'], '2027-02-15')
+inv.S1.lastUpdated = '01/03/2027' // the March deduction saved it
+assert.ok(!ctx.bucketActionItems_(new Date('2027-04-10T10:00:00')).some(i => /check your savings/.test(i.title)), 'less than 3 months since she typed it')
+assert.ok(ctx.bucketActionItems_(new Date('2027-05-20T10:00:00')).some(i => /check your savings/.test(i.title) && /Since 15 Feb 2027/.test(i.description)))
+console.log('keep income real: ok')

@@ -33,6 +33,20 @@ function incomePayMonths_(plan, today) {
   return out;
 }
 
+/** She typed the balance herself since the last deduction (it differs, or was saved on a later day): remember the date,
+ *  so the "check your savings balance" reminder counts 3 months from then. */
+function noteTypedBalance_(ref, inv, entries, settings) {
+  var mine = entries.filter(function (e) { return e.ref === ref && e.amt > 0; });
+  var last = mine[mine.length - 1];
+  if (!last) return;
+  var upd = incomeParseDay_(inv.lastUpdated), autoDay = incomeParseDay_(last.at);
+  var cv = parseFloat(inv.currentValue) || 0;
+  var manual = (last.bal !== undefined && Math.abs(cv - last.bal) > 1) || (upd && autoDay && upd > autoDay);
+  if (!manual) return;
+  var day = Utilities.formatDate(upd || new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  if (settings['BalanceChecked:' + ref] !== day) { updateSetting('BalanceChecked:' + ref, day); settings['BalanceChecked:' + ref] = day; }
+}
+
 /** Deduct this month's (and any missed month's) income from cash sources. Returns what was done. */
 function applyMonthlyIncome(params) {
   // the daily job and an app open can run at the same moment: one at a time, so nothing is deducted twice
@@ -66,6 +80,7 @@ function applyMonthlyIncomeLocked_(params) {
         if (!inv || inv.status === 'Inactive') {
           entry.amt = 0; entry.short = amount; entry.skip = (s.name || 'The savings account') + ' is no longer in your investments';
         } else {
+          if (balances[s.ref] === undefined) noteTypedBalance_(s.ref, inv, entries, settings);
           var cv = balances[s.ref] !== undefined ? balances[s.ref] : (parseFloat(inv.currentValue) || 0);
           var take = Math.min(amount, Math.max(0, cv));
           entry.amt = take; entry.bal = cv - take;
@@ -157,6 +172,17 @@ function incomeEmailItems_() {
 
 var APP_GOALS_URL_ = 'https://capitalfriends.in/goals';
 
+/** 'dd/MM/yyyy' (the sheet lists) or 'yyyy-MM-dd' / ISO -> Date at midnight, or null. */
+function incomeParseDay_(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  var m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(String(v));
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  var d = new Date(v); return isNaN(d) ? null : d;
+}
+
 function incomeFmtDate_(d) { return Utilities.formatDate(d, Session.getScriptTimeZone(), 'd MMM yyyy'); }
 
 /**
@@ -220,6 +246,44 @@ function bucketActionItems_(today) {
       var months = Math.floor(bal / amt);
       if (months <= 12 && !hasAppRefill) add({ key: gid + ':low:' + month + ':' + s.ref, type: months <= 3 ? 'critical' : 'warning', title: gname + ': Income running low',
         description: (s.name || 'Savings') + ' has about ' + months + ' month' + (months === 1 ? '' : 's') + ' of income left (' + formatCurrency(bal) + '). Refill it from Stability: open Goals → Refill now.' });
+    });
+  });
+
+  // 4. keep the Income numbers real: import the CAS for SWPs, check the savings balance every 3 months
+  var txns = null;
+  goals.forEach(function (g) {
+    var gid = g.goalId, gname = g.goalName || 'Retirement';
+    var plan = incomeJson_(settings['IncomePlan:' + gid], null);
+    if (!plan || !plan.sources) return;
+    var ilog = incomeJson_(settings['IncomeLog:' + gid], []);
+    var started = incomeParseDay_(plan.start + '-01');
+    plan.sources.forEach(function (s) {
+      if (s.kind === 'swp') {
+        if (txns === null) { try { txns = getAllMFTransactions() || []; } catch (e) { txns = []; } }
+        var pid = String(s.ref).split('::')[0];
+        var last = txns.filter(function (t) { return t.portfolioId === pid; }).reduce(function (mx, t) { var d = incomeParseDay_(t.date); return d && (!mx || d > mx) ? d : mx; }, null);
+        var since = last && started && last < started ? started : last; // the plan started after the last statement
+        if (since && (today - since) / 864e5 > 60) add({ key: gid + ':cas:' + Utilities.formatDate(since, Session.getScriptTimeZone(), 'yyyy-MM-dd'), type: 'warning', title: gname + ': import your CAS statement',
+          description: 'Your SWP from ' + (s.name || 'the liquid fund') + ' has been estimated since ' + incomeFmtDate_(since) + '. Import your latest CAS (Mutual Funds → Import statement) so Income shows the real balance.' });
+      } else if (s.kind === 'cash') {
+        var inv = getInvestmentById(s.ref);
+        if (!inv) return;
+        var mine = ilog.filter(function (e) { return e.ref === s.ref && e.amt > 0; });
+        if (!mine.length) return;
+        var lastAuto = mine[mine.length - 1];
+        // she updated it herself: the balance differs from what the last deduction left, or it was saved on a later day
+        var upd = incomeParseDay_(inv.lastUpdated);
+        var autoDay = incomeParseDay_(lastAuto.at);
+        var cv = parseFloat(inv.currentValue) || 0;
+        var manual = (lastAuto.bal !== undefined && Math.abs(cv - lastAuto.bal) > 1) || (upd && autoDay && upd > autoDay);
+        if (manual) return;
+        // last time she typed the balance herself (noted by the deduction job), else when the deductions started
+        var firstAuto = incomeParseDay_(mine[0].at);
+        var typed = incomeParseDay_(settings['BalanceChecked:' + s.ref]);
+        var checkedAt = typed && (!firstAuto || typed > firstAuto) ? typed : firstAuto;
+        if (checkedAt && (today - checkedAt) / 864e5 >= 90) add({ key: gid + ':check:' + s.ref + ':' + Utilities.formatDate(checkedAt, Session.getScriptTimeZone(), 'yyyy-MM-dd'), type: 'warning', title: gname + ': check your savings balance',
+          description: 'Since ' + incomeFmtDate_(checkedAt) + ' the app has taken ' + formatCurrency(Number(s.amount) || 0) + ' a month from ' + (s.name || 'savings') + ' (now ' + formatCurrency(cv) + '). Interest and other spending are not known to the app: if your bank shows a different amount, update it in Other investments.' });
+      }
     });
   });
 
