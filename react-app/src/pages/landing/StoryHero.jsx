@@ -1,7 +1,7 @@
 // The landing page's first screen: everything Capital Friends does, without scrolling.
 // Left: what it is + Sign in + five chapters. Right: a stage that plays each chapter as a small animated scene
 // (flat illustrations + Open Peeps people, CSS3 animations) and moves on by itself; tap a chapter to jump.
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { C, G, Disc, ART_CSS } from './LandingArt'
 
 // family members as simple flat busts (one style for everyone): tinted disc, shoulders, head, hair
@@ -61,13 +61,18 @@ const Flow = ({ d, c, t, dot = true }) => (
 )
 
 /* 1 · your Drive: sign in → My Drive → your sheet, locked to you */
-function SceneDrive() {
-  const S = 1.2, W = 172, H = 186, Y = 44, X = [110, 447, 784], MID = Y + (H * S) / 2
-  const Card = ({ x, t, children }) => (
-    <g transform={`translate(${x} ${Y}) scale(${S})`}><g className="st-rise" style={T(t)}>
-      <rect width={W} height={H} rx="16" fill="#fff" stroke={C.line} strokeWidth="1.5" />{children}
+// a card in the Drive scene — kept outside the scene so a re-render never re-mounts it (that replayed its animation)
+const DS = 1.2, DW = 172, DH = 186, DY = 44
+function DriveCard({ x, t, children }) {
+  return (
+    <g transform={`translate(${x} ${DY}) scale(${DS})`}><g className="st-rise" style={T(t)}>
+      <rect width={DW} height={DH} rx="16" fill="#fff" stroke={C.line} strokeWidth="1.5" />{children}
     </g></g>
   )
+}
+function SceneDrive() {
+  const S = DS, W = DW, H = DH, Y = DY, X = [110, 447, 784], MID = Y + (H * S) / 2
+  const Card = DriveCard
   return (
     <svg viewBox={VB} className="st-svg" aria-label="Sign in with Google, a private sheet is made in your own Google Drive, and only you can see it">
       <Card x={X[0]} t={0}>
@@ -442,9 +447,12 @@ function SceneFamily() {
   )
 }
 
-const SCENES = { drive: SceneDrive, all: SceneAll, cas: SceneCas, ath: SceneAlerts, goals: SceneGoals, family: SceneFamily }
+// each scene re-renders only when it is replaced, so the rest of the page updating never restarts an animation
+const memoScene = (f) => memo(f, () => true)
+const SCENES_RAW = { drive: SceneDrive, all: SceneAll, cas: SceneCas, ath: SceneAlerts, goals: SceneGoals, family: SceneFamily }
+const SCENES = Object.fromEntries(Object.entries(SCENES_RAW).map(([k, f]) => [k, memoScene(f)]))
 
-export default function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
+function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
   const [i, setI] = useState(0)
   // the scenes play on by themselves; they only wait while the browser tab is hidden
   const [paused, setPaused] = useState(false)
@@ -502,6 +510,8 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
     </section>
   )
 }
+
+export default memo(StoryHero)
 
 const CSS = `
 .st{position:relative;overflow:hidden;background:linear-gradient(180deg,#f6f8fc 0%,#ffffff 70%);height:calc(100vh - 60px);min-height:600px;max-height:940px;display:flex;flex-direction:column}

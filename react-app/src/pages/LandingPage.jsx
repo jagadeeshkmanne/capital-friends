@@ -517,6 +517,8 @@ function useFamiliesCount() {
   }, [])
   return n
 }
+const HERO_G = <GI s={20} />   // made once, so the hero isn't re-rendered by the page's own timers
+
 export default function LandingPage() {
   const { isAuthenticated, loading, signIn } = useAuth()
   const families = useFamiliesCount()
@@ -563,7 +565,7 @@ export default function LandingPage() {
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#f8fafc', color: '#0f172a', WebkitFontSmoothing: 'antialiased' }}>
       {/* ─── HEADER + HERO: logo, families count, socials; then the animated story of what the app does ─── */}
       <LandingHeader signIn={signIn} isMobile={isMobile} youtube={YOUTUBE_URL} instagram={INSTAGRAM_URL} families={families?.families} />
-      <StoryHero signIn={signIn} isMobile={isMobile} GoogleIcon={<GI s={20} />} families={families?.families} videoUrl={YOUTUBE_URL} />
+      <StoryHero signIn={signIn} isMobile={isMobile} GoogleIcon={HERO_G} families={families?.families} videoUrl={YOUTUBE_URL} />
 
       {/* ─── 3 REASONS (right under the hero: what makes it different, in one look) ─── */}
       <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: isMobile ? '22px 16px' : '30px 24px' }}>
