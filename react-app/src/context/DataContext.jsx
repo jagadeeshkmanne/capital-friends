@@ -57,6 +57,7 @@ export function DataProvider({ children }) {
   const [goalPortfolioMappings, setGoalPortfolioMappings] = useState(null)
   const [assetAllocations, setAssetAllocations] = useState(null)
   const [settings, setSettings] = useState(null)
+  const settingsRef = useRef(null); settingsRef.current = settings
   // Health check: session cache for instant same-tab checks, IDB for persistence
   const [healthCheckCompleted, setHealthCheckCompleted] = useState(
     cachedHC !== null ? cachedHC : null
@@ -578,16 +579,30 @@ export function DataProvider({ children }) {
   }, [refreshOtherInvestments])
 
   // ── Goals CRUD ──
+  // _extras ({ repeat, payYears }) are kept in the Settings tab (GoalExtras), not in the Goals sheet
+  const saveGoalExtras = useCallback(async (goalId, extras) => {
+    if (!goalId || !extras) return
+    let all = {}
+    try { all = JSON.parse(settingsRef.current?.GoalExtras || '{}') || {} } catch { all = {} }
+    const e = { repeat: Math.max(0, Number(extras.repeat) || 0), payYears: Math.max(1, Number(extras.payYears) || 1) }
+    const had = !!all[goalId]
+    if (e.repeat === 0 && e.payYears === 1) { if (!had) return; delete all[goalId] } else all[goalId] = e
+    await updateSettings({ GoalExtras: JSON.stringify(all) })
+  }, [updateSettings])
   const addGoal = useCallback(async (data) => {
-    const result = await api.createGoal(data)
+    const { _extras, ...goal } = data || {}
+    const result = await api.createGoal(goal)
+    if (_extras) { try { await saveGoalExtras(result?.goalId, _extras) } catch (e) { console.warn('goal extras', e) } }
     await refreshGoals()
     return result
-  }, [refreshGoals])
+  }, [refreshGoals, saveGoalExtras])
 
   const updateGoal = useCallback(async (id, data) => {
-    await api.updateGoal(id, data)
+    const { _extras, ...goal } = data || {}
+    await api.updateGoal(id, goal)
+    if (_extras) { try { await saveGoalExtras(id, _extras) } catch (e) { console.warn('goal extras', e) } }
     await refreshGoals()
-  }, [refreshGoals])
+  }, [refreshGoals, saveGoalExtras])
 
   const deleteGoal = useCallback(async (id) => {
     await api.deleteGoal(id)

@@ -1,3 +1,4 @@
+import { readGoalExtras, REPEAT_OPTIONS, PAY_OPTIONS } from '../../utils/goalExtras'
 import { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, ChevronLeft, Target, DollarSign, CheckCircle2, TrendingUp, AlertTriangle } from 'lucide-react'
 import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
@@ -110,7 +111,11 @@ function retirementAgeAtDate(dob, targetDate) {
 export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent, defaultType }) {
   const { mv } = useMask()
   const isEdit = !!initial
-  const { activeMembers } = useData()
+  const { activeMembers, settings } = useData()
+  // repeats / paid over years (kept in Settings → GoalExtras, see utils/goalExtras.js)
+  const initEx = (initial?.goalId && readGoalExtras(settings)[initial.goalId]) || {}
+  const [repeat, setRepeat] = useState(String(initEx.repeat || 0))
+  const [payYears, setPayYears] = useState(String(initEx.payYears || 1))
   const memberOptions = (activeMembers || []).map((m) => ({
     value: m.memberId,
     label: m.relationship ? `${mv(m.memberName, 'name')} (${m.relationship})` : m.memberName,
@@ -439,6 +444,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
         initialCost: (!isRetirement && !isEmergency) ? calc.todaysCost : undefined,
         retirementAge: isRetirement ? (Number(form.retirementAge) || undefined) : undefined,
         dob: isRetirement ? (form.dob || undefined) : undefined,
+        _extras: isRetirement || isEmergency ? { repeat: 0, payYears: 1 } : { repeat: Number(repeat) || 0, payYears: Number(payYears) || 1 },
       })
     } finally { setSaving(false) }
   }
@@ -547,6 +553,18 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           <FormSelect value={form.priority} onChange={(v) => set('priority', v)} options={PRIORITIES} />
           <p className="text-[11px] text-[var(--text-dim)] mt-1">If your money can't cover all goals today: High goals get it first, then Medium, then Low. Goals with the same priority share it equally (the same % of what each needs). The emergency fund always comes first.</p>
         </FormField>
+        {!isRetirement && !isEmergency && form.goalType && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Repeats">
+              <FormSelect value={repeat} onChange={setRepeat} options={REPEAT_OPTIONS} />
+              <p className="text-[11px] text-[var(--text-dim)] mt-1">Yearly trip, school fees, insurance premium: when you close it, the next one is added for you.</p>
+            </FormField>
+            <FormField label="Paid">
+              <FormSelect value={payYears} onChange={setPayYears} options={PAY_OPTIONS} />
+              <p className="text-[11px] text-[var(--text-dim)] mt-1">College fees over 4 years: the amount is spent in equal parts from the goal date, so it needs less today.</p>
+            </FormField>
+          </div>
+        )}
         <FormField label="Notes">
           <FormTextarea value={form.notes} onChange={(v) => set('notes', v)} placeholder="Optional notes..." rows={2} />
         </FormField>
@@ -621,6 +639,18 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           <p className="text-[11px] text-[var(--text-dim)] mt-1">If your money can't cover all goals today: High goals get it first, then Medium, then Low. Goals with the same priority share it equally (the same % of what each needs). The emergency fund always comes first.</p>
             </FormField>
           </div>
+          {!isRetirement && !isEmergency && form.goalType && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Repeats">
+                <FormSelect value={repeat} onChange={setRepeat} options={REPEAT_OPTIONS} />
+                <p className="text-[11px] text-[var(--text-dim)] mt-1">Yearly trip, school fees, insurance premium: when you close it, the next one is added for you.</p>
+              </FormField>
+              <FormField label="Paid">
+                <FormSelect value={payYears} onChange={setPayYears} options={PAY_OPTIONS} />
+                <p className="text-[11px] text-[var(--text-dim)] mt-1">College fees over 4 years: the amount is spent in equal parts from the goal date, so it needs less today.</p>
+              </FormField>
+            </div>
+          )}
         </div>
       )}
 

@@ -177,9 +177,9 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
       {closed.length > 0 && (
         <div className="g2-card">
           <div className="g2-lbl"><span>Completed goals</span><span>{closed.length}</span></div>
-          {closed.map((g) => { const nm = String(g.notes || ''); const used = /withdrawn/i.test(nm); const when = (nm.match(/(?:Withdrawn|Not needed) on ([0-9/.-]+)/i) || [])[1]; return (
+          {closed.map((g) => { const nm = String(g.notes || ''); const used = /withdrawn/i.test(nm); const when = (nm.match(/(?:Withdrawn|Not needed) on ([0-9/.-]+)/i) || [])[1]; const usedAmt = (nm.match(/used (₹[\d,]+)/) || [])[1]; return (
             <div key={g.goalId} className="g2-done"><span className={`g2-flag ${used ? 'ok' : ''}`}>{used ? '✓' : '–'}</span>
-              <div><b>{icon(g)} {mt(g.goalName)}</b><small>{used ? 'Completed · money used' : 'Closed · not needed'}{when ? ` · ${when}` : ''}</small></div>
+              <div><b>{icon(g)} {mt(g.goalName)}</b><small>{used ? (usedAmt ? `Completed · used ${usedAmt}` : 'Completed · money used') : 'Closed · not needed'}{when ? ` · ${when}` : ''}</small></div>
               <span className="g2-v">{L(g.targetAmount)}</span></div>) })}
         </div>
       )}
@@ -409,7 +409,7 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
         <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{gs.needNote}</small></div>
         <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gs.gapNote}</small></div>
-        <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
+        <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>{g.payYears > 1 ? `over ${g.payYears} years from ${yearOf(g)}` : `in ${yearOf(g)}`}{g.repeatYears ? ` · repeats every ${g.repeatYears > 1 ? `${g.repeatYears} years` : 'year'}` : ''}</small></div>
         {p.isRet && <RetirementActions goal={p.goal} slot="stat" fallback={<RetMonthly p={p} retired={retired} />} />}
       </div>
       {(() => {
@@ -474,21 +474,29 @@ function ShortStep({ s, n, pname }) {
 
 function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   const [open, setOpen] = useState(false)
-  const done = (how) => { setOpen(false); closeGoal(s.goal, how) }
+  const g = s.goal, n = Math.max(1, Number(g.payYears) || 1)
+  const part = n > 1 ? Math.min(s.has, Math.round((Number(g.targetAmount) || 0) / n)) : s.has
+  const [amt, setAmt] = useState(String(Math.round(part)))
+  const done = (how) => { setOpen(false); closeGoal(g, how, { amount: Number(amt) || 0 }) }
+  const ago = monthsPast(g)
   return (
     <div className="g2-rdy">
-      <div><b>Date reached{monthsPast(s.goal) >= 1 ? ` ${agoText(monthsPast(s.goal))}` : ''} · {L(s.has)} ready to use</b><span>{monthsPast(s.goal) >= 2 ? 'Already used it? Mark the goal so this money counts for your other goals again.' : 'Withdraw it when you need it, then mark the goal.'}</span></div>
+      <div><b>{n > 1 ? `This year's payment · ${L(part)}` : `Date reached${ago >= 1 ? ` ${agoText(ago)}` : ''} · ${L(s.has)} ready to use`}</b><span>{n > 1 ? `Paid over ${n} years: pay this part, the rest stays invested for the next ${n - 1}.` : ago >= 2 ? 'Already used it? Mark the goal so this money counts for your other goals again.' : 'Withdraw it when you need it, then mark the goal.'}</span></div>
       <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw plan ›</button>
-      {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw: ${mt(s.goal.goalName)}`} wide>
+      {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw: ${mt(g.goalName)}`} wide>
         <div className="g2 g2-wdm">
-          <p className="g2-wdmh"><b>{L(s.has)}</b> from {s.rows.length} investment{s.rows.length > 1 ? 's' : ''}. Redeem these when you pay, then tell the app what happened.</p>
+          <p className="g2-wdmh"><b>{L(s.has)}</b> from {s.rows.length} investment{s.rows.length > 1 ? 's' : ''}. Redeem {n > 1 ? "this year's part" : 'these'} when you pay, then tell the app what happened.</p>
           <div className="g2-wdl">{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}</div>
+          <label className="block mt-4 text-xs text-[var(--text-muted)]">How much did you use? <span className="text-[var(--text-dim)]">(anything left goes back to your other goals{n > 1 ? ', or stays for next year' : ''})</span>
+            <input type="number" value={amt} onChange={(e) => setAmt(e.target.value)} className="mt-1 w-full sm:w-56 block bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] tabular-nums" />
+          </label>
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
-            <button onClick={() => done('used')} className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">✓ Withdrawn, mark completed</button>
-            <button onClick={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(s.goal.goalId)}`) }} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Need more time</button>
+            {n > 1 && <button onClick={() => done('part')} className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">✓ Paid this year, keep the rest</button>}
+            <button onClick={() => done('used')} className={n > 1 ? 'px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors' : 'px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors'}>✓ Withdrawn, mark completed</button>
+            <button onClick={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(g.goalId)}`) }} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Need more time</button>
             <button onClick={() => done('not')} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Not needed</button>
           </div>
-          <p className="g2-hint">Anything left after you close the goal becomes free money for your other goals.</p>
+          <p className="g2-hint">{g.repeatYears ? `This goal repeats: after you close it, the next one is added for ${new Date(g.targetDate).getFullYear() + g.repeatYears}. ` : ''}Anything left after you close the goal becomes free money for your other goals.</p>
         </div>
       </Modal>, document.body)}
     </div>
