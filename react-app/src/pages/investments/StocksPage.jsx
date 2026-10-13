@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, ChevronDown, MoreVertical, Trash2,
-  RefreshCw, X, Check, Loader2, Upload
+  RefreshCw, X, Check, Loader2, Upload, FileText, FileSpreadsheet
 } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -14,6 +14,7 @@ import Modal, { FormDateInput } from '../../components/Modal'
 import StockPortfolioForm from '../../components/forms/StockPortfolioForm'
 import BuyStockForm from '../../components/forms/BuyStockForm'
 import ImportStocksForm from '../../components/forms/ImportStocksForm'
+import ImportDematForm from '../../components/forms/ImportDematForm'
 import SellStockForm from '../../components/forms/SellStockForm'
 import EditStockTxnForm from '../../components/forms/EditStockTxnForm'
 import PageLoading from '../../components/PageLoading'
@@ -37,6 +38,7 @@ export default function StocksPage() {
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [txnMenuOpen, setTxnMenuOpen] = useState(null)
+  const [importMenu, setImportMenu] = useState(false)
 
   // Filter portfolios by member + enrich ownerName
   const portfolios = useMemo(() => {
@@ -189,6 +191,55 @@ export default function StocksPage() {
     }
   }
 
+  // Testing clean-up: every stock portfolio, transaction and holding of this family (cannot be undone)
+  async function handleDeleteAll() {
+    setImportMenu(false)
+    const n = (stockPortfolios || []).length
+    if (!await confirm(`This permanently deletes ALL stock data of your family: ${n} portfolio${n === 1 ? '' : 's'}, every stock holding and transaction, and links from goals to stock portfolios. Mutual funds and everything else stay. This cannot be undone.`, { title: 'Delete all stocks?', confirmLabel: 'Delete everything' })) return
+    if (!await confirm('Really delete all stocks? There is no undo.', { title: 'Last check', confirmLabel: 'Yes, delete all stocks' })) return
+    showBlockUI('Deleting all stocks...')
+    try {
+      await api.deleteAllStocks()
+      await refreshStocks()
+      setSelectedPortfolioId('all')
+      showToast('All stocks deleted')
+    } catch (err) {
+      showToast(err.message || 'Failed to delete stocks', 'error')
+    } finally {
+      hideBlockUI()
+    }
+  }
+
+  const importMenuEl = (
+    <div className="relative">
+      <button
+        onClick={() => setImportMenu((o) => !o)}
+        className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-colors border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+      >
+        <Upload size={14} /> Import <ChevronDown size={12} className={importMenu ? 'rotate-180' : ''} />
+      </button>
+      {importMenu && (<>
+        <div className="fixed inset-0 z-40" onClick={() => setImportMenu(false)} />
+        <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl py-1">
+          <button onClick={() => { setImportMenu(false); setModal({ importFile: selectedPortfolioId !== 'all' ? selectedPortfolioId : '' }) }} className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] flex gap-2.5">
+            <FileSpreadsheet size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+            <span><span className="block text-xs font-semibold text-[var(--text-primary)]">Broker file (Excel / CSV)</span><span className="block text-xs text-[var(--text-dim)]">Zerodha, Groww… holdings, or our template (India + US)</span></span>
+          </button>
+          <button onClick={() => { setImportMenu(false); setModal({ importDemat: true }) }} className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] flex gap-2.5">
+            <FileText size={15} className="text-sky-400 shrink-0 mt-0.5" />
+            <span><span className="block text-xs font-semibold text-[var(--text-primary)]">CDSL / NSDL statement (PDF)</span><span className="block text-xs text-[var(--text-dim)]">All demat accounts of a PAN; makes the portfolios for you</span></span>
+          </button>
+          {(stockPortfolios || []).length > 0 && (<>
+            <div className="my-1 border-t border-[var(--border-light)]" />
+            <button onClick={handleDeleteAll} className="w-full text-left px-3 py-2 hover:bg-rose-500/10 flex items-center gap-2.5 text-xs font-semibold text-[var(--accent-rose)]">
+              <Trash2 size={14} className="shrink-0" /> Delete all stocks…
+            </button>
+          </>)}
+        </div>
+      </>)}
+    </div>
+  )
+
   async function handleEditTransaction(data) {
     showBlockUI('Updating...')
     try {
@@ -212,6 +263,8 @@ export default function StocksPage() {
             <button onClick={() => setModal('addPortfolio')} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
               Create your first portfolio
             </button>
+            <p className="text-xs text-[var(--text-dim)]">or</p>
+            {importMenuEl}
           </div>
         </div>
       ) : (
@@ -365,13 +418,7 @@ export default function StocksPage() {
               >
                 <TrendingDown size={14} /> Sell
               </button>
-              <button
-                onClick={() => setModal({ importFile: selectedPortfolioId !== 'all' ? selectedPortfolioId : '' })}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-colors border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                title="Import holdings from an Excel / CSV file (Symbol, Quantity, Avg price)"
-              >
-                <Upload size={14} /> Import
-              </button>
+              {importMenuEl}
             </div>
           </div>
 
@@ -667,6 +714,10 @@ export default function StocksPage() {
             onCancel={() => setModal(null)}
           />
         )}
+      </Modal>
+
+      <Modal open={!!modal?.importDemat} onClose={() => setModal(null)} title="Import shares from a CDSL / NSDL statement" wide>
+        {modal?.importDemat && <ImportDematForm onCancel={() => setModal(null)} />}
       </Modal>
 
       <Modal open={!!modal?.sell} onClose={() => setModal(null)} title="Sell Stock" wide>
