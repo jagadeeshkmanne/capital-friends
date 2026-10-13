@@ -15,7 +15,7 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
     <header className={`lh ${scrolled ? 'sc' : ''} ${isMobile ? 'm' : ''}`}>
       <style>{CSS}</style>
       <div className="lh-in">
-        <a href="#" className="lh-logo" aria-label="Capital Friends home"><LogoMark size={isMobile ? 30 : 34} /><span className="lh-wm">Capital <em>Friends</em></span></a>
+        <a href="#" className="lh-logo" aria-label="Capital Friends home"><LogoMark size={isMobile ? 30 : 34} />{!isMobile && <span className="lh-wm">Capital <em>Friends</em></span>}</a>
         <div className="lh-r">
           {families ? (
             <span className="lh-fam" title="Families using Capital Friends">
@@ -36,10 +36,8 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
 }
 
 const CSS = `
-.lh{position:sticky;top:0;z-index:100;overflow:hidden;background:linear-gradient(100deg,#1e1b4b 0%,#25215e 45%,#123d48 100%);box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:box-shadow .25s}
+.lh{position:sticky;top:0;z-index:100;overflow:hidden;background:#1e1b4b;box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:box-shadow .25s}
 .lh.sc{box-shadow:0 12px 30px -18px rgba(30,27,75,.75)}
-.lh::before{content:'';position:absolute;inset:0;background:radial-gradient(40% 140% at 15% 0%,rgba(124,58,237,.35),transparent 70%),radial-gradient(35% 140% at 85% 100%,rgba(20,184,166,.28),transparent 70%);animation:lhGlow 14s ease-in-out infinite alternate;pointer-events:none}
-@keyframes lhGlow{to{transform:translateX(4%)}}
 .lh-in{position:relative;max-width:1360px;margin:0 auto;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-sizing:border-box}
 .lh-logo{text-decoration:none;display:inline-flex;align-items:center;gap:10px}
 .lh-wm{font-family:Inter,system-ui,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#fff;white-space:nowrap}.lh-wm em{font-style:normal;color:#34d399}

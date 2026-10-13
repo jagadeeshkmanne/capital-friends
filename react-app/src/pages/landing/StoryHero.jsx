@@ -84,7 +84,7 @@ function SceneDrive() {
       <Flow d={`M${X[0] + W * S + 10} ${MID} H${X[1] - 10}`} c={C.teal} t={1.8} />
       <Card x={X[1]} t={2.1}>
         <g transform="translate(18 18)"><path d="M8 0 h12 l10 17 h-12 Z" fill="#0f9d58" /><path d="M-1 22 l6 -10 h20 l-6 10 Z" fill="#4285f4" /><path d="M20 0 l10 17 l-6 10 l-10 -17 Z" fill="#fbbc04" /></g>
-        <Tx x={58} y={34} s={12} w={800} c={C.navy}>My Drive</Tx>
+        <Tx x={58} y={34} s={12} w={800} c={C.navy}>Your Drive</Tx>
         {[0, 1, 2].map((k) => <g key={k} transform={`translate(14 ${54 + k * 28})`}><rect width={W - 28} height="22" rx="6" fill={C.mist} /><rect x="8" y="6" width="14" height="10" rx="2" fill="#cbd5e1" /><rect x="30" y="8" width={[60, 76, 48][k]} height="6" rx="3" fill="#cbd5e1" /></g>)}
         <g transform="translate(14 142)"><g className="st-newfile" style={T(2.9)}>
           <rect width={W - 28} height="28" rx="8" fill="#dcfce7" stroke="#16a34a" strokeWidth="1.5" />
@@ -95,7 +95,7 @@ function SceneDrive() {
       <Flow d={`M${X[1] + W * S + 10} ${MID} H${X[2] - 10}`} c={C.teal} t={3.4} />
       <Card x={X[2]} t={3.7}>
         <path d={`M0 16 Q0 0 16 0 H${W - 16} Q${W} 0 ${W} 16 V30 H0 Z`} fill="#16a34a" />
-        <rect x="14" y="12" width="56" height="7" rx="3.5" fill="#fff" opacity=".9" />
+        <Tx x={14} y={20} s={11.5} w={800} c="#fff">Your sheet</Tx>
         {[0, 1, 2, 3, 4].map((r) => (
           <g key={r} transform={`translate(12 ${42 + r * 27})`}><g className="st-row" style={T(4.1 + r * 0.18)}>
             {[0, 1, 2].map((c) => <rect key={c} x={c * 50} y="0" width="48" height="21" rx="4" fill={r === 0 ? '#bbf7d0' : C.mist} />)}
@@ -131,13 +131,14 @@ function SceneAll() {
   let acc = 0
   return (
     <svg viewBox={VB} className="st-svg" aria-label="Every family member's funds, stocks, FDs, gold, insurance and loans in one net worth that grows over the years">
-      {/* members */}
-      {[['you', 'You', '₹62 L'], ['spouse', 'Spouse', '₹38 L'], ['mother', 'Mother', '₹17 L']].map(([k, n, v], r) => {
-        const y = 105 + r * 100
+      {/* members on both sides, each flowing into the ring */}
+      {[['you', 'You', '₹62 L', 0, 0], ['spouse', 'Spouse', '₹38 L', 0, 1], ['mother', 'Mother', '₹17 L', 1, 0], ['father', 'Father', '₹21 L', 1, 1]].map(([k, n, v, side, r]) => {
+        const y = 130 + r * 150, bx = side ? 900 : 64, ex = side ? cx + R + 34 : cx - R - 34
+        const d = side ? `M${bx - 8} ${y} C${bx - 90} ${y} ${ex + 60} ${cy} ${ex} ${cy}` : `M${bx + 144} ${y} C${bx + 230} ${y} ${ex - 60} ${cy} ${ex} ${cy}`
         return (
           <g key={k}>
-            <Flow d={`M196 ${y} C290 ${y} 300 ${cy} ${cx - R - 34} ${cy}`} c={C.violet} t={0.6 + r * 0.25} />
-            <g transform={`translate(70 ${y - 34})`}><g className="st-row" style={T(0.2 + r * 0.2)}>
+            <Flow d={d} c={C.violet} t={0.6 + (side * 2 + r) * 0.2} />
+            <g transform={`translate(${bx} ${y - 34})`}><g className="st-row" style={T(0.2 + (side * 2 + r) * 0.15)}>
               <rect width="136" height="68" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
               <g transform="translate(34 34)"><Bust k={k} r={22} /></g>
               <Tx x={66} y={30} s={13} c={C.navy}>{n}</Tx><Tx x={66} y={48} s={11.5} w={600} c={C.slate}>{v}</Tx>
@@ -165,31 +166,6 @@ function SceneAll() {
         <Tx y={-12} s={10.5} c={C.slate} a="middle">FAMILY NET WORTH</Tx>
         <Tx y={16} s={26} w={800} c={C.navy} a="middle">₹1.17 Cr</Tx>
         <Tx y={36} s={11} c={C.emerald} a="middle">▲ 14.2% a year</Tx>
-      </g></g>
-      {/* the app's own Asset Allocation card (same colours and rows as the dashboard) */}
-      <Flow d={`M${cx + R + 34} ${cy} C${cx + R + 80} ${cy} 760 ${cy} 800 ${cy}`} c={C.violet} t={1.4} />
-      <g transform="translate(806 70)"><g className="st-rise" style={T(1.2)}>
-        <rect width="266" height="270" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
-        <rect x="18" y="20" width="3" height="12" rx="1.5" fill="#94a3b8" />
-        <Tx x={28} y={30.5} s={10} w={800} c={C.slate} letterSpacing=".06em">ASSET ALLOCATION</Tx>
-        <g transform="translate(133 100)">
-          {(() => { let acc2 = 0; const r2 = 42, c2 = 2 * Math.PI * r2; return ALLOC.map(([l, p, c], n) => {
-            const len = (p / 100) * c2, off = -(acc2 / 100) * c2; acc2 += p
-            return <circle key={l} className="la-donut" style={T(1.6 + n * 0.15)} r={r2} fill="none" stroke={c} strokeWidth="16" strokeDasharray={`${len} ${c2 - len}`} strokeDashoffset={off} transform="rotate(-90)" />
-          }) })()}
-          <Tx y={-4} s={7.5} w={700} c={C.slate} a="middle" letterSpacing=".05em">NET WORTH</Tx>
-          <Tx y={11} s={14} w={800} c={C.navy} a="middle">₹1.17 Cr</Tx>
-        </g>
-        {ALLOC.map(([l, p, c, v], n) => (
-          <g key={l} transform={`translate(16 ${160 + n * 21})`}><g className="st-row" style={T(1.9 + n * 0.15)}>
-            <rect width="234" height="18" rx="6" fill={C.mist} />
-            <circle cx="10" cy="9" r="3.5" fill={c} />
-            <Tx x={20} y={12.5} s={9.5} w={600} c={C.slate}>{l}</Tx>
-            <Tx x={186} y={12.5} s={9.5} w={800} c={C.navy} a="end">{v}</Tx>
-            <rect x="194" y="3" width="34" height="12" rx="6" fill={`color-mix(in srgb, ${c} 16%, #fff)`} />
-            <Tx x={211} y={12} s={8.5} w={800} c={c} a="middle">{p}%</Tx>
-          </g></g>
-        ))}
       </g></g>
     </svg>
   )
@@ -224,12 +200,15 @@ function SceneCas() {
           </g></g>
         ))}
       </g>
-      <path d="M864 110 V310" stroke={C.line} strokeWidth="2" strokeDasharray="3 6" />
-      {[['chart', '38', 'funds found'], ['sheet', '1,240', 'transactions'], ['check', '2012', 'history from']].map(([g, a, b], i) => (
-        <g key={b} transform={`translate(864 ${110 + i * 100})`}><g className="st-row" style={T(2.6 + i * 0.3)}>
-          <circle r="24" fill="#fff" stroke={C.sky} strokeWidth="2.5" /><g transform="scale(.62)" style={{ color: C.sky }}>{G[g]}</g>
-          <Tx x={40} y={-2} s={24} w={800} c={C.navy}>{a}</Tx>
-          <Tx x={40} y={17} s={12} w={600} c={C.slate}>{b}</Tx>
+      {[['you', 'Your CAS', '24 funds'], ['spouse', "Spouse's CAS", '9 funds'], ['mother', "Mother's CAS", '5 funds']].map(([k, n, f], i) => (
+        <g key={k} transform={`translate(830 ${74 + i * 104})`}><g className="st-row" style={T(1.2 + i * 0.6)}>
+          <rect width="230" height="80" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
+          <g transform="translate(38 40)"><Bust k={k} r={22} /></g>
+          <Tx x={72} y={34} s={13} c={C.navy}>{n}</Tx>
+          <rect x="72" y="46" width="120" height="6" rx="3" fill={C.mist} />
+          <rect className="st-grow" style={T(1.4 + i * 0.6)} x="72" y="46" width="120" height="6" rx="3" fill={C.sky} />
+          <g className="st-pop" style={T(2.4 + i * 0.6)}><Tx x={72} y={68} s={10.5} w={700} c={C.emerald}>✓ imported · {f}</Tx></g>
+          <g transform="translate(208 40)"><g className="st-tick" style={T(2.4 + i * 0.6)}><circle r="9" fill={C.emerald} /><path d="M-4 0 L-1 3 L4.5 -3" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></g></g>
         </g></g>
       ))}
     </svg>
@@ -241,7 +220,7 @@ G.bell = <path d="M-8 5 V-2 A8 8 0 0 1 8 -2 V5 L11 8 H-11 Z M-3.2 10 A3.2 3.2 0 
 function SceneAlerts() {
   const y = (pct) => 96 + pct * 12          // 0% below the high at y 96, every 1% lower = 12px
   const line = 'M70 300 C120 280 150 240 196 200 S270 104 320 96 S400 132 444 156 S520 172 556 210 S612 236 640 240'
-  const area = `${line} V350 H70 Z`
+  const area = `${line} V330 H70 Z`
   // how far below its peak, by colour: amber 5–10%, rose 10%+; violet for a rebalance
   const NOTE = [['Small cap fund', '12%', 'below its peak', '#e11d48', 4.3, 'down'],
     ['Flexi cap fund', '6%', 'below its peak', '#d97706', 5.0, 'down'],
@@ -249,15 +228,20 @@ function SceneAlerts() {
   return (
     <svg viewBox={VB} className="st-svg" aria-label="The app watches each fund's peak (all-time high) and alerts you on your phone when it falls 5% or 10% below it">
       <defs><linearGradient id="st-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={C.navy} stopOpacity=".14" /><stop offset="1" stopColor={C.navy} stopOpacity="0" /></linearGradient></defs>
+      <rect x="44" y="12" width="680" height="380" rx="22" fill="#fff" stroke={C.line} strokeWidth="1.5" className="st-rise" style={T(0)} />
+      <rect x="70" y={y(5)} width="590" height={y(10) - y(5)} fill="#fef3c7" opacity=".55" />
+      <rect x="70" y={y(10)} width="590" height={330 - y(10)} fill="#ffe4e6" opacity=".5" />
+      {['Oct 24', 'Apr 25', 'Oct 25', 'Apr 26', 'Oct 26'].map((m, k) => <Tx key={m} x={70 + k * 142.5} y={372} s={10} w={600} c="#94a3b8" a={k === 0 ? 'start' : k === 4 ? 'end' : 'middle'}>{m}</Tx>)}
+      <g transform="translate(86 46)"><circle r="16" fill={`color-mix(in srgb, ${C.rose} 14%, #fff)`} /><g transform="scale(.6)" style={{ color: C.rose }}>{G.chart}</g></g>
       {/* the fund and its all-time high */}
-      <Tx x={70} y={44} s={15} w={800} c={C.navy}>A fund you hold</Tx>
-      <Tx x={70} y={64} s={11.5} w={600} c={C.slate}>NAV, last 2 years</Tx>
-      <line x1="70" x2="660" y1={y(0)} y2={y(0)} stroke={C.navy} strokeOpacity=".5" strokeWidth="1.5" strokeDasharray="6 6" />
-      <line x1="70" x2="660" y1={y(5)} y2={y(5)} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 6" />
-      <line x1="70" x2="660" y1={y(10)} y2={y(10)} stroke="#e11d48" strokeOpacity=".7" strokeWidth="1.5" strokeDasharray="3 6" />
-      <Tx x={664} y={y(0) + 4} s={10.5} w={800} c={C.navy}>Peak</Tx>
-      <Tx x={664} y={y(5) + 4} s={10.5} w={800} c="#d97706">−5%</Tx>
-      <Tx x={664} y={y(10) + 4} s={10.5} w={800} c="#e11d48">−10%</Tx>
+      <Tx x={112} y={42} s={14} w={800} c={C.navy}>A fund you hold</Tx>
+      <Tx x={112} y={59} s={11} w={600} c={C.slate}>NAV, last 2 years</Tx>
+      <line x1="70" x2="650" y1={y(0)} y2={y(0)} stroke={C.navy} strokeOpacity=".5" strokeWidth="1.5" strokeDasharray="6 6" />
+      <line x1="70" x2="650" y1={y(5)} y2={y(5)} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 6" />
+      <line x1="70" x2="650" y1={y(10)} y2={y(10)} stroke="#e11d48" strokeOpacity=".7" strokeWidth="1.5" strokeDasharray="3 6" />
+      <Tx x={656} y={y(0) + 4} s={10.5} w={800} c={C.navy}>Peak</Tx>
+      <Tx x={656} y={y(5) + 4} s={10.5} w={800} c="#d97706">−5%</Tx>
+      <Tx x={656} y={y(10) + 4} s={10.5} w={800} c="#e11d48">−10%</Tx>
       <path d={area} fill="url(#st-area)" className="st-pop" style={T(1.8)} />
       <path className="st-line2" style={T(0.4)} d={line} fill="none" stroke={C.navy} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
       {/* the crown at the top */}
@@ -278,7 +262,7 @@ function SceneAlerts() {
         </g></g>
       ))}
       {/* …and lands on your phone */}
-      <Flow d="M690 220 C720 220 730 220 770 220" c={C.rose} t={4.1} />
+      <Flow d="M728 220 H776" c={C.rose} t={4.1} />
       <g transform="translate(784 18)"><g className="st-rise" style={T(0.2)}>
         <rect width="236" height="388" rx="36" fill={C.navy} />
         <rect x="9" y="9" width="218" height="370" rx="28" fill="#f8fafc" />
@@ -324,13 +308,13 @@ function SceneGoals() {
           <Tx x={28} y={-59} s={11} c={C.slate}>{l}</Tx>
         </g></g>
       ))}
-      <g className="st-car" style={{ offsetPath: `path('${road}')` }}>
+      <g className="st-car2" style={{ offsetPath: `path('${road}')` }}>
         <g transform="translate(-22 -18)"><rect x="0" y="6" width="44" height="16" rx="6" fill={C.rose} /><path d="M8 7 L14 -2 H30 L36 7 Z" fill="#fecdd3" /><circle cx="11" cy="23" r="5" fill={C.navy} /><circle cx="33" cy="23" r="5" fill={C.navy} /></g>
       </g>
 
       {/* Home 2029: one bucket, like the retirement ones — safe money (teal) rises, equity (violet) drains as the date nears */}
-      <path className="la-dash" d="M214 262 Q250 250 282 228" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
-      <g transform="translate(100 112)"><g className="st-rise" style={T(0.6)}>
+      <path className="la-dash" d="M174 262 Q230 256 282 228" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
+      <g transform="translate(60 112)"><g className="st-rise" style={T(0.6)}>
         <Tx x={0} y={-22} s={11} w={800} c={C.teal} letterSpacing=".06em">HOME · MOVES TO SAFE</Tx>
         <g transform="translate(0 16)">
           <clipPath id="st-home"><path d={BUCKET} /></clipPath>
@@ -353,6 +337,15 @@ function SceneGoals() {
         </g>
       </g></g>
 
+      {/* reached! */}
+      <g transform="translate(372 150)"><g className="st-pop" style={T(5.6)}>
+        <rect x="-74" y="-15" width="148" height="30" rx="15" fill={C.teal} />
+        <Tx x={8} y={5} s={12} w={800} c="#fff" a="middle">Home goal reached</Tx>
+        <g transform="translate(-56 0)"><circle r="8" fill="#fff" /><path d="M-3.5 0 L-1 2.6 L3.8 -2.6" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></g>
+      </g></g>
+      {[[-26, -30, C.amber], [24, -34, C.violet], [36, -6, C.rose], [-36, -4, C.sky], [0, -44, C.emerald]].map(([dx, dy, c], n) => (
+        <circle key={n} className="st-confetti" style={{ ...T(5.5 + n * 0.06), '--dx': `${dx}px`, '--dy': `${dy}px` }} cx="301" cy="214" r="4" fill={c} />
+      ))}
       {/* Retirement 2045: growth refills stability, stability refills income */}
       <path className="la-dash" d="M942 156 Q942 200 900 222" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
       <g transform="translate(700 236)"><g className="st-rise" style={T(1.2)}>
@@ -395,6 +388,11 @@ function SceneFamily() {
         <path d="M0 40 L130 122 L260 40 V200 H0 Z" fill="#d1fae5" />
         <path d="M0 200 L130 112 L260 200 Z" fill="#a7f3d0" />
       </g>
+      <g transform="translate(475 382)"><g className="st-pop" style={T(3.4)}>
+        <rect x="-196" y="-20" width="392" height="40" rx="20" fill="#ecfdf5" stroke="#a7f3d0" />
+        <g transform="translate(-172 0)"><circle r="12" fill={C.emerald} /><g transform="scale(.46)" style={{ color: '#fff' }}>{G.shield}</g></g>
+        <Tx x={12} y={5} s={13} w={700} c="#065f46" a="middle">If something happens to you, your family knows</Tx>
+      </g></g>
       {people.map(([k, x, y, l], i) => {
         const d = `M${from[0]} ${from[1]} Q${(from[0] + x) / 2} ${y} ${x - 46} ${y}`
         return (
@@ -439,21 +437,23 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
       {/* the whole hero is the stage: a soft glow in the scene's colour and floating things everywhere */}
       <div className="st-glow" aria-hidden="true" />
       <h1 className="st-h"><span className="st-h1a">Your family's money,</span> <span className="st-rot"><span key={ch.k} style={{ '--c': ch.c }}>{ch.ph}</span></span></h1>
+      <div className="st-mid">
       {/* how it works, as a path: Your Drive → Track → Import → Goals → Family */}
-      <ol className="st-path" role="tablist">
-        {CHAPTERS.map((c, k) => (
-          <li key={c.k} className={k === i ? 'on' : k < i ? 'done' : ''} style={{ '--cc': c.c }}>
-            <button type="button" role="tab" aria-selected={k === i} aria-label={c.t} onClick={() => setI(k)}>
-              <span className="st-dot"><Glyph name={c.icon} color={k <= i ? '#fff' : '#94a3b8'} size={13} /></span>
-              <span className="st-lb">{c.s}</span>
-            </button>
-            {k < CHAPTERS.length - 1 && <span className="st-ln"><i style={k === i ? { animationDuration: `${c.dur || DUR}ms`, animationPlayState: paused ? 'paused' : 'running' } : undefined} /></span>}
-          </li>
-        ))}
-      </ol>
-      {/* the scene, edge to edge */}
-      <div className="st-r" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-        <div key={ch.k} className="st-scene"><Scene /></div>
+        <ol className="st-path" role="tablist">
+          {CHAPTERS.map((c, k) => (
+            <li key={c.k} className={k === i ? 'on' : k < i ? 'done' : ''} style={{ '--cc': c.c }}>
+              <button type="button" role="tab" aria-selected={k === i} aria-label={c.t} onClick={() => setI(k)}>
+                <span className="st-dot"><Glyph name={c.icon} color={k <= i ? '#fff' : '#94a3b8'} size={13} /></span>
+                <span className="st-lb">{c.s}</span>
+              </button>
+              {k < CHAPTERS.length - 1 && <span className="st-ln"><i style={k === i ? { animationDuration: `${c.dur || DUR}ms`, animationPlayState: paused ? 'paused' : 'running' } : undefined} /></span>}
+            </li>
+          ))}
+        </ol>
+        {/* the scene, edge to edge */}
+        <div className="st-r" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+          <div key={ch.k} className="st-scene"><Scene /></div>
+        </div>
       </div>
       {/* one dock at the bottom: start, watch, and how many families */}
       <div className="st-dock">
@@ -472,7 +472,17 @@ const CSS = `
 .st-legal a{font-family:Inter,system-ui,sans-serif;font-size:12px;font-weight:500;color:#94a3b8;text-decoration:none}.st-legal a:hover{color:#0b1120;text-decoration:underline}
 .st-glow{position:absolute;left:10%;top:6%;width:80%;height:80%;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--c) 16%,transparent),transparent 72%);transition:background .8s ease;pointer-events:none}
 
-.st-r{position:relative;z-index:2;flex:1;min-height:0;width:100%;max-width:1400px;margin:0 auto;padding:0 24px;box-sizing:border-box;perspective:1400px}
+.st-mid{position:relative;z-index:2;flex:1;min-height:0;width:100%;max-width:1440px;margin:0 auto;display:flex;align-items:stretch}
+.st-r{position:relative;z-index:2;flex:1;min-height:0;min-width:0;padding:0 24px 0 8px;box-sizing:border-box;perspective:1400px}
+.st:not(.m) .st-path{flex-direction:column;align-items:flex-start;justify-content:center;width:auto;max-width:none;margin:0;padding:0 0 0 32px}
+.st:not(.m) .st-path li{flex:0 0 auto;flex-direction:column;align-items:flex-start}
+.st:not(.m) .st-ln{flex:0 0 auto;width:2px;height:30px;margin:4px 0 4px 19px}
+.st:not(.m) .st-ln i{transform:scaleY(0);transform-origin:top}
+.st:not(.m) .st-path li.done .st-ln i{transform:none}
+.st:not(.m) .st-path li.on .st-ln i{animation-name:stBarY}
+@keyframes stBarY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.st:not(.m) .st-path button{padding:3px;border-radius:999px;transition:background .2s}
+.st:not(.m) .st-path li.on button{background:#fff;box-shadow:0 8px 20px -12px rgba(15,23,42,.4);padding-right:14px}
 .st-h{position:relative;z-index:3;margin:0;padding:26px 24px 0;text-align:center;font-family:Inter,system-ui,sans-serif;font-weight:700;letter-spacing:-.025em;line-height:1.2;color:#0b1120;font-size:clamp(22px,2.1vw,32px)}
 .st-h1a{display:inline}
 .st-rot{display:inline-block;position:relative;overflow:hidden;vertical-align:bottom;padding-bottom:.08em}
@@ -565,6 +575,10 @@ const CSS = `
 @keyframes stWalk{from{offset-distance:0%;opacity:0}6%{opacity:1}to{offset-distance:100%;opacity:1}}
 .st-drop{animation:stDrop .55s cubic-bezier(.2,.9,.3,1.2) both}
 @keyframes stDrop{from{transform:translateY(-22px);opacity:0}to{transform:none;opacity:1}}
+.st-car2{offset-rotate:auto;animation:stCarHome 4.5s cubic-bezier(.45,0,.4,1) both 1s}
+@keyframes stCarHome{from{offset-distance:0%}to{offset-distance:26.6%}}
+.st-confetti{opacity:0;animation:stConf .9s ease-out both}
+@keyframes stConf{0%{opacity:0;transform:translate(0,0) scale(.4)}30%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1)}}
 @keyframes stPress{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
 @keyframes stCursor{from{offset-distance:0%;opacity:0}20%{opacity:1}to{offset-distance:100%;opacity:1}}
 @keyframes stDraw{to{stroke-dashoffset:0}}
@@ -584,7 +598,7 @@ const CSS = `
 .st.m{height:calc(100svh - 54px);min-height:600px;max-height:none}
 .st.m .st-path{padding:12px 10px 0}.st.m .st-lb{display:none}.st.m .st-path li.on .st-lb{display:inline;font-size:12px}.st.m .st-ln{margin:0 4px}.st.m .st-dot{width:30px;height:30px}
 /* phones: the wide scene keeps its size and the camera pans slowly across it */
-.st.m .st-r{padding:0;display:flex;align-items:center;overflow:hidden}
+.st.m .st-mid{flex-direction:column}.st.m .st-r{padding:0;display:flex;align-items:center;overflow:hidden}
 .st.m .st-scene{position:relative;inset:auto;height:min(340px,100%);width:100%;transform:none}
 .st.m .st-svg{height:100%;width:auto;max-width:none;animation:stPan 7.5s ease-in-out both}
 @keyframes stPan{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(calc(-100% + 100vw))}}
