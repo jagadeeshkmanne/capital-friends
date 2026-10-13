@@ -250,7 +250,7 @@ export default function FundsDashboardPage() {
         {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
         {/* ── Stat cards (Mutual Funds page style) ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="cf-stats grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <Stat sz={sz} label="Invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
           <Stat sz={sz} label="Current Value" value={amt(t.currentValue)} bold />
           <Stat sz={sz} label="Total Gain" positive={(t.totalGain ?? t.pl) >= 0}

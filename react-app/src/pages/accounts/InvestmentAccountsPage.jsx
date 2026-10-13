@@ -80,7 +80,7 @@ export default function InvestmentAccountsPage() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="cf-stats grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Total Accounts" value={filtered.length} />
             <StatCard label="Platforms" value={uniquePlatforms} />
             <StatCard label="Demat / Trading" value={dematCount} />

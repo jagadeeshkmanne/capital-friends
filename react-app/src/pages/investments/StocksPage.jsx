@@ -352,7 +352,7 @@ export default function StocksPage() {
           )}
 
           {/* ── Stat Cards ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="cf-stats grid grid-cols-2 sm:grid-cols-5 gap-3">
             <StatCard label="Invested" value={formatINR(stats.invested)} />
             <StatCard label="Current Value" value={formatINR(stats.current)} bold />
             <StatCard

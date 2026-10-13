@@ -301,3 +301,24 @@ header { padding-top: env(safe-area-inset-top); }        /* under the notch when
   input, select, textarea { font-size: 16px !important; }
   main { -webkit-overflow-scrolling: touch; }
 }
+
+/* phones: buy / rebalance badges only on Dashboard and Mutual Funds, so page titles have room */
+@media (max-width: 1023.98px) { [data-signal="off"] { display: none !important; } }
+
+/* ── phones: dialogs as full pages ── */
+@keyframes slide-up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+.animate-slide-up { animation: slide-up .22s cubic-bezier(.2,.8,.2,1); }
+.cf-mpage .cf-form-actions { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 !important; padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px); background: var(--bg-base); border-top: 1px solid var(--border); gap: 12px; z-index: 5; }
+.cf-mpage .cf-form-actions > button { flex: 1; white-space: nowrap; height: 48px; font-size: 15px; border-radius: 12px; justify-content: center; }
+.cf-mpage .cf-form-actions > button:first-child { border: 1px solid var(--border-input); }
+.cf-mpage input:not([type=checkbox]):not([type=radio]), .cf-mpage select, .cf-mpage textarea { min-height: 46px; font-size: 16px; border-radius: 12px; }
+.cf-mpage label { font-size: 13px; }
+
+/* phones: summary tiles as one swipeable row instead of a tall grid */
+@media (max-width: 639.98px) {
+  .cf-stats { display: flex !important; overflow-x: auto; gap: 8px !important; margin: 0 -12px; padding: 0 12px 2px; scrollbar-width: none; }
+  .cf-stats::-webkit-scrollbar { display: none; }
+  .cf-stats > * { flex: 0 0 auto; min-width: 42%; padding: 10px 12px !important; }
+}
+
+.cf-mpage:has(.cf-form-actions) > .overflow-y-auto { padding-bottom: calc(env(safe-area-inset-bottom) + 96px); }

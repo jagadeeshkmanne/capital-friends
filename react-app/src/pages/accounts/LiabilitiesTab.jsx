@@ -103,7 +103,7 @@ export default function LiabilitiesTab() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="cf-stats grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Liabilities" value={`${activeCount} active`} />
             <StatCard label="Outstanding" value={formatINR(totalOutstanding)} color="rose" bold />
             <StatCard label="Monthly EMI" value={formatINR(totalEMI)} color="rose" />

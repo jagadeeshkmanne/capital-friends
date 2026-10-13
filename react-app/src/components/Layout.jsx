@@ -15,10 +15,10 @@ import { Heart, X } from 'lucide-react'
 export default function Layout() {
   // pages scroll inside <main>, not the window: go back to the top whenever the page (path) changes
   const mainRef = useRefScroll(null)
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   useScreenMask()
   useGoalPoolSync()
-  useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname])
+  useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname, search])
 
   const { loading, error, settling } = useData()
   const [showDonate, setShowDonate] = useState(false)

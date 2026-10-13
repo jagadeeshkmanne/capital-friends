@@ -144,7 +144,7 @@ const TITLES = [
   ['/dashboard', 'Dashboard'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
   ['/accounts/bank', 'Bank Accounts'], ['/accounts/investment', 'Investment Accounts'], ['/goals', 'Goals'], ['/more', 'More'], ['/family', 'Family'],
   ['/insurance', 'Insurance'], ['/liabilities', 'Liabilities'], ['/reminders', 'Reminders'], ['/settings', 'Settings'], ['/import', 'Import Statement'],
-  ['/health-check', 'Health Check'], ['/about', 'About'],
+  ['/health-check', 'Health Check'], ['/about', 'About'], ['/investments/funds', 'All Funds'], ['/reports', 'Reports'], ['/retirement-buckets', 'Retirement'],
 ]
 export function mobileTitle(pathname) {
   const hit = TITLES.filter(([p]) => pathname === p || pathname.startsWith(p + '/')).sort((a, b) => b[0].length - a[0].length)[0]
@@ -171,6 +171,7 @@ export default function Header() {
   const notifRef = useRef(null)
 
   const notifCount = criticalAlerts.length + upcomingReminders.length
+  const signalsHere = location.pathname === '/dashboard' || location.pathname.startsWith('/investments/mutual-funds')
   const { buyOppCount, buyCount, strongBuyCount, rebalanceCount } = investmentSignals
 
   // Close dropdowns on outside click
@@ -314,8 +315,8 @@ export default function Header() {
         <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-[52px] lg:h-14">
           {/* Phone: back arrow on sub-pages, then the page title */}
           <div className="flex lg:hidden items-center gap-1 min-w-0">
-            {!isTabPath(location.pathname) ? (
-              <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/more'))} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
+            {(!isTabPath(location.pathname) || /[?&](p|f)=/.test(location.search)) ? (
+              <button type="button" onClick={() => { if (window.history.state?.idx > 0) return navigate(-1); const q = new URLSearchParams(location.search); if (q.has('f')) { q.delete('f'); return navigate(`${location.pathname}?${q}`) } if (q.has('p')) return navigate(location.pathname); navigate('/more') }} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
             ) : (
               <Link to="/dashboard" className="shrink-0"><img src={LOGO_ICON} alt="Capital Friends" className="h-7 w-auto" /></Link>
             )}
@@ -335,9 +336,9 @@ export default function Header() {
             {/* YouTube + Instagram — eye-catching pills (on phones they live in More) */}
             <span className="hidden lg:contents"><HeaderSocial /></span>
 
-            {/* Buy Opportunities — icon button with count badge */}
+            {/* Buy Opportunities — icon button with count badge (phones: only on Dashboard and Mutual Funds) */}
             {buyOppCount > 0 && (
-              <button
+              <button data-signal={signalsHere ? undefined : 'off'}
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
                 className={`flex relative p-2 rounded-lg transition-colors ${
                   dialogKey === 'buyopp'
@@ -353,7 +354,7 @@ export default function Header() {
 
             {/* Rebalance Alerts — icon button with count badge */}
             {rebalanceCount > 0 && (
-              <button
+              <button data-signal={signalsHere ? undefined : 'off'}
                 onClick={() => { setDialogKey(dialogKey === 'rebalance' ? null : 'rebalance'); closeAll() }}
                 className={`flex relative p-2 rounded-lg transition-colors ${
                   dialogKey === 'rebalance'

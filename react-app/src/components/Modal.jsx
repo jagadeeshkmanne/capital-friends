@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { X, Calendar } from 'lucide-react'
+import { X, Calendar, ArrowLeft } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useMask } from '../context/MaskContext'
@@ -19,7 +19,32 @@ export default function Modal({ open, onClose, title, children, wide, maxWidth, 
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  // phones: the dialog opens as a full page (back arrow + title, like an app screen); the phone's Back button closes it
+  const phone = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023.98px)').matches
+  const closeRef = useRef(onClose); closeRef.current = onClose
+  useEffect(() => {
+    if (!open || !phone) return
+    const tag = 'cf-modal-' + Math.random().toString(36).slice(2)
+    window.history.pushState({ ...(window.history.state || {}), cfModal: tag }, '')
+    const onPop = () => closeRef.current?.()
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (window.history.state?.cfModal === tag) window.history.back() // closed with a button: drop the entry we added
+    }
+  }, [open, phone])
+
   if (!open) return null
+
+  if (phone) return (
+    <div className="cf-mpage fixed inset-0 z-50 flex flex-col bg-[var(--bg-base)] animate-slide-up">
+      <div className="flex items-center gap-1 h-[52px] px-2 border-b border-[var(--border)] bg-[var(--bg-header)] shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <button onClick={onClose} aria-label="Back" className="p-2 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ArrowLeft size={22} /></button>
+        <h2 className="text-[17px] font-bold text-[var(--text-primary)] truncate">{title}</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-6">{children}</div>
+    </div>
+  )
 
   return (
     <div ref={overlayRef} className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] sm:pt-[10vh] px-4" onClick={(e) => { if (e.target === overlayRef.current) onClose() }}>
@@ -157,7 +182,7 @@ export function FormCheckbox({ checked, onChange, label }) {
 
 export function FormActions({ onCancel, onSubmit, submitLabel = 'Save', loading, disabled }) {
   return (
-    <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-[var(--border-light)]">
+    <div className="cf-form-actions flex items-center justify-end gap-2 pt-4 mt-4 border-t border-[var(--border-light)]">
       <button onClick={onCancel} disabled={loading} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40">
         Cancel
       </button>

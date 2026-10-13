@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { FileUp, Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
@@ -255,13 +255,26 @@ export default function MutualFundsPage() {
   const chipProps = { goalLinks, navigate, mt }
 
   const [modal, setModal] = useState(null)
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
+  // the open portfolio / fund live in the URL (?p=…&f=…), so the phone's Back button and the app bar's back arrow work
+  const [sp, setSp] = useSearchParams()
+  const selectedPortfolioId = sp.get('p') || 'all'
+  const setSelectedPortfolioId = (id) => {
+    if ((id || 'all') === selectedPortfolioId) return
+    const q = new URLSearchParams(sp); q.delete('f')
+    if (!id || id === 'all') q.delete('p'); else q.set('p', id)
+    setSp(q)
+  }
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [txnFundFilter, setTxnFundFilter] = useState('all')
   const [txnMenuOpen, setTxnMenuOpen] = useState(null) // transactionId of open menu
   const [breakdownOpen, setBreakdownOpen] = useState(true)
-  const [fundDetailHolding, setFundDetailHolding] = useState(null) // holding object for fund detail modal
+  const fkey = sp.get('f')
+  const setFundDetailHolding = (h) => {
+    const q = new URLSearchParams(sp)
+    if (h) { q.set('f', h.holdingId || `${h.portfolioId}::${h.schemeCode || h.fundCode}`); setSp(q) }
+    else if (q.has('f')) { if (window.history.state?.idx > 0) window.history.back(); else { q.delete('f'); setSp(q, { replace: true }) } }
+  }
 
   // Enrich portfolios: resolve investmentAccountId, ownerId & ownerName from investment accounts
   const enrichedPortfolios = useMemo(() => {
@@ -403,6 +416,8 @@ export default function MutualFundsPage() {
       return { ...h, currentAllocationPct, plPct, _key }
     })
   }, [holdings])
+
+  const fundDetailHolding = fkey ? (enrichedHoldings.find((h) => h._key === fkey || h.holdingId === fkey) || null) : null
 
   // Group holdings by portfolio (for "All" view)
   const holdingsByPortfolio = useMemo(() => {
@@ -875,8 +890,8 @@ export default function MutualFundsPage() {
       ) : (
         <>
           {!fundDetailHolding && selectedPortfolioId !== 'all' && (<>
-          {/* ── Back to All + Portfolio Name ── */}
-          <div className="flex items-center gap-2">
+          {/* ── Back to All + Portfolio Name (phones use the app bar's back arrow) ── */}
+          <div className="hidden lg:flex items-center gap-2">
             <button
               onClick={() => { setSelectedPortfolioId('all'); setSubTab('holdings') }}
               className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
@@ -1231,7 +1246,7 @@ export default function MutualFundsPage() {
               <div className="space-y-3">
                 {/* Back + Fund Name + Portfolio badge */}
                 <div className="flex items-start gap-2.5">
-                  <button onClick={() => setFundDetailHolding(null)} className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors mt-0.5 shrink-0">
+                  <button onClick={() => setFundDetailHolding(null)} className="max-lg:hidden p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors mt-0.5 shrink-0">
                     <ArrowLeft size={16} />
                   </button>
                   <div className="flex-1 min-w-0">
