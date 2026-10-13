@@ -78,10 +78,9 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
     for (const i of order) { if (want < 1) break; const t = Math.min(want, rows[i].value); v[rowKey(rows[i])] = fmtIn(t); want -= t }
     return v
   }, [rows, n, s.has, g.targetAmount])
-  const [typed, setTyped] = useState({})
-  const taken = { ...fill, ...typed }   // a row the list gains later starts filled; typed amounts stay on their row
+  // a completed goal is withdrawn in full: everything it holds (a goal paid over years: this year's part). No editing.
+  const taken = fill
   const [record, setRecord] = useState(true)
-  const set = (i, v) => { const k = rowKey(rows[i]); setTyped((t) => ({ ...t, [k]: v })) }
   const total = rows.reduce((t, r) => t + Math.min(num(taken[rowKey(r)]), r.value), 0)
   const leftover = Math.max(0, s.has - total)
   const groups = ['other', 'mf', 'stock'].map((k) => ({ k, items: rows.map((r, i) => ({ r, i })).filter((x) => x.r.kind === k) })).filter((x) => x.items.length)
@@ -91,29 +90,24 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
     <div className="g2 wdp">
       <div className="wdp-top">
         <div><span>Kept for this goal</span><b>{L(s.has)}</b></div>
-        <div><span>You're taking</span><b className="v">{L(total)}</b></div>
-        <div><span>{n > 1 ? 'Stays for next year' : 'Goes back to other goals'}</span><b>{L(leftover)}</b></div>
+        <div><span>{n > 1 ? "This year's payment" : 'You withdraw'}</span><b className="v">{L(total)}</b></div>
+        {n > 1 ? <div><span>Stays for next year</span><b>{L(leftover)}</b></div> : <div><span>From</span><b>{rows.length} investment{rows.length > 1 ? 's' : ''}</b></div>}
       </div>
-      <p className="wdp-help">Filled with what this goal holds in each. Change any amount to what you really took — part of the FD, all of a fund, or 0.</p>
+      <p className="wdp-help">{n > 1 ? "This year's part, taken from the safest money first. Redeem these, then press Done." : 'The goal is complete: redeem everything below (this goal’s share of each), then press Done.'}</p>
 
-      {groups.map(({ k, items }) => { const K = KIND[k]; return (
+      {groups.filter(({ items }) => items.some(({ r }) => num(taken[rowKey(r)]) >= 1)).map(({ k, items }) => { const K = KIND[k]; return (
         <div key={k} className="wdp-grp">
           <p className="wdp-gt"><K.icon size={13} style={{ color: K.c }} /> {K.t}</p>
           {items.map(({ r, i }) => {
             const v = num(taken[rowKey(r)]), all = v >= r.value - 1, none = v < 1
+            if (none) return null
             return (
               <div key={i} className={`wdp-row ${none ? 'off' : ''}`}>
                 <div className="wdp-n">
                   <b>{k === 'other' ? mt(r.name) : k === 'mf' ? splitFundName(r.name).main : r.name}</b>
-                  <small>{k === 'other' ? `${r.holding?.investmentType || 'Investment'} · update its value` : `${pname(r.portfolioId)} · ${r.all ? 'all ' : ''}${Number(r.units).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${k === 'stock' ? 'shares' : 'units'}`}</small>
+                  <small>{k === 'other' ? `${r.holding?.investmentType || 'Investment'} · ${all ? 'close it / take it all' : 'take this much'}` : `${pname(r.portfolioId)} · redeem ${all && r.all ? 'all ' : ''}${Number(all ? r.units : v / (Number(r.holding?.currentNav) || Number(r.holding?.currentPrice) || 1)).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${k === 'stock' ? 'shares' : 'units'}`}</small>
                 </div>
-                <div className="wdp-in">
-                  <label><span>₹</span><input inputMode="decimal" value={taken[rowKey(r)] ?? ''} onChange={(e) => set(i, e.target.value)} onBlur={() => set(i, fmtIn(Math.min(num(taken[rowKey(r)]), r.value)))} onFocus={(e) => e.target.select()} aria-label={`Taking from ${r.name}`} /></label>
-                  <div className="wdp-q"><small>of {L(r.value)}</small>
-                    <button type="button" className={all ? 'on' : ''} onClick={() => set(i, fmtIn(r.value))}>All</button>
-                    <button type="button" className={none ? 'on' : ''} onClick={() => set(i, '0')}>None</button>
-                  </div>
-                </div>
+                <div className="wdp-amt"><b>{L(v)}</b>{!all && <small>of {L(r.value)}</small>}</div>
               </div>
             )
           })}
@@ -146,6 +140,7 @@ const CSS = `
 .wdp-gt{display:flex;align-items:center;gap:6px;margin:0;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);background:var(--bg-inset);border-bottom:1px solid var(--border-light)}
 .wdp-row{display:flex;align-items:center;gap:14px;padding:11px 14px;transition:opacity .15s}.wdp-row+.wdp-row{border-top:1px solid var(--border-light)}.wdp-row.off .wdp-n{opacity:.5}
 .wdp-n{flex:1;min-width:0}.wdp-n b{display:block;font-size:14px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wdp-n small{display:block;font-size:12px;color:var(--text-dim);margin-top:2px}
+.wdp-amt{text-align:right;flex-shrink:0}.wdp-amt b{display:block;font-size:15px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums}.wdp-amt small{font-size:11.5px;color:var(--text-dim)}
 .wdp-in{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .wdp-in label{display:flex;align-items:center;gap:4px;width:150px;padding:0 10px;height:38px;border-radius:10px;border:1px solid var(--border-input);background:var(--bg-input)}
 .wdp-in label:focus-within{border-color:#8b5cf6;box-shadow:0 0 0 2px color-mix(in srgb,#8b5cf6 25%,transparent)}
