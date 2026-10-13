@@ -151,7 +151,6 @@ function getAllStocksForClientSearch() {
 function getStockBySymbol(symbol) {
   try {
     if (!symbol) return null;
-    if (isUsSymbol_(symbol)) return getUsStock_(symbol);
 
     const sheet = getSheet(CONFIG.stockMasterDataSheet);
     if (!sheet) return null;
@@ -173,11 +172,14 @@ function getStockBySymbol(symbol) {
           sector: data[i][6],
           industry: data[i][7],
           status: data[i][8],
-          isin: data[i][9]
+          isin: data[i][9],
+          currency: 'INR'
         };
       }
     }
 
+    // not in the list: a direct Google Finance symbol (NASDAQ:AAPL, LON:VOD, BOM:517015 …)
+    if (normDirect_(symbol)) return getDirectStock_(symbol);
     return null;
 
   } catch (error) {
@@ -188,19 +190,57 @@ function getStockBySymbol(symbol) {
 
 
 // ============================================================================
-// US STOCKS AND ETFs
-// A US holding is written as EXCHANGE:TICKER (NASDAQ:AAPL, NYSE:KO, NYSEARCA:VOO). Every amount in the
-// sheets stays in rupees: buy prices are saved in ₹ (the dollar price × the dollar rate that day), and the
-// live price formula is GOOGLEFINANCE(ticker) × GOOGLEFINANCE("CURRENCY:USDINR"). So values, P&L, net worth,
-// goals and the email work as for Indian stocks, and P&L includes the rupee's move.
+// STOCKS FROM ANY EXCHANGE (direct Google Finance symbols)
+// Indian stocks normally come from the stock list (NSE rows and BSE-only rows). Anything else is written
+// the Google Finance way, EXCHANGE:TICKER: NASDAQ:AAPL, NYSE:KO, NYSEARCA:VOO, LON:VOD, TYO:7203 … and
+// also BOM:517015 / NSE:XYZ for an Indian stock that is not in the list yet.
+// Every amount in the sheets stays in rupees: a foreign buy price is saved in ₹ (price × that currency's
+// rupee rate on the buy date), and the live price formula is GOOGLEFINANCE(ticker) × the rate today. So
+// values, P&L, net worth, goals and the email work as for Indian stocks (P&L includes the rupee's move).
 // ============================================================================
-var US_SYMBOL_RE_ = /^(NASDAQ|NYSE|NYSEARCA|NYSEAMERICAN|NYSEMKT|BATS|CBOE):[A-Z0-9.\-]{1,12}$/;
-function isUsSymbol_(symbol) { return US_SYMBOL_RE_.test(String(symbol || '').trim().toUpperCase()); }
-function usPriceFormula_(gfSymbol) {
-  return '=IFERROR(GOOGLEFINANCE("' + gfSymbol + '", "price")*GOOGLEFINANCE("CURRENCY:USDINR"), 0)';
+var DIRECT_SYMBOL_RE_ = /^([A-Z]{2,14}):([A-Z0-9][A-Z0-9.\-&]{0,19})$/;
+var INDIAN_EXCHANGES_ = { NSE: 1, BOM: 1, BSE: 1 };
+var US_EXCHANGES_ = { NASDAQ: 1, NYSE: 1, NYSEARCA: 1, NYSEAMERICAN: 1, NYSEMKT: 1, BATS: 1, CBOE: 1 };
+// quoted in 1/100 of the currency (London pence, Johannesburg cents, Tel Aviv agorot)
+var MINOR_CCY_ = { GBX: 'GBP', GBp: 'GBP', ZAC: 'ZAR', ZAc: 'ZAR', ILA: 'ILS' };
+
+function normDirect_(symbol) {
+  var s = String(symbol || '').trim().toUpperCase();
+  if (/^BSE:\d{6}$/.test(s)) s = 'BOM:' + s.slice(4);
+  return DIRECT_SYMBOL_RE_.test(s) ? s : '';
 }
+function directExchange_(symbol) { var s = normDirect_(symbol); return s ? s.split(':')[0] : ''; }
+/** A foreign (non-Indian) symbol, e.g. NASDAQ:AAPL or LON:VOD. */
+function isForeignSymbol_(symbol) { var ex = directExchange_(symbol); return !!ex && !INDIAN_EXCHANGES_[ex]; }
+// kept for older callers
+function isUsSymbol_(symbol) { return !!US_EXCHANGES_[directExchange_(symbol)]; }
+
+/** Formula for "1 unit of this currency in ₹" (blank/INR → 1). Pence-style currencies are divided by 100. */
+function fxFormula_(currency, dateExpr) {
+  var c = String(currency || 'INR');
+  var minor = MINOR_CCY_[c] || MINOR_CCY_[c.toUpperCase()];
+  var base = (minor || c).toUpperCase();
+  if (base === 'INR') return minor ? '0.01' : '1';
+  var div = minor ? '/100' : '';
+  if (!dateExpr) return 'GOOGLEFINANCE("CURRENCY:' + base + 'INR")' + div;
+  var hist = 'GOOGLEFINANCE("CURRENCY:' + base + 'INR", "price", ' + dateExpr + '-6, ' + dateExpr + ')';
+  return 'INDEX(' + hist + ', ROWS(' + hist + '), 2)' + div; // last close on or before that day
+}
+function sheetDate_(d) { return 'DATE(' + d.getFullYear() + ',' + (d.getMonth() + 1) + ',' + d.getDate() + ')'; }
+
+/** Live ₹ price formula for a holding. */
+function priceFormulaFor_(gfSymbol, currency) {
+  if (!currency && isForeignSymbol_(gfSymbol)) // currency not known here: let the sheet ask Google Finance
+    return '=IFERROR(GOOGLEFINANCE("' + gfSymbol + '", "price")*GOOGLEFINANCE("CURRENCY:"&GOOGLEFINANCE("' + gfSymbol + '", "currency")&"INR"), 0)';
+  var fx = fxFormula_(currency);
+  return '=IFERROR(GOOGLEFINANCE("' + gfSymbol + '", "price")' + (fx === '1' ? '' : '*' + fx) + ', 0)';
+}
+// kept for older callers
+function usPriceFormula_(gfSymbol) { return priceFormulaFor_(gfSymbol, 'USD'); }
+
 /** Several GOOGLEFINANCE values at once through temp cells (they work only as formulas). */
 function gfValues_(formulas) {
+  if (!formulas.length) return [];
   var sheet = getSheet(CONFIG.settingsSheet);
   if (!sheet) return formulas.map(function () { return ''; });
   var range = sheet.getRange(1, 26, formulas.length, 1); // Z1:Z…, far from the settings
@@ -210,46 +250,83 @@ function gfValues_(formulas) {
   range.clearContent();
   return vals;
 }
+
 /**
- * Look up a US stock / ETF: name, $ price, today's dollar rate and (optional) the dollar rate on a date.
- * @returns {{ valid, symbol, companyName, priceUsd, fx, fxOnDate, price }}  price = ₹ per share today
+ * Quotes for direct symbols in one go (cached 6 h): name, price in its own currency, the currency,
+ * today's rupee rate and ₹ price.  dates (optional): { SYMBOL: 'yyyy-mm-dd' } → fxOnDate for that day.
+ * @returns {Object} { SYMBOL: { valid, symbol, companyName, currency, priceLocal, fx, fxOnDate, price, exchange, error? } }
  */
-function getUsQuote(symbol, date) {
-  var sym = String(symbol || '').trim().toUpperCase();
-  if (!isUsSymbol_(sym)) return { valid: false, symbol: sym, error: 'Write it as EXCHANGE:TICKER, e.g. NASDAQ:AAPL' };
-  var cache = CacheService.getScriptCache();
-  var key = 'usq:' + sym + ':' + (date || '');
-  var hit = cache.get(key);
-  if (hit) return JSON.parse(hit);
-  var f = [
-    '=IFERROR(GOOGLEFINANCE("' + sym + '", "name"), "")',
-    '=IFERROR(GOOGLEFINANCE("' + sym + '", "price"), 0)',
-    '=IFERROR(GOOGLEFINANCE("CURRENCY:USDINR"), 0)'
-  ];
-  var d = date ? new Date(date) : null;
-  if (d && !isNaN(d.getTime())) {
-    // the closing rate on that day (or the last trading day before it)
-    var dt = 'DATE(' + d.getFullYear() + ',' + (d.getMonth() + 1) + ',' + d.getDate() + ')';
-    var hist = 'GOOGLEFINANCE("CURRENCY:USDINR", "price", ' + dt + '-6, ' + dt + ')';
-    f.push('=IFERROR(INDEX(' + hist + ', ROWS(' + hist + '), 2), 0)'); // last close on or before that day
-  }
-  var v = gfValues_(f);
-  var priceUsd = Number(v[1]) || 0, fx = Number(v[2]) || 0;
-  var out = {
-    valid: priceUsd > 0, symbol: sym, companyName: String(v[0] || '') || sym.split(':')[1],
-    priceUsd: priceUsd, fx: fx, fxOnDate: Number(v[3]) || fx, price: priceUsd * fx,
-    exchange: 'US', sector: 'US equity'
-  };
-  if (!out.valid) out.error = 'Google Finance has no price for ' + sym + '. Check the exchange and ticker.';
-  cache.put(key, JSON.stringify(out), out.valid ? 21600 : 600);
+function getQuotes_(symbols, dates) {
+  var cache = CacheService.getScriptCache(), out = {}, todo = [];
+  dates = dates || {};
+  (symbols || []).forEach(function (raw) {
+    var sym = normDirect_(raw);
+    if (!sym || out[sym]) return;
+    var d = dates[raw] || dates[sym] || '';
+    var hit = cache.get('gq2:' + sym + ':' + d);
+    if (hit) out[sym] = JSON.parse(hit); else todo.push({ sym: sym, d: d });
+  });
+  // pass 1: name, price, currency
+  var f1 = [];
+  todo.forEach(function (t) {
+    f1.push('=IFERROR(GOOGLEFINANCE("' + t.sym + '", "name"), "")', '=IFERROR(GOOGLEFINANCE("' + t.sym + '", "price"), 0)', '=IFERROR(GOOGLEFINANCE("' + t.sym + '", "currency"), "")');
+  });
+  var v1 = gfValues_(f1);
+  // pass 2: rupee rates (today and on the date) for the currencies found
+  var f2 = [];
+  todo.forEach(function (t, i) {
+    var ex = t.sym.split(':')[0];
+    t.name = String(v1[i * 3] || ''); t.priceLocal = Number(v1[i * 3 + 1]) || 0;
+    t.currency = String(v1[i * 3 + 2] || '') || (INDIAN_EXCHANGES_[ex] ? 'INR' : US_EXCHANGES_[ex] ? 'USD' : '');
+    var dd = t.d ? new Date(t.d) : null;
+    t.fxAt = f2.length; f2.push('=IFERROR(' + fxFormula_(t.currency) + ', 0)');
+    if (dd && !isNaN(dd.getTime())) { t.fxDateAt = f2.length; f2.push('=IFERROR(' + fxFormula_(t.currency, sheetDate_(dd)) + ', 0)'); }
+  });
+  var v2 = gfValues_(f2);
+  todo.forEach(function (t) {
+    var ex = t.sym.split(':')[0];
+    var fx = Number(v2[t.fxAt]) || 0;
+    var fxOnDate = t.fxDateAt !== undefined ? (Number(v2[t.fxDateAt]) || fx) : fx;
+    var q = {
+      valid: t.priceLocal > 0 && fx > 0, symbol: t.sym, companyName: t.name || t.sym.split(':')[1],
+      currency: t.currency, priceLocal: t.priceLocal, fx: fx, fxOnDate: fxOnDate, price: t.priceLocal * fx,
+      exchange: INDIAN_EXCHANGES_[ex] ? (ex === 'NSE' ? 'NSE' : 'BSE') : US_EXCHANGES_[ex] ? 'US' : ex,
+      sector: INDIAN_EXCHANGES_[ex] ? '' : US_EXCHANGES_[ex] ? 'US equity' : 'Foreign equity'
+    };
+    if (!q.valid) q.error = 'Google Finance has no price for ' + t.sym + '. Check the exchange and ticker.';
+    out[t.sym] = q;
+    try { cache.put('gq2:' + t.sym + ':' + t.d, JSON.stringify(q), q.valid ? 21600 : 600); } catch (e) { /* ignore */ }
+  });
   return out;
 }
-/** A US symbol as a stock record (same shape as a master-data stock). */
-function getUsStock_(symbol) {
-  var q = getUsQuote(symbol);
-  if (!q.valid) return null;
-  return { symbol: q.symbol, bseCode: '', companyName: q.companyName, exchange: 'US', gfNSE: q.symbol, gfBSE: '', sector: 'US equity', industry: '', status: 'Active', isin: '' };
+
+/**
+ * Look up one direct symbol (any exchange). Same answer shape as before plus currency / priceLocal;
+ * priceUsd is kept for US symbols (older screens read it).
+ */
+function getQuote(symbol, date) {
+  var sym = normDirect_(symbol);
+  if (!sym) return { valid: false, symbol: String(symbol || ''), error: 'Write it as EXCHANGE:TICKER, e.g. NASDAQ:AAPL or LON:VOD' };
+  var dates = {}; if (date) dates[sym] = String(date).slice(0, 10);
+  var q = getQuotes_([sym], dates)[sym];
+  if (q && q.currency === 'USD') q.priceUsd = q.priceLocal;
+  return q;
 }
+// kept for older callers (the 'stock:us-quote' action)
+function getUsQuote(symbol, date) { return getQuote(symbol, date); }
+
+/** A direct symbol as a stock record (same shape as a master-data stock), or null when it has no price. */
+function getDirectStock_(symbol) {
+  var q = getQuote(symbol);
+  if (!q || !q.valid) return null;
+  var indian = !isForeignSymbol_(q.symbol);
+  return {
+    symbol: q.symbol, bseCode: '', companyName: q.companyName, exchange: q.exchange,
+    gfNSE: indian && q.exchange === 'NSE' ? q.symbol : (indian ? '' : q.symbol), gfBSE: indian && q.exchange === 'BSE' ? q.symbol : '',
+    sector: q.sector, industry: '', status: 'Active', isin: '', currency: q.currency
+  };
+}
+function getUsStock_(symbol) { return getDirectStock_(symbol); }
 
 /**
  * Get current stock price using GOOGLEFINANCE via a temp cell.
@@ -284,17 +361,18 @@ function getStockPrice(gfSymbol) {
  * @returns {Object} { symbol, price }
  */
 function fetchStockPrice(symbol) {
-  if (isUsSymbol_(symbol)) {
-    var q = getUsQuote(symbol);
-    return { symbol: q.symbol, price: q.price || 0, priceUsd: q.priceUsd || 0, fx: q.fx || 0, companyName: q.companyName, valid: q.valid };
-  }
   var stock = getStockBySymbol(symbol);
   if (!stock) return { symbol: symbol, price: 0 };
 
   var gfSymbol = stock.gfNSE || stock.gfBSE || '';
+  if (isForeignSymbol_(gfSymbol)) {
+    var q = getQuote(gfSymbol);
+    return { symbol: stock.symbol, price: q.price || 0, priceLocal: q.priceLocal || 0, currency: q.currency, fx: q.fx || 0, priceUsd: q.currency === 'USD' ? q.priceLocal : 0, companyName: q.companyName, valid: q.valid };
+  }
   var price = getStockPrice(gfSymbol);
+  if (!(price > 0) && stock.gfNSE && stock.gfBSE) price = getStockPrice(stock.gfBSE); // no NSE price: try BSE
 
-  return { symbol: symbol, price: price };
+  return { symbol: stock.symbol, price: price, currency: 'INR' };
 }
 
 // ============================================================================
@@ -858,10 +936,14 @@ function deleteStockTransaction(transactionId) {
 // ============================================================================
 
 /**
- * Bulk import holdings from a broker file (Symbol, Quantity, Avg Price), e.g. a Zerodha holdings export.
- * Each row becomes one BUY transaction on `date` (note "Imported"), then holdings are recalculated.
+ * Bulk import holdings from a broker file or a CDSL / NSDL statement. Each row becomes one BUY transaction
+ * (note "Imported …"), then holdings are recalculated.
+ * Rows are matched by symbol, then ISIN, in the stock list; anything else written EXCHANGE:TICKER
+ * (NASDAQ:AAPL, LON:VOD, BOM:517015) is checked with Google Finance.
+ * A foreign row's average price is in its own currency (row.currency, else the stock's currency) and is
+ * saved in ₹ at that currency's rupee rate on the row's buy date (today when no date).
  * Never throws for a bad row: unknown symbols / bad numbers are returned in `skipped`.
- * @param {Object} params { portfolioId, date, rows: [{ symbol, quantity, avgPrice, sourceSymbol }] }
+ * @param {Object} params { portfolioId, date, rows: [{ symbol, quantity, avgPrice, sourceSymbol, isin?, currency?, date?, note? }] }
  * @returns {Object} { success, imported: [{symbol, quantity, avgPrice}], skipped: [{symbol, reason}] }
  */
 function importStockHoldings(params) {
@@ -873,6 +955,8 @@ function importStockHoldings(params) {
     if (rows.length > 500) throw new Error('Too many rows (max 500 per import)');
     var txnDate = params.date ? new Date(params.date) : new Date();
     if (isNaN(txnDate.getTime())) txnDate = new Date();
+    var ymd = function (d) { return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd'); };
+    var todayYmd = ymd(new Date());
 
     var portfolio = getAllStockPortfolios().find(function (p) { return p.portfolioId === portfolioId; });
     if (!portfolio) throw new Error('Portfolio not found: ' + portfolioId);
@@ -882,8 +966,40 @@ function importStockHoldings(params) {
     if (!master) throw new Error('StockMasterData sheet not found');
     var mLast = master.getLastRow();
     var mData = mLast > 2 ? master.getRange(3, 1, mLast - 2, 10).getValues() : [];
-    var bySymbol = {};
-    mData.forEach(function (r) { if (r[0]) bySymbol[r[0].toString().toUpperCase()] = r; });
+    var bySymbol = {}, byIsin = {};
+    mData.forEach(function (r) {
+      if (r[0]) bySymbol[r[0].toString().toUpperCase()] = r;
+      if (r[9] && String(r[8]) === 'Active') byIsin[r[9].toString().toUpperCase()] = r;
+    });
+
+    // pass 1: match each row; direct symbols are quoted together
+    var prepared = rows.map(function (row) {
+      var sym = String((row && row.symbol) || '').trim().toUpperCase();
+      var isin = String((row && row.isin) || '').trim().toUpperCase();
+      var m = bySymbol[sym] || (isin && byIsin[isin]) || null;
+      var d = row && row.date ? new Date(row.date) : null;
+      if (!d || isNaN(d.getTime())) d = txnDate;
+      return { row: row, sym: sym, m: m, direct: !m && normDirect_(sym) ? normDirect_(sym) : '', date: d };
+    });
+    var quotes = getQuotes_(prepared.filter(function (p) { return p.direct; }).map(function (p) { return p.direct; }));
+
+    // pass 2: rupee rates on the buy dates (one batch)
+    var fxNeed = {}, fxKeys = [];
+    prepared.forEach(function (p) {
+      var q = p.direct ? quotes[p.direct] : null;
+      if (!q || !q.valid || !isForeignSymbol_(p.direct)) return;
+      p.ccy = String(p.row.currency || q.currency || '').trim();
+      if (!p.ccy || p.ccy.toUpperCase() === 'INR') return;
+      p.dateYmd = ymd(p.date);
+      if (p.dateYmd === todayYmd && p.ccy === q.currency) return; // today's rate is in the quote
+      var k = p.ccy + '|' + p.dateYmd;
+      if (!fxNeed[k]) { fxNeed[k] = true; fxKeys.push(k); }
+    });
+    var fxVals = gfValues_(fxKeys.map(function (k) {
+      var parts = k.split('|'), d = new Date(parts[1] + 'T12:00:00');
+      return '=IFERROR(' + fxFormula_(parts[0], parts[1] === todayYmd ? '' : sheetDate_(d)) + ', 0)';
+    }));
+    var fxOn = {}; fxKeys.forEach(function (k, i) { fxOn[k] = Number(fxVals[i]) || 0; });
 
     var txSheet = getSheet(CONFIG.stockTransactionsSheet);
     if (!txSheet) throw new Error('StockTransactions sheet not found');
@@ -891,21 +1007,23 @@ function importStockHoldings(params) {
     var existingIds = tLast > 2 ? txSheet.getRange(3, 1, tLast - 2, 1).getValues().flat() : [];
 
     var imported = [], skipped = [], newRows = [], symbols = {};
-    rows.forEach(function (row) {
-      var label = (row && (row.sourceSymbol || row.symbol)) || '(blank)';
+    prepared.forEach(function (p) {
+      var row = p.row || {};
+      var label = row.sourceSymbol || row.symbol || row.isin || '(blank)';
       try {
-        var sym = (row.symbol || '').toString().trim().toUpperCase();
         var qty = parseFloat(row.quantity);
         var price = parseFloat(row.avgPrice);
-        var m = bySymbol[sym];
-        var note = 'Imported from holdings file';
-        if (!m && isUsSymbol_(sym)) {
-          var us = getUsQuote(sym);
-          if (!us.valid) { skipped.push({ symbol: label, reason: us.error }); return; }
-          m = [us.symbol, '', us.companyName, 'US', us.symbol, '', 'US equity', '', 'Active', ''];
-          if (String(row.currency || 'USD').toUpperCase() !== 'INR' && us.fx > 0) {
-            note = 'Imported · $' + price + ' at ₹' + us.fx.toFixed(2) + '/$';
-            price = price * us.fx;
+        var m = p.m;
+        var note = row.note ? String(row.note) : 'Imported from holdings file';
+        if (!m && p.direct) {
+          var q = quotes[p.direct];
+          if (!q || !q.valid) { skipped.push({ symbol: label, reason: (q && q.error) || 'No price on Google Finance' }); return; }
+          m = [q.symbol, '', q.companyName, q.exchange, q.symbol, '', q.sector, '', 'Active', ''];
+          if (isForeignSymbol_(p.direct) && p.ccy && p.ccy.toUpperCase() !== 'INR' && price > 0) {
+            var fx = (p.dateYmd === todayYmd && p.ccy === q.currency) ? q.fx : fxOn[p.ccy + '|' + p.dateYmd];
+            if (!(fx > 0)) { skipped.push({ symbol: label, reason: 'Could not get the ' + p.ccy + ' rate for ' + p.dateYmd }); return; }
+            note = 'Imported · ' + p.ccy + ' ' + price + ' at ₹' + fx.toFixed(2) + ' (' + p.dateYmd + ')';
+            price = price * fx;
           }
         }
         if (!m) { skipped.push({ symbol: label, reason: 'Not found in the stock list' }); return; }
@@ -915,7 +1033,7 @@ function importStockHoldings(params) {
         existingIds.push(id);
         var gf = m[4] || m[5] || '';
         var total = qty * price;
-        newRows.push([id, portfolioId, portfolio.portfolioName, m[0], m[2], m[3], gf, 'BUY', txnDate, qty, price, total, 0, total, note, '']);
+        newRows.push([id, portfolioId, portfolio.portfolioName, m[0], m[2], m[3], gf, 'BUY', p.date, qty, price, total, 0, total, note, '']);
         symbols[m[0]] = true;
         imported.push({ symbol: m[0], quantity: qty, avgPrice: price });
       } catch (e) {
@@ -935,6 +1053,37 @@ function importStockHoldings(params) {
     return { success: true, imported: imported, skipped: skipped };
   } catch (error) {
     log('Error importing stocks: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Delete ALL stock data of this family (for starting over after testing): every stock portfolio, transaction
+ * and holding, and goal links to stock portfolios. Cannot be undone. Needs confirm === 'DELETE'.
+ */
+function deleteAllStocks(params) {
+  try {
+    if (!params || params.confirm !== 'DELETE') throw new Error('Type DELETE to confirm');
+    var counts = {};
+    [['transactions', CONFIG.stockTransactionsSheet], ['holdings', CONFIG.stockHoldingsSheet], ['portfolios', CONFIG.stockPortfoliosSheet]].forEach(function (t) {
+      var sh = getSheet(t[1]);
+      var n = sh ? Math.max(0, sh.getLastRow() - 2) : 0;
+      if (n > 0) sh.getRange(3, 1, n, sh.getMaxColumns()).clearContent(); // clear (not delete) so formulas that point at these tabs keep their ranges
+      counts[t[0]] = n;
+    });
+    // goal links to stock portfolios (column G = "Stock")
+    var gm = getSheet(CONFIG.goalPortfolioMappingSheet);
+    counts.goalLinks = 0;
+    if (gm && gm.getLastRow() > 2) {
+      var v = gm.getRange(3, 1, gm.getLastRow() - 2, 7).getValues();
+      for (var i = v.length - 1; i >= 0; i--) {
+        if (String(v[i][6]) === 'Stock' || String(v[i][3]).indexOf('PFL-STK-') === 0) { gm.deleteRow(i + 3); counts.goalLinks++; }
+      }
+    }
+    log('deleteAllStocks: ' + JSON.stringify(counts));
+    return { success: true, deleted: counts };
+  } catch (error) {
+    log('Error deleting all stocks: ' + error.toString());
     return { success: false, error: error.message };
   }
 }
@@ -1006,11 +1155,12 @@ function recalculateStockHoldings(portfolioId, stockSymbol) {
     const avgBuyPrice = buyQuantity > 0 ? totalInvestment / buyQuantity : 0;
     const currentInvestment = totalQuantity * avgBuyPrice;
 
-    // Get stock details
-    const stock = getStockBySymbol(stockSymbol);
+    // Get stock details (if the list / Google Finance can't tell us right now, use what the transaction saved)
+    let stock = getStockBySymbol(stockSymbol);
     if (!stock) {
-      log(`Warning: Stock not found in master data: ${stockSymbol}`);
-      return;
+      const t0 = relevantTransactions[0];
+      if (!t0[6]) { log(`Warning: Stock not found in master data: ${stockSymbol}`); return; }
+      stock = { symbol: t0[3], companyName: t0[4], exchange: t0[5], gfNSE: t0[6], gfBSE: '', sector: '', currency: '' };
     }
 
     // Get portfolio name
@@ -1039,7 +1189,12 @@ function recalculateStockHoldings(portfolioId, stockSymbol) {
     const rowNum = existingRowIndex > 0 ? existingRowIndex : holdingsLastRow + 1;
 
     // Formulas for live price and P&L calculations
-    const currentPriceFormula = !gfSymbol ? 0 : isUsSymbol_(gfSymbol) ? usPriceFormula_(gfSymbol) : `=IFERROR(GOOGLEFINANCE("${gfSymbol}", "price"), 0)`;
+    // Indian: NSE price, else BSE. Foreign: price × that currency's rupee rate today.
+    const currentPriceFormula = !gfSymbol ? 0
+      : isForeignSymbol_(gfSymbol) ? priceFormulaFor_(gfSymbol, stock.currency)
+      : (stock.gfNSE && stock.gfBSE && gfSymbol === stock.gfNSE)
+        ? `=IFERROR(GOOGLEFINANCE("${stock.gfNSE}", "price"), IFERROR(GOOGLEFINANCE("${stock.gfBSE}", "price"), 0))`
+        : `=IFERROR(GOOGLEFINANCE("${gfSymbol}", "price"), 0)`;
     const currentValueFormula = `=G${rowNum}*J${rowNum}`;
     const unrealizedPLFormula = `=K${rowNum}-I${rowNum}`;
     const unrealizedPLPctFormula = `=IF(I${rowNum}>0, L${rowNum}/I${rowNum}, 0)`;

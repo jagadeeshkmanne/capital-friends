@@ -187,3 +187,30 @@ function clearMasterTabCache_() {
   var cnt = cache.get('mtab_cnt:Stock_Data'); if (cnt) keys.push('mtab_v1:Stock_Data:' + cnt + ':n');
   cache.removeAll(keys);
 }
+
+/**
+ * US stocks and ETFs for the stock search (master DB tab US_Stocks, built by importUsStocks there).
+ * Compact rows [symbol, ticker, name, exchange, type], shared by all users and cached 6 hours.
+ * Empty list when the tab doesn't exist yet (then people can still type NASDAQ:AAPL directly).
+ */
+function getUsStocksList() {
+  var cache = CacheService.getScriptCache(), key = 'us_list_v1';
+  var n = +cache.get(key + ':n');
+  if (n) {
+    var keys = []; for (var i = 0; i < n; i++) keys.push(key + ':' + i);
+    var got = cache.getAll(keys), json = '', ok = true;
+    for (var j = 0; j < n; j++) { if (!got[keys[j]]) { ok = false; break; } json += got[keys[j]]; }
+    if (ok) return JSON.parse(json);
+  }
+  var rows;
+  try { rows = masterRows_('US_Stocks', 5); } catch (e) { Logger.log('US_Stocks not readable: ' + e); return []; }
+  rows = (rows || []).filter(function (r) { return r[0] && String(r[0]).indexOf(':') > 0; })
+    .map(function (r) { return [String(r[0]), String(r[1]), String(r[2]), String(r[3]), String(r[4])]; });
+  try {
+    var str = JSON.stringify(rows), put = {}, size = 90000, c = 0;
+    for (var p = 0; p < str.length; p += size) put[key + ':' + (c++)] = str.substring(p, p + size);
+    put[key + ':n'] = String(c);
+    if (rows.length) cache.putAll(put, 21600);
+  } catch (e) { Logger.log('US list cache put failed: ' + e); }
+  return rows;
+}

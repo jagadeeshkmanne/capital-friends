@@ -452,6 +452,15 @@ function routeAction(action, params, userRecord) {
     case 'stock:us-quote':
       return getUsQuote(params.symbol, params.date);
 
+    case 'stock:quote':
+      return getQuote(params.symbol, params.date);
+
+    case 'stocks:us-list':
+      return getUsStocksList();
+
+    case 'stocks:delete-all':
+      return deleteAllStocks(params);
+
     case 'stock-transaction:edit':
       return editStockTransaction(params.transactionId, params);
 
