@@ -10,8 +10,8 @@
  *      bseindia.com (Markets → Equity → List of Scrips → Equity, Active), paste it into a tab called
  *      BSE_Import (header row included) and run importBseStocks() again.
  *
- * 2. importUsStocks()   — writes the US_Stocks tab: every US-listed company from the SEC's public
- *    ticker file (Nasdaq, NYSE, Cboe) plus a list of popular US ETFs. Rebuilt each run (it is a separate
+ * 2. importUsStocks()   — writes the US_Stocks tab: every US stock and ETF from Nasdaq Trader's public
+ *    symbol directory (Nasdaq, NYSE, NYSE American, NYSE Arca, Cboe), SEC ticker file as a fallback. Rebuilt each run (it is a separate
  *    tab, nothing in Stock_Data changes).
  *      Columns: A Symbol (Google Finance form, e.g. NASDAQ:AAPL) · B Ticker · C Name · D Exchange ·
  *               E Type (Stock / ETF) · F Currency (USD)
@@ -160,36 +160,18 @@ var US_ETFS_ = [
 
 function importUsStocks() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var res = UrlFetchApp.fetch('https://www.sec.gov/files/company_tickers_exchange.json', {
-    muteHttpExceptions: true,
-    headers: { 'User-Agent': 'Capital Friends contact@capitalfriends.in', 'Accept': 'application/json' }
-  });
-  if (res.getResponseCode() !== 200) {
-    Logger.log('SEC list: HTTP ' + res.getResponseCode() + '. US_Stocks left as it was.');
-    return { success: false, error: 'HTTP ' + res.getResponseCode() };
+  // 1st choice: Nasdaq Trader's symbol directory (every Nasdaq / NYSE / NYSE Arca / Cboe listing, with an ETF flag).
+  // 2nd: the SEC ticker file (companies only; it often refuses Google's servers with HTTP 403).
+  var got = usFromNasdaqTrader_(), source = 'Nasdaq Trader';
+  if (got.length < 1000) { got = usFromSec_(); source = 'SEC'; }
+  if (got.length < 1000) {
+    Logger.log('US list: no source answered (' + got.length + ' rows). US_Stocks left as it was.');
+    return { success: false, error: 'No US list source' };
   }
-  var json = JSON.parse(res.getContentText());
-  var f = json.fields || ['cik', 'name', 'ticker', 'exchange'];
-  var iName = f.indexOf('name'), iTicker = f.indexOf('ticker'), iEx = f.indexOf('exchange');
-
+  // the directory is the authority; the hand-made ETF list only fills gaps (the SEC file has no ETFs)
   var rows = [], seen = {};
-  US_ETFS_.forEach(function (e) {
-    var sym = e[0] + ':' + e[1];
-    seen[e[1]] = true;
-    rows.push([sym, e[1], e[2], e[0], 'ETF', 'USD']);
-  });
-  (json.data || []).forEach(function (d) {
-    var ex = SEC_EXCHANGE_TO_GF_[String(d[iEx] || '').toUpperCase()];
-    if (!ex) return;                                   // OTC / unknown: Google Finance often has no price
-    var t = String(d[iTicker] || '').toUpperCase().replace(/-/g, '.'); // BRK-B → BRK.B (Google Finance form)
-    if (!t || seen[t]) return;
-    seen[t] = true;
-    rows.push([ex + ':' + t, t, String(d[iName] || t), ex, 'Stock', 'USD']);
-  });
-  if (rows.length < 1000) {
-    Logger.log('SEC list looks too short (' + rows.length + '). US_Stocks left as it was.');
-    return { success: false, error: 'Short list' };
-  }
+  got.forEach(function (r) { if (!seen[r[1]]) { seen[r[1]] = true; rows.push(r); } });
+  US_ETFS_.forEach(function (e) { if (!seen[e[1]]) { seen[e[1]] = true; rows.push([e[0] + ':' + e[1], e[1], e[2], e[0], 'ETF', 'USD']); } });
 
   var tab = ss.getSheetByName(US_STOCKS_TAB) || ss.insertSheet(US_STOCKS_TAB);
   tab.getRange(1, 1, 1, 6).setValues([['Symbol', 'Ticker', 'Name', 'Exchange', 'Type', 'Currency']]).setFontWeight('bold');
@@ -198,8 +180,69 @@ function importUsStocks() {
   tab.getRange(2, 1, rows.length, 6).setNumberFormat('@').setValues(rows);
   var extra = tab.getLastRow() - (rows.length + 1);
   if (extra > 0) tab.getRange(rows.length + 2, 1, extra, 6).clearContent();
-  Logger.log('US_Stocks: ' + rows.length + ' rows (' + US_ETFS_.length + ' ETFs)');
-  return { success: true, count: rows.length };
+  var etfs = rows.filter(function (r) { return r[4] === 'ETF'; }).length;
+  Logger.log('US_Stocks (' + source + '): ' + rows.length + ' rows (' + etfs + ' ETFs)');
+  return { success: true, count: rows.length, source: source };
+}
+
+function usFetchText_(url, headers) {
+  try {
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: headers || { 'User-Agent': 'Mozilla/5.0' } });
+    if (res.getResponseCode() !== 200) { Logger.log(url + ': HTTP ' + res.getResponseCode()); return ''; }
+    return res.getContentText();
+  } catch (e) { Logger.log(url + ' failed: ' + e); return ''; }
+}
+
+// Nasdaq Trader exchange codes (otherlisted.txt) → Google Finance prefix
+var NT_EXCHANGE_TO_GF_ = { N: 'NYSE', A: 'NYSEAMERICAN', P: 'NYSEARCA', Z: 'BATS' };
+// skip warrants, rights, units, preferreds and notes: no normal share price on Google Finance
+var US_SKIP_NAME_RE_ = /\b(warrants?|rights?|units?|preferred|depositary shares? representing|notes due|debentures?|subordinated)\b/i;
+
+/** [[symbol, ticker, name, exchange, type, 'USD']] from nasdaqlisted.txt + otherlisted.txt ([] when unavailable). */
+function usFromNasdaqTrader_() {
+  var base = 'https://www.nasdaqtrader.com/dynamic/SymDir/';
+  return parseNasdaqListed_(usFetchText_(base + 'nasdaqlisted.txt')).concat(parseOtherListed_(usFetchText_(base + 'otherlisted.txt')));
+}
+function ntRows_(text) {
+  return String(text || '').split(/\r?\n/).slice(1).filter(function (l) { return l && l.indexOf('File Creation Time') !== 0; }).map(function (l) { return l.split('|'); });
+}
+/** nasdaqlisted.txt: Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares */
+function parseNasdaqListed_(text) {
+  var out = [];
+  ntRows_(text).forEach(function (c) {
+    var t = String(c[0] || '').trim().toUpperCase(), name = String(c[1] || '').trim();
+    if (!t || c[3] === 'Y' || /[^A-Z.]/.test(t) || US_SKIP_NAME_RE_.test(name)) return;
+    out.push(['NASDAQ:' + t, t, usCleanName_(name), 'NASDAQ', c[6] === 'Y' ? 'ETF' : 'Stock', 'USD']);
+  });
+  return out;
+}
+/** otherlisted.txt: ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol */
+function parseOtherListed_(text) {
+  var out = [];
+  ntRows_(text).forEach(function (c) {
+    var t = String(c[0] || '').trim().toUpperCase(), name = String(c[1] || '').trim(), ex = NT_EXCHANGE_TO_GF_[String(c[2] || '').trim()];
+    if (!t || !ex || c[6] === 'Y' || /[^A-Z.]/.test(t) || US_SKIP_NAME_RE_.test(name)) return;
+    out.push([ex + ':' + t, t, usCleanName_(name), ex, c[4] === 'Y' ? 'ETF' : 'Stock', 'USD']);
+  });
+  return out;
+}
+/** "Apple Inc. - Common Stock" → "Apple Inc." */
+function usCleanName_(n) {
+  return String(n).replace(/\s+-\s+(Class [A-Z] )?(Common Stock|Ordinary Shares|American Depositary Shares|Common Shares|Shares of Beneficial Interest).*$/i, '').trim();
+}
+
+/** Fallback: SEC company tickers (no ETFs). */
+function usFromSec_() {
+  var text = usFetchText_('https://www.sec.gov/files/company_tickers_exchange.json', { 'User-Agent': 'Capital Friends contact@capitalfriends.in', 'Accept': 'application/json' });
+  if (!text) return [];
+  var json = JSON.parse(text), f = json.fields || ['cik', 'name', 'ticker', 'exchange'];
+  var iName = f.indexOf('name'), iTicker = f.indexOf('ticker'), iEx = f.indexOf('exchange'), out = [];
+  (json.data || []).forEach(function (d) {
+    var ex = SEC_EXCHANGE_TO_GF_[String(d[iEx] || '').toUpperCase()];
+    var t = String(d[iTicker] || '').toUpperCase().replace(/-/g, '.');
+    if (ex && t) out.push([ex + ':' + t, t, String(d[iName] || t), ex, 'Stock', 'USD']);
+  });
+  return out;
 }
 
 // ── daily refresh ────────────────────────────────────────────────────────────
