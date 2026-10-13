@@ -115,6 +115,9 @@ export function classifyOtherInvestment(investment) {
   const type = String(investment?.investmentType || '').trim()
   const category = String(investment?.investmentCategory || '').trim().toLowerCase()
   const t = type.toLowerCase()
+  // EPF / PPF / NPS-like money is never Income, whatever category it was saved with: it stays invested
+  // (EPF can keep earning interest after retirement) until you withdraw it by its own rules.
+  if (/\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation|gratuity/i.test(`${type} ${investment?.investmentName || ''}`)) return { bucket: 'b2', reason: type || 'Locked (EPF / PPF / NPS)', equity: 0, confidence: 'type' }
   if (t === 'fixed deposit' || t === 'fd') return { bucket: 'b1', reason: 'Fixed deposit', equity: 0, confidence: 'type' }
   if (t === 'cash / savings' || category === 'cash') return { bucket: 'b1', reason: 'Cash / savings', equity: 0, confidence: 'type' }
   if (['epf', 'ppf', 'bonds', 'nps'].includes(t)) return { bucket: 'b2', reason: type, equity: 0, confidence: 'type' }

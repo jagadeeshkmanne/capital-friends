@@ -239,3 +239,9 @@ test('linked EPF counts in the Stability bucket but is never sold', () => {
   assert.equal(plan.totals.b3, 1000000)
   for (const op of plan.operations) for (const a of op.allocations) assert.notEqual(a.portfolioId, 'INV-EPF')
 })
+
+test('EPF / PPF / NPS never land in Income, whatever category they were saved with', () => {
+  assert.equal(classifyOtherInvestment({ investmentType: 'EPF', investmentCategory: 'Cash' }).bucket, 'b2')
+  assert.equal(classifyOtherInvestment({ investmentType: 'Cash / Savings', investmentCategory: 'Cash', investmentName: 'Provident fund' }).bucket, 'b2')
+  assert.equal(classifyOtherInvestment({ investmentType: 'Cash / Savings', investmentCategory: 'Cash', investmentName: 'Savings account' }).bucket, 'b1')
+})

@@ -177,15 +177,36 @@ function JarSvg({ c, f }) {
   return <svg width="46" height="60" viewBox="0 0 54 70" aria-hidden="true"><rect x="15" y="2" width="24" height="7" rx="3" fill={c} /><path d="M12 12Q8 12 8 18L8 60Q8 66 14 66L40 66Q46 66 46 60L46 18Q46 12 42 12Z" fill="none" stroke={c} strokeWidth="2.4" /><rect x="10" y={y} width="34" height={64 - y} rx="4" fill={c} opacity=".55" /></svg>
 }
 /** Which jar an investment sits in today: liquid / short debt / cash → Income, other debt / hybrid → Stability, equity & gold → Growth */
-const isLocked = (it) => it.kind === 'other' && /\b(epf|ppf|nps|vpf)\b/i.test(it.holding?.investmentType || '')
+const LOCK_RE = /\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation|gratuity/i
+/** EPF / PPF / NPS and similar: money you can't move today; it comes out only by its own rules (EPF at retirement or later, PPF at maturity). */
+const isLocked = (it) => it.kind === 'other' && LOCK_RE.test(`${it.holding?.investmentType || ''} ${it.holding?.investmentName || ''}`)
 const jarOf = (it) => {
-  const n = `${it.holding?.fundName || ''} ${it.holding?.investmentType || ''} ${it.holding?.category || ''}`
+  if (isLocked(it)) return 'stb' // never Income: it is not in your hand until you withdraw it
   if (isGold(it.holding) || (it.eq || 0) >= 0.65) return 'gro'
-  if (/liquid|overnight|money market|ultra short|low duration|savings|cash|fixed deposit|\bfd\b/i.test(n)) return 'inc'
+  if (it.kind === 'mf') return /liquid|overnight|money market|ultra short|low duration/i.test(`${it.holding?.category || ''} ${it.holding?.fundName || ''}`) ? 'inc' : 'stb'
+  const t = `${it.holding?.investmentType || ''} ${it.holding?.investmentCategory || ''}`
+  if (/cash|savings|fixed deposit|\bfd\b/i.test(t)) return 'inc'
   return 'stb'
 }
+/** Income should hold 2 years of expenses, Stability the next 5, Growth the rest. Shows what is extra or short
+ *  in each jar and the move that fixes it. EPF / PPF / NPS are not counted as movable money. */
+function BucketGaps({ tgt, sum, lockedSum }) {
+  const inc = sum('inc'), stbFree = Math.max(0, sum('stb') - lockedSum), stb = sum('stb'), gro = sum('gro')
+  const extraInc = Math.max(0, inc - tgt.inc), shortInc = Math.max(0, tgt.inc - inc)
+  const shortStb = Math.max(0, tgt.stb - stb), shortGro = Math.max(0, tgt.gro - gro)
+  const lines = []
+  if (shortInc > 0) lines.push(`Income is ${L(shortInc)} short of 2 years of expenses. Move ${L(Math.min(shortInc, stbFree || shortInc))} from Stability to a liquid fund${stbFree < shortInc ? ' (EPF / PPF / NPS are not used for this)' : ''}.`)
+  if (extraInc > 0) {
+    const toStb = Math.min(extraInc, shortStb), toGro = Math.min(extraInc - toStb, shortGro)
+    lines.push(`Income has ${L(extraInc)} more than 2 years of expenses.${toStb > 0 ? ` Move ${L(toStb)} to Stability (a hybrid or debt fund).` : ''}${toGro > 0 ? ` Move ${L(toGro)} to Growth (an equity fund).` : ''}${toStb + toGro < extraInc ? ' The rest can stay as extra safety, or go to Growth.' : ''}`)
+  }
+  if (shortStb - Math.min(extraInc, shortStb) > 0) lines.push(`Stability is ${L(shortStb - Math.min(extraInc, shortStb))} short of 5 years of expenses.`)
+  if (shortGro - Math.max(0, Math.min(extraInc - Math.min(extraInc, shortStb), shortGro)) > 0) lines.push(`Growth is ${L(shortGro - Math.max(0, Math.min(extraInc - Math.min(extraInc, shortStb), shortGro)))} below the plan.`)
+  if (!lines.length) return <p className="g2-hint">✓ Every jar is on plan.</p>
+  return <div className="g2-hint">{lines.map((t, i) => <div key={i}>⚠ {t}</div>)}</div>
+}
 function Buckets({ p, items, retired, mt, pname, onOpen }) {
-  const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal')
+  const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal') || (p.road || []).find((r) => r.k === 'spend')
   const b = stop?.bucket
   const tgt = b?.monthly ? { inc: b.income, stb: b.stability, gro: Math.max(0, p.target - b.income - b.stability) } : null
   const hold = { inc: [], stb: [], gro: [] }
@@ -206,7 +227,8 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
       {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
         : retired ? null : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Until {yearOf(p.goal) - 5}: one growth mix</div><div className={p.bucketMode ? 'on' : ''}>{yearOf(p.goal) - 5}–{yearOf(p.goal)}: fill the jars</div><div>From {yearOf(p.goal)} (retirement): live from them</div></div>}
       <div className="g2-jars">{jar('gro', 'Growth', 'the rest · equity')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('inc', 'Income', '2 years of expenses · safe')}</div>
-      {locked.length > 0 && <p className="g2-hint">🔒 EPF / PPF / NPS ({L(locked.reduce((t, it) => t + it.value, 0))}) count in Stability but are never switched: you withdraw them by their own rules (EPF at retirement, PPF at maturity) and put the money in a liquid or debt fund.</p>}
+      {(retired || p.bucketMode) && tgt && <BucketGaps tgt={tgt} sum={sum} lockedSum={locked.reduce((t, it) => t + it.value, 0)} />}
+      {locked.length > 0 && <p className="g2-hint">🔒 EPF / PPF / NPS ({L(locked.reduce((t, it) => t + it.value, 0))}) count in Stability but are never switched and never pay your income: they stay where they are, earning interest, until you withdraw them by their own rules (EPF at retirement or later, PPF at maturity). When you do, put the money in a liquid or debt fund.</p>}
       <div className="g2-flow"><div>→ refills Stability after good years</div><div>→ refills Income once a year</div><div>↓ pays your monthly income</div></div>
       <p className="g2-hint">{retired ? 'You spend only from Income. Once a year a Refill plan shows on this card (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown on this card).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
     </div>
