@@ -83,6 +83,38 @@ function gvizFetch_(tabName, tq) {
   return json;
 }
 
+/**
+ * Several master-DB queries at once (UrlFetchApp.fetchAll, a few at a time so Google doesn't throttle us).
+ * Any query that fails or returns an error is retried on its own with gvizFetch_ (3 tries, back-off),
+ * so the result is the same as one-by-one, only faster. Returns the parsed answers in the same order.
+ */
+function gvizFetchMany_(tabName, tqs, groupSize) {
+  var base = 'https://docs.google.com/spreadsheets/d/' + CONFIG.masterDbId + '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(tabName) + '&tq=';
+  var out = new Array(tqs.length), size = groupSize || 6;
+  for (var g = 0; g < tqs.length; g += size) {
+    var idx = [], reqs = [];
+    for (var i = g; i < Math.min(tqs.length, g + size); i++) { idx.push(i); reqs.push({ url: base + encodeURIComponent(tqs[i]), muteHttpExceptions: true }); }
+    var resps = null;
+    try { resps = UrlFetchApp.fetchAll(reqs); } catch (e) {
+      if (/permission|not sufficient/i.test(String(e && e.message))) throw e;
+      resps = null; // the whole batch failed: each query falls back below
+    }
+    idx.forEach(function (k, j) {
+      var r = resps && resps[j];
+      try {
+        if (!r || r.getResponseCode() !== 200) throw new Error('HTTP ' + (r ? r.getResponseCode() : '?'));
+        var text = r.getContentText();
+        var json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+        if (json.status !== 'ok') throw new Error('status ' + json.status);
+        out[k] = json;
+      } catch (e) {
+        out[k] = gvizFetch_(tabName, tqs[k]); // retried on its own (throws only if it keeps failing)
+      }
+    });
+  }
+  return out;
+}
+
 function gvizValue_(v, type, tz) {
   if (type === 'date' || type === 'datetime') {
     var m = String(v).match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+)(?:,(\d+))?)?\)/);

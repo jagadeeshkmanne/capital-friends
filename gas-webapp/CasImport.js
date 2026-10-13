@@ -219,11 +219,17 @@ function casFundIndex_(isins) {
       return false;
     });
   }
-  // Apps Script allows URLs of about 2,000 characters: 20 ISINs per request keeps well under that
-  for (var i = 0; i < list.length; i += 20) {
-    var part = list.slice(i, i + 20);
+  // Apps Script allows URLs of about 2,000 characters: 20 ISINs per request keeps well under that.
+  // The requests run a few at a time in parallel (a 500-fund statement: 25 requests in ~3 s instead of ~20 s);
+  // a request that fails is retried on its own, so a slow moment never loses funds.
+  var parts = [];
+  for (var i = 0; i < list.length; i += 20) parts.push(list.slice(i, i + 20));
+  var answers = parts.length ? gvizFetchMany_(CONFIG.masterMFDataSheet, parts.map(function (part) {
     var rx = part.join('|');
-    var json = gvizFetch_(CONFIG.masterMFDataSheet, "select A,B,D,I,J where I matches '" + rx + "' or J matches '" + rx + "'");
+    return "select A,B,D,I,J where I matches '" + rx + "' or J matches '" + rx + "'";
+  })) : [];
+  parts.forEach(function (part, pi) {
+    var json = answers[pi];
     (json.table.rows || []).forEach(function (row) {
       var c = row.c || [];
       var v = function (k) { return c[k] && c[k].v !== null && c[k].v !== undefined ? c[k].v : ''; };
@@ -238,7 +244,7 @@ function casFundIndex_(isins) {
       part.forEach(function (x) { put[CK + x] = out[x] ? JSON.stringify(out[x]) : '-'; }); // '-' = not in the list (checked)
       try { cache.putAll(put, 6 * 3600); } catch (e) { }
     }
-  }
+  });
   return out;
 }
 
