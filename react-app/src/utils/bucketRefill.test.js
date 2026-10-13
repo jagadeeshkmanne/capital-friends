@@ -124,10 +124,23 @@ test('market check is weighted by value and schedule uses the retirement anniver
   assert.equal(schedule.nextDate.toISOString().slice(0, 10), '2028-01-15')
 })
 
-test('income full but stability short in a good year: shown as not due, not "all set"', () => {
+test('stability used in a crash, market back near its high mid-year: growth refills stability now', () => {
   const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 1200000, b2: 1500000, b3: 11800000 }), planDate: MID_YEAR })
   assert.deepEqual(ids(plan), ['b3-to-b2'])
+  assert.equal(amountOf(plan, 'b3-to-b2'), 1500000)
+  assert.equal(plan.status, 'due')
+})
+
+test('stability only a little short mid-year (under 6 months): waits for the yearly date', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 1200000, b2: 2800000, b3: 11800000 }), planDate: MID_YEAR })
+  assert.deepEqual(ids(plan), ['b3-to-b2'])
   assert.equal(plan.status, 'not-due')
+})
+
+test('stability short mid-year but the market is still down: growth is not sold', () => {
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 1200000, b2: 1500000, b3: 8000000, nav: 70 }), planDate: MID_YEAR })
+  assert.equal(plan.operations.some(op => op.from === 'b3'), false)
+  assert.notEqual(plan.status, 'due')
 })
 
 test('goal marked Achieved before its target date counts as retired', () => {

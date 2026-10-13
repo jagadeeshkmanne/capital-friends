@@ -38,7 +38,7 @@ export function bucketCheck({ tgt, inc, stb, gro, locked, monthly }) {
   }
   const stbAfter = stb + (free - left)
   if (m && stbAfter < m * REFILL_RULES.stabilityFloorMonths) warn.push(`Stability holds less than 2 years of expenses. In the next good market year, refill it from Growth.`)
-  else if (stbAfter < tgt.stb) info.push(`Stability is below 5 years of expenses. Growth refills it in a good market year.`)
+  else if (stbAfter < tgt.stb) info.push(`Stability is below 5 years of expenses. As soon as your growth funds are back near their high, the app asks Growth to refill it.`)
   if (left > 0) steps.push(`${L(left)} free money left after filling the jars: put it in Growth (equity funds, in parts over 6 to 12 months), or keep it for other goals.`)
   const total = inc + stb + gro
   if (m && total < tgt.inc + tgt.stb) warn.push(`All your money covers about ${(total / (m * 12)).toFixed(1)} years of expenses, less than the 7 years Income and Stability need.`)

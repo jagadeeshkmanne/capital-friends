@@ -8,6 +8,8 @@
 //   - Income bucket (B1) holds 2 years of expenses, topped up once a year.
 //     A refill is due on the yearly refill date (retirement anniversary), or
 //     earlier if B1 drops to 12 months.
+//   - Stability used up in a crash: as soon as the market is good again (growth near its high),
+//     growth refills Stability to 5 years, without waiting for the yearly date (gap of 6+ months).
 //   - Growth market check: the growth funds' (B3) NAV against their all-time
 //     high, weighted by value. Within 10% of the high = good, otherwise down.
 //   - Good market: stability surplus above 5 years → B1 first, then growth → B1,
@@ -33,6 +35,7 @@ export const REFILL_RULES = {
   stabilityMonths: 60,
   stabilityFloorMonths: 24,
   earlyRefillMonths: 12,
+  stabilityRefillMonths: 6,
   lateStartIncomeMonths: 12,
   goodMarketMaxBelowAthPct: 10,
   refillWindowDays: 45,
@@ -354,9 +357,13 @@ export function buildBucketRefillPlan({
   const b1Low = months.b1 <= rules.earlyRefillMonths
   const inWindow = daysSinceRefillDate !== null && daysSinceRefillDate <= rules.refillWindowDays
   const hasWork = operations.length > 0
+  // Stability was used in a crash and the market is back near its high: refill Stability from Growth now,
+  // don't wait for the yearly date (the next crash may come before it). Only for a real gap, 6+ months of expenses.
+  const stabilityTopUp = operations.find(op => op.id === 'b3-to-b2')
+  const stabilityDue = market.status === 'good' && !!stabilityTopUp && stabilityTopUp.fundedAmount >= monthly * rules.stabilityRefillMonths
   if (!hasWork && b1Gap <= monthly * 0.5) {
     status = 'ok'
-  } else if (b1Low || inWindow) {
+  } else if (b1Low || inWindow || stabilityDue) {
     status = 'due'
   } else {
     // Includes a stability-only top-up while income is full: shown on request.
