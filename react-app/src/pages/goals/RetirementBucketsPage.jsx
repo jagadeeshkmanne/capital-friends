@@ -13,6 +13,8 @@ import BucketHowItWorks from '../../components/buckets/BucketHowItWorks'
 import { allocateBucketWithdrawal } from '../../utils/retirementBuckets'
 import { buildBucketRefillPlan } from '../../utils/bucketRefill'
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
+import { readIncomePlan, readRefillLog, splitToSources } from '../../utils/incomePlan'
+import * as api from '../../services/api'
 
 const BUCKET = {
   b1: { name: 'Income', long: 'Income bucket', icon: Wallet, text: 'text-emerald-400', soft: 'bg-emerald-500/10', bar: 'bg-emerald-500/60', border: 'border-emerald-500/40', holds: 'Liquid and short-term debt funds' },
@@ -27,6 +29,7 @@ const REASON = {
   'growth-short': 'Growth did not have enough, so Stability covers the rest.',
   'glide-path': 'Your equity is above the glide path for your years to retirement, so some growth moves to safer funds.',
   'build-step': 'This quarter’s small step towards your retirement buckets. Growth funds are near their high.',
+  'stability-step': 'Stability is far below 5 years: this is the first of two steps a month apart, so one bad week can’t catch the whole amount.',
   'late-start': 'There is not enough safe money for even 1 year, so 1 year of expenses comes from growth, even though it is down.',
 }
 
@@ -206,8 +209,26 @@ const FLOW_CSS = `
 .txn-arrow-x{animation:txn-ax 4s ease-in-out infinite}.txn-arrow-y{animation:txn-ay 4s ease-in-out infinite}
 @media (prefers-reduced-motion: reduce){.flow-dash{animation:none}.txn-sell,.txn-buy,.txn-arrow-x,.txn-arrow-y{animation:none}.flow-coin{animation:none;opacity:0}.flow-level{animation:none}.flow-t1,.flow-t2{animation:none;opacity:0}.flow-t3{animation:none;opacity:1}}`
 
-function RefillSteps({ plan, operations }) {
+function RefillSteps({ plan, operations, goalId, incomePlan, onDone }) {
   const [destinations, setDestinations] = useState({})
+  // money for Income: into the savings account / sweep-in FD that pays the monthly income, or into a liquid fund
+  const cashSources = (incomePlan?.sources || []).filter(s => s.kind === 'cash' && s.ref)
+  const [toSavings, setToSavings] = useState(cashSources.length > 0)
+  const [marking, setMarking] = useState(false)
+  const [marked, setMarked] = useState(false)
+  const markDone = async () => {
+    setMarking(true)
+    try {
+      const ops = []
+      for (const op of operations) {
+        if (op.to === 'b1' && toSavings && cashSources.length) for (const part of splitToSources(op.fundedAmount, cashSources)) ops.push({ from: op.from, to: 'b1', amount: part.amount, toRef: part.ref })
+        else ops.push({ from: op.from, to: op.to, amount: Math.round(op.fundedAmount) })
+      }
+      await api.markRefillDone({ goalId, ops })
+      setMarked(true)
+      onDone?.()
+    } finally { setMarking(false) }
+  }
   // buy inside the same portfolio, so retirement money stays in the retirement portfolio
   const destinationFor = (op, portfolioId) =>
     destinations[`${op.id}::${portfolioId}`] || destinationCandidates(plan, op.to, portfolioId)[0] || null
@@ -253,10 +274,10 @@ function RefillSteps({ plan, operations }) {
                   </div>
                   <div className="hidden md:flex items-center self-center text-[var(--text-dim)]">→</div>
                   <div className={`rounded-lg border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden border-t-[3px] ${to.border}`}>
-                    <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-400">Buy · same portfolio</p>
+                    <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-400">{op.to === 'b1' && toSavings && cashSources.length ? 'To your bank' : 'Buy · same portfolio'}</p>
                     <div className="flex justify-between gap-3 px-3 py-2 border-t border-[var(--border-light)]">
                       <div className="min-w-0 flex-1">
-                        {candidates.length > 1 ? (
+                        {op.to === 'b1' && toSavings && cashSources.length ? <p className="text-sm text-[var(--text-primary)]">{cashSources.map(c => c.name).join(' + ')}</p> : candidates.length > 1 ? (
                           <select value={dest?.key || ''} onChange={e => setDestinations(p => ({ ...p, [destKey]: candidates.find(c => c.key === e.target.value) }))}
                             className="w-full text-sm bg-[var(--bg-inset)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[var(--text-primary)]">
                             {candidates.map(c => <option key={c.key} value={c.key}>{splitFundName(c.fundName || '').main}</option>)}
@@ -273,6 +294,17 @@ function RefillSteps({ plan, operations }) {
           </div>
         )
       })}
+      {operations.some(op => op.to === 'b1') && cashSources.length > 0 && (
+        <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3 text-sm space-y-1.5">
+          <p className="font-semibold text-[var(--text-primary)]">Where does the Income money go?</p>
+          <label className="flex items-center gap-2"><input type="radio" checked={toSavings} onChange={() => setToSavings(true)} /> Into {cashSources.map(c => c.name).join(' and ')} (the money from the sale lands in your bank)</label>
+          <label className="flex items-center gap-2"><input type="radio" checked={!toSavings} onChange={() => setToSavings(false)} /> Into the liquid fund shown above</label>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={marking || marked} onClick={markDone} className="px-3 py-2 text-sm font-semibold rounded-lg bg-emerald-600 text-white disabled:opacity-60">{marked ? 'Marked done ✓' : marking ? 'Saving…' : 'I did these: mark done'}</button>
+        <p className="text-xs text-[var(--text-dim)]">{toSavings && operations.some(op => op.to === 'b1') && cashSources.length ? 'Your savings balance goes up now. ' : ''}Fund sales and buys show after your next CAS import. This refill is not asked again this year.</p>
+      </div>
       <p className="text-[11px] text-[var(--text-dim)]">Sell in units, buy in ₹ (units depend on that day's NAV). Selling may have tax. Not investment advice.</p>
     </div>
   )
@@ -323,7 +355,9 @@ function MonthlyWithdrawal({ plan }) {
  */
 export function RetirementActions({ goal, slot = 'alert', fallback }) {
   const data = useData()
-  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF } = data
+  const { goalList, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, stockHoldings, switchMF, redeemMF, settings } = data
+  const incomePlan = goal ? readIncomePlan(settings, goal.goalId) : null
+  const refillLog = goal ? readRefillLog(settings, goal.goalId) : []
   const [open, setOpen] = useState(null) // 'refill' | 'income' | 'how'
   const goalAttribution = useMemo(() => {
     const allocMap = {}
@@ -336,8 +370,8 @@ export function RetirementActions({ goal, slot = 'alert', fallback }) {
     const yearsLeft = goal.targetDate ? Math.max(0, (new Date(goal.targetDate) - new Date()) / (365.25 * 864e5)) : 0
     return buildBucketRefillPlan({ goal, mappings: goalPortfolioMappings, holdings: mfHoldings, portfolios: mfPortfolios, assetAllocations,
       targetEquityPct: getRecommendedAllocation('Retirement', yearsLeft).equity, lastBucketMoveDate: lastBucketMove(mfTransactions, goal),
-      otherInvestments: otherInvList || [], attribution: goalAttribution[goal.goalId] })
-  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution])
+      otherInvestments: otherInvList || [], attribution: goalAttribution[goal.goalId], refillLog })
+  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution, JSON.stringify(refillLog)]) // eslint-disable-line react-hooks/exhaustive-deps
   const noPlan = !plan || plan.noExpenses || plan.status === 'not-started'
   const ops = noPlan ? [] : plan.operations
   const showRefill = !noPlan && ops.length > 0 && plan.status !== 'not-due'
@@ -363,10 +397,10 @@ export function RetirementActions({ goal, slot = 'alert', fallback }) {
         </button>
       )}
       {open === 'how' && createPortal(<Modal open onClose={() => setOpen(null)} title="How the 3 buckets work" maxWidth="max-w-2xl" maxHeight="max-h-[90vh]"><BucketHowItWorks /></Modal>, document.body)}
-      {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · yearly refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
+      {(open === 'refill' || open === 'income') && createPortal(<Modal open onClose={() => setOpen(null)} title={open === 'refill' ? 'Retirement buckets · refill' : "This month's income"} wide maxHeight="max-h-[90vh]">
         <div className="space-y-3">
       {open === 'refill' && (
-        <RefillSteps key={goal.goalId} plan={plan} operations={ops} />
+        <RefillSteps key={goal.goalId} plan={plan} operations={ops} goalId={goal.goalId} incomePlan={incomePlan} />
       )}
       {open === 'income' && (
         <MonthlyWithdrawal key={`w-${goal.goalId}`} plan={plan} />

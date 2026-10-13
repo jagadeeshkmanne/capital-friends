@@ -58,8 +58,28 @@ test('recovery year: growth refills income and tops stability back to 5 years', 
   const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 600000, b2: 1800000, b3: 11000000, nav: 96 }), planDate: ON_REFILL_DATE })
   assert.deepEqual(ids(plan), ['b3-to-b1', 'b3-to-b2'])
   assert.equal(amountOf(plan, 'b3-to-b1'), 600000)
-  assert.equal(amountOf(plan, 'b3-to-b2'), 1200000)
-  assert.equal(Math.round(plan.after.b2), 3000000)
+  // gap of 2 years: two steps a month apart; this is the first (half the gap, at least 12 months)
+  assert.equal(amountOf(plan, 'b3-to-b2'), 600000)
+  assert.equal(Math.round(plan.after.b2), 2400000)
+})
+
+test('big Stability gap: second step waits a month after the first is marked done, then goes ahead in a good market', () => {
+  const h = holdings({ b1: 1200000, b2: 1500000, b3: 11800000 })
+  const log = [{ at: '2027-06-20', ops: [{ from: 'b3', to: 'b2', amount: 750000 }] }]
+  const soon = buildBucketRefillPlan({ ...base, holdings: h, planDate: MID_YEAR, refillLog: log })
+  assert.equal(soon.operations.some(op => op.id === 'b3-to-b2'), false)
+  assert.ok(soon.warnings.some(w => w.code === 'stability-step-wait'))
+  assert.notEqual(soon.status, 'due')
+  const later = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 1200000, b2: 2250000, b3: 11050000 }), planDate: new Date('2027-08-01T00:00:00.000Z'), refillLog: log })
+  assert.equal(amountOf(later, 'b3-to-b2'), 750000)
+  assert.equal(later.status, 'due')
+})
+
+test('this year\'s Income refill marked done: not asked again until next year (unless Income drops to 12 months)', () => {
+  const log = [{ at: '2027-01-22', ops: [{ from: 'b2', to: 'b1', amount: 600000 }] }]
+  const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 900000, b2: 3000000, b3: 11800000, nav: 70 }), planDate: new Date('2027-02-25T00:00:00.000Z'), refillLog: log })
+  assert.notEqual(plan.status, 'due')
+  assert.equal(plan.incomeRefilledOn.toISOString().slice(0, 10), '2027-01-22')
 })
 
 test('long fall: stability stops at its 2-year floor and the plan warns', () => {
@@ -127,7 +147,7 @@ test('market check is weighted by value and schedule uses the retirement anniver
 test('stability used in a crash, market back near its high mid-year: growth refills stability now', () => {
   const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 1200000, b2: 1500000, b3: 11800000 }), planDate: MID_YEAR })
   assert.deepEqual(ids(plan), ['b3-to-b2'])
-  assert.equal(amountOf(plan, 'b3-to-b2'), 1500000)
+  assert.equal(amountOf(plan, 'b3-to-b2'), 750000) // gap 2.5 years: first of two steps
   assert.equal(plan.status, 'due')
 })
 
@@ -244,5 +264,5 @@ test('late starter, good market: both safe buckets are filled from growth now', 
   const plan = buildBucketRefillPlan({ ...base, holdings: holdings({ b1: 0, b2: 0, b3: 11800000, nav: 98 }), planDate: ON_REFILL_DATE })
   assert.deepEqual(ids(plan), ['b3-to-b1', 'b3-to-b2'])
   assert.equal(amountOf(plan, 'b3-to-b1'), 1200000)
-  assert.equal(amountOf(plan, 'b3-to-b2'), 3000000)
+  assert.equal(amountOf(plan, 'b3-to-b2'), 1500000) // Stability empty: half now, the rest a month later
 })

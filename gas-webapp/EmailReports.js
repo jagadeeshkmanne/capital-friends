@@ -1247,6 +1247,7 @@ function buildDashboardReportData() {
 
       // Action items
       actionItems: topActionItems,
+      incomeItems: incomeEmailItems_(), // monthly retirement income: paid / short / running low (IncomePlan.js)
 
       // Buy opportunities
       buyOpportunities: buyOpportunities,

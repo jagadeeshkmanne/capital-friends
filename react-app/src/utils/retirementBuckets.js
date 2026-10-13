@@ -118,7 +118,10 @@ export function classifyOtherInvestment(investment) {
   // EPF / PPF / NPS-like money is never Income, whatever category it was saved with: it stays invested
   // (EPF can keep earning interest after retirement) until you withdraw it by its own rules.
   if (/\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation/i.test(`${type} ${investment?.investmentName || ''}`)) return { bucket: 'b2', reason: type || 'Locked (EPF / PPF / NPS)', equity: 0, confidence: 'type' }
-  if (t === 'fixed deposit' || t === 'fd') return { bucket: 'b1', reason: 'Fixed deposit', equity: 0, confidence: 'type' }
+  // A sweep-in FD is linked to savings and the bank breaks it as needed: it can pay monthly income.
+  if (/sweep/.test(t)) return { bucket: 'b1', reason: 'Sweep-in FD', equity: 0, confidence: 'type' }
+  // A regular FD can't pay a monthly amount: it is safe money for Stability and refills Income when it matures.
+  if (t === 'fixed deposit' || t === 'fd') return { bucket: 'b2', reason: 'Fixed deposit (refills Income when it matures)', equity: 0, confidence: 'type' }
   if (t === 'cash / savings' || category === 'cash') return { bucket: 'b1', reason: 'Cash / savings', equity: 0, confidence: 'type' }
   if (['epf', 'ppf', 'bonds', 'nps'].includes(t)) return { bucket: 'b2', reason: type, equity: 0, confidence: 'type' }
   if (category === 'gold' || category === 'silver' || includesAny(t, COMMODITY_WORDS)) return { bucket: 'b3', reason: 'Gold/silver', equity: 0, confidence: 'type' }

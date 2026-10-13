@@ -35,3 +35,20 @@ test('everything on plan: no steps, no warnings', () => {
   const r = bucketCheck({ tgt: tgt(30000), inc: 720000, stb: 1800000, gro: 3000000, locked: 0, monthly: 30000 })
   assert.deepEqual([r.steps.length, r.warn.length], [0, 0])
 })
+
+import { bucketReminders } from './bucketCheck.js'
+const epf = { kind: 'other', value: 2600000, holding: { investmentType: 'EPF' } }
+test('EPF reminder: retired at 48 -> earns until 58; retired at 58 -> about 3 years; past -> check it', () => {
+  const t = new Date('2026-10-13')
+  assert.match(bucketReminders({ items: [epf], age: 48, retAge: 48, today: t })[0].text, /until about 2036 \(age 58\)/)
+  assert.match(bucketReminders({ items: [epf], age: 58, retAge: 58, today: t })[0].text, /until about 2029 \(about 3 years/)
+  const late = bucketReminders({ items: [epf], age: 63, retAge: 58, today: t })[0]
+  assert.equal(late.type, 'warn'); assert.match(late.text, /probably stopped earning interest \(around 2024\)/)
+})
+test('FD maturity: within a year -> info, matured -> press Received', () => {
+  const t = new Date('2026-10-13')
+  const fd = (m) => ({ kind: 'other', value: 500000, holding: { investmentType: 'Fixed Deposit', investmentName: 'SBI FD', dynamicFields: JSON.stringify({ maturityDate: m }) } })
+  assert.match(bucketReminders({ items: [fd('2027-03-15')], today: t })[0].text, /matures on 15 Mar 2027/)
+  assert.equal(bucketReminders({ items: [fd('2026-09-01')], today: t })[0].type, 'warn')
+  assert.equal(bucketReminders({ items: [fd('2029-01-01')], today: t }).length, 0)
+})

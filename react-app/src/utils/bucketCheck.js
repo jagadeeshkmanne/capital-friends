@@ -44,3 +44,37 @@ export function bucketCheck({ tgt, inc, stb, gro, locked, monthly }) {
   if (m && total < tgt.inc + tgt.stb) warn.push(`All your money covers about ${(total / (m * 12)).toFixed(1)} years of expenses, less than the 7 years Income and Stability need.`)
   return { free, steps, warn, info }
 }
+
+const dyn = (h) => { const v = h?.dynamicFields; if (v && typeof v === 'object') return v; try { const x = JSON.parse(v || '{}'); return typeof x === 'string' ? JSON.parse(x) : x || {} } catch { return {} } }
+const dmy = (d) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+/**
+ * Dated reminders for the retirement card:
+ *  - EPF stops earning interest: at 58 if you stopped working before 55, else about 3 years after you stopped
+ *    (EPFO rules; check them every year). Until then it stays locked in Stability.
+ *  - A regular FD maturing within a year (it refills Income: press Received then), or already matured.
+ * items: the goal's items ({ kind, holding, value }); age: today's age; retAge: age at the retirement date.
+ */
+export function bucketReminders({ items = [], age, retAge, today = new Date() }) {
+  const out = []
+  const y = today.getFullYear()
+  const epf = items.filter((it) => it.kind === 'other' && /\bepf\b|provident/i.test(`${it.holding?.investmentType || ''} ${it.holding?.investmentName || ''}`))
+  if (epf.length && age && retAge) {
+    const total = epf.reduce((t, it) => t + it.value, 0)
+    const stopYear = retAge < 55 ? y + Math.max(0, 58 - age) : y - Math.max(0, age - retAge) + 3
+    if (stopYear < y) out.push({ type: 'warn', text: `EPF (${L(total)}) has probably stopped earning interest (around ${stopYear}). Check it, withdraw it, and press Received in Other investments.` })
+    else if (stopYear - y <= 1) out.push({ type: 'warn', text: `EPF (${L(total)}) stops earning interest around ${stopYear}. Plan to withdraw it before then, and press Received in Other investments when the money comes.` })
+    else out.push({ type: 'info', text: `EPF (${L(total)}) keeps earning interest until about ${stopYear}${retAge < 55 ? ' (age 58)' : ' (about 3 years after you stopped working)'}. It stays locked in Stability until then. EPF rules change: check them each year.` })
+  }
+  for (const it of items) {
+    if (it.kind !== 'other' || !/fixed deposit|^fd$/i.test(it.holding?.investmentType || '') || /sweep/i.test(it.holding?.investmentType || '')) continue
+    const md = dyn(it.holding).maturityDate
+    const d = md ? new Date(md) : null
+    if (!d || isNaN(d)) continue
+    const days = (d - today) / 864e5
+    const nm = it.holding?.investmentName || 'An FD'
+    if (days < 0) out.push({ type: 'warn', text: `${nm} (${L(it.value)}) matured on ${dmy(d)}. Press Received in Other investments: the money refills Income.` })
+    else if (days <= 365) out.push({ type: 'info', text: `${nm} (${L(it.value)}) matures on ${dmy(d)}. Then press Received: the money refills Income.` })
+  }
+  return out
+}

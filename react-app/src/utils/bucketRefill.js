@@ -10,6 +10,9 @@
 //     earlier if B1 drops to 12 months.
 //   - Stability used up in a crash: as soon as the market is good again (growth near its high),
 //     growth refills Stability to 5 years, without waiting for the yearly date (gap of 6+ months).
+//     A gap of more than 12 months is filled in two steps, a month apart (good market both times).
+//   - "Mark done" (RefillLog): this year's Income refill is not asked again; the next one is next year
+//     (or earlier if Income drops to 12 months).
 //   - Growth market check: the growth funds' (B3) NAV against their all-time
 //     high, weighted by value. Within 10% of the high = good, otherwise down.
 //   - Good market: stability surplus above 5 years → B1 first, then growth → B1,
@@ -36,6 +39,8 @@ export const REFILL_RULES = {
   stabilityFloorMonths: 24,
   earlyRefillMonths: 12,
   stabilityRefillMonths: 6,
+  stabilityStepMonths: 12,  // a Stability gap bigger than this is refilled in two steps
+  stabilityStepGapDays: 30, // the second step waits a month (and a good market)
   lateStartIncomeMonths: 12,
   goodMarketMaxBelowAthPct: 10,
   refillWindowDays: 45,
@@ -149,6 +154,7 @@ export function buildBucketRefillPlan({
   targetEquityPct,
   planDate = new Date(),
   lastBucketMoveDate = null,
+  refillLog = [],
   rules: customRules,
   otherInvestments = [],
   attribution = null,
@@ -187,6 +193,11 @@ export function buildBucketRefillPlan({
 
   const market = assessGrowthMarket(base.byBucket.b3.filter(fund => !fund.isOther), rules.goodMarketMaxBelowAthPct)
   const schedule = refillSchedule(goal, planDate)
+  // "Mark done" lines (RefillLog): has this year's Income refill been done, and when was the last Stability step?
+  const logged = (refillLog || []).map(e => ({ ...e, date: validDate(e.at) })).filter(e => e.date && e.date <= planDate)
+  const lastTo = to => logged.filter(e => (e.ops || []).some(o => o.to === to)).sort((a, b) => b.date - a.date)[0] || null
+  const incomeDone = lastTo('b1')
+  const stabilityDone = lastTo('b2')
 
   const b2Sources = base.byBucket.b2.filter(fund => !fund.isOther).sort((a, b) =>
     (a.equityPercent ?? 100) - (b.equityPercent ?? 100) || b.goalValue - a.goalValue,
@@ -311,8 +322,15 @@ export function buildBucketRefillPlan({
     }
     // 3. Growth tops stability back up to 5 years.
     const b2Gap = Math.max(0, targets.b2 - b2Now)
-    if (b2Gap > minMove) {
-      const result = sellGrowth(b3Sources, b2Gap, committedUnits, rules.goodMarketMaxBelowAthPct)
+    // A big gap is filled in two steps a month apart, so one bad week can't catch the whole amount.
+    const bigGap = b2Gap > monthly * rules.stabilityStepMonths
+    const sinceStep = stabilityDone ? (planDate - stabilityDone.date) / DAY_MS : null
+    const waitStep = bigGap && sinceStep !== null && sinceStep < rules.stabilityStepGapDays
+    const secondStep = sinceStep !== null && sinceStep >= rules.stabilityStepGapDays && sinceStep <= 180 // the first step was done recently: finish it
+    const stepAmount = bigGap && !secondStep ? Math.max(monthly * rules.stabilityStepMonths, b2Gap / 2) : b2Gap
+    if (waitStep) warnings.push({ code: 'stability-step-wait', amount: b2Gap, nextDate: new Date(stabilityDone.date.getTime() + rules.stabilityStepGapDays * DAY_MS) })
+    if (b2Gap > minMove && !waitStep) {
+      const result = sellGrowth(b3Sources, Math.min(b2Gap, stepAmount), committedUnits, rules.goodMarketMaxBelowAthPct)
       if (result.fundedAmount > 1) {
         operations.push(operation('b3-to-b2', 'b3', 'b2', result, 'good-market'))
         b2Now += result.fundedAmount
@@ -355,15 +373,19 @@ export function buildBucketRefillPlan({
   let status
   const daysSinceRefillDate = schedule.lastDate ? (planDate.getTime() - schedule.lastDate.getTime()) / DAY_MS : null
   const b1Low = months.b1 <= rules.earlyRefillMonths
-  const inWindow = daysSinceRefillDate !== null && daysSinceRefillDate <= rules.refillWindowDays
+  const doneThisYear = !!incomeDone && !!schedule.lastDate && incomeDone.date >= new Date(schedule.lastDate.getTime() - rules.refillWindowDays * DAY_MS)
+  const inWindow = daysSinceRefillDate !== null && daysSinceRefillDate <= rules.refillWindowDays && !doneThisYear
   const hasWork = operations.length > 0
   // Stability was used in a crash and the market is back near its high: refill Stability from Growth now,
   // don't wait for the yearly date (the next crash may come before it). Only for a real gap, 6+ months of expenses.
   const stabilityTopUp = operations.find(op => op.id === 'b3-to-b2')
-  const stabilityDue = market.status === 'good' && !!stabilityTopUp && stabilityTopUp.fundedAmount >= monthly * rules.stabilityRefillMonths
+  // A refill marked done in the last 30 days: the balances change only after the next CAS import, so don't ask again.
+  const recent = e => !!e && (planDate - e.date) / DAY_MS < rules.stabilityStepGapDays
+  const waitingForImport = recent(incomeDone) || recent(stabilityDone)
+  const stabilityDue = market.status === 'good' && !!stabilityTopUp && stabilityTopUp.fundedAmount >= monthly * rules.stabilityRefillMonths && !recent(stabilityDone)
   if (!hasWork && b1Gap <= monthly * 0.5) {
     status = 'ok'
-  } else if (b1Low || inWindow || stabilityDue) {
+  } else if (((b1Low || inWindow) && !recent(incomeDone)) || stabilityDue) {
     status = 'due'
   } else {
     // Includes a stability-only top-up while income is full: shown on request.
@@ -378,6 +400,9 @@ export function buildBucketRefillPlan({
   return {
     ...common,
     status,
+    incomeRefilledOn: incomeDone?.date || null,
+    waitingForImport,
+    stabilityRefilledOn: stabilityDone?.date || null,
     hasWork,
     nextCheckDate,
     operations,

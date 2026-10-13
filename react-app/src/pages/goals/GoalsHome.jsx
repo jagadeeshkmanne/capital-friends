@@ -1,12 +1,15 @@
 // The Goals page (one page): To do this month → all goals together → free money → the road of goals by year.
 // Numbers come from the goals pool (Money for goals), buildGoalPlan (pool mode), familyPlan and goalTodo.
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
 import { List, Layers } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { RetirementActions } from './RetirementBucketsPage'
-import { bucketCheck, lastsYears } from '../../utils/bucketCheck'
+import { bucketCheck, lastsYears, bucketReminders } from '../../utils/bucketCheck'
+import { readIncomePlan, readIncomeLog, readRefillLog, incomeStatus, defaultIncomePlan, lastRefill } from '../../utils/incomePlan'
+import { useData } from '../../context/DataContext'
+import * as api from '../../services/api'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -85,7 +88,19 @@ function useCurve(dep) {
   return [ref, d]
 }
 
+let incomeApplied = false // once per app session: take this month's income from savings if the daily job hasn't yet
+function useApplyIncomeOnce() {
+  const { settings } = useData()
+  const has = !!settings && Object.keys(settings).some((k) => k.startsWith('IncomePlan:'))
+  useEffect(() => {
+    if (!has || incomeApplied) return
+    incomeApplied = true
+    api.applyIncome().catch(() => { incomeApplied = false })
+  }, [has])
+}
+
 export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
+  useApplyIncomeOnce()
   const { mt, navigate, pname, closeGoal } = ctx
   const steps = todo.steps.filter((x) => x.t === 'cash' || x.t === 'switch' || x.t === 'protect')
   const protectOf = Object.fromEntries(todo.steps.filter((x) => x.t === 'protect').map((x) => [x.goal.goalId, x]))
@@ -183,7 +198,7 @@ function JarSvg({ c, f }) {
   const y = 66 - Math.max(4, Math.min(1, f || 0) * 52)
   return <svg width="46" height="60" viewBox="0 0 54 70" aria-hidden="true"><rect x="15" y="2" width="24" height="7" rx="3" fill={c} /><path d="M12 12Q8 12 8 18L8 60Q8 66 14 66L40 66Q46 66 46 60L46 18Q46 12 42 12Z" fill="none" stroke={c} strokeWidth="2.4" /><rect x="10" y={y} width="34" height={64 - y} rx="4" fill={c} opacity=".55" /></svg>
 }
-/** Which jar an investment sits in today: liquid / short debt / cash → Income, other debt / hybrid → Stability, equity & gold → Growth */
+/** Which jar an investment sits in today: savings, sweep-in FD, liquid funds → Income; regular FDs, other debt, hybrid, EPF / PPF / NPS → Stability; equity & gold → Growth */
 const LOCK_RE = /\b(epf|ppf|nps|vpf)\b|provident|pension|superannuation/i
 /** EPF / PPF / NPS and similar: money you can't move today; it comes out only by its own rules (EPF at retirement or later, PPF at maturity). */
 const isLocked = (it) => it.kind === 'other' && LOCK_RE.test(`${it.holding?.investmentType || ''} ${it.holding?.investmentName || ''}`)
@@ -192,8 +207,8 @@ const jarOf = (it) => {
   if (isGold(it.holding) || (it.eq || 0) >= 0.65) return 'gro'
   if (it.kind === 'mf') return /liquid|overnight|money market|ultra short|low duration/i.test(`${it.holding?.category || ''} ${it.holding?.fundName || ''}`) ? 'inc' : 'stb'
   const t = `${it.holding?.investmentType || ''} ${it.holding?.investmentCategory || ''}`
-  if (/cash|savings|fixed deposit|\bfd\b/i.test(t)) return 'inc'
-  return 'stb'
+  if (/sweep|cash|savings/i.test(t)) return 'inc' // money you can draw every month
+  return 'stb' // regular FDs, bonds, other debt: safe money that refills Income when it matures
 }
 function BucketGaps({ tgt, sum, lockedSum, monthly, age, inflation }) {
   const { steps, warn, info } = bucketCheck({ tgt, inc: sum('inc'), stb: sum('stb'), gro: sum('gro'), locked: lockedSum, monthly })
@@ -212,20 +227,93 @@ function BucketGaps({ tgt, sum, lockedSum, monthly, age, inflation }) {
     </div>
   )
 }
+const KIND = { cash: 'taken by the app on the pay day', swp: 'monthly SWP · the CAS import updates it' }
+/** Retired: "₹30,000 a month · paid from HDFC savings". Edit in place: sources (fixed amounts), pay day. */
+function IncomePlanBox({ plan, status, options, monthly, onSave, payFund }) {
+  const [edit, setEdit] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const start = () => setEdit(JSON.parse(JSON.stringify(plan || defaultIncomePlan(options, monthly))))
+  const save = async () => { setSaving(true); try { await onSave({ ...edit, sources: edit.sources.filter((s) => s.ref && Number(s.amount) > 0) }); setEdit(null) } finally { setSaving(false) } }
+  const setSrc = (i, patch) => setEdit((e) => ({ ...e, sources: e.sources.map((s, j) => (j === i ? { ...s, ...patch } : s)) }))
+  if (edit) return (
+    <div className="g2-pay" style={{ display: 'block' }}>
+      <b>Monthly income · where it comes from</b>
+      {edit.sources.map((s, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+          <select value={s.ref} onChange={(e) => { const o = options.find((x) => x.ref === e.target.value); setSrc(i, { ref: o?.ref || '', kind: o?.kind || 'cash', name: o?.name || '' }) }} style={{ flex: '1 1 220px', background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', color: 'var(--text-primary)' }}>
+            <option value="">Pick a savings account or liquid fund…</option>
+            {options.map((o) => <option key={o.ref} value={o.ref}>{o.name} · {o.kind === 'cash' ? 'savings / sweep-in FD' : 'liquid fund (SWP)'} · {L(o.value)}</option>)}
+          </select>
+          <input type="number" min="0" step="1000" value={s.amount} onChange={(e) => setSrc(i, { amount: Number(e.target.value) || 0 })} style={{ width: 120, background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', color: 'var(--text-primary)' }} aria-label="Amount a month" />
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>a month</span>
+          {edit.sources.length > 1 && <button type="button" className="g2-link" onClick={() => setEdit((e) => ({ ...e, sources: e.sources.filter((_, j) => j !== i) }))}>Remove</button>}
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 10, flexWrap: 'wrap', fontSize: 12 }}>
+        <button type="button" className="g2-link" onClick={() => setEdit((e) => ({ ...e, sources: [...e.sources, { kind: 'cash', ref: '', name: '', amount: 0 }] }))}>+ Add another source</button>
+        <label>Pay day <select value={edit.day || 1} onChange={(e) => setEdit((x) => ({ ...x, day: Number(e.target.value) }))} style={{ background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)' }}>{Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select> of each month</label>
+        <span style={{ color: 'var(--text-dim)' }}>Total {L(edit.sources.reduce((t, s) => t + (Number(s.amount) || 0), 0))} a month (expenses about {L(monthly)})</span>
+      </div>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>Savings and sweep-in FD: the app takes the amount out on the pay day, even when the app is closed. Liquid fund: set up the SWP in your fund-house app; the CAS import shows the real sale. Regular FDs refill Income when they mature.</p>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button type="button" className="g2-pill" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="g2-link" onClick={() => setEdit(null)}>Cancel</button>
+      </div>
+    </div>
+  )
+  if (!plan?.sources?.length) return (
+    <div className="g2-pay"><b>{L(monthly)} every month</b><span>{options.length ? <>Set where it comes from: a savings account (the app takes it out each month) or a liquid fund SWP{payFund ? <> like <b>{payFund}</b></> : ''}. <a className="g2-link" onClick={start}>Set up ›</a></> : 'Keep 2 years of expenses in a savings account, sweep-in FD or liquid fund (the Income jar), then set where it comes from.'}</span></div>
+  )
+  return (
+    <div className="g2-pay" style={{ display: 'block' }}>
+      <b>{L(status?.payMonthly || 0)} every month</b> <a className="g2-link" style={{ fontSize: 12, marginLeft: 6 }} onClick={start}>Edit</a>
+      {(status?.rows || []).map((r, i) => (
+        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, marginTop: 6 }}>
+          <span>{r.name}{r.missing ? ' (removed)' : ''} · {L(r.amount)} · <span style={{ color: 'var(--text-dim)' }}>{KIND[r.kind]}</span></span>
+          <span style={{ whiteSpace: 'nowrap' }}>{r.estimated ? 'about ' : ''}{L(r.value)} · {r.months >= 99 ? '' : `${Math.floor(r.months)} months`}</span>
+        </div>
+      ))}
+      {(status?.reserves || []).length > 0 && <div style={{ fontSize: 12, marginTop: 6, color: 'var(--text-dim)' }}>Reserve in Income: {status.reserves.map((r) => `${r.name} ${L(r.value)}`).join(' · ')}</div>}
+      {(status?.rows || []).some((r) => r.estimated) && <div style={{ fontSize: 11, marginTop: 6, color: 'var(--text-dim)' }}>“about”: SWPs since your last CAS import are taken off as an estimate; the next import shows the real balance.</div>}
+      {[...(status?.steps || []).map((t) => ['→ ', t, null]), ...(status?.warn || []).map((t) => ['⚠ ', t, '#fbbf24']), ...(status?.info || []).map((t) => ['', t, 'var(--text-dim)'])].map(([pre, t, c], i) => <div key={`m${i}`} style={{ fontSize: 12, marginTop: 6, color: c || undefined }}>{pre}{t}</div>)}
+    </div>
+  )
+}
+
+/** What can pay the monthly income: savings / sweep-in FD entries and liquid funds in the Income jar. */
+const incomeOptions = (incItems, mt) => incItems.map((it) => it.kind === 'mf'
+  ? { kind: 'swp', ref: it.key, name: fname(it.holding), value: it.value }
+  : { kind: 'cash', ref: it.holding?.investmentId, name: mt(it.holding?.investmentName || it.holding?.investmentType || 'Savings'), value: it.value })
+  .filter((o) => o.ref)
+
 function Buckets({ p, items, retired, mt, pname, onOpen }) {
+  const { settings, updateSettings, mfTransactions } = useData()
   const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal') || (p.road || []).find((r) => r.k === 'spend')
   const b = stop?.bucket
   const tgt = b?.monthly ? { inc: b.income, stb: b.stability, gro: Math.max(0, p.target - b.income - b.stability) } : null
   const hold = { inc: [], stb: [], gro: [] }
   const locked = items.filter(isLocked)
   for (const it of items) hold[jarOf(it)].push(it)
-  const sum = (k) => hold[k].reduce((t, it) => t + it.value, 0)
+  // Monthly income plan (retired): where the money comes from, and SWPs estimated until the next CAS import
+  const gid = p.goal.goalId
+  const iplan = readIncomePlan(settings, gid)
+  const options = incomeOptions(hold.inc, mt)
+  const ist = retired && b?.monthly ? incomeStatus({ plan: iplan, options, log: readIncomeLog(settings, gid), transactions: mfTransactions || [], monthly: b.monthly }) : null
+  const estCut = ist ? ist.rows.reduce((t, r) => t + (r.estimated ? r.pending * r.amount : 0), 0) : 0
+  const sum = (k) => hold[k].reduce((t, it) => t + it.value, 0) - (k === 'inc' ? estCut : 0)
+  const age = ageNow(p.goal), retAge = age != null ? age - Math.max(0, new Date().getFullYear() - yearOf(p.goal)) : null
+  const reminders = retired || p.bucketMode ? bucketReminders({ items, age, retAge }) : []
+  const refilled = lastRefill(readRefillLog(settings, gid))
+  const saveIncome = async (plan) => {
+    await updateSettings({ [`IncomePlan:${gid}`]: JSON.stringify(plan) })
+    try { await api.applyIncome() } catch { /* the daily job will run it */ }
+  }
   const live = (retired || p.bucketMode) && tgt
   const free = live ? Math.max(0, sum('inc') - tgt.inc) : 0
   const shown = (k) => (k === 'inc' && live ? Math.min(sum('inc'), tgt.inc) : sum(k))
   const tot = sum('inc') + sum('stb') + sum('gro') || 1
   const name = (it) => (it.kind === 'mf' ? fname(it.holding) : `${isLocked(it) ? '🔒 ' : ''}${mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}`)
-  const payFund = [...hold.inc].sort((a, c) => c.value - a.value)[0]
+  const payFund = [...hold.inc].filter((it) => it.kind === 'mf').sort((a, c) => c.value - a.value)[0]
   const jar = (k, label, sub) => (
     <div className={`g2-jar ${k}`}>
       <div className="g2-jh"><JarSvg c={JC[k]} f={retired || p.bucketMode ? (tgt?.[k] ? shown(k) / tgt[k] : sum(k) / tot) : sum(k) / tot} /><div><div className="nm">{label}</div><div className="amt">{L(shown(k))}</div><div className="of">{tgt?.[k] && (retired || p.bucketMode) ? `of ${L(tgt[k])} · ` : ''}{sub}</div></div></div>
@@ -234,14 +322,16 @@ function Buckets({ p, items, retired, mt, pname, onOpen }) {
   )
   return (
     <div className="g2-bk">
-      {retired && b?.monthly ? <div className="g2-pay"><b>{L(b.monthly)} every month</b><span>Paid as a monthly SWP from {payFund ? <b>{name(payFund)}</b> : 'a liquid fund'} (the Income jar).</span></div>
+      {retired && b?.monthly ? <IncomePlanBox plan={iplan} status={ist} options={options} monthly={b.monthly} onSave={saveIncome} payFund={payFund ? name(payFund) : ''} />
         : retired ? null : <div className="g2-btl"><div className={!p.bucketMode ? 'on' : ''}>Until {yearOf(p.goal) - 5}: one growth mix</div><div className={p.bucketMode ? 'on' : ''}>{yearOf(p.goal) - 5}–{yearOf(p.goal)}: fill the jars</div><div>From {yearOf(p.goal)} (retirement): live from them</div></div>}
       <div className="g2-jars">{jar('gro', 'Growth', 'the rest · equity')}{jar('stb', 'Stability', 'next 5 years · hybrid / debt')}{jar('inc', 'Income', '2 years of expenses · safe')}</div>
       {free > 0 && <div className="g2-pay"><b>{L(free)} free money</b><span>Cash above 2 years of expenses. It is not part of Income: it fills Stability first, then Growth (see below).</span></div>}
       {(retired || p.bucketMode) && tgt && <BucketGaps tgt={tgt} sum={sum} lockedSum={locked.reduce((t, it) => t + it.value, 0)} monthly={b.monthly} age={ageNow(p.goal)} inflation={Number(p.goal.expectedInflation) || 0.06} />}
+      {reminders.length > 0 && <div className="g2-hint">{reminders.map((r, i) => <div key={i} style={r.type === 'warn' ? { color: '#fbbf24' } : null}>{r.type === 'warn' ? '⚠ ' : '📅 '}{r.text}</div>)}</div>}
+      {retired && refilled && <p className="g2-hint">✓ Last refill marked done on {refilled.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. The jars show it after your next CAS import.</p>}
       {locked.length > 0 && <p className="g2-hint">🔒 EPF / PPF / NPS ({L(locked.reduce((t, it) => t + it.value, 0))}) count in Stability but are never switched and never pay your income: they stay where they are, earning interest, until you withdraw them by their own rules (EPF at retirement or later, PPF at maturity). When you do, put the money in a liquid or debt fund.</p>}
       <div className="g2-flow"><div>→ refills Stability after good years</div><div>→ refills Income once a year</div><div>↓ pays your monthly income</div></div>
-      <p className="g2-hint">{retired ? 'You spend only from Income. Once a year a Refill plan shows on this card (sell units from Stability → buy the liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown on this card).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
+      <p className="g2-hint">{retired ? 'You spend only from Income. Once a year a Refill plan shows on this card (sell units from Stability → into your savings account or liquid fund). After a market fall it says: don\'t sell Growth this year.' : p.bucketMode ? 'In the last 5 years the app fills Income and Stability step by step (one step a year, shown on this card).' : `Until ${yearOf(p.goal) - 5} everything grows together; then the app starts filling the jars.`}</p>
     </div>
   )
 }

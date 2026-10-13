@@ -120,7 +120,8 @@ var FRESH_AFTER_WRITE_ = {
   'goal:delete': { goals: 'getAllGoals', goalPortfolioMappings: 'getGoalPortfolioMappings' },
   'goal:mappings-update': { goalPortfolioMappings: 'getGoalPortfolioMappings' },
   'reminder:': { reminders: 'getAllReminders' },
-  'settings:update': { settings: 'getAllSettings' }
+  'settings:update': { settings: 'getAllSettings' },
+  'income:': { otherInvestments: 'getAllInvestments', settings: 'getAllSettings' }
 };
 
 function FRESH_READERS_() {
@@ -476,6 +477,13 @@ function routeAction(action, params, userRecord) {
 
     case 'healthcheck:get':
       return getLatestHealthCheckResponses();
+
+    // ── Monthly retirement income (IncomePlan.js) ──
+    case 'income:apply':        // take this month's income from savings / sweep-in FD (also run by the daily job)
+      return applyMonthlyIncome(params);
+
+    case 'income:refill-done':  // "Mark done" on a refill; money into savings is added to its balance
+      return markRefillDone(params);
 
     // ── Settings ──
     case 'settings:list':

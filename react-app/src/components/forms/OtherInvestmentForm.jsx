@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
-import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
+import { FormField, FormInput, FormSelect, FormTextarea, FormActions, DeleteButton, FormDateInput } from '../Modal'
 import { useMask } from '../../context/MaskContext'
 import { useMetalPrices, metalLiveValue } from '../../utils/metals'
 
 const INVESTMENT_TYPES = [
   { value: 'Cash / Savings', category: 'Cash' },
   { value: 'Fixed Deposit', category: 'Debt' },
+  { value: 'Sweep-in FD', category: 'Cash' },
   { value: 'PPF', category: 'Debt' },
   { value: 'EPF', category: 'Debt' },
   { value: 'NPS', category: 'Debt' },
@@ -98,6 +99,7 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
 
   // Metal-specific fields
   const [weightGrams, setWeightGrams] = useState(initDynamic.weightGrams || '')
+  const [maturityDate, setMaturityDate] = useState(initDynamic.maturityDate || '')
   const [purity, setPurity] = useState(initDynamic.purity || '')
   const [calculatedValue, setCalculatedValue] = useState(null)
   const [showQuickLoan, setShowQuickLoan] = useState(false)
@@ -182,6 +184,8 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
         purity: purity || '',
       }
     }
+    // FD maturity date: the retirement buckets use it ("matures in March, it refills Income")
+    if (/fixed deposit|^fd$/i.test(form.investmentType) && maturityDate) data.dynamicFields = { ...(data.dynamicFields || {}), maturityDate }
     if (showQuickLoan && quickLoan.lenderName) {
       data.quickLoan = {
         liabilityType: LOAN_SUGGESTIONS[form.investmentType] || 'Personal Loan',
@@ -234,6 +238,12 @@ export default function OtherInvestmentForm({ initial, onSave, onDelete, onCance
           <FormInput type="number" value={form.currentValue} onChange={(v) => set('currentValue', v)} placeholder="e.g., 537500" />
         </FormField>
       </div>
+
+      {/fixed deposit|^fd$/i.test(form.investmentType) && (
+        <FormField label="Maturity date (optional)">
+          <FormDateInput value={maturityDate} onChange={setMaturityDate} />
+        </FormField>
+      )}
 
       {/* Metal Weight & Purity fields */}
       {isMetalType(form.investmentType) && (

@@ -495,6 +495,9 @@ function dailyUserSync() {
     var result = refreshAllMasterData();
     log('Data sync complete for ' + email + ': ' + JSON.stringify(result));
 
+    // Monthly retirement income: take this month's amount from savings / sweep-in FD (IncomePlan.js)
+    try { var inc = applyMonthlyIncome(); if (inc.applied.length) log('Monthly income: ' + JSON.stringify(inc.applied)); } catch (e) { log('applyMonthlyIncome error: ' + e); }
+
   } catch (e) {
     log('dailyUserSync error: ' + e.toString());
   }

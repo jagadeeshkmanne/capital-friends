@@ -26,6 +26,7 @@ const SECTION_META = {
   NPS: { label: 'NPS', color: 'bg-sky-500', order: 5, route: '/investments/other' },
   'Fixed Deposit': { label: 'Fixed Deposit', color: 'bg-teal-500', order: 6, route: '/investments/other' },
   FD: { label: 'Fixed Deposit', color: 'bg-teal-500', order: 6, route: '/investments/other' },
+  'Sweep-in FD': { label: 'Sweep-in FD', color: 'bg-teal-300', order: 6, route: '/investments/other' },
   RD: { label: 'RD', color: 'bg-teal-400', order: 7, route: '/investments/other' },
   SSY: { label: 'SSY', color: 'bg-pink-400', order: 8, route: '/investments/other' },
   NSC: { label: 'NSC', color: 'bg-indigo-400', order: 9, route: '/investments/other' },
@@ -79,7 +80,7 @@ const NAV_ITEMS = [
 const SECTION_HEX = {
   mf: '#8b5cf6', stocks: '#3b82f6',
   PPF: '#14b8a6', EPF: '#f59e0b', NPS: '#ec4899',
-  'Fixed Deposit': '#06b6d4', FD: '#06b6d4', RD: '#2dd4bf',
+  'Fixed Deposit': '#06b6d4', FD: '#06b6d4', RD: '#2dd4bf', 'Sweep-in FD': '#5eead4',
   SSY: '#f472b6', NSC: '#818cf8', Bonds: '#22d3ee',
   Debt: '#0ea5e9',
   'Physical Gold': '#fbbf24', 'Digital Gold': '#f59e0b', 'Sovereign Gold Bond': '#d97706', Gold: '#fbbf24',
@@ -104,7 +105,7 @@ function getSectionHex(key) {
 const ASSET_CLASS_MAP = {
   stocks: 'Equity',
   PPF: 'Debt', EPF: 'Debt', NPS: 'Debt',
-  'Cash / Savings': 'Cash',
+  'Cash / Savings': 'Cash', 'Sweep-in FD': 'Cash',
   'Fixed Deposit': 'Debt', FD: 'Debt', RD: 'Debt', SSY: 'Debt', NSC: 'Debt', Bonds: 'Debt', Debt: 'Debt',
   'Physical Gold': 'Gold', 'Digital Gold': 'Gold', 'Sovereign Gold Bond': 'Gold', Gold: 'Gold',
   'Physical Silver': 'Gold', 'Digital Silver': 'Gold', Silver: 'Gold',

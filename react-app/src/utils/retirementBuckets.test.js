@@ -222,7 +222,8 @@ test('target-aware preview never transfers between linked portfolios', () => {
 
 test('linked EPF counts in the Stability bucket but is never sold', () => {
   assert.equal(classifyOtherInvestment({ investmentType: 'EPF', investmentCategory: 'Debt' }).bucket, 'b2')
-  assert.equal(classifyOtherInvestment({ investmentType: 'Fixed Deposit', investmentCategory: 'Debt' }).bucket, 'b1')
+  assert.equal(classifyOtherInvestment({ investmentType: 'Fixed Deposit', investmentCategory: 'Debt' }).bucket, 'b2') // regular FD: Stability, refills Income at maturity
+  assert.equal(classifyOtherInvestment({ investmentType: 'Sweep-in FD', investmentCategory: 'Cash' }).bucket, 'b1')
   assert.equal(classifyOtherInvestment({ investmentType: 'Real Estate', investmentCategory: 'Property' }).bucket, null)
   const plan = buildRetirementBucketPlan({
     goal: { ...goal, targetAmount: 30000000 },

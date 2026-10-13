@@ -270,6 +270,20 @@ function buildDashboardPDFHTML(data) {
   }
 
   // ══════════════════════════════════════════════════════════════════
+  // 1D. MONTHLY RETIREMENT INCOME (IncomePlan.js)
+  // ══════════════════════════════════════════════════════════════════
+  if (d.incomeItems && d.incomeItems.length) {
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _cs + '"><tbody><tr><td style="padding:20px">';
+    h += _secH('Monthly Income', '#059669', '');
+    for (var ii = 0; ii < d.incomeItems.length; ii++) {
+      var it = d.incomeItems[ii], icol = it.type === 'warning' ? '#d97706' : '#059669';
+      h += '<div style="padding:8px 0;' + (ii ? 'border-top:1px solid #f1f5f9;' : '') + '"><div style="font-size:13px;font-weight:700;color:' + icol + '">' + _escHtml(it.title) + '</div>';
+      h += '<div style="font-size:12px;color:#64748b;line-height:1.4">' + _escHtml(it.description) + '</div></div>';
+    }
+    h += '</td></tr></tbody></table>';
+  }
+
+  // ══════════════════════════════════════════════════════════════════
   // 2. NET WORTH
   // ══════════════════════════════════════════════════════════════════
   h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _cs + '"><tbody><tr><td>';
