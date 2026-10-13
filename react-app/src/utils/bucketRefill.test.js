@@ -266,3 +266,11 @@ test('late starter, good market: both safe buckets are filled from growth now', 
   assert.equal(amountOf(plan, 'b3-to-b1'), 1200000)
   assert.equal(amountOf(plan, 'b3-to-b2'), 1500000) // Stability empty: half now, the rest a month later
 })
+
+test('SWPs since the last CAS import lower Income for the refill too (early refill not missed)', () => {
+  const h = holdings({ b1: 1200000, b2: 3000000, b3: 11800000, nav: 70 })
+  assert.notEqual(buildBucketRefillPlan({ ...base, holdings: h, planDate: MID_YEAR }).status, 'due')
+  const plan = buildBucketRefillPlan({ ...base, holdings: h, planDate: MID_YEAR, b1Pending: 600000 })
+  assert.equal(plan.status, 'due')
+  assert.equal(amountOf(plan, 'b2-to-b1-down'), 600000)
+})

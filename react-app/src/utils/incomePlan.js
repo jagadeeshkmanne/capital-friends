@@ -119,6 +119,11 @@ export function incomeStatus({ plan, options = [], log = [], transactions = [], 
   for (const e of log || []) if (e.m === thisMonth && e.short > 0) warn.push(`${byRef[e.ref]?.name || 'A source'} had only ${fmt(e.amt)} on the pay day: ${fmt(e.short)} of this month's income still to pay. Use another source, or refill Income.`)
   for (const e of log || []) if (e.m === thisMonth && e.skip) warn.push(`This month's income was not taken: ${e.skip}.`)
 
+  // a pay-from account shared with other goals: the monthly money leaves the whole account, so the other goals lose too
+  for (const r of rows) {
+    const o = byRef[r.ref]
+    if (o && o.share != null && o.share < 0.995) warn.push(`${r.name} is only ${Math.round(o.share * 100)}% for this goal. The monthly income leaves the whole account, so your other goals lose money too. In Money for goals, give it 100% to this goal, or pay from another account.`)
+  }
   for (const r of rows) {
     if (r.missing) { warn.push(`${r.name || 'A source'} is no longer in your investments. Pick another place to pay from.`); continue }
     if (r.amount > 0 && r.months <= LOW_MONTHS) {

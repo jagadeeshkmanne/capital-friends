@@ -155,6 +155,7 @@ export function buildBucketRefillPlan({
   planDate = new Date(),
   lastBucketMoveDate = null,
   refillLog = [],
+  b1Pending = 0, // SWPs paid since the last CAS import (estimated): Income is that much lower than the units say
   rules: customRules,
   otherInvestments = [],
   attribution = null,
@@ -179,7 +180,7 @@ export function buildBucketRefillPlan({
   if (!(monthly > 0)) return { noExpenses: true, expense: base.expense }
   // Ignore tiny moves (rounding, a few days of spending): never suggest less than half a month.
   const minMove = Math.max(1000, monthly * 0.5)
-  const totals = base.totals
+  const totals = { ...base.totals, b1: Math.max(0, base.totals.b1 - (Number(b1Pending) || 0)) }
   const months = {
     b1: totals.b1 / monthly,
     b2: totals.b2 / monthly,

@@ -242,7 +242,7 @@ function IncomePlanBox({ plan, status, options, monthly, onSave, payFund }) {
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
           <select value={s.ref} onChange={(e) => { const o = options.find((x) => x.ref === e.target.value); setSrc(i, { ref: o?.ref || '', kind: o?.kind || 'cash', name: o?.name || '' }) }} style={{ flex: '1 1 220px', background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', color: 'var(--text-primary)' }}>
             <option value="">Pick a savings account or liquid fund…</option>
-            {options.map((o) => <option key={o.ref} value={o.ref}>{o.name} · {o.kind === 'cash' ? 'savings / sweep-in FD' : 'liquid fund (SWP)'} · {L(o.value)}</option>)}
+            {options.map((o) => <option key={o.ref} value={o.ref}>{o.name} · {o.kind === 'cash' ? 'savings / sweep-in FD' : 'liquid fund (SWP)'} · {L(o.value)}{o.share != null && o.share < 0.995 ? ` · only ${Math.round(o.share * 100)}% for this goal` : ''}</option>)}
           </select>
           <input type="number" min="0" step="1000" value={s.amount} onChange={(e) => setSrc(i, { amount: Number(e.target.value) || 0 })} style={{ width: 120, background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', color: 'var(--text-primary)' }} aria-label="Amount a month" />
           <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>a month</span>
@@ -281,9 +281,10 @@ function IncomePlanBox({ plan, status, options, monthly, onSave, payFund }) {
 }
 
 /** What can pay the monthly income: savings / sweep-in FD entries and liquid funds in the Income jar. */
+const shareOf = (it) => { const full = Number(it.holding?.currentValue) || 0; return full > 0 ? Math.min(1, it.value / full) : null }
 const incomeOptions = (incItems, mt) => incItems.map((it) => it.kind === 'mf'
-  ? { kind: 'swp', ref: it.key, name: fname(it.holding), value: it.value }
-  : { kind: 'cash', ref: it.holding?.investmentId, name: mt(it.holding?.investmentName || it.holding?.investmentType || 'Savings'), value: it.value })
+  ? { kind: 'swp', ref: it.key, name: fname(it.holding), value: it.value, share: shareOf(it) }
+  : { kind: 'cash', ref: it.holding?.investmentId, name: mt(it.holding?.investmentName || it.holding?.investmentType || 'Savings'), value: it.value, share: shareOf(it) })
   .filter((o) => o.ref)
 
 function Buckets({ p, items, retired, mt, pname, onOpen }) {

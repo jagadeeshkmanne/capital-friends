@@ -86,3 +86,10 @@ test('last refill marked done, by destination', () => {
   assert.equal(lastRefill(log, 'b1').at, '2027-01-20')
   assert.equal(lastRefill(log).at, '2027-03-01')
 })
+
+test('pay-from account shared with other goals: warned (the money leaves the whole account)', () => {
+  const st = incomeStatus({ plan, options: [{ kind: 'cash', ref: 'INV-1', name: 'HDFC savings', value: 600000, share: 0.5 }], monthly: 30000, today: d('2027-01-02') })
+  assert.ok(st.warn.some((w) => /only 50% for this goal.*give it 100% to this goal/.test(w)))
+  const full = incomeStatus({ plan, options: [{ kind: 'cash', ref: 'INV-1', name: 'HDFC savings', value: 600000, share: 1 }], monthly: 30000, today: d('2027-01-02') })
+  assert.equal(full.warn.length, 0)
+})
