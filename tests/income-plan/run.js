@@ -5,7 +5,7 @@ const fs = require('fs'); const vm = require('vm')
 const ctx = { console, Date, JSON, Math, Number, String, Object, Array,
   LockService: { getUserLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
   Utilities: { formatDate: (d, tz, f) => f === 'yyyy-MM' ? d.toISOString().slice(0, 7) : d.toISOString().slice(0, 10) },
-  Session: { getScriptTimeZone: () => 'Asia/Kolkata' }, log: () => {}, formatCurrency: (v) => '₹' + v }
+  Session: { getScriptTimeZone: () => 'Asia/Kolkata', getEffectiveUser: () => ({ getEmail: () => 'owner@x.com' }) }, log: () => {}, formatCurrency: (v) => '₹' + v }
 vm.createContext(ctx)
 vm.runInContext(fs.readFileSync(require('path').join(__dirname, '../../gas-webapp/IncomePlan.js'), 'utf8'), ctx)
 let settings, inv
@@ -39,6 +39,7 @@ ctx.getEmailRecipients = () => [{ email: 'a@x.com' }, { email: 'b@x.com' }]
 ctx.getAllGoals = () => [{ goalId: 'G1', goalName: 'Retirement', goalType: 'Retirement', isActive: true, targetDate: '2025-01-15T00:00:00.000Z' }]
 ctx.getAllInvestments = () => Object.values(inv)
 reset(60000) // ₹60,000 left at ₹30,000 a month: 2 months
+settings.AlertsTo = 'all' // everyone on the report (default is only the family head)
 inv.FD1 = { investmentId: 'FD1', investmentType: 'Fixed Deposit', investmentName: 'SBI FD', status: 'Active', currentValue: 500000, dynamicFields: { maturityDate: '2027-01-10' } }
 let items = ctx.bucketActionItems_(new Date('2027-02-01T10:00:00'))
 assert.ok(items.some(i => /yearly bucket refill/.test(i.title)), 'yearly refill due (15 Jan, not marked done)')
@@ -85,3 +86,19 @@ inv.S1.lastUpdated = '01/03/2027' // the March deduction saved it
 assert.ok(!ctx.bucketActionItems_(new Date('2027-04-10T10:00:00')).some(i => /check your savings/.test(i.title)), 'less than 3 months since she typed it')
 assert.ok(ctx.bucketActionItems_(new Date('2027-05-20T10:00:00')).some(i => /check your savings/.test(i.title) && /Since 15 Feb 2027/.test(i.description)))
 console.log('keep income real: ok')
+
+// ── monthly CAS reminder: on the day (or first run after), once a month, off switch, alerts to 'self' ──
+mails = []
+settings = {}
+ctx.getAllFamilyMembers = () => [{ memberName: 'J', relationship: 'Self', status: 'Active', email: 'me@x.com' }, { memberName: 'V', relationship: 'Spouse', status: 'Active', email: 'v@x.com' }]
+ctx.getAllMFTransactions = () => [{ portfolioId: 'P1', type: 'BUY', transactionType: 'SIP', date: '12/09/2026' }]
+assert.strictEqual(ctx.sendCasReminder_(new Date('2026-10-16T10:00:00')).sent, 0, 'before day 17 (SIP on the 12th + 5)')
+assert.strictEqual(ctx.sendCasReminder_(new Date('2026-10-18T10:00:00')).sent, 1)
+assert.strictEqual(mails[0].to, 'me@x.com', 'only me by default')
+assert.strictEqual(ctx.sendCasReminder_(new Date('2026-10-25T10:00:00')).sent, 0, 'once a month')
+settings.CasReminderDay = '3'; assert.strictEqual(ctx.sendCasReminder_(new Date('2026-11-03T10:00:00')).sent, 1, 'the day she picked')
+settings.CasReminder = 'OFF'; assert.ok(ctx.sendCasReminder_(new Date('2026-12-05T10:00:00')).off)
+settings.AlertsTo = 'all'; settings.CasReminder = 'ON'; mails = []; ctx.sendCasReminder_(new Date('2026-12-05T10:00:00'))
+assert.strictEqual(mails.length, 2, 'everyone on the report')
+settings.AlertsBuckets = 'OFF'; assert.ok(ctx.sendBucketAlerts_(new Date('2026-12-05T10:00:00')).off)
+console.log('alert settings: ok')

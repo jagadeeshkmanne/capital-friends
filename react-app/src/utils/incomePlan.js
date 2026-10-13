@@ -165,3 +165,20 @@ function fmt(v) {
   if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`
   return `₹${n.toLocaleString('en-IN')}`
 }
+
+/**
+ * A good day for the monthly CAS reminder: a few days after the family's last SIP date of the month, so the
+ * statement already has that month's SIPs. From SIP buys in the last 12 months; 10 when there are none.
+ */
+export function suggestCasDay(transactions = [], today = new Date()) {
+  const from = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
+  const days = new Set()
+  for (const t of transactions || []) {
+    if (String(t.type).toUpperCase() !== 'BUY' || !/SIP/i.test(t.transactionType || '')) continue
+    const d = txDate(t)
+    if (d && d >= from) days.add(d.getDate())
+  }
+  if (!days.size) return { day: 10, sipDays: [] }
+  const sipDays = [...days].sort((a, b) => a - b)
+  return { day: Math.min(28, Math.max(...sipDays) + 5), sipDays }
+}

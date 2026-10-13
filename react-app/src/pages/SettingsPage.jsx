@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun, Mail, ChevronDown, ChevronRight, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye, CloudDownload, Heart, Send, Palette, FileUp } from 'lucide-react'
+import { Moon, Sun, Mail, BellRing, ChevronDown, ChevronRight, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye, CloudDownload, Heart, Send, Palette, FileUp } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
 import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
@@ -9,6 +9,7 @@ import { useMask } from '../context/MaskContext'
 import { useToast } from '../context/ToastContext'
 import * as api from '../services/api'
 import { clearStocksCache } from '../components/forms/StockSearchInput'
+import { suggestCasDay } from '../utils/incomePlan'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -357,6 +358,9 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Alerts & reminders: separate from the family report email */}
+      <AlertsCard />
+
       {/* Financial Health Check */}
       <button onClick={() => navigate('/health-check')}
               className="w-full text-left bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden hover:bg-[var(--bg-hover)] transition-colors">
@@ -398,6 +402,68 @@ export default function SettingsPage() {
 }
 
 /* ── Reusable sub-components ── */
+
+/** Alert emails, each with its own switch: retirement bucket / income actions, and the monthly CAS reminder. */
+function AlertsCard() {
+  const { settings, updateSettings, mfTransactions } = useData()
+  const { showToast } = useToast()
+  const sug = suggestCasDay(mfTransactions || [])
+  const [buckets, setBuckets] = useState('ON')
+  const [to, setTo] = useState('self')
+  const [cas, setCas] = useState('ON')
+  const [casDay, setCasDay] = useState(String(sug.day))
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  useEffect(() => {
+    if (!settings) return
+    setBuckets(String(settings.AlertsBuckets || 'ON').toUpperCase())
+    setTo(settings.AlertsTo || 'self')
+    setCas(String(settings.CasReminder || 'ON').toUpperCase())
+    if (settings.CasReminderDay) setCasDay(String(settings.CasReminderDay))
+  }, [settings])
+  const save = async () => {
+    setSaving(true)
+    try {
+      await updateSettings({ AlertsBuckets: buckets, AlertsTo: to, CasReminder: cas, CasReminderDay: String(casDay) })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) { showToast(e.message || 'Failed to save', 'error') } finally { setSaving(false) }
+  }
+  const Toggle = ({ on, set }) => (
+    <button type="button" onClick={() => set(on === 'ON' ? 'OFF' : 'ON')} aria-pressed={on === 'ON'}
+      className={`w-9 h-5 rounded-full relative transition-colors ${on === 'ON' ? 'bg-violet-600' : 'bg-[var(--border)]'}`}>
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on === 'ON' ? 'left-[18px]' : 'left-0.5'}`} />
+    </button>
+  )
+  return (
+    <Card>
+      <CardHeader icon={<BellRing size={14} />} title="Alerts & Reminders" />
+      <div className="px-4 py-4 space-y-4">
+        <p className="text-xs text-[var(--text-dim)]">Separate short emails, only when something needs doing. The family report above is not changed. They need Daily updates ON.</p>
+        <div className="space-y-1">
+          <Row label="Retirement & income alerts"><Toggle on={buckets} set={setBuckets} /></Row>
+          <p className="text-[11px] text-[var(--text-dim)]">Bucket refill due, Income running low or short, FD matured, EPF, check your savings balance. Reminders until it's done.</p>
+        </div>
+        <div className="space-y-1">
+          <Row label="Monthly CAS import reminder"><Toggle on={cas} set={setCas} /></Row>
+          {cas === 'ON' && (
+            <Row label="Day of the month">
+              <Select value={casDay} onChange={setCasDay} options={Array.from({ length: 28 }, (_, i) => String(i + 1))} />
+            </Row>
+          )}
+          <p className="text-[11px] text-[var(--text-dim)]">{sug.sipDays.length
+            ? `Your SIPs run on the ${sug.sipDays.join(', ')}. Day ${sug.day} gives the statement time to include them.`
+            : 'Pick a few days after your SIP dates, so the statement includes them.'}</p>
+        </div>
+        <Row label="Send alerts to">
+          <Select value={to === 'all' ? 'Everyone on the report' : 'Only me'} onChange={(v) => setTo(v === 'Only me' ? 'self' : 'all')} options={['Only me', 'Everyone on the report']} />
+        </Row>
+        <div className="flex justify-end">
+          <button onClick={save} disabled={saving} className="px-4 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50">{saving ? 'Saving...' : saved ? 'Saved!' : 'Save'}</button>
+        </div>
+      </div>
+    </Card>
+  )
+}
 
 function Card({ children }) {
   return (

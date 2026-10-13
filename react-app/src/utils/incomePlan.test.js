@@ -93,3 +93,11 @@ test('pay-from account shared with other goals: warned (the money leaves the who
   const full = incomeStatus({ plan, options: [{ kind: 'cash', ref: 'INV-1', name: 'HDFC savings', value: 600000, share: 1 }], monthly: 30000, today: d('2027-01-02') })
   assert.equal(full.warn.length, 0)
 })
+
+import { suggestCasDay } from './incomePlan.js'
+test('CAS reminder day: 5 days after the last SIP date of the month (max 28), 10 when no SIPs', () => {
+  const t = [{ type: 'BUY', transactionType: 'SIP', date: '05/09/2026' }, { type: 'BUY', transactionType: 'SIP', date: '12/09/2026' }, { type: 'BUY', transactionType: 'LUMPSUM', date: '25/09/2026' }]
+  assert.deepEqual(suggestCasDay(t, d('2026-10-13')), { day: 17, sipDays: [5, 12] })
+  assert.equal(suggestCasDay([{ type: 'BUY', transactionType: 'SIP', date: '27/09/2026' }], d('2026-10-13')).day, 28)
+  assert.equal(suggestCasDay([], d('2026-10-13')).day, 10)
+})

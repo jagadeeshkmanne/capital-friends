@@ -310,8 +310,23 @@ function bucketActionItems_(today) {
  */
 var BUCKET_REMIND_DAYS_ = { critical: 3, warning: 7 }; // reminder until it's done (Mark done / Received clears it)
 
+/** Who gets the alert emails (Settings > Alerts & reminders): 'self' = only the family head, 'all' = everyone who
+ *  gets the family report. */
+function alertRecipients_() {
+  var to = String(getSetting('AlertsTo') || 'self');
+  var all = getEmailRecipients();
+  if (to === 'all' && all.length) return all;
+  try {
+    var self = (getAllFamilyMembers() || []).filter(function (m) { return m.status === 'Active' && m.relationship === 'Self' && m.email; })[0];
+    if (self) return [{ name: self.memberName, email: String(self.email).trim() }];
+  } catch (e) { log('alertRecipients_: ' + e); }
+  var me = Session.getEffectiveUser().getEmail();
+  return me ? [{ name: 'You', email: me }] : all;
+}
+
 function sendBucketAlerts_(today) {
   today = today || new Date();
+  if (String(getSetting('AlertsBuckets') || 'ON').toUpperCase() === 'OFF') return { sent: 0, off: true };
   var items = bucketActionItems_(today);
   var sentMap = incomeJson_(getSetting('BucketAlertsSent'), {});
   var todayKey = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -323,7 +338,7 @@ function sendBucketAlerts_(today) {
     return days >= (BUCKET_REMIND_DAYS_[it.type] || 7);
   });
   if (!due.length) return { sent: 0 };
-  var recipients = getEmailRecipients();
+  var recipients = alertRecipients_();
   if (!recipients.length) return { sent: 0 };
   var isReminder = due.every(function (it) { return !!rec(it.key); });
   var crit = due.some(function (it) { return it.type === 'critical'; });
@@ -370,3 +385,56 @@ function buildBucketAlertHTML_(items) {
 }
 
 function escHtml_(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// ============================================================================
+// MONTHLY CAS REMINDER (Settings > Alerts & reminders: on/off and the day, e.g. a few days after the SIP dates)
+// ============================================================================
+
+var CAMS_CAS_URL_ = 'https://www.camsonline.com/Investors/Statements/Consolidated-Account-Statement';
+var APP_IMPORT_URL_ = 'https://capitalfriends.in/import';
+
+/** Once a month, on the chosen day (or the first run after it): "request your CAS from CAMS, then import it". */
+function sendCasReminder_(today) {
+  today = today || new Date();
+  var on = String(getSetting('CasReminder') || 'ON').toUpperCase(); // on by default (Settings shows it on)
+  if (on !== 'ON') return { sent: 0, off: true };
+  var txAll = [];
+  try { txAll = getAllMFTransactions() || []; } catch (e) { }
+  if (!txAll.length) return { sent: 0, noFunds: true }; // nothing imported yet: the reminder starts after the first import
+  // the day picked in Settings, else 5 days after the last SIP date of the month (same as the app's suggestion)
+  var sipMax = 0, yearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+  txAll.forEach(function (t) { var d = incomeParseDay_(t.date); if (String(t.type).toUpperCase() === 'BUY' && /SIP/i.test(t.transactionType || '') && d && d >= yearAgo && d.getDate() > sipMax) sipMax = d.getDate(); });
+  var day = Math.min(28, Math.max(1, parseInt(getSetting('CasReminderDay'), 10) || (sipMax ? sipMax + 5 : 10)));
+  if (today.getDate() < day) return { sent: 0 };
+  var month = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM');
+  if (getSetting('CasReminderSent') === month) return { sent: 0 };
+  var recipients = alertRecipients_();
+  if (!recipients.length) return { sent: 0 };
+  var since = '';
+  try {
+    var last = txAll.reduce(function (mx, t) { var d = incomeParseDay_(t.date); return d && (!mx || d > mx) ? d : mx; }, null);
+    if (last) since = ' Your last statement in the app ends on ' + incomeFmtDate_(last) + '.';
+  } catch (e) { }
+  var items = [
+    { type: 'warning', title: '1. Ask CAMS for your statement', description: 'On the CAMS website choose Detailed statement, the period from your last import (or 01-Jan-2000), with zero-balance folios, and your email. It arrives as a PDF with your password.' },
+    { type: 'warning', title: '2. Import it in Capital Friends', description: 'Mutual Funds → Import statement: choose the PDF, type the password. New SIPs, SWPs and switches are added; nothing you have is duplicated.' + since }
+  ];
+  var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:20px"><div style="max-width:600px;margin:0 auto">'
+    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:12px">Capital Friends</div>'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #ddd6fe;border-radius:12px"><tbody><tr><td style="padding:20px">'
+    + '<div style="font-size:15px;font-weight:800;color:#7c3aed;margin-bottom:10px">Time for your monthly mutual fund update</div>';
+  items.forEach(function (it, i) {
+    html += '<div style="padding:10px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '"><div style="font-size:13px;font-weight:700;color:#0f172a">' + escHtml_(it.title) + '</div><div style="font-size:13px;color:#475569;line-height:1.5;margin-top:2px">' + escHtml_(it.description) + '</div></div>';
+  });
+  html += '<div style="margin-top:14px"><a href="' + CAMS_CAS_URL_ + '" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:8px;margin-right:8px">Open CAMS &rsaquo;</a>'
+    + '<a href="' + APP_IMPORT_URL_ + '" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:8px">Import in Capital Friends &rsaquo;</a></div>'
+    + '<div style="font-size:11px;color:#94a3b8;margin-top:10px">You get this on day ' + day + ' of each month. Change the day or turn it off in Settings &rsaquo; Alerts &amp; reminders.</div>'
+    + '</td></tr></tbody></table></div></div>';
+  var n = 0;
+  recipients.forEach(function (r) {
+    try { GmailApp.sendEmail(r.email, 'Monthly update: import your mutual fund statement', '1) Request your CAS from CAMS: ' + CAMS_CAS_URL_ + '\n2) Import it: ' + APP_IMPORT_URL_, { htmlBody: html, name: 'Capital Friends' }); n++; }
+    catch (e) { log('sendCasReminder_ to ' + r.email + ': ' + e); }
+  });
+  if (n) updateSetting('CasReminderSent', month);
+  return { sent: n };
+}
