@@ -5,6 +5,7 @@ import { useScreenMask } from '../hooks/useScreenMask'
 import { useGoalPoolSync } from '../hooks/useGoalPoolSync'
 import Header from './Header'
 import BottomNav from './BottomNav'
+import MobileMenu from './MobileMenu'
 import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
 import DailyUpdatesBanner from './DailyUpdatesBanner'
@@ -105,6 +106,7 @@ export default function Layout() {
       </main>
 
       <BottomNav />
+      <MobileMenu />
 
       {/* Floating banner — shows on every session, dismiss hides for this session */}
       {!bannerDismissed && (

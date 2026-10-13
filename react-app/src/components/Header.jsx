@@ -1,3 +1,5 @@
+import { openMobileMenu } from './MobileMenu'
+import { Menu as MenuIcon } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
@@ -139,7 +141,7 @@ function inferMFCategory(name) {
 const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alerts' }
 
 // Phone app bar: the page's title, and a back arrow on pages that aren't one of the bottom tabs
-const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/accounts/bank', '/goals', '/more']
+const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/investments/stocks', '/goals', '/more']
 const TITLES = [
   ['/dashboard', 'Dashboard'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
   ['/accounts/bank', 'Bank Accounts'], ['/accounts/investment', 'Investment Accounts'], ['/goals', 'Goals'], ['/more', 'More'], ['/family', 'Family'],
@@ -316,9 +318,9 @@ export default function Header() {
           {/* Phone: back arrow on sub-pages, then the page title */}
           <div className="flex lg:hidden items-center gap-1 min-w-0">
             {(!isTabPath(location.pathname) || /[?&](p|f)=/.test(location.search)) ? (
-              <button type="button" onClick={() => { if (window.history.state?.idx > 0) return navigate(-1); const q = new URLSearchParams(location.search); if (q.has('f')) { q.delete('f'); return navigate(`${location.pathname}?${q}`) } if (q.has('p')) return navigate(location.pathname); navigate('/more') }} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
+              <button type="button" onClick={() => { if (window.history.state?.idx > 0) return navigate(-1); const q = new URLSearchParams(location.search); if (q.has('f')) { q.delete('f'); return navigate(`${location.pathname}?${q}`) } if (q.has('p')) return navigate(location.pathname); navigate('/dashboard') }} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
             ) : (
-              <Link to="/dashboard" className="shrink-0"><img src={LOGO_ICON} alt="Capital Friends" className="h-7 w-auto" /></Link>
+              <button type="button" onClick={openMobileMenu} aria-label="Menu" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><MenuIcon size={23} /></button>
             )}
             <h1 className="ml-1 text-[19px] font-bold tracking-tight text-[var(--text-primary)] truncate">{mobileTitle(location.pathname)}</h1>
           </div>
