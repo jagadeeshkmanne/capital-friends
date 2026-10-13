@@ -16,7 +16,7 @@
  *      Columns: A Symbol (Google Finance form, e.g. NASDAQ:AAPL) · B Ticker · C Name · D Exchange ·
  *               E Type (Stock / ETF) · F Currency (USD)
  *
- * Run both once by hand, then installGlobalStocksWeeklyTrigger() keeps them fresh (Sunday 3 AM).
+ * Run both once by hand, then installGlobalStocksDailyTrigger() keeps them fresh (every day, 3 AM).
  * ============================================================================
  */
 
@@ -202,17 +202,21 @@ function importUsStocks() {
   return { success: true, count: rows.length };
 }
 
-// ── weekly refresh ───────────────────────────────────────────────────────────
+// ── daily refresh ────────────────────────────────────────────────────────────
 
-function refreshGlobalStocksWeekly() {
+function refreshGlobalStocksDaily() {
   try { importBseStocks(); } catch (e) { Logger.log('importBseStocks failed: ' + e); }
   try { importUsStocks(); } catch (e) { Logger.log('importUsStocks failed: ' + e); }
 }
+function refreshGlobalStocksWeekly() { refreshGlobalStocksDaily(); } // older trigger name
 
-function installGlobalStocksWeeklyTrigger() {
+/** Run once: refresh the BSE-only and US lists every day at 3 AM (replaces the older weekly trigger). */
+function installGlobalStocksDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'refreshGlobalStocksWeekly') ScriptApp.deleteTrigger(t);
+    var h = t.getHandlerFunction();
+    if (h === 'refreshGlobalStocksDaily' || h === 'refreshGlobalStocksWeekly') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('refreshGlobalStocksWeekly').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create();
-  Logger.log('Weekly BSE + US stock list refresh installed (Sunday 3 AM)');
+  ScriptApp.newTrigger('refreshGlobalStocksDaily').timeBased().everyDays(1).atHour(3).create();
+  Logger.log('Daily BSE + US stock list refresh installed (3 AM)');
 }
+function installGlobalStocksWeeklyTrigger() { installGlobalStocksDailyTrigger(); } // older name

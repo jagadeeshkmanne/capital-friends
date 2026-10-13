@@ -67,12 +67,12 @@ export const isDirectSymbol = (s) => DIRECT_SYMBOL_RE.test(String(s || '').trim(
 export const isForeignSymbol = (s) => { const m = String(s || '').trim().toUpperCase().match(DIRECT_SYMBOL_RE); return !!m && !INDIAN_EX.has(m[1]) }
 export const isUsSymbol = isForeignSymbol // older name
 
-// US stocks and ETFs list (master DB, refreshed weekly) — loaded only when someone searches
+// US stocks and ETFs list (master DB, refreshed daily) — loaded only when someone searches
 let _usCache = null, _usPromise = null
 export function loadUsStocks() {
   if (_usCache) return Promise.resolve(_usCache)
   if (_usPromise) return _usPromise
-  const fresh = (t) => t && Date.now() - new Date(t).getTime() < 3 * 86400000
+  const fresh = (t) => t && Date.now() - new Date(t).getTime() < 86400000
   _usPromise = getWithMeta('usStocksList')
     .then((rec) => {
       if (rec && Array.isArray(rec.data) && rec.data.length && fresh(rec.updatedAt)) return rec.data
