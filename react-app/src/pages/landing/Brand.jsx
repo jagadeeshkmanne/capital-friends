@@ -1,7 +1,8 @@
 // Capital Friends logo: three rising bars topped with heads — a family that is also a growth chart —
 // inside a rounded tile (violet → teal). Works from 16px (favicon) to large.
 // Our own Capital Friends logo (public/logo-new.png, trimmed). Its C and F are white: use it on a dark background.
-const LOGO = () => (typeof window !== 'undefined' && window.__LOGO) || `${import.meta.env.BASE_URL}landing/logo-mark.png`   // logo-new.png trimmed
+import logoMark from './logo-mark.png'   // bundled into assets/, so the deploy always ships it
+const LOGO = () => (typeof window !== 'undefined' && window.__LOGO) || logoMark
 export function LogoMark({ size = 36 }) {
   return <img src={LOGO()} alt="Capital Friends" style={{ height: size, width: 'auto', display: 'block' }} />
 }
