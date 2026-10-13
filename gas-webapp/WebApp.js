@@ -449,6 +449,9 @@ function routeAction(action, params, userRecord) {
     case 'stock:price':
       return fetchStockPrice(params.symbol);
 
+    case 'stock:us-quote':
+      return getUsQuote(params.symbol, params.date);
+
     case 'stock-transaction:edit':
       return editStockTransaction(params.transactionId, params);
 

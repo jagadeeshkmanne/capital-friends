@@ -267,6 +267,8 @@ export const deleteStockPortfolio = (portfolioId) => callAPI('stock-portfolio:de
 // Stock Data
 export const getAllStocks = () => callAPI('stocks:all')
 export const getStockPrice = (symbol) => callAPI('stock:price', { symbol })
+// US stocks / ETFs (EXCHANGE:TICKER): name, $ price, today's dollar rate and the rate on a date
+export const getUsQuote = (symbol, date) => callAPI('stock:us-quote', { symbol, date })
 
 // Stock Transactions
 export const buyStock = (data) => callAPI('stock:buy', data)

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Fuse from 'fuse.js'
-import { getAllStocks, getStockPrice } from '../../services/api'
+import { getAllStocks, getStockPrice, getUsQuote } from '../../services/api'
 import { getWithMeta, put } from '../../services/idb'
 import { Search, X, Loader2 } from 'lucide-react'
 
@@ -57,12 +57,24 @@ export function loadStocks() {
   return _stocksPromise
 }
 
+// US stocks and ETFs: typed as a ticker (AAPL, VOO) or EXCHANGE:TICKER (NASDAQ:AAPL)
+export const US_SYMBOL_RE = /^(NASDAQ|NYSE|NYSEARCA|NYSEAMERICAN|NYSEMKT|BATS|CBOE):[A-Z0-9.\-]{1,12}$/
+export const isUsSymbol = (s) => US_SYMBOL_RE.test(String(s || '').trim().toUpperCase())
+function usOptions(q) {
+  const t = q.trim().toUpperCase()
+  if (US_SYMBOL_RE.test(t)) return [t]
+  if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(t)) return []
+  return [`NASDAQ:${t}`, `NYSE:${t}`, `NYSEARCA:${t}`] // NYSEARCA = most US ETFs (VOO, SPY, VTI)
+}
+
 export default function StockSearchInput({ value, onSelect, placeholder, disabled }) {
   const [query, setQuery] = useState('')
   const [stocks, setStocks] = useState(_stocksCache || [])
   const [loading, setLoading] = useState(!_stocksCache)
   const [open, setOpen] = useState(false)
   const [fetchingPrice, setFetchingPrice] = useState(false)
+  const [usBusy, setUsBusy] = useState('')
+  const [usErr, setUsErr] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
@@ -131,6 +143,16 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
       .finally(() => setFetchingPrice(false))
   }
 
+  async function handleSelectUs(sym) {
+    setUsBusy(sym); setUsErr('')
+    try {
+      const q = await getUsQuote(sym)
+      if (!q?.valid) { setUsErr(q?.error || `No price found for ${sym}`); return }
+      onSelect({ symbol: q.symbol, companyName: q.companyName, exchange: 'US', sector: 'US equity', price: q.price, priceUsd: q.priceUsd, fx: q.fx })
+      setQuery(''); setOpen(false)
+    } catch (e) { setUsErr(e.message || 'Could not reach Google Finance') } finally { setUsBusy('') }
+  }
+
   function handleClear() {
     onSelect({ symbol: '', companyName: '' })
     setQuery('')
@@ -149,6 +171,7 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
             {!fetchingPrice && value.price > 0 && (
               <span className="text-xs font-semibold text-emerald-400 tabular-nums">
                 CMP: ₹{value.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {value.priceUsd > 0 && <span className="text-[var(--text-dim)] font-normal"> · ${value.priceUsd.toFixed(2)} at ₹{Number(value.fx).toFixed(2)}/$</span>}
               </span>
             )}
           </div>
@@ -178,8 +201,8 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
         />
       </div>
 
-      {open && results.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl max-h-[240px] overflow-y-auto">
+      {open && (results.length > 0 || usOptions(query).length > 0) && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl max-h-[280px] overflow-y-auto">
           {results.map((stock) => (
             <button
               key={stock.symbol}
@@ -196,10 +219,19 @@ export default function StockSearchInput({ value, onSelect, placeholder, disable
               </div>
             </button>
           ))}
+          {usOptions(query).map((sym) => (
+            <button key={sym} type="button" onClick={() => handleSelectUs(sym)} disabled={!!usBusy}
+              className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-colors border-t border-[var(--border-light)] flex items-center gap-2">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 shrink-0">US</span>
+              <span className="text-xs text-[var(--text-primary)] flex-1"><b>{sym}</b> <span className="text-[var(--text-dim)]">· {sym.startsWith('NYSEARCA') ? 'US ETF (NYSE Arca)' : sym.startsWith('NASDAQ') ? 'US stock on Nasdaq' : 'US stock on NYSE'}</span></span>
+              {usBusy === sym && <Loader2 size={12} className="text-violet-400 animate-spin" />}
+            </button>
+          ))}
+          {usErr && <p className="px-3 py-2 text-xs text-rose-400 border-b border-[var(--border-light)]">{usErr}</p>}
         </div>
       )}
 
-      {open && query.length >= 1 && results.length === 0 && !loading && (
+      {open && query.length >= 1 && results.length === 0 && usOptions(query).length === 0 && !loading && (
         <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl p-4 text-center">
           <p className="text-xs text-[var(--text-muted)]">No stocks found for "{query}"</p>
         </div>

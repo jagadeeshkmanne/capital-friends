@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { getUsQuote } from '../../services/api'
+import { isUsSymbol } from './StockSearchInput'
 import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR } from '../../data/familyData'
@@ -29,6 +31,23 @@ export default function BuyStockForm({ portfolioId, initialData, existingHolding
     notes: initialData?.notes || '',
   })
   const [errors, setErrors] = useState({})
+  // US stocks / ETFs: enter the $ price; the app turns it into ₹ with the dollar rate on that day
+  const us = isUsSymbol(form.symbol)
+  const [usd, setUsd] = useState('')
+  const [fx, setFx] = useState('')
+  const [fxBusy, setFxBusy] = useState(false)
+  useEffect(() => {
+    if (!us || !form.date) return
+    let alive = true
+    setFxBusy(true)
+    getUsQuote(form.symbol, form.date).then((q) => { if (alive && q?.fxOnDate > 0) setFx(String(Math.round(q.fxOnDate * 100) / 100)) }).catch(() => {}).finally(() => alive && setFxBusy(false))
+    return () => { alive = false }
+  }, [us, form.symbol, form.date])
+  useEffect(() => {
+    if (!us) return
+    const v = (Number(usd) || 0) * (Number(fx) || 0)
+    if (v > 0) setForm((f) => ({ ...f, pricePerShare: String(Math.round(v * 100) / 100) }))
+  }, [us, usd, fx])
   const [saving, setSaving] = useState(false)
 
   function set(key, val) {
@@ -61,7 +80,8 @@ export default function BuyStockForm({ portfolioId, initialData, existingHolding
   async function handleSubmit() {
     if (!validate()) return
     setSaving(true)
-    try { await onSave(form) } finally { setSaving(false) }
+    const usNote = us && Number(usd) > 0 && Number(fx) > 0 ? `$${usd} at ₹${fx}/$` : ''
+    try { await onSave(usNote ? { ...form, notes: [usNote, form.notes].filter(Boolean).join(' · ') } : form) } finally { setSaving(false) }
   }
 
   const portfolioOptions = activePortfolios.map((p) => {
@@ -121,7 +141,15 @@ export default function BuyStockForm({ portfolioId, initialData, existingHolding
         <FormField label="Quantity (Shares)" required error={errors.quantity}>
           <FormInput type="number" value={form.quantity} onChange={(v) => set('quantity', v)} placeholder="e.g., 100" />
         </FormField>
-        <FormField label="Price per Share (₹)" required error={errors.pricePerShare}>
+        {us && (<>
+          <FormField label={'Price per share ($)'} required>
+            <FormInput type="number" value={usd} onChange={setUsd} placeholder="e.g., 185.20" />
+          </FormField>
+          <FormField label={fxBusy ? 'Dollar rate (₹ per $) · checking…' : 'Dollar rate (₹ per $) that day'}>
+            <FormInput type="number" value={fx} onChange={setFx} placeholder="e.g., 83.10" />
+          </FormField>
+        </>)}
+        <FormField label={us ? "Price per Share in ₹ (worked out)" : "Price per Share (₹)"} required error={errors.pricePerShare}>
           <FormInput type="number" value={form.pricePerShare} onChange={(v) => set('pricePerShare', v)} placeholder="e.g., 2500" />
         </FormField>
       </div>

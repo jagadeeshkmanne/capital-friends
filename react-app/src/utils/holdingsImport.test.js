@@ -41,3 +41,12 @@ describe('holdings import', () => {
     expect(toNumber('₹ 1,316.54')).toBe(1316.54)
   })
 })
+
+describe('US stocks and ETFs', () => {
+  it('EXCHANGE:TICKER matches without the Indian stock list', () => {
+    const empty = buildStockIndex([])
+    expect(matchStock({ sourceSymbol: 'nasdaq:aapl' }, empty).symbol).toBe('NASDAQ:AAPL')
+    expect(matchStock({ sourceSymbol: 'NYSEARCA:VOO' }, empty).exchange).toBe('US')
+    expect(matchStock({ sourceSymbol: 'AAPL' }, empty)).toBe(null)
+  })
+})

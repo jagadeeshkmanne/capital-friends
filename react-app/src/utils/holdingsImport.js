@@ -182,7 +182,11 @@ export function buildStockIndex(stocks) {
   }
   return { bySym, byIsin, byLoose, byBse }
 }
+const US_RE = /^(NASDAQ|NYSE|NYSEARCA|NYSEAMERICAN|NYSEMKT|BATS|CBOE):[A-Z0-9.\-]{1,12}$/
 export function matchStock(item, idx) {
+  // US stocks / ETFs written as EXCHANGE:TICKER: their average price is in $ (the server converts it to ₹)
+  const raw = String(item.sourceSymbol || '').trim().toUpperCase()
+  if (US_RE.test(raw)) return { symbol: raw, companyName: raw.split(':')[1] + ' (US)', exchange: 'US' }
   const sym = normalizeSymbol(item.sourceSymbol)
   return idx.bySym.get(sym) || (item.isin && idx.byIsin.get(item.isin)) || idx.byLoose.get(loose(sym)) || (/^\d{6}$/.test(sym) && idx.byBse.get(sym)) || null
 }

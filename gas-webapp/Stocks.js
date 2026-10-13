@@ -151,6 +151,7 @@ function getAllStocksForClientSearch() {
 function getStockBySymbol(symbol) {
   try {
     if (!symbol) return null;
+    if (isUsSymbol_(symbol)) return getUsStock_(symbol);
 
     const sheet = getSheet(CONFIG.stockMasterDataSheet);
     if (!sheet) return null;
@@ -183,6 +184,71 @@ function getStockBySymbol(symbol) {
     log('Error getting stock by symbol: ' + error.toString());
     return null;
   }
+}
+
+
+// ============================================================================
+// US STOCKS AND ETFs
+// A US holding is written as EXCHANGE:TICKER (NASDAQ:AAPL, NYSE:KO, NYSEARCA:VOO). Every amount in the
+// sheets stays in rupees: buy prices are saved in ₹ (the dollar price × the dollar rate that day), and the
+// live price formula is GOOGLEFINANCE(ticker) × GOOGLEFINANCE("CURRENCY:USDINR"). So values, P&L, net worth,
+// goals and the email work as for Indian stocks, and P&L includes the rupee's move.
+// ============================================================================
+var US_SYMBOL_RE_ = /^(NASDAQ|NYSE|NYSEARCA|NYSEAMERICAN|NYSEMKT|BATS|CBOE):[A-Z0-9.\-]{1,12}$/;
+function isUsSymbol_(symbol) { return US_SYMBOL_RE_.test(String(symbol || '').trim().toUpperCase()); }
+function usPriceFormula_(gfSymbol) {
+  return '=IFERROR(GOOGLEFINANCE("' + gfSymbol + '", "price")*GOOGLEFINANCE("CURRENCY:USDINR"), 0)';
+}
+/** Several GOOGLEFINANCE values at once through temp cells (they work only as formulas). */
+function gfValues_(formulas) {
+  var sheet = getSheet(CONFIG.settingsSheet);
+  if (!sheet) return formulas.map(function () { return ''; });
+  var range = sheet.getRange(1, 26, formulas.length, 1); // Z1:Z…, far from the settings
+  range.setFormulas(formulas.map(function (f) { return [f]; }));
+  flushSheets_();
+  var vals = range.getValues().map(function (r) { return r[0]; });
+  range.clearContent();
+  return vals;
+}
+/**
+ * Look up a US stock / ETF: name, $ price, today's dollar rate and (optional) the dollar rate on a date.
+ * @returns {{ valid, symbol, companyName, priceUsd, fx, fxOnDate, price }}  price = ₹ per share today
+ */
+function getUsQuote(symbol, date) {
+  var sym = String(symbol || '').trim().toUpperCase();
+  if (!isUsSymbol_(sym)) return { valid: false, symbol: sym, error: 'Write it as EXCHANGE:TICKER, e.g. NASDAQ:AAPL' };
+  var cache = CacheService.getScriptCache();
+  var key = 'usq:' + sym + ':' + (date || '');
+  var hit = cache.get(key);
+  if (hit) return JSON.parse(hit);
+  var f = [
+    '=IFERROR(GOOGLEFINANCE("' + sym + '", "name"), "")',
+    '=IFERROR(GOOGLEFINANCE("' + sym + '", "price"), 0)',
+    '=IFERROR(GOOGLEFINANCE("CURRENCY:USDINR"), 0)'
+  ];
+  var d = date ? new Date(date) : null;
+  if (d && !isNaN(d.getTime())) {
+    // the closing rate on that day (or the last trading day before it)
+    var dt = 'DATE(' + d.getFullYear() + ',' + (d.getMonth() + 1) + ',' + d.getDate() + ')';
+    var hist = 'GOOGLEFINANCE("CURRENCY:USDINR", "price", ' + dt + '-6, ' + dt + ')';
+    f.push('=IFERROR(INDEX(' + hist + ', ROWS(' + hist + '), 2), 0)'); // last close on or before that day
+  }
+  var v = gfValues_(f);
+  var priceUsd = Number(v[1]) || 0, fx = Number(v[2]) || 0;
+  var out = {
+    valid: priceUsd > 0, symbol: sym, companyName: String(v[0] || '') || sym.split(':')[1],
+    priceUsd: priceUsd, fx: fx, fxOnDate: Number(v[3]) || fx, price: priceUsd * fx,
+    exchange: 'US', sector: 'US equity'
+  };
+  if (!out.valid) out.error = 'Google Finance has no price for ' + sym + '. Check the exchange and ticker.';
+  cache.put(key, JSON.stringify(out), out.valid ? 21600 : 600);
+  return out;
+}
+/** A US symbol as a stock record (same shape as a master-data stock). */
+function getUsStock_(symbol) {
+  var q = getUsQuote(symbol);
+  if (!q.valid) return null;
+  return { symbol: q.symbol, bseCode: '', companyName: q.companyName, exchange: 'US', gfNSE: q.symbol, gfBSE: '', sector: 'US equity', industry: '', status: 'Active', isin: '' };
 }
 
 /**
@@ -218,6 +284,10 @@ function getStockPrice(gfSymbol) {
  * @returns {Object} { symbol, price }
  */
 function fetchStockPrice(symbol) {
+  if (isUsSymbol_(symbol)) {
+    var q = getUsQuote(symbol);
+    return { symbol: q.symbol, price: q.price || 0, priceUsd: q.priceUsd || 0, fx: q.fx || 0, companyName: q.companyName, valid: q.valid };
+  }
   var stock = getStockBySymbol(symbol);
   if (!stock) return { symbol: symbol, price: 0 };
 
@@ -828,6 +898,16 @@ function importStockHoldings(params) {
         var qty = parseFloat(row.quantity);
         var price = parseFloat(row.avgPrice);
         var m = bySymbol[sym];
+        var note = 'Imported from holdings file';
+        if (!m && isUsSymbol_(sym)) {
+          var us = getUsQuote(sym);
+          if (!us.valid) { skipped.push({ symbol: label, reason: us.error }); return; }
+          m = [us.symbol, '', us.companyName, 'US', us.symbol, '', 'US equity', '', 'Active', ''];
+          if (String(row.currency || 'USD').toUpperCase() !== 'INR' && us.fx > 0) {
+            note = 'Imported · $' + price + ' at ₹' + us.fx.toFixed(2) + '/$';
+            price = price * us.fx;
+          }
+        }
         if (!m) { skipped.push({ symbol: label, reason: 'Not found in the stock list' }); return; }
         if (!(qty > 0)) { skipped.push({ symbol: label, reason: 'Quantity is missing or zero' }); return; }
         if (!(price > 0)) { skipped.push({ symbol: label, reason: 'Average price is missing or zero' }); return; }
@@ -835,7 +915,7 @@ function importStockHoldings(params) {
         existingIds.push(id);
         var gf = m[4] || m[5] || '';
         var total = qty * price;
-        newRows.push([id, portfolioId, portfolio.portfolioName, m[0], m[2], m[3], gf, 'BUY', txnDate, qty, price, total, 0, total, 'Imported from holdings file', '']);
+        newRows.push([id, portfolioId, portfolio.portfolioName, m[0], m[2], m[3], gf, 'BUY', txnDate, qty, price, total, 0, total, note, '']);
         symbols[m[0]] = true;
         imported.push({ symbol: m[0], quantity: qty, avgPrice: price });
       } catch (e) {
@@ -959,7 +1039,7 @@ function recalculateStockHoldings(portfolioId, stockSymbol) {
     const rowNum = existingRowIndex > 0 ? existingRowIndex : holdingsLastRow + 1;
 
     // Formulas for live price and P&L calculations
-    const currentPriceFormula = gfSymbol ? `=IFERROR(GOOGLEFINANCE("${gfSymbol}", "price"), 0)` : 0;
+    const currentPriceFormula = !gfSymbol ? 0 : isUsSymbol_(gfSymbol) ? usPriceFormula_(gfSymbol) : `=IFERROR(GOOGLEFINANCE("${gfSymbol}", "price"), 0)`;
     const currentValueFormula = `=G${rowNum}*J${rowNum}`;
     const unrealizedPLFormula = `=K${rowNum}-I${rowNum}`;
     const unrealizedPLPctFormula = `=IF(I${rowNum}>0, L${rowNum}/I${rowNum}, 0)`;

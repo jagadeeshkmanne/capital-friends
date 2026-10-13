@@ -136,7 +136,7 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
           {fileName && <span className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]"><FileSpreadsheet size={14} /> {fileName}</span>}
           <button type="button" onClick={downloadSample} className="ml-auto flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"><Download size={12} /> Download Excel template</button>
         </div>
-        <p className="text-xs text-[var(--text-dim)] mt-2">Needs 3 columns: <strong>Symbol</strong> (or Instrument), <strong>Quantity</strong> and <strong>Avg price</strong>. Zerodha, Groww and most broker holdings downloads work as they are (.xlsx or .csv).</p>
+        <p className="text-xs text-[var(--text-dim)] mt-2">Needs 3 columns: <strong>Symbol</strong> (or Instrument), <strong>Quantity</strong> and <strong>Avg price</strong>. Zerodha, Groww and most broker holdings downloads work as they are (.xlsx or .csv). US stocks and ETFs: write the symbol as <strong>NASDAQ:AAPL</strong>, <strong>NYSE:KO</strong> or <strong>NYSEARCA:VOO</strong> and the average price in <strong>$</strong>; it is turned into ₹ at today's dollar rate.</p>
         <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
       </div>
 
