@@ -7,7 +7,7 @@
       // SPA routing fix for GitHub Pages
       // Save the current path so index.html can restore it via React Router
       sessionStorage.setItem('spa-redirect', window.location.pathname + window.location.search + window.location.hash);
-      window.location.replace('/');
+      window.location.replace(window.location.pathname.indexOf('/beta/') === 0 ? '/beta/' : '/');
     </script>
   </head>
   <body></body>
