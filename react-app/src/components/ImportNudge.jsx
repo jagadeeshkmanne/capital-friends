@@ -33,8 +33,14 @@ export default function ImportNudge({ transactions, returnsReason, funds }) {
     )
   }
 
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-violet-500/30 p-4 sm:p-5"
+  return (<>
+    {/* phones: one compact row */}
+    <button type="button" onClick={() => navigate('/import')} className="sm:hidden w-full flex items-center gap-3 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-3 text-left active:bg-violet-500/20">
+      <span className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center shrink-0"><FileUp size={18} className="text-white" /></span>
+      <span className="flex-1 min-w-0"><span className="block text-sm font-semibold text-[var(--text-primary)]">Import your CAMS statement</span><span className="block text-xs text-[var(--text-muted)]">All funds and full history in 2 minutes</span></span>
+      <span role="button" onClick={(e) => { e.stopPropagation(); snooze(14) }} aria-label="Not now" className="p-1.5 -mr-1 rounded-full"><X size={15} className="text-[var(--text-dim)]" /></span>
+    </button>
+    <div className="hidden sm:block relative overflow-hidden rounded-2xl border border-violet-500/30 p-4 sm:p-5"
       style={{ background: 'linear-gradient(120deg, rgba(124,58,237,0.18) 0%, rgba(8,145,178,0.14) 60%, rgba(22,163,74,0.12) 100%)' }}>
       <style>{`@keyframes cfNudgeGlow{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.55)}50%{box-shadow:0 0 0 10px rgba(139,92,246,0)}}`}</style>
       <button onClick={() => snooze(14)} aria-label="Not now" className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-black/10"><X size={14} className="text-[var(--text-dim)]" /></button>
@@ -57,5 +63,5 @@ export default function ImportNudge({ transactions, returnsReason, funds }) {
         </div>
       </div>
     </div>
-  )
+  </>)
 }

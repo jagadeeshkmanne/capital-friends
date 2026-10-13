@@ -290,3 +290,14 @@ body {
   padding: 2px 4px !important;
   font-size: 0.75rem !important;
 }
+
+/* ── Native feel on phones (mobile-ui) ── */
+html, body { overscroll-behavior: none; }              /* no page bounce / pull-to-refresh of the whole site */
+* { -webkit-tap-highlight-color: transparent; }          /* no grey flash on tap */
+button, a, [role="button"], nav { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+header { padding-top: env(safe-area-inset-top); }        /* under the notch when opened as an app */
+@media (max-width: 1023px) {
+  /* iPhone zooms into inputs under 16px: keep form fields at 16px on phones */
+  input, select, textarea { font-size: 16px !important; }
+  main { -webkit-overflow-scrolling: touch; }
+}

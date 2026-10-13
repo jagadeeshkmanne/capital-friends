@@ -191,6 +191,43 @@ function GoalChips({ pid, big, goalLinks, navigate, mt }) {
   )
 }
 
+/** Phones: Groww-style holdings header. Current value big, invested and total returns under it, XIRR and SIP in
+ *  one line; realized / unrealized / CAGR / holdings cost on "More". */
+function MobileSummary({ stats, returns, navigate }) {
+  const [more, setMore] = useState(false)
+  const up = stats.totalPL >= 0
+  const sign = (v) => (v >= 0 ? '+' : '')
+  const pct = (v) => (v == null ? '—' : `${(v * 100).toFixed(1)}%`)
+  return (
+    <div className="sm:hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] px-4 pt-4 pb-3">
+      <p className="text-xs text-[var(--text-dim)]">Current value</p>
+      <p className="text-[30px] font-bold text-[var(--text-primary)] tabular-nums leading-tight">{formatINR(stats.current)}</p>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-[13px] tabular-nums">
+        <div><p className="text-[var(--text-dim)]">Invested</p><p className="font-semibold text-[var(--text-secondary)]">{formatINR(stats.invested)}</p></div>
+        <div className="text-right"><p className="text-[var(--text-dim)]">Total returns</p><p className={`font-semibold ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{sign(stats.totalPL)}{formatINR(stats.totalPL)} ({sign(stats.totalPLPct)}{stats.totalPLPct.toFixed(1)}%)</p></div>
+      </div>
+      <div className="mt-3 pt-3 border-t border-[var(--border-light)] flex items-center justify-between text-[13px] tabular-nums">
+        <span className="text-[var(--text-dim)]">XIRR {returns?.xirr == null ? <button onClick={() => navigate('/import')} className="underline text-violet-400">import statement</button> : <b className={returns.xirr >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{pct(returns.xirr)}</b>}</span>
+        <span className="text-[var(--text-dim)]">SIP <b className="text-[var(--text-secondary)]">{formatINR(stats.monthlySIP)}</b>/mo</span>
+        <button type="button" onClick={() => setMore((v) => !v)} className="flex items-center gap-0.5 text-violet-400 font-semibold">{more ? 'Less' : 'More'}<ChevronDown size={14} className={more ? 'rotate-180' : ''} /></button>
+      </div>
+      {more && (
+        <div className="mt-2 divide-y divide-[var(--border-light)] text-[13px] tabular-nums">
+          {[
+            ['Unrealized P&L', `${sign(stats.unrealizedPL)}${formatINR(stats.unrealizedPL)} (${sign(stats.unrealizedPLPct)}${stats.unrealizedPLPct.toFixed(1)}%)`, stats.unrealizedPL >= 0],
+            ['Realized P&L', `${sign(stats.realizedPL)}${formatINR(stats.realizedPL)}`, stats.realizedPL >= 0],
+            ['CAGR', pct(returns?.cagr), returns?.cagr == null ? null : returns.cagr >= 0],
+            ['Holdings cost', formatINR(stats.holdingsCost), null],
+            ['Funds with SIP', String(stats.sipFunds || 0), null],
+          ].map(([k, v, good]) => (
+            <div key={k} className="flex justify-between py-2"><span className="text-[var(--text-dim)]">{k}</span><span className={`font-semibold ${good == null ? 'text-[var(--text-secondary)]' : good ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{v}</span></div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MutualFundsPage() {
   const navigate = useNavigate()
   const { selectedMember } = useFamily()
@@ -822,7 +859,7 @@ export default function MutualFundsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {portfolios.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Wallet size={32} className="text-[var(--text-dim)]" />
@@ -947,8 +984,11 @@ export default function MutualFundsPage() {
           {/* ── Invite to import the CAMS statement (hidden once imported with full history) ── */}
           <ImportNudge transactions={mfTransactions} returnsReason={returns?.returnsReason} funds={returns?.unreliableFunds} />
 
+          {/* ── Phones: one summary card (current value, invested, returns), the rest on tap ── */}
+          <MobileSummary stats={stats} returns={returns} navigate={navigate} />
+
           {/* ── Stat Cards ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
+          <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
             <StatCard
               label="Your Money In"
               value={formatINR(stats.invested)}
@@ -997,7 +1037,7 @@ export default function MutualFundsPage() {
             <>
             {/* Portfolio Breakdown — Pie Charts (shown first in All view) */}
             {breakdown && breakdown.assetList.length > 0 && (
-              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+              <div className="max-sm:order-last bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
                 <button onClick={() => setBreakdownOpen(p => !p)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors">
                   <span className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolio Breakdown</span>
                   <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform duration-200 ${breakdownOpen ? 'rotate-180' : ''}`} />
@@ -1034,21 +1074,21 @@ export default function MutualFundsPage() {
 
             {/* Investment Journey Chart */}
             {insights && insights.timeline.length >= 2 && (
-              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
+              <div className="max-sm:order-last bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
                 <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Investment Journey</p>
                 <JourneyChartLW data={insights.timeline} txns={insights.valueTxns} formatMoney={formatINR} />
               </div>
             )}
 
             {/* Portfolio Summary Table */}
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Portfolios</p>
+            <div className="flex items-center justify-between -mb-2 sm:mb-0">
+              <p className="text-[17px] sm:text-sm font-bold sm:font-bold text-[var(--text-primary)] sm:text-[var(--text-muted)] sm:uppercase sm:tracking-wider">Portfolios</p>
               <div className="flex items-center gap-2">
-                <button onClick={() => navigate('/import')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors shadow-sm">
+                <button onClick={() => navigate('/import')} className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors shadow-sm">
                   <FileUp size={13} /> Import statement
                 </button>
                 <button onClick={() => setModal('addPortfolio')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors shadow-sm">
-                  <Plus size={13} /> New Portfolio
+                  <Plus size={13} /> <span className="sm:hidden">New</span><span className="hidden sm:inline">New Portfolio</span>
                 </button>
                 <button onClick={() => navigate('/investments/funds')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors shadow-sm">
                   <Layers size={12} /> All Funds
@@ -1141,40 +1181,27 @@ export default function MutualFundsPage() {
                     const totalPLUp = p.totalPL >= 0
                     const ind = portfolioIndicators[p.portfolioId] || {}
                     return (
-                      <div key={p.portfolioId} className="px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                      <div key={p.portfolioId} role="button" tabIndex={0} className="px-4 py-3.5 active:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                            onClick={() => { setSelectedPortfolioId(p.portfolioId); setSubTab('holdings') }}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{dn(p.portfolioName)}</p>
-                            {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
-                            {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
-                            <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setModal({ editPortfolio: p }) }}
-                            className="w-6 h-6 flex items-center justify-center rounded-full text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                        </div>
-                        <p className="text-xs text-[var(--text-dim)] mt-0.5">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
-                        <GoalChips pid={p.portfolioId} {...chipProps} />
-                        <div className="flex items-center gap-4 mt-2 text-xs tabular-nums">
-                          <div>
-                            <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Invested</p>
-                            <p className="text-[var(--text-secondary)]">{formatINR(p.totalInvestment)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Current</p>
-                            <p className="text-[var(--text-primary)] font-semibold">{formatINR(p.currentValue)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[var(--text-dim)] uppercase text-[10px] font-semibold">Total P&L</p>
-                            <p className={`font-bold ${totalPLUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                              {totalPLUp ? '+' : ''}{formatINR(p.totalPL)}
-                              <span className="font-normal ml-1">({totalPLUp ? '+' : ''}{p.totalPLPct.toFixed(1)}%)</span>
+                        {/* Groww-style row: name and who / funds on the left, value and return on the right */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="flex items-center gap-1.5 text-[15px] font-semibold text-[var(--text-primary)]">
+                              <span className="truncate">{dn(p.portfolioName)}</span>
+                              {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Buy opportunity" />}
+                              {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title="Rebalance needed" />}
                             </p>
+                            <p className="text-[13px] text-[var(--text-dim)] mt-0.5 truncate">{mv(p.ownerName, 'name')} · {p.fundCount} funds</p>
                           </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.currentValue)}</p>
+                            <p className={`text-[13px] font-medium tabular-nums mt-0.5 ${totalPLUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{totalPLUp ? '+' : ''}{formatINR(p.totalPL)} ({totalPLUp ? '+' : ''}{p.totalPLPct.toFixed(1)}%)</p>
+                          </div>
+                          <ChevronRight size={16} className="text-[var(--text-dim)] shrink-0" />
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="flex-1 min-w-0"><GoalChips pid={p.portfolioId} {...chipProps} /></div>
+                          <button onClick={(e) => { e.stopPropagation(); setModal({ editPortfolio: p }) }} aria-label="Edit portfolio" className="w-8 h-8 -mr-2 flex items-center justify-center rounded-full text-[var(--text-dim)] active:bg-[var(--bg-hover)] shrink-0"><Pencil size={13} /></button>
                         </div>
                       </div>
                     )
