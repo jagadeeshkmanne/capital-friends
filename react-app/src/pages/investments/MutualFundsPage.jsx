@@ -1749,8 +1749,8 @@ export default function MutualFundsPage() {
                     </table>
                   </div>
 
-                  {/* Mobile cards — minimal Groww-style */}
-                  <div className="lg:hidden space-y-2 p-3">
+                  {/* Phones: one grouped list, a row per fund (tap opens the fund) */}
+                  <div className="lg:hidden divide-y divide-[var(--border-light)]">
                     {groupHoldings.map((h) => {
                       const isPlanned = h.units === 0
                       const unrealUp = h.pl >= 0
@@ -1761,7 +1761,7 @@ export default function MutualFundsPage() {
 
                       if (isPlanned) {
                         return (
-                          <div key={h._key} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 opacity-60">
+                          <div key={h._key} className="px-4 py-3.5 opacity-60">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
@@ -1793,33 +1793,27 @@ export default function MutualFundsPage() {
                         )
                       }
 
+                      const lock = h.lumpsumRestricted && h.sipRestricted ? ['Blocked', 'text-red-400 bg-red-500/15'] : h.lumpsumRestricted ? ['SIP only', 'text-amber-400 bg-amber-500/15'] : h.sipRestricted ? ['Lumpsum only', 'text-amber-400 bg-amber-500/15'] : null
                       return (
                         <button
                           key={h._key}
                           onClick={() => setFundDetailHolding(h)}
-                          className="w-full bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 text-left hover:bg-[var(--bg-hover)] transition-colors"
+                          className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-[var(--bg-hover)] transition-colors"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-xs font-medium text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
-                                {h.lumpsumRestricted && h.sipRestricted && <span className="text-xs font-semibold text-red-400 bg-red-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Blocked</span>}
-                                {h.lumpsumRestricted && !h.sipRestricted && <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />SIP only</span>}
-                                {!h.lumpsumRestricted && h.sipRestricted && <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"><Lock size={8} />Lumpsum only</span>}
-                              </div>
-                              {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)]">{splitFundName(h.fundName).plan}</p>}
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
-                              <p className={`text-xs font-semibold tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                {unrealUp ? '+' : ''}{formatINR(h.pl)} ({unrealUp ? '+' : ''}{h.plPct.toFixed(1)}%)
-                              </p>
-                            </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[15px] font-medium text-[var(--text-primary)] leading-snug line-clamp-2">{splitFundName(h.fundName).main}</p>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-[var(--text-dim)] tabular-nums">
+                              <span>Invested {formatINR(h.investment)}</span>
+                              {lock && <span className={`text-[11px] font-semibold px-1.5 py-px rounded flex items-center gap-0.5 ${lock[1]}`}><Lock size={9} />{lock[0]}</span>}
+                            </p>
                           </div>
-                          <div className="flex items-center justify-between mt-1.5 text-xs tabular-nums">
-                            <span className="text-[var(--text-dim)]">Invested {formatINR(h.investment)}</span>
-                            <ChevronRight size={12} className="text-[var(--text-dim)]" />
+                          <div className="text-right shrink-0">
+                            <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(h.currentValue)}</p>
+                            <p className={`mt-0.5 text-[13px] font-medium tabular-nums ${unrealUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                              {unrealUp ? '+' : ''}{h.plPct.toFixed(1)}%
+                            </p>
                           </div>
+                          <ChevronRight size={16} className="shrink-0 text-[var(--text-dim)]" />
                         </button>
                       )
                     })}
