@@ -12,7 +12,7 @@ const FOLK = {
   father: { skin: C.skin3, hair: '#cbd5e1', shirt: C.sky, look: 'short' },
   son: { skin: C.skin1, hair: '#4b2e1e', shirt: C.emerald, look: 'short' },
 }
-function Bust({ k, r = 28 }) {
+export function Bust({ k, r = 28 }) {
   const f = FOLK[k], id = `bu-${k}-${r}`
   return (
     <g>
@@ -37,6 +37,7 @@ const CHAPTERS = [
   { k: 'drive', ph: 'private, in your own Drive', icon: 'lock', c: C.teal, s: 'Your Drive', t: 'Your data stays in your own Google Drive', d: 'Sign in with Google and the app makes a private sheet in your Drive. Only you — and who you share it with — can see it.' },
   { k: 'all', ph: 'all in one place', icon: 'chart', c: C.violet, s: 'Track', t: 'Everything in one place', d: 'Funds, stocks, FDs, PPF, gold, insurance and loans — for every family member.' },
   { k: 'cas', ph: 'imported in a minute', icon: 'sheet', c: C.sky, s: 'Import', t: 'Import your CAS in a minute', d: 'Drop your CAMS / CDSL statement PDF: every fund, share and transaction comes in.' },
+  { k: 'ath', ph: 'watched for you every day', icon: 'bell', c: C.rose, s: 'Alerts', t: 'Alerts when a fund falls below its all-time high' },
   { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
   { k: 'family', ph: 'known to your family', icon: 'mail', c: C.emerald, s: 'Family', t: 'Your family is never in the dark', d: 'A regular summary email: where every rupee, policy and nominee is — even without you.' },
 ]
@@ -119,6 +120,12 @@ function SceneDrive() {
 
 /* 2 · everything in one place: every member → one net worth ring → growing over the years */
 const RING = [['chart', C.violet, 'Mutual funds', 34], ['stocks', C.emerald, 'Stocks', 16], ['bank', C.sky, 'FD & PPF', 18], ['gold', C.amber, 'Gold', 12], ['shield', C.rose, 'Insurance', 8], ['loan', '#64748b', 'Loans', 12]]
+const ALLOC = [['Mutual Funds', 46, '#f97316', '₹53.8 L'], ['Real Estate', 20, '#ec4899', '₹23.4 L'], ['Stocks', 12, '#8b5cf6', '₹14.0 L'], ['Gold', 10, '#fbbf24', '₹11.7 L'], ['FD & PPF', 12, '#34d399', '₹14.1 L']]
+// a pie wedge starting at `from` % and spanning `p` %
+const wedge = (from, p, r) => {
+  const a0 = (from / 100) * 2 * Math.PI - Math.PI / 2, a1 = ((from + p) / 100) * 2 * Math.PI - Math.PI / 2
+  return `M0 0 L${(r * Math.cos(a0)).toFixed(2)} ${(r * Math.sin(a0)).toFixed(2)} A${r} ${r} 0 ${p > 50 ? 1 : 0} 1 ${(r * Math.cos(a1)).toFixed(2)} ${(r * Math.sin(a1)).toFixed(2)} Z`
+}
 function SceneAll() {
   const cx = 550, cy = 205, R = 150, dr = 64, circ = 2 * Math.PI * dr, gap = 4
   let acc = 0
@@ -159,17 +166,30 @@ function SceneAll() {
         <Tx y={16} s={26} w={800} c={C.navy} a="middle">₹1.17 Cr</Tx>
         <Tx y={36} s={11} c={C.emerald} a="middle">▲ 14.2% a year</Tx>
       </g></g>
-      {/* growing over the years */}
+      {/* the app's own Asset Allocation card (same colours and rows as the dashboard) */}
       <Flow d={`M${cx + R + 34} ${cy} C${cx + R + 80} ${cy} 760 ${cy} 800 ${cy}`} c={C.violet} t={1.4} />
-      <g transform="translate(810 96)"><g className="st-rise" style={T(1.2)}>
-        <rect width="236" height="210" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
-        <Tx x={20} y={32} s={11} c={C.slate}>Net worth</Tx>
-        <Tx x={20} y={58} s={22} w={800} c={C.navy}>₹1.17 Cr</Tx>
-        {[0, 1, 2].map((k) => <line key={k} x1="20" x2="216" y1={96 + k * 32} y2={96 + k * 32} stroke={C.mist} strokeWidth="1.5" />)}
-        <path d="M20 170 C50 162 70 166 96 150 S146 132 170 112 S204 90 216 82 V176 H20 Z" fill={C.violet} opacity=".08" />
-        <path className="st-line" style={T(1.8)} d="M20 170 C50 162 70 166 96 150 S146 132 170 112 S204 90 216 82" fill="none" stroke={C.violet} strokeWidth="3.5" strokeLinecap="round" />
-        <circle className="st-pop" style={T(3.1)} cx="216" cy="82" r="6" fill="#fff" stroke={C.violet} strokeWidth="3" />
-        {['2020', '2022', '2024', '2026'].map((y, k) => <Tx key={y} x={20 + k * 65} y={196} s={10} w={600} c={C.slate} a={k === 0 ? 'start' : k === 3 ? 'end' : 'middle'}>{y}</Tx>)}
+      <g transform="translate(806 70)"><g className="st-rise" style={T(1.2)}>
+        <rect width="266" height="270" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
+        <rect x="18" y="20" width="3" height="12" rx="1.5" fill="#94a3b8" />
+        <Tx x={28} y={30.5} s={10} w={800} c={C.slate} letterSpacing=".06em">ASSET ALLOCATION</Tx>
+        <g transform="translate(133 100)">
+          {(() => { let acc2 = 0; const r2 = 42, c2 = 2 * Math.PI * r2; return ALLOC.map(([l, p, c], n) => {
+            const len = (p / 100) * c2, off = -(acc2 / 100) * c2; acc2 += p
+            return <circle key={l} className="la-donut" style={T(1.6 + n * 0.15)} r={r2} fill="none" stroke={c} strokeWidth="16" strokeDasharray={`${len} ${c2 - len}`} strokeDashoffset={off} transform="rotate(-90)" />
+          }) })()}
+          <Tx y={-4} s={7.5} w={700} c={C.slate} a="middle" letterSpacing=".05em">NET WORTH</Tx>
+          <Tx y={11} s={14} w={800} c={C.navy} a="middle">₹1.17 Cr</Tx>
+        </g>
+        {ALLOC.map(([l, p, c, v], n) => (
+          <g key={l} transform={`translate(16 ${160 + n * 21})`}><g className="st-row" style={T(1.9 + n * 0.15)}>
+            <rect width="234" height="18" rx="6" fill={C.mist} />
+            <circle cx="10" cy="9" r="3.5" fill={c} />
+            <Tx x={20} y={12.5} s={9.5} w={600} c={C.slate}>{l}</Tx>
+            <Tx x={186} y={12.5} s={9.5} w={800} c={C.navy} a="end">{v}</Tx>
+            <rect x="194" y="3" width="34" height="12" rx="6" fill={`color-mix(in srgb, ${c} 16%, #fff)`} />
+            <Tx x={211} y={12} s={8.5} w={800} c={c} a="middle">{p}%</Tx>
+          </g></g>
+        ))}
       </g></g>
     </svg>
   )
@@ -204,20 +224,69 @@ function SceneCas() {
           </g></g>
         ))}
       </g>
-      {[['38', 'funds'], ['1,240', 'transactions'], ['since 2012', 'full history']].map(([a, b], i) => (
-        <g key={b} transform={`translate(840 ${78 + i * 100})`}><g className="st-pop" style={T(2.8 + i * 0.3)}>
-          <rect width="190" height="78" rx="18" fill="#eff6ff" />
-          <Tx x={95} y={38} s={22} w={800} c={C.sky} a="middle">{a}</Tx>
-          <Tx x={95} y={60} s={12} c={C.slate} a="middle">{b}</Tx>
+      <path d="M864 110 V310" stroke={C.line} strokeWidth="2" strokeDasharray="3 6" />
+      {[['chart', '38', 'funds found'], ['sheet', '1,240', 'transactions'], ['check', '2012', 'history from']].map(([g, a, b], i) => (
+        <g key={b} transform={`translate(864 ${110 + i * 100})`}><g className="st-row" style={T(2.6 + i * 0.3)}>
+          <circle r="24" fill="#fff" stroke={C.sky} strokeWidth="2.5" /><g transform="scale(.62)" style={{ color: C.sky }}>{G[g]}</g>
+          <Tx x={40} y={-2} s={24} w={800} c={C.navy}>{a}</Tx>
+          <Tx x={40} y={17} s={12} w={600} c={C.slate}>{b}</Tx>
         </g></g>
       ))}
     </svg>
   )
 }
 
-/* 4 · goals on one road: Home moves to safe money as it nears; Retirement lives on three buckets */
+/* 4 · alerts: a fund falls below its all-time high → Buy / Strong Buy alerts, plus rebalance alerts */
+G.bell = <path d="M-8 5 V-2 A8 8 0 0 1 8 -2 V5 L11 8 H-11 Z M-3.2 10 A3.2 3.2 0 0 0 3.2 10 Z" fill="currentColor" />
+function SceneAlerts() {
+  const y = (pct) => 80 + pct * 11      // 0% below the high at y 80, each 1% lower = 11px
+  const line = 'M40 262 C90 240 120 205 160 172 S220 92 262 80 S330 118 372 136 S442 150 472 176 S522 206 548 212'
+  return (
+    <svg viewBox={VB} className="st-svg" aria-label="The app watches each fund's all-time high and alerts you when it falls 5% or 10% below it">
+      <g transform="translate(64 40)"><g className="st-rise" style={T(0.1)}>
+        <rect width="604" height="340" rx="20" fill="#fff" stroke={C.line} strokeWidth="1.5" />
+        <Tx x={28} y={38} s={14} w={800} c={C.navy}>Axis Small Cap Fund</Tx>
+        <Tx x={28} y={56} s={11} w={600} c={C.slate}>NAV · last 2 years</Tx>
+        {/* zones */}
+        <rect x="40" y={y(5)} width="520" height={y(10) - y(5)} fill="#eff6ff" />
+        <rect x="40" y={y(10)} width="520" height={y(20) - y(10)} fill="#ecfdf5" />
+        <Tx x={52} y={y(5) + 18} s={10.5} w={800} c="#2563eb">5% below the high · Buy</Tx>
+        <Tx x={52} y={y(20) - 12} s={10.5} w={800} c="#059669">10% below the high · Strong Buy</Tx>
+        {/* the all-time high */}
+        <line x1="40" x2="560" y1={y(0)} y2={y(0)} stroke="#c62828" strokeWidth="1.5" strokeDasharray="6 6" />
+        <path className="st-line2" style={T(0.5)} d={line} fill="none" stroke={C.navy} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        <g transform={`translate(262 ${y(0)})`}><g className="st-pop" style={T(1.4)}>
+          <circle r="7" fill="#fff" stroke="#c62828" strokeWidth="3" />
+          <rect x="-58" y="-38" width="116" height="24" rx="12" fill="#fee2e2" />
+          <Tx y={-21.5} s={10.5} w={800} c="#c62828" a="middle">All-time high ₹52.10</Tx>
+        </g></g>
+        <g transform={`translate(548 212)`}><g className="st-pop" style={T(2.6)}>
+          <circle className="st-halo" r="16" fill={C.emerald} opacity=".25" />
+          <circle r="7" fill={C.emerald} stroke="#fff" strokeWidth="2.5" />
+          <rect x="-150" y="14" width="140" height="26" rx="13" fill={C.navy} />
+          <Tx x={-80} y={31} s={11} w={800} c="#fff" a="middle">₹45.80 · ▼ 12%</Tx>
+        </g></g>
+      </g></g>
+      <Flow d="M690 210 H720" c={C.rose} t={2.6} dot={false} />
+      {[['Axis Small Cap Fund', '▼ 12% below its high', 'Strong Buy', '#059669', '#ecfdf5', 2.8],
+        ['Parag Parikh Flexi Cap', '▼ 6% below its high', 'Buy', '#2563eb', '#eff6ff', 3.4],
+        ['Rebalance', 'Equity 8% above target', 'Review', '#b45309', '#fef3c7', 4.0]].map(([n, sub, tag, tc, tb, t], i) => (
+        <g key={n} transform={`translate(730 ${66 + i * 104})`}><g className="st-notif" style={T(t)}>
+          <rect width="336" height="86" rx="18" fill="#fff" stroke={C.line} strokeWidth="1.5" />
+          <g transform="translate(40 43)"><circle r="22" fill={`color-mix(in srgb, ${C.rose} 12%, #fff)`} /><g className={i === 0 ? 'st-ring' : ''} style={{ color: C.rose }}>{G.bell}</g></g>
+          <Tx x={76} y={38} s={13} w={800} c={C.navy}>{n}</Tx>
+          <Tx x={76} y={58} s={11.5} w={600} c={C.slate}>{sub}</Tx>
+          <rect x={318 - tag.length * 7 - 20} y="31" width={tag.length * 7 + 20} height="24" rx="12" fill={tb} />
+          <Tx x={318 - (tag.length * 7 + 20) / 2} y={47} s={11} w={800} c={tc} a="middle">{tag}</Tx>
+        </g></g>
+      ))}
+    </svg>
+  )
+}
+
+/* 5 · goals on one road: Home moves to safe money as it nears; Retirement lives on three buckets */
 const GLIDE = [['2026', 0.8], ['2027', 0.62], ['2028', 0.36], ['2029', 0.1]]
-const JAR = 'M8 0 H96 Q104 0 104 8 V128 Q104 150 82 150 H22 Q0 150 0 128 V8 Q0 0 8 0 Z'
+const BUCKET = 'M0 0 h64 v92 q0 12 -12 12 h-40 q-12 0 -12 -12 Z'
 function SceneGoals() {
   const road = 'M40 370 C220 370 260 260 420 260 S640 170 780 170 S980 110 1060 90'
   const stops = [[301, 284, 'home', '2029', 'Home', C.teal], [608, 215, 'target', '2034', 'Education', C.violet], [942, 138, 'gold', '2045', 'Retire', C.amber]]
@@ -239,26 +308,26 @@ function SceneGoals() {
         <g transform="translate(-22 -18)"><rect x="0" y="6" width="44" height="16" rx="6" fill={C.rose} /><path d="M8 7 L14 -2 H30 L36 7 Z" fill="#fecdd3" /><circle cx="11" cy="23" r="5" fill={C.navy} /><circle cx="33" cy="23" r="5" fill={C.navy} /></g>
       </g>
 
-      {/* Home 2029: the jar slowly turns from equity (violet) to safe money (teal) */}
-      <path className="la-dash" d="M200 214 Q240 214 282 210" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
-      <g transform="translate(46 26)"><g className="st-rise" style={T(0.6)}>
-        <Tx x={0} y={14} s={11} w={800} c={C.teal} letterSpacing=".06em">HOME · MOVES TO SAFE</Tx>
-        <g transform="translate(0 34)">
-          <clipPath id="st-jar"><path d={JAR} /></clipPath>
-          <g clipPath="url(#st-jar)">
-            <rect width="104" height="150" fill={C.violet} opacity=".92" />
-            <g className="st-safe"><g className="st-wave"><path d="M-104 8 Q-78 0 -52 8 T0 8 T52 8 T104 8 T156 8 T208 8 V400 H-104 Z" fill={C.teal} /></g></g>
-            <rect x="12" y="10" width="10" height="110" rx="5" fill="#fff" opacity=".22" />
+      {/* Home 2029: one bucket, like the retirement ones — safe money (teal) rises, equity (violet) drains as the date nears */}
+      <path className="la-dash" d="M214 262 Q250 250 282 228" fill="none" stroke={C.teal} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" />
+      <g transform="translate(100 112)"><g className="st-rise" style={T(0.6)}>
+        <Tx x={0} y={-22} s={11} w={800} c={C.teal} letterSpacing=".06em">HOME · MOVES TO SAFE</Tx>
+        <g transform="translate(0 16)">
+          <clipPath id="st-home"><path d={BUCKET} /></clipPath>
+          <g clipPath="url(#st-home)">
+            <rect width="64" height="104" fill={C.violet} opacity=".85" />
+            <g className="st-safe"><g className="st-wave"><path d="M-64 6 Q-48 0 -32 6 T0 6 T32 6 T64 6 T96 6 T128 6 V300 H-64 Z" fill={C.teal} opacity=".9" /></g></g>
           </g>
-          <path d={JAR} fill="none" stroke={C.navy} strokeOpacity=".18" strokeWidth="3" />
-          <rect x="24" y="-8" width="56" height="10" rx="4" fill="#cbd5e1" />
+          <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
+          <g transform="translate(32 -16)"><circle r="13" fill="#fff" stroke={C.teal} strokeWidth="2" /><g transform="scale(.48)" style={{ color: C.teal }}>{G.home}</g></g>
+          <Tx x={32} y={124} s={11.5} c={C.ink} a="middle">Home · 2029</Tx>
         </g>
-        <g transform="translate(122 92)">
+        <g transform="translate(80 58)">
           {GLIDE.map(([y, e], n) => (
             <g key={y} className={n === GLIDE.length - 1 ? 'st-yr last' : 'st-yr'} style={T(1 + n * 1.5)}>
-              <Tx s={26} w={800} c={C.navy}>{y}</Tx>
-              <g transform="translate(0 26)"><circle cx="5" cy="-4" r="5" fill={C.violet} /><Tx x={16} s={12} c={C.slate}>Equity <tspan fill={C.navy} fontWeight="800">{Math.round(e * 100)}%</tspan></Tx></g>
-              <g transform="translate(0 46)"><circle cx="5" cy="-4" r="5" fill={C.teal} /><Tx x={16} s={12} c={C.slate}>Safe <tspan fill={C.navy} fontWeight="800">{Math.round((1 - e) * 100)}%</tspan></Tx></g>
+              <Tx s={18} w={800} c={C.navy}>{y}</Tx>
+              <g transform="translate(0 20)"><circle cx="4" cy="-4" r="4" fill={C.violet} /><Tx x={13} s={11} c={C.slate}>Equity <tspan fill={C.navy} fontWeight="800">{Math.round(e * 100)}%</tspan></Tx></g>
+              <g transform="translate(0 37)"><circle cx="4" cy="-4" r="4" fill={C.teal} /><Tx x={13} s={11} c={C.slate}>Safe <tspan fill={C.navy} fontWeight="800">{Math.round((1 - e) * 100)}%</tspan></Tx></g>
             </g>
           ))}
         </g>
@@ -320,13 +389,11 @@ function SceneFamily() {
           </g>
         )
       })}
-      <Tx x={475} y={378} s={14} c={C.ink} a="middle">If something happens to you,</Tx>
-      <Tx x={475} y={400} s={14} c={C.emerald} a="middle">they know where everything is.</Tx>
     </svg>
   )
 }
 
-const SCENES = { drive: SceneDrive, all: SceneAll, cas: SceneCas, goals: SceneGoals, family: SceneFamily }
+const SCENES = { drive: SceneDrive, all: SceneAll, cas: SceneCas, ath: SceneAlerts, goals: SceneGoals, family: SceneFamily }
 
 export default function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
   const [i, setI] = useState(0)
@@ -351,12 +418,13 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
       <style>{ART_CSS + CSS}</style>
       {/* the whole hero is the stage: a soft glow in the scene's colour and floating things everywhere */}
       <div className="st-glow" aria-hidden="true" />
+      <h1 className="st-h"><span className="st-h1a">Your family's money,</span> <span className="st-rot"><span key={ch.k} style={{ '--c': ch.c }}>{ch.ph}</span></span></h1>
       {/* how it works, as a path: Your Drive → Track → Import → Goals → Family */}
       <ol className="st-path" role="tablist">
         {CHAPTERS.map((c, k) => (
           <li key={c.k} className={k === i ? 'on' : k < i ? 'done' : ''} style={{ '--cc': c.c }}>
             <button type="button" role="tab" aria-selected={k === i} aria-label={c.t} onClick={() => setI(k)}>
-              <span className="st-dot"><Glyph name={c.icon} color={k <= i ? '#fff' : '#94a3b8'} size={15} /></span>
+              <span className="st-dot"><Glyph name={c.icon} color={k <= i ? '#fff' : '#94a3b8'} size={13} /></span>
               <span className="st-lb">{c.s}</span>
             </button>
             {k < CHAPTERS.length - 1 && <span className="st-ln"><i style={k === i ? { animationDuration: `${c.dur || DUR}ms`, animationPlayState: paused ? 'paused' : 'running' } : undefined} /></span>}
@@ -367,42 +435,40 @@ export default function StoryHero({ signIn, isMobile, GoogleIcon, families, vide
       <div className="st-r" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
         <div key={ch.k} className="st-scene"><Scene /></div>
       </div>
-      {/* the words and the button, at the bottom */}
-      <div className="st-bar">
-        {families ? <span className="st-fam"><i className="st-live" /><b>{families.toLocaleString('en-IN')}</b> families use it</span> : <span />}
-        <div className="st-l">
-          <h1><span className="st-h1a">Your family's money,</span> <span className="st-rot"><span key={ch.k} style={{ '--c': ch.c }}>{ch.ph}</span></span></h1>
-          <div className="st-cta">
-            {videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch the 2-minute tour"><span className="st-play" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">2-min tour</span></a>}
-            <button onClick={signIn} className="st-btn"><span className="st-g">{GoogleIcon}</span>Get started free</button>
-          </div>
-        </div>
+      {/* one dock at the bottom: start, watch, and how many families */}
+      <div className="st-dock">
+        <button onClick={signIn} className="st-btn"><span className="st-g">{GoogleIcon}</span>Sign in with Google<span className="st-free">FREE</span></button>
+        {videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch the 2-minute tour"><span className="st-play" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">2-min tour</span></a>}
       </div>
+      {/* Google sign-in verification needs these on the home page */}
+      <nav className="st-legal" aria-label="Legal"><a href="https://capitalfriends.in/privacy">Privacy Policy</a><a href="https://capitalfriends.in/terms">Terms &amp; Conditions</a></nav>
     </section>
   )
 }
 
 const CSS = `
-.st{position:relative;overflow:hidden;background:linear-gradient(180deg,#f6f8fc 0%,#ffffff 70%);height:calc(100vh - 60px);min-height:600px;max-height:940px;display:flex;flex-direction:column}
+.st{position:relative;overflow:hidden;background:linear-gradient(180deg,#f6f8fc 0%,#ffffff 70%);height:calc(100vh - 68px);min-height:600px;max-height:940px;display:flex;flex-direction:column}
+.st-legal{position:absolute;z-index:4;right:32px;bottom:22px;display:flex;gap:16px}
+.st-legal a{font-family:Inter,system-ui,sans-serif;font-size:12px;font-weight:500;color:#94a3b8;text-decoration:none}.st-legal a:hover{color:#0b1120;text-decoration:underline}
 .st-glow{position:absolute;left:10%;top:6%;width:80%;height:80%;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--c) 16%,transparent),transparent 72%);transition:background .8s ease;pointer-events:none}
 
 .st-r{position:relative;z-index:2;flex:1;min-height:0;width:100%;max-width:1400px;margin:0 auto;padding:0 24px;box-sizing:border-box;perspective:1400px}
-.st-bar{position:relative;z-index:3;width:100%;max-width:1360px;margin:0 auto;padding:6px 40px 26px;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
-.st-l{display:flex;align-items:center;gap:28px;min-width:0}
-.st h1{margin:0;font-family:Inter,system-ui,sans-serif;font-weight:700;letter-spacing:-.025em;line-height:1.15;color:#0b1120;font-size:clamp(22px,2vw,30px);text-align:right}
-.st-h1a{display:block}
-.st-rot{display:block;position:relative;overflow:hidden;min-height:1.2em;padding-bottom:.06em}
+.st-h{position:relative;z-index:3;margin:0;padding:26px 24px 0;text-align:center;font-family:Inter,system-ui,sans-serif;font-weight:700;letter-spacing:-.025em;line-height:1.2;color:#0b1120;font-size:clamp(22px,2.1vw,32px)}
+.st-h1a{display:inline}
+.st-rot{display:inline-block;position:relative;overflow:hidden;vertical-align:bottom;padding-bottom:.08em}
 .st-rot>span{display:inline-block;animation:stWord .6s cubic-bezier(.2,.8,.2,1) both;color:var(--c)}
 @keyframes stWord{from{transform:translateY(60%);opacity:0;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
-.st-cta{display:flex;gap:10px;align-items:center;padding-left:28px;border-left:1px solid #e2e8f0}
-.st-btn{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 22px 0 6px;border-radius:999px;border:0;cursor:pointer;color:#fff;background:#0b1120;font-family:Inter,system-ui,sans-serif;font-weight:600;font-size:15px;box-shadow:0 10px 24px -12px rgba(11,17,32,.6);transition:transform .18s,box-shadow .18s,background .18s}
+.st-dock{position:relative;z-index:3;align-self:center;margin:0 0 24px;display:flex;align-items:center;gap:6px;padding:6px;border-radius:999px;background:rgba(255,255,255,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 0 0 1px rgba(15,23,42,.06),0 18px 40px -20px rgba(15,23,42,.35)}
+.st-btn{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 6px;border-radius:999px;border:0;cursor:pointer;color:#fff;background:#0b1120;font-family:Inter,system-ui,sans-serif;font-weight:600;font-size:15px;box-shadow:0 10px 24px -12px rgba(11,17,32,.6);transition:transform .18s,box-shadow .18s,background .18s}
+.st-free{margin-left:4px;padding:4px 9px;border-radius:999px;background:#10b981;color:#fff;font-size:11px;font-weight:800;letter-spacing:.08em;box-shadow:0 0 0 3px rgba(16,185,129,.22);animation:stFree 2.6s ease-in-out infinite}
+@keyframes stFree{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.22)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.1)}}
 .st-btn:hover{transform:translateY(-1px);background:#1e293b;box-shadow:0 14px 28px -12px rgba(11,17,32,.6)}
 .st-g{width:36px;height:36px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center}
 .st-btn2{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 6px;color:#334155;font-weight:600;font-size:14.5px;text-decoration:none}
 .st-btn2:hover{color:#0b1120}
 .st-play{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:var(--c);box-shadow:0 0 0 1px #e2e8f0,0 4px 10px -6px rgba(15,23,42,.3);padding-left:2px;box-sizing:border-box;transition:color .6s,transform .18s}
 .st-btn2:hover .st-play{transform:scale(1.08)}
-.st-fam{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#64748b}.st-fam b{color:#0b1120;font-weight:700}
+.st-fam{display:flex;padding:0 16px 0 14px;border-left:1px solid #e2e8f0;height:26px;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#64748b}.st-fam b{color:#0b1120;font-weight:700}
 .st-avs{display:flex}
 .st-avs img{width:40px;height:40px;border-radius:50%;object-fit:cover;object-position:top;background:#fff;border:3px solid #fff;margin-left:-12px;box-shadow:0 4px 10px -4px rgba(15,23,42,.3);animation:laPop .5s cubic-bezier(.3,1.6,.5,1) both}
 .st-avs img:first-child{margin-left:0}
@@ -425,7 +491,7 @@ const CSS = `
 /* soft moving mesh behind everything */
 .st::before{content:'';position:absolute;inset:-20%;background:radial-gradient(30% 40% at 20% 30%,rgba(124,58,237,.10),transparent 70%),radial-gradient(30% 40% at 80% 70%,rgba(13,148,136,.10),transparent 70%),radial-gradient(25% 30% at 60% 20%,rgba(14,165,233,.08),transparent 70%);animation:stMesh 22s ease-in-out infinite alternate;pointer-events:none}
 @keyframes stMesh{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(3%,-2%) rotate(8deg)}}
-.st-path{position:relative;z-index:3;list-style:none;margin:0 auto;padding:22px 32px 4px;display:flex;align-items:center;justify-content:center;gap:0;width:100%;max-width:980px;box-sizing:border-box}
+.st-path{position:relative;z-index:3;list-style:none;margin:0 auto;padding:14px 32px 0;display:flex;align-items:center;justify-content:center;gap:0;width:100%;max-width:980px;box-sizing:border-box}
 .st-path li{display:flex;align-items:center;flex:1}.st-path li:last-child{flex:0 0 auto}
 .st-path button{display:flex;align-items:center;gap:9px;background:none;border:0;padding:4px;cursor:pointer}
 .st-dot{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#fff;border:2px solid #e2e8f0;transition:background .3s,border-color .3s,transform .3s,box-shadow .3s}
@@ -461,12 +527,20 @@ const CSS = `
 .st-line{stroke-dasharray:240;stroke-dashoffset:240;animation:stLine 1.6s ease-out forwards}
 @keyframes stLine{to{stroke-dashoffset:0}}
 .st-safe{animation:stSafe 4.5s cubic-bezier(.45,0,.4,1) both 1s}
-@keyframes stSafe{0%{transform:translateY(120px)}33%{transform:translateY(93px)}66%{transform:translateY(54px)}100%{transform:translateY(15px)}}
+@keyframes stSafe{0%{transform:translateY(83px)}33%{transform:translateY(64px)}66%{transform:translateY(37px)}100%{transform:translateY(10px)}}
 .st-wave{animation:stWave 2.2s linear infinite}
-@keyframes stWave{from{transform:translateX(0)}to{transform:translateX(104px)}}
+@keyframes stWave{from{transform:translateX(0)}to{transform:translateX(64px)}}
 .st-yr{opacity:0;animation:stYr 1.5s ease both}.st-yr.last{animation-name:stYrLast}
 @keyframes stYr{0%{opacity:0;transform:translateY(8px)}15%,85%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px)}}
 @keyframes stYrLast{0%{opacity:0;transform:translateY(8px)}15%,100%{opacity:1;transform:none}}
+.st-wedge{transform-box:view-box;transform-origin:0 0;animation:stWedge .6s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes stWedge{from{transform:scale(0) rotate(-40deg);opacity:0}to{transform:none;opacity:1}}
+.st-line2{stroke-dasharray:1200;stroke-dashoffset:1200;animation:stLine2 2.2s ease-out forwards}
+@keyframes stLine2{to{stroke-dashoffset:0}}
+.st-notif{animation:stNotif .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes stNotif{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.st-ring{transform-box:fill-box;transform-origin:50% 0;animation:stRingB 1s ease-in-out 3.2s 2}
+@keyframes stRingB{0%,100%{transform:rotate(0)}20%{transform:rotate(16deg)}40%{transform:rotate(-14deg)}60%{transform:rotate(9deg)}80%{transform:rotate(-5deg)}}
 @keyframes stPress{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
 @keyframes stCursor{from{offset-distance:0%;opacity:0}20%{opacity:1}to{offset-distance:100%;opacity:1}}
 @keyframes stDraw{to{stroke-dashoffset:0}}
@@ -490,11 +564,8 @@ const CSS = `
 .st.m .st-scene{position:relative;inset:auto;height:min(340px,100%);width:100%;transform:none}
 .st.m .st-svg{height:100%;width:auto;max-width:none;animation:stPan 7.5s ease-in-out both}
 @keyframes stPan{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(calc(-100% + 100vw))}}
-.st.m .st-bar{flex-direction:column-reverse;align-items:center;padding:4px 16px 22px;gap:12px}
-.st.m .st-l{flex-direction:column;gap:14px}
-.st.m h1{font-size:24px;text-align:center}
-.st.m .st-cta{padding-left:0;border-left:0;flex-direction:row-reverse}.st.m .st-btn{height:48px}.st.m .st-btn2t{display:none}
-.st.m .st-fam{font-size:12.5px}
+.st.m .st-h{font-size:22px;padding:16px 16px 0}.st.m .st-rot{display:block}
+.st.m .st-legal{position:relative;right:auto;bottom:auto;justify-content:center;padding:0 0 14px}.st.m .st-dock{margin:0 0 10px;flex-wrap:nowrap}.st.m .st-btn{font-size:14px}.st.m .st-btn2t,.st.m .st-fam{display:none}
 .st.m .st-glow{left:-30%;top:20%;width:160%;height:60%}
 @media (prefers-reduced-motion:reduce){.st-flow,.st-scan,.st-car,.st-env,.st-play::after,.st-am,.st-spark{animation:none!important}.st-flow,.st-env,.st-spark{display:none}}
 `
