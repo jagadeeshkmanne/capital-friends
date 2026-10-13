@@ -40,9 +40,10 @@ export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPor
   for (const p of plans || []) {
     if (p.state !== 'due' || p.isRet || !(p.has > 0)) continue
     const rows = (p.att?.items || []).filter((it) => it.value > 0.5).map((it) => {
-      if (it.kind === 'mf') { const u = (Number(it.holding.units) || 0) * (it.fraction ?? 1); return { kind: 'mf', name: it.holding.fundName, portfolioId: it.portfolioId, units: u, all: (it.fraction ?? 1) > 0.999, value: it.value } }
-      if (it.kind === 'stock') return { kind: 'stock', name: it.holding.symbol || it.holding.stockName, portfolioId: it.portfolioId, units: (Number(it.holding.quantity) || 0) * (it.fraction ?? 1), value: it.value }
-      return { kind: 'other', name: it.holding?.investmentName || it.holding?.investmentType || 'Investment', value: it.value }
+      // holding: the fund / stock / investment itself, so the withdraw window can record what was taken
+      if (it.kind === 'mf') { const u = (Number(it.holding.units) || 0) * (it.fraction ?? 1); return { kind: 'mf', name: it.holding.fundName, portfolioId: it.portfolioId, units: u, all: (it.fraction ?? 1) > 0.999, value: it.value, holding: it.holding } }
+      if (it.kind === 'stock') return { kind: 'stock', name: it.holding.symbol || it.holding.stockName, portfolioId: it.portfolioId, units: (Number(it.holding.quantity) || 0) * (it.fraction ?? 1), value: it.value, holding: it.holding }
+      return { kind: 'other', name: it.holding?.investmentName || it.holding?.investmentType || 'Investment', value: it.value, holding: it.holding }
     }).sort((a, b) => b.value - a.value)
     steps.push({ t: 'ready', goal: p.goal, has: p.has, rows })
   }

@@ -92,7 +92,7 @@ export function goalWant(g, now = new Date(), sip = 0) {
  * @param items  poolItems(...) (only included ones are used)
  * @returns { mappings: [{ goalId, portfolioId, allocationPct, investmentType }], byGoal: { [goalId]: { want, got, eq } }, left: ₹ not used }
  */
-export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved = [] }) {
+export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved = [], held = {} }) {
   const live = (goals || []).filter((g) => g.isActive !== false && validDate(g.targetDate) && Number(g.targetAmount) > 0)
   const its = (items || []).filter((i) => i.included && i.value > 0).map((i) => ({ ...i, left: i.value }))
   const take = {} // goalId -> itemId -> ₹
@@ -128,6 +128,14 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   // confirm). After you withdraw, those funds are smaller, so it simply gets less: nothing moves from other goals.
   const kept = new Set()
   for (const g of live.filter(past)) {
+    // held: the ₹ it had when its date passed (saved once). Then a redemption you record only shrinks this goal,
+    // never the other goals that share the same portfolio.
+    const h = held && held[g.goalId] && held[g.goalId].items
+    if (h && Object.keys(h).length) {
+      kept.add(g.goalId)
+      for (const [id, amt] of Object.entries(h)) { const it = its.find((i) => i.id === id); if (it) give(g, it, Math.min(it.left, Number(amt) || 0)) }
+      continue
+    }
     const ms = (reserved || []).filter((m) => m.goalId === g.goalId && Number(m.allocationPct) > 0)
     if (!ms.length) continue
     kept.add(g.goalId)
@@ -187,7 +195,7 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   const freeIts = its.filter((i) => i.kind !== 'retirement' && i.left > 0.5)
   const extra = freeIts.reduce((t, i) => t + i.left, 0)
   const extraEq = freeIts.reduce((t, i) => t + i.left * i.eq, 0)
-  return { mappings, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra, extraEq, extraItems: freeIts.map((i) => ({ id: i.id, name: i.name, type: i.type, value: i.left, eq: i.eq })) }
+  return { mappings, take, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra, extraEq, extraItems: freeIts.map((i) => ({ id: i.id, name: i.name, type: i.type, value: i.left, eq: i.eq })) }
 }
 
 /** True when two sets of links differ enough to be worth saving (a new / dropped link, or a share 2+ points off). */

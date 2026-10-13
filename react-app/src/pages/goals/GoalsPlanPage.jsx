@@ -37,7 +37,7 @@ export default function GoalsPlanPage() {
   const navigate = useNavigate()
   const mt = useMaskText()
   const { selectedMember } = useFamily()
-  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList, updateGoal, updateGoalMappings, addGoal, deleteGoal } = useData()
+  const { goalList, mfHoldings, stockHoldings, otherInvList, assetAllocations, mfPortfolios, stockPortfolios, banks, liabilityList, updateGoal, updateGoalMappings, addGoal, deleteGoal, redeemMFBulk, sellStock, updateOtherInvestment } = useData()
   const confirm = useConfirm()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const closing = useRef(false)
@@ -74,16 +74,33 @@ export default function GoalsPlanPage() {
     const fmt = (v) => '₹' + Math.round(v).toLocaleString('en-IN')
     const nextDate = (years) => { const d = new Date(g.targetDate); d.setFullYear(d.getFullYear() + years); return d.toISOString().slice(0, 10) }
     const left = Math.max(0, (Number(g.targetAmount) || 0) - amount)
-    const ok = await confirm(how === 'part'
-      ? `Mark this year's payment${amount ? ` of ${fmt(amount)}` : ''} as done? "${g.goalName}" moves to ${new Date(nextDate(1)).getFullYear()} with ${fmt(left)} for the remaining ${payYears - 1} year${payYears - 1 > 1 ? 's' : ''}. Also record the redemption in Mutual Funds, otherwise the money you took out still counts.`
+    // what the withdraw window will record first (FD value down, fund units redeemed, shares sold)
+    const acts = Array.isArray(opts.actions) ? opts.actions : []
+    const actTxt = acts.length ? `\n\nThe app will record:\n${acts.map((a) => `• ${a.kind === 'mf' ? `Redeem ${a.redeem.units} units of ${a.label} ≈ ${fmt(a.amount)}` : a.kind === 'stock' ? `Sell ${a.sell.quantity} ${a.label} ≈ ${fmt(a.amount)}` : `${a.label}: take ${fmt(a.amount)}, its value becomes ${fmt(a.update.currentValue)}${a.update.currentValue < 1 ? ` (${a.update.status})` : ''}`}`).join('\n')}` : ''
+    const ok = await confirm((how === 'part'
+      ? `Mark this year's payment${amount ? ` of ${fmt(amount)}` : ''} as done? "${g.goalName}" moves to ${new Date(nextDate(1)).getFullYear()} with ${fmt(left)} for the remaining ${payYears - 1} year${payYears - 1 > 1 ? 's' : ''}.${acts.length ? '' : ' Also record the redemption in Mutual Funds, otherwise the money you took out still counts.'}`
       : used
-        ? `Close "${g.goalName}" as withdrawn${amount ? ` (${fmt(amount)} used)` : ''}? Also record the redemption in Mutual Funds (or update the holding), otherwise the money you took out still counts for your other goals.${repeatYears ? ` The next one is added for ${new Date(nextDate(repeatYears)).getFullYear()}.` : ''}`
-        : `Close "${g.goalName}" as not needed? Its money goes back to your other goals.${repeatYears ? ` The next one is still added for ${new Date(nextDate(repeatYears)).getFullYear()}.` : ''}`,
+        ? `Close "${g.goalName}" as withdrawn${amount ? ` (${fmt(amount)} used)` : ''}?${acts.length ? '' : ' Also record the redemption in Mutual Funds (or update the holding), otherwise the money you took out still counts for your other goals.'}${repeatYears ? ` The next one is added for ${new Date(nextDate(repeatYears)).getFullYear()}.` : ''}`
+        : `Close "${g.goalName}" as not needed? Its money goes back to your other goals.${repeatYears ? ` The next one is still added for ${new Date(nextDate(repeatYears)).getFullYear()}.` : ''}`) + actTxt,
     { title: how === 'part' ? "This year's payment" : used ? 'Money withdrawn' : 'Goal not needed', confirmLabel: how === 'part' ? 'Yes, move to next year' : 'Close goal', destructive: false })
     if (!ok) return
     closing.current = true
     const today = new Date().toLocaleDateString('en-IN')
     try {
+      // 1. record what was taken (stops at the first failure, before the goal is touched)
+      if (acts.length) {
+        showBlockUI('Recording the withdrawal...')
+        try {
+          const red = acts.filter((a) => a.kind === 'mf').map((a) => ({ ...a.redeem, notes: `For goal: ${g.goalName}` }))
+          if (red.length) await redeemMFBulk(red)
+          for (const a of acts.filter((x) => x.kind === 'stock')) await sellStock({ ...a.sell, notes: `For goal: ${g.goalName}` })
+          for (const a of acts.filter((x) => x.kind === 'other')) {
+            const inv = a.update.inv
+            await updateOtherInvestment(inv.investmentId, { ...inv, familyMember: inv.familyMemberId || '', currentValue: a.update.currentValue, status: a.update.status,
+              notes: [inv.notes, `${fmt(a.amount)} used for ${g.goalName} on ${today}`].filter(Boolean).join(' · ') })
+          }
+        } finally { hideBlockUI() }
+      }
       if (how === 'part' && payYears > 1) {
         const note = `Paid ${amount ? fmt(amount) : "this year's part"} on ${today}`
         await updateGoal(g.goalId, { ...g, familyMember: g.familyMemberName || 'Self', targetDate: nextDate(1), targetAmount: left, notes: [g.notes, note].filter(Boolean).join(' · '), _extras: { repeat: repeatYears, payYears: payYears - 1 } })

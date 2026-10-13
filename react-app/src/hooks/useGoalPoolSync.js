@@ -12,6 +12,11 @@ export function readPoolChoice(settings) {
   try { const c = JSON.parse(settings?.GoalsPool || '{}'); return { off: Array.isArray(c.off) ? c.off : [], on: Array.isArray(c.on) ? c.on : [] } } catch { return { off: [], on: [] } }
 }
 
+/** ₹ held per goal once its date passed: Settings → GoalHeld, JSON { goalId: { at, items: { itemId: ₹ } } } */
+export function readGoalHeld(settings) {
+  try { const o = JSON.parse(settings?.GoalHeld || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {} } catch { return {} }
+}
+
 /** Pool + its share per goal, computed live from today's data (used by the goals page and the sync below). */
 /** The pool share for all goals, from plain data (no React): used by useGoalPool and by the validation tests. */
 export function computeGoalPool(d) {
@@ -38,13 +43,14 @@ export function computeGoalPool(d) {
     return Object.fromEntries(goals.map((g) => [g.goalId, itemsMonthly(att[g.goalId]?.items)]))
   }
   const reserved = savedLinks || [] // goals past their date keep the shares saved in the sheet
-  let shared = sharePool({ goals, items, reserved }), sipOf = null
+  const held = readGoalHeld(settings)
+  let shared = sharePool({ goals, items, reserved, held }), sipOf = null
   for (let k = 0; k < 8; k++) {
     const next = sipFrom(shared.mappings)
     const merged = sipOf ? Object.fromEntries(Object.keys(next).map((id) => [id, (next[id] + sipOf[id]) / 2])) : next
     const same = sipOf && Object.keys(merged).every((id) => Math.abs(merged[id] - sipOf[id]) < 100)
     sipOf = merged
-    shared = sharePool({ goals, items, sipOf, reserved })
+    shared = sharePool({ goals, items, sipOf, reserved, held })
     if (same) break
   }
   // last pass: a goal is never left short while money is free — count only the SIP it surely gets
@@ -53,7 +59,7 @@ export function computeGoalPool(d) {
     const short = goals.some((g) => (act[g.goalId] || 0) < (sipOf[g.goalId] || 0) - 100)
     if (!short) break
     sipOf = Object.fromEntries(Object.keys(act).map((id) => [id, Math.min(act[id], sipOf[id])]))
-    shared = sharePool({ goals, items, sipOf, reserved })
+    shared = sharePool({ goals, items, sipOf, reserved, held })
   }
   return { items, choice, eqOf, allocMap, ...shared }
 }
@@ -89,11 +95,25 @@ export function useGoalPoolSync() {
     const restores = [...new Set(mfHoldings.filter((h) => h.originalTargetPct !== null && h.originalTargetPct !== undefined).map((h) => h.portfolioId))]
     // only goals whose own links changed are written
     const goals = [...live].filter((gid) => linksChanged(current.filter((m) => m.goalId === gid), pool.mappings.filter((m) => m.goalId === gid)))
-    return { restores, changed: goals.length > 0 || closed.length > 0, goals, closed, next: pool.mappings }
+    // ₹ held by goals whose date has passed: saved once when the date passes, dropped when the goal is closed or
+    // its date moves on (so a redemption only shrinks that goal; see sharePool)
+    const heldNow = readGoalHeld(settings)
+    const now = Date.now()
+    const pastIds = new Set(goalList.filter((g) => g.isActive !== false && g.goalType !== 'Retirement' && new Date(g.targetDate).getTime() < now).map((g) => g.goalId))
+    let heldNext = null
+    for (const gid of Object.keys(heldNow)) if (!pastIds.has(gid)) { heldNext = heldNext || { ...heldNow }; delete heldNext[gid] }
+    for (const gid of pastIds) {
+      if (heldNow[gid]) continue
+      const t = pool.take?.[gid]
+      if (!t || !Object.keys(t).length) continue
+      heldNext = heldNext || { ...heldNow }
+      heldNext[gid] = { at: new Date().toISOString().slice(0, 10), items: Object.fromEntries(Object.entries(t).map(([id, v]) => [id, Math.round(v)])) }
+    }
+    return { restores, changed: goals.length > 0 || closed.length > 0, goals, closed, next: pool.mappings, heldNext }
   }, [loading, isRefreshing, freshLoad, settingsAt, pass, goalList, goalPortfolioMappings, mfHoldings, settings, pool.mappings]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!work || (!work.changed && !work.restores.length) || busy.current) return
+    if (!work || (!work.changed && !work.restores.length && !work.heldNext) || busy.current) return
     try { if (sessionStorage.getItem('cf-record') === '1') return } catch { /* ignore */ }
     const once = (key) => { try { if (sessionStorage.getItem(key)) return false; sessionStorage.setItem(key, '1') } catch { /* ignore */ } return true }
     busy.current = true
@@ -106,6 +126,9 @@ export function useGoalPoolSync() {
           const name = (mfPortfolios || []).find((p) => p.portfolioId === pid)?.portfolioName || 'a portfolio'
           showToast(`${name}: your own target allocation is back.`, 'success', 5000)
         } catch (e) { showToast(`Could not restore targets: ${e.message}`, 'error') }
+      }
+      if (work.heldNext && typeof updateSettings === 'function' && once(`cf-held:${JSON.stringify(work.heldNext)}`)) {
+        try { await updateSettings({ GoalHeld: JSON.stringify(work.heldNext) }) } catch { /* next fresh load tries again */ }
       }
       if (work.changed && typeof updateGoalMappings === 'function') {
         const sig = work.next.map((m) => `${m.goalId}:${m.portfolioId}:${Math.round(m.allocationPct)}`).sort().join('|')

@@ -1,6 +1,7 @@
 // The Goals page (one page): To do this month → all goals together → free money → the road of goals by year.
 // Numbers come from the goals pool (Money for goals), buildGoalPlan (pool mode), familyPlan and goalTodo.
 import { goalStatus, goalIcon, monthsPast, agoText } from '../../utils/goalStatus'
+import WithdrawPanel from './WithdrawPanel'
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
@@ -476,28 +477,15 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   const [open, setOpen] = useState(false)
   const g = s.goal, n = Math.max(1, Number(g.payYears) || 1)
   const part = n > 1 ? Math.min(s.has, Math.round((Number(g.targetAmount) || 0) / n)) : s.has
-  const [amt, setAmt] = useState(String(Math.round(part)))
-  const done = (how) => { setOpen(false); closeGoal(g, how, { amount: Number(amt) || 0 }) }
   const ago = monthsPast(g)
   return (
     <div className="g2-rdy">
       <div><b>{n > 1 ? `This year's payment · ${L(part)}` : `Date reached${ago >= 1 ? ` ${agoText(ago)}` : ''} · ${L(s.has)} ready to use`}</b><span>{n > 1 ? `Paid over ${n} years: pay this part, the rest stays invested for the next ${n - 1}.` : ago >= 2 ? 'Already used it? Mark the goal so this money counts for your other goals again.' : 'Withdraw it when you need it, then mark the goal.'}</span></div>
-      <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw plan ›</button>
-      {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw: ${mt(g.goalName)}`} wide>
-        <div className="g2 g2-wdm">
-          <p className="g2-wdmh"><b>{L(s.has)}</b> from {s.rows.length} investment{s.rows.length > 1 ? 's' : ''}. Redeem {n > 1 ? "this year's part" : 'these'} when you pay, then tell the app what happened.</p>
-          <div className="g2-wdl">{s.rows.map((r, i) => <WdRow key={i} r={r} mt={mt} pname={pname} />)}</div>
-          <label className="block mt-4 text-xs text-[var(--text-muted)]">How much did you use? <span className="text-[var(--text-dim)]">(anything left goes back to your other goals{n > 1 ? ', or stays for next year' : ''})</span>
-            <input type="number" value={amt} onChange={(e) => setAmt(e.target.value)} className="mt-1 w-full sm:w-56 block bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] tabular-nums" />
-          </label>
-          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[var(--border)]">
-            {n > 1 && <button onClick={() => done('part')} className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">✓ Paid this year, keep the rest</button>}
-            <button onClick={() => done('used')} className={n > 1 ? 'px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors' : 'px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors'}>✓ Withdrawn, mark completed</button>
-            <button onClick={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(g.goalId)}`) }} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Need more time</button>
-            <button onClick={() => done('not')} className="px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Not needed</button>
-          </div>
-          <p className="g2-hint">{g.repeatYears ? `This goal repeats: after you close it, the next one is added for ${new Date(g.targetDate).getFullYear() + g.repeatYears}. ` : ''}Anything left after you close the goal becomes free money for your other goals.</p>
-        </div>
+      <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw ›</button>
+      {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw · ${mt(g.goalName)}`} wide maxHeight="max-h-[92vh]">
+        <WithdrawPanel s={s} mt={mt} pname={pname}
+          onDone={(how, opts) => { setOpen(false); closeGoal(g, how, opts) }}
+          onMoreTime={() => { setOpen(false); navigate(`/goals/classic?edit=${encodeURIComponent(g.goalId)}`) }} />
       </Modal>, document.body)}
     </div>
   )
@@ -542,7 +530,6 @@ function Step({ s, n, mt, pname, closeGoal, navigate }) {
   }
   return null
 }
-const WdRow = ({ r, mt, pname }) => <Row chip="wd" k="WITHDRAW" a={r.name ? (r.kind === 'other' ? mt(r.name) : splitFundName(r.name).main) : ''} b={r.kind === 'other' ? 'close it, or let it mature' : `${pname(r.portfolioId)} · redeem ${r.all ? 'all ' : ''}${U(r.units)} ${r.kind === 'stock' ? 'shares' : 'units'}`} v={`≈ ${L(r.value)}`} />
 const Row = ({ chip, k, a, b, v }) => <div className="g2-row"><span className={`g2-chip ${chip}`}>{k}</span><div><b>{a}</b><small>{b}</small></div><span className="g2-v">{v}</span></div>
 
 const CSS = `

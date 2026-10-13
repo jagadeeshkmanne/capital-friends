@@ -48,3 +48,23 @@ describe('SIPs', () => {
     expect(itemsMonthly([{ kind: 'mf', holding: { ongoingSIP: 1000 }, fraction: 0.5 }, { kind: 'other', holding: { currentValue: 100, dynamicFields: '{"monthlyContribution":7200}' }, value: 100 }])).toBe(7700)
   })
 })
+
+import { withdrawActions } from '../pages/goals/WithdrawPanel'
+describe('withdraw window', () => {
+  const rows = [
+    { kind: 'other', name: 'HDFC FD', value: 538000, holding: { investmentId: 'OI-1', investmentType: 'Fixed Deposit', currentValue: 538000 } },
+    { kind: 'mf', name: 'Liquid Fund', portfolioId: 'P1', units: 100, all: true, value: 17000, holding: { fundCode: '111', currentNav: 170, units: 100 } },
+    { kind: 'mf', name: 'Equity Fund', portfolioId: 'P1', units: 50, value: 5000, holding: { fundCode: '222', currentNav: 100, units: 200 } },
+  ]
+  it('part of the FD, all of one fund, none of the other', () => {
+    const a = withdrawActions(rows, ['3,00,000', '17,000', '0'], '2026-10-13')
+    expect(a).toHaveLength(2)
+    expect(a[0].update).toMatchObject({ currentValue: 238000, status: 'Active' })
+    expect(a[1].redeem).toMatchObject({ fundCode: '111', units: 100, price: 170 })
+  })
+  it('all of the FD marks it matured; part of a fund redeems by NAV', () => {
+    const a = withdrawActions(rows, ['5,38,000', '0', '2,000'])
+    expect(a[0].update).toMatchObject({ currentValue: 0, status: 'Matured' })
+    expect(a[1].redeem.units).toBe(20)
+  })
+})

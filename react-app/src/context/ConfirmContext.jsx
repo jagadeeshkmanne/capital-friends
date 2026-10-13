@@ -43,7 +43,7 @@ export function ConfirmProvider({ children }) {
               </span>
               <div>
                 <h3 className="text-sm font-bold text-[var(--text-primary)]">{dialog.title}</h3>
-                <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{dialog.message}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed whitespace-pre-line">{dialog.message}</p>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2">
