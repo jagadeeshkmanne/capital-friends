@@ -1,5 +1,6 @@
 // The Goals page (one page): To do this month → all goals together → free money → the road of goals by year.
 // Numbers come from the goals pool (Money for goals), buildGoalPlan (pool mode), familyPlan and goalTodo.
+import { goalStatus, goalIcon, monthsPast, agoText } from '../../utils/goalStatus'
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
@@ -15,8 +16,7 @@ import { classifyRetirementHolding } from '../../utils/retirementBuckets'
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const fname = (h) => (h ? splitFundName(h.fundName || h.schemeName || '').main : 'a fund')
-const ICON = { Retirement: '🌴', Education: '🎓', Marriage: '💍', Home: '🏠', 'House Purchase': '🏠', 'Emergency Fund': '🛟', Vehicle: '🚗', Travel: '✈️' }
-const icon = (g) => ICON[g.goalType] || '🎯'
+const icon = goalIcon
 const yearOf = (g) => new Date(g.targetDate).getFullYear()
 const monthYear = (g) => new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
 const isGold = (h) => /gold|silver/i.test(`${h?.category || ''} ${h?.fundName || ''} ${h?.investmentType || ''} ${h?.investmentCategory || ''}`)
@@ -390,13 +390,13 @@ function RetMonthly({ p, retired }) {
 function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, closeGoal, navigate }) {
   const [show, setShow] = useState(null)
   const g = p.goal
-  const retired = p.isRet && p.years <= 0
-  const due = p.state === 'due' && !p.isRet
+  const gs = goalStatus(p)
+  const retired = gs.retired
+  const due = gs.due
   const pct = p.target > 0 ? Math.min(100, Math.round((p.has / p.target) * 100)) : 0
-  const retShort = retired ? Math.max(0, p.target - p.has) : 0
-  const st = due ? ['due', 'Money ready'] : p.state === 'short' ? ['warn', `${L(-p.gap)} short`] : retired ? (retShort > 1000 ? ['warn', `Retired · ${L(retShort)} short`] : ['ok', 'Retired · on track']) : ['ok', 'On track']
-  const gap = due ? ['ok', 'Ready'] : p.state === 'short' ? ['warn', `${L(-p.gap)} short`] : retShort > 1000 ? ['warn', `${L(retShort)} short`] : ['ok', 'On track']
-  const yrs = retired ? `retired ${Math.round(-p.years) || ''}${Math.round(-p.years) ? ' yrs ago' : ''}` : due ? 'date reached' : `${p.years < 1 ? `${Math.max(1, Math.round(p.years * 12))} months` : `${Math.round(p.years * 2) / 2} years`} left`
+  const st = [gs.tone, gs.badge]
+  const gap = gs.gap
+  const yrs = gs.when
   const items = (p.att?.items || []).filter((it) => it.value > 0.5).sort((a, b) => b.value - a.value)
   return (
     <div id={`goal-${g.goalId}`} className={`g2-card g2-goal ${st[0]}`}>
@@ -407,8 +407,8 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
       </div>
       <div className={`g2-stats ${p.isRet ? 'g2-st5' : ''}`}>
         <div className="hv"><span><i>₹</i>Have today</span><b>{L(p.has)}</b><small>from the pool</small></div>
-        <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{due ? 'the goal amount' : 'with your SIP'}</small></div>
-        <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gap[0] === 'ok' ? 'nothing to add' : 'today'}</small></div>
+        <div className="nd"><span><i>◎</i>Need today</span><b>{L(due ? p.target : p.need)}</b><small>{gs.needNote}</small></div>
+        <div className={`gp ${gap[0]}`}><span><i>{gap[0] === 'ok' ? '✓' : '!'}</i>Gap</span><b className={gap[0]}>{gap[1]}</b><small>{gs.gapNote}</small></div>
         <div className="tg"><span><i>⚑</i>Goal amount</span><b>{L(p.target)}</b><small>in {yearOf(g)}</small></div>
         {p.isRet && <RetirementActions goal={p.goal} slot="stat" fallback={<RetMonthly p={p} retired={retired} />} />}
       </div>
@@ -420,6 +420,12 @@ function GoalCard({ p, mt, pname, renderBuckets, ready, protect, familyOk, close
           note={protect ? `⚠ Too much equity for ${p.years < 1 ? 'a few months' : `${Math.round(p.years * 2) / 2} years`} left: see "Make it safer" at the top.` : mostlyRet ? `Mostly EPF / PPF / NPS (${L(retOnly)}), which count as debt and stay for retirement. Your equity is counted in your other goals' share.` : null} />
       })()}
       {due && ready && <ReadyStep s={ready} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />}
+      {due && gs.short > 0 && (
+        <div className="g2-rdy" style={{ marginTop: ready ? 8 : 12 }}>
+          <div><b>{p.has >= 1 ? `Only ${L(p.has)} of ${L(p.target)} is set aside` : 'Nothing is set aside for it'}</b><span>{p.has >= 1 ? 'Use what is there, or give it more time.' : 'Move the date, lower the amount, or mark it not needed.'}</span></div>
+          <button onClick={() => navigate(`/goals/classic?edit=${encodeURIComponent(g.goalId)}`)} className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Edit goal ›</button>
+        </div>
+      )}
       {p.isRet && <RetirementActions goal={p.goal} slot="alert" />}
       {/* one row of small buttons (like the app's other buttons); the lists open below */}
       {p.has < 1 && p.state === 'short' && <p className="g2-hint" style={{ marginTop: 10 }}>Nothing set aside yet: your money isn't enough for every goal today, and goals with a higher priority get it first. Want this one funded too? Give it the same priority as them in Edit goals, and they'll share the money.</p>}
@@ -471,7 +477,7 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   const done = (how) => { setOpen(false); closeGoal(s.goal, how) }
   return (
     <div className="g2-rdy">
-      <div><b>Date reached · {L(s.has)} ready to use</b><span>Withdraw it when you need it, then mark the goal.</span></div>
+      <div><b>Date reached{monthsPast(s.goal) >= 1 ? ` ${agoText(monthsPast(s.goal))}` : ''} · {L(s.has)} ready to use</b><span>{monthsPast(s.goal) >= 2 ? 'Already used it? Mark the goal so this money counts for your other goals again.' : 'Withdraw it when you need it, then mark the goal.'}</span></div>
       <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw plan ›</button>
       {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw: ${mt(s.goal.goalName)}`} wide>
         <div className="g2 g2-wdm">

@@ -1,3 +1,4 @@
+import { goalStatus, goalIcon } from '../../utils/goalStatus'
 import { Wallet, Pencil, Plus } from 'lucide-react'
 // Main Goals page (/goals, goal detail at /goals/plan/:goalId; the classic page is /goals/classic): one road for all goals, this month's steps from today's fund
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
@@ -22,10 +23,13 @@ import GoalForm from '../../components/forms/GoalForm'
 const L = (v) => (v ? formatINR(Math.round(v)) : '—')
 const U = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const fname = (h) => (h ? splitFundName(h.fundName || h.schemeName || '').main : 'a fund of your choice')
-const ICON = { Retirement: '🌴', Education: '🎓', Marriage: '💍', Home: '🏠', 'House Purchase': '🏠', 'Emergency Fund': '🛟', Vehicle: '🚗', Travel: '✈️' }
-const icon = (g) => ICON[g.goalType] || '🎯'
+const icon = goalIcon
 const STATUS = { off: ['Off your plan', 'var(--accent-rose)'], step: ['Step due', 'var(--accent-amber)'], good: ['On plan', '#22c55e'] }
-const gapTxt = (p) => p.state === 'short' ? [`${L(-p.gap)} short`, 'var(--accent-rose)'] : p.state === 'extra' ? [`${L(p.gap)} extra`, 'var(--accent-blue)'] : p.state === 'due' ? ['Due now', 'var(--accent-amber)'] : ['On plan', '#22c55e']
+const gapTxt = (p) => {
+  const gs = goalStatus(p)
+  if (gs.due || gs.retired) return gs.short > 0 ? [gs.gap[1], 'var(--accent-rose)'] : [gs.due ? 'Due now' : 'On plan', gs.due ? 'var(--accent-amber)' : '#22c55e']
+  return p.state === 'short' ? [`${L(-p.gap)} short`, 'var(--accent-rose)'] : p.state === 'extra' ? [`${L(p.gap)} extra`, 'var(--accent-blue)'] : p.state === 'achieved' ? ['Fully funded', '#22c55e'] : ['On plan', '#22c55e']
+}
 const realSteps = (p) => p.steps.filter((s) => s.t !== 'buckets')
 
 export default function GoalsPlanPage() {
@@ -296,6 +300,9 @@ const goalCells = (p, gp) => [
 /** What the goal needs today: a monthly SIP, OR one lump sum. Shown only when the goal is short. */
 function NeedRow({ p }) {
   const running = p.sip ? `${L(p.sip)}/mo` : 'none'
+  const gs = goalStatus(p)
+  if (gs.due && gs.short > 0) return <div className="gp-need-ok" style={{ color: 'var(--accent-rose)' }}>! Date reached {gs.when.replace('date reached ', '')} with {L(p.has)} of {L(p.target)}: use what's there, move the date, or lower the amount (Edit goal).</div>
+  if (gs.retired && gs.short > 0) return <div className="gp-need-ok" style={{ color: 'var(--accent-rose)' }}>! {L(gs.short)} below the goal amount. Your income comes from the retirement buckets{p.sip ? ` · SIP still running ${L(p.sip)}/mo` : ''}.</div>
   if (!(p.lumpToday > 0)) return <div className="gp-need-ok">✓ Covered{p.sip ? ` · keep your SIP ${L(p.sip)}/mo` : ''}</div>
   return (
     <div className="gp-need">
@@ -312,7 +319,7 @@ function GoalCard({ p, mt, navigate }) {
   const nextTxt = next && ({ safer: 'Make safer', ease: 'Equity starts easing', bucket: 'Start retirement buckets', goal: p.isRet ? 'Retire' : 'Goal year', spend: 'Live from buckets' }[next.k])
   return (
     <div className="gp-vc" onClick={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)}>
-      <div className="gp-vh"><Ring p={p} /><div><b>{icon(p.goal)} {mt(p.goal.goalName)}</b><span>Due {new Date(p.goal.targetDate).getFullYear()} · {p.yearsLeft} yrs left</span></div><Dot c={sc}>{stt}</Dot></div>
+      <div className="gp-vh"><Ring p={p} /><div><b>{icon(p.goal)} {mt(p.goal.goalName)}</b><span>Due {new Date(p.goal.targetDate).getFullYear()} · {goalStatus(p).when}</span></div><Dot c={sc}>{stt}</Dot></div>
       <Grid cells={goalCells(p, gp)} />
       <MixRow p={p} />
       <NeedRow p={p} />
@@ -429,7 +436,7 @@ function GoalDetail({ p, ctx }) {
   return (
     <>
       <div className="gp-panel">
-        <div className="gp-vh gp-hero"><Ring p={p} big /><div><b>{icon(g)} {mt(g.goalName)}</b><span>Due {new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · {p.yearsLeft} years left</span></div><Dot c={sc}>{stt}</Dot></div>
+        <div className="gp-vh gp-hero"><Ring p={p} big /><div><b>{icon(g)} {mt(g.goalName)}</b><span>Due {new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · {goalStatus(p).when}</span></div><Dot c={sc}>{stt}</Dot></div>
         <Grid six four cells={goalCells(p, gp)} />
         <MixRow p={p} />
         <NeedRow p={p} />

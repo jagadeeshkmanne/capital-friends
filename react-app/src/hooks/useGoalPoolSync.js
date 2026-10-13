@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext'
 import { riskFraction, attributeFamilyGoals } from '../utils/goalAttribution'
 import { poolItems, sharePool, linksChanged } from '../utils/goalPool'
 import { resolvePortfolioOwners } from '../utils/fundsDashboard'
+import { withPortfolioSip } from '../utils/portfolioSip'
 
 /** The person's "Money for goals" switches, kept in the Settings tab as JSON { off: [ids], on: [ids] }. */
 export function readPoolChoice(settings) {
@@ -13,7 +14,8 @@ export function readPoolChoice(settings) {
 /** Pool + its share per goal, computed live from today's data (used by the goals page and the sync below). */
 /** The pool share for all goals, from plain data (no React): used by useGoalPool and by the validation tests. */
 export function computeGoalPool(d) {
-  const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
+  const { goalList, mfPortfolios, mfHoldings: rawHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
+  const mfHoldings = withPortfolioSip(rawHoldings, mfPortfolios) // same SIPs as the goals page
   const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
   const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
   const choice = readPoolChoice(settings)
