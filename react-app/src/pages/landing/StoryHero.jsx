@@ -38,7 +38,7 @@ const CHAPTERS = [
   { k: 'all', ph: 'all in one place', icon: 'chart', c: C.violet, s: 'Track', t: 'Everything in one place', dur: 4500, d: 'Funds, stocks, FDs, PPF, gold, insurance and loans — for every family member.' },
   { k: 'cas', ph: 'imported in a minute', icon: 'sheet', c: C.sky, s: 'CAS import', t: 'Import your CAS in a minute', dur: 5000, d: 'Drop your CAMS / CDSL statement PDF: every fund, share and transaction comes in.' },
   { k: 'ath', ph: 'watched for you every day', icon: 'bell', c: C.rose, s: 'Alerts', t: 'Alerts when a fund falls below its all-time high', dur: 7000 },
-  { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', dur: 11500, d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
+  { k: 'goals', ph: 'planned for every goal', icon: 'target', c: C.amber, s: 'Goals', t: 'A plan for every goal', dur: 10500, d: 'Money shared across goals, safer as dates come near, and the exact step each month.' },
   { k: 'family', ph: 'known to your family', icon: 'mail', c: C.emerald, s: 'Family', t: 'Your family is never in the dark', dur: 5200, d: 'A regular summary email: where every rupee, policy and nominee is — even without you.' },
 ]
 
@@ -293,7 +293,8 @@ function SceneAlerts() {
 const GLIDE_EDU = [['2031', 0.8], ['2032', 0.6], ['2033', 0.34], ['2034', 0.1]]
 const BUCKET = 'M0 0 h64 v92 q0 12 -12 12 h-40 q-12 0 -12 -12 Z'
 // when the car is driving to each goal (seconds from the start of the scene)
-const LEG = { edu: [1.0, 3.6], retire: [5.4, 3.0] }
+const LEG = { edu: [1.0, 3.6], retire: [5.4, 3.5] }
+const RET_YEARS = [['2041', '4 yrs to go'], ['2042', '3 yrs to go'], ['2043', '2 yrs to go'], ['2044', '1 yr to go'], ['2045', 'ready']]
 
 function GlideBucket({ x, y, id, title, label, icon, c, years, at: [t0, len] }) {
   const step = len / years.length
@@ -368,19 +369,26 @@ function SceneGoals() {
       <GlideBucket x={300} y={248} id="edu" title="KIDS' EDUCATION · MOVES TO SAFE" label="" icon="target" c={C.violet} years={GLIDE_EDU} at={LEG.edu} />
       <Reached x={400} y={40} fx={380} fy={102} text="Education goal reached" c={C.violet} t={LEG.edu[0] + LEG.edu[1] + 0.1} />
 
-      {/* Retirement 2045: once there, three buckets take over */}
-      <g className="st-pop" style={T(rt)}><path className="la-dash" d="M880 146 Q880 180 850 204" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" /></g>
+      {/* Retirement 2045: in the last 5 years before it, the three buckets fill year by year as the car drives there */}
+      <g className="st-pop" style={T(LEG.retire[0])}><path className="la-dash" d="M880 146 Q880 180 850 204" fill="none" stroke={C.amber} strokeWidth="2.5" strokeDasharray="4 6" strokeLinecap="round" /></g>
       <Reached x={770} y={52} fx={880} fy={50} text="Retired" c={C.amber} t={rt} />
-      <g transform="translate(720 222)"><g className="st-rise" style={T(rt + 0.2)}>
-        <Tx x={0} y={0} s={11} w={800} c="#b45309" letterSpacing=".06em">RETIREMENT · THREE BUCKETS</Tx>
+      <g transform="translate(720 222)"><g className="st-rise" style={T(LEG.retire[0])}>
+        <Tx x={0} y={0} s={11} w={800} c="#b45309" letterSpacing=".06em">RETIREMENT · 3 BUCKETS</Tx>
+        <g transform="translate(272 0)">
+          {RET_YEARS.map(([yr, sub], n) => (
+            <g key={yr} className={n === RET_YEARS.length - 1 ? 'st-yr last' : 'st-yr'} style={{ animationDelay: `${LEG.retire[0] + n * (LEG.retire[1] / 5)}s`, animationDuration: `${LEG.retire[1] / 5}s` }}>
+              <Tx s={13} w={800} c={C.navy} a="end">{yr}<tspan dx="6" fontSize="10.5" fontWeight="600" fill={C.slate}>{sub}</tspan></Tx>
+            </g>
+          ))}
+        </g>
         {[['Income', C.sky, 46, 'spend now'], ['Stability', C.teal, 58, '3–7 yrs'], ['Growth', C.violet, 70, '7+ yrs']].map(([l, c, h, sub], i) => (
           <g key={l} transform={`translate(${i * 96} 16)`}>
             <clipPath id={`st-b-${l}`}><path d={BUCKET} /></clipPath>
-            <g clipPath={`url(#st-b-${l})`}><rect width="64" height="104" fill="#f8fafc" /><g className="la-fill st-quick" style={T(rt + 0.5 + i * 0.25)}><rect y={104 - h} width="64" height={h} fill={c} opacity=".85" /></g></g>
+            <g clipPath={`url(#st-b-${l})`}><rect width="64" height="104" fill="#f8fafc" /><rect className="st-fill5" style={{ ...T(LEG.retire[0]), animationDuration: `${LEG.retire[1]}s`, '--h': `${h}px` }} y={104 - h} width="64" height={h} fill={c} opacity=".85" /></g>
             <path d={BUCKET} fill="none" stroke="#94a3b8" strokeWidth="2.5" />
             <Tx x={32} y={124} s={11.5} c={C.ink} a="middle">{l}</Tx>
             <Tx x={32} y={139} s={10} w={600} c={C.slate} a="middle">{sub}</Tx>
-            {i > 0 && <path className="la-dash" d="M-6 34 Q-18 20 -28 34" fill="none" stroke={c} strokeWidth="3" strokeDasharray="4 5" strokeLinecap="round" />}
+            {i > 0 && <g className="st-pop" style={T(rt)}><path className="la-dash" d="M-6 34 Q-18 20 -28 34" fill="none" stroke={c} strokeWidth="3" strokeDasharray="4 5" strokeLinecap="round" /></g>}
           </g>
         ))}
       </g></g>
@@ -608,9 +616,11 @@ const CSS = `
 @keyframes stCarHome{from{offset-distance:0%}to{offset-distance:26.6%}}
 .st-confetti{opacity:0;animation:stConf .9s ease-out both}
 @keyframes stConf{0%{opacity:0;transform:translate(0,0) scale(.4)}30%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1)}}
-.st-car3{offset-rotate:auto;animation:stCarTrip 7.4s linear both 1s}
-@keyframes stCarTrip{0%{offset-distance:0%;animation-timing-function:cubic-bezier(.45,0,.4,1)}48.6%{offset-distance:33.5%}59.5%{offset-distance:33.5%;animation-timing-function:cubic-bezier(.45,0,.4,1)}100%{offset-distance:81.5%}}
+.st-car3{offset-rotate:auto;animation:stCarTrip 7.9s linear both 1s}
+@keyframes stCarTrip{0%{offset-distance:0%;animation-timing-function:cubic-bezier(.45,0,.4,1)}45.6%{offset-distance:33.5%}55.7%{offset-distance:33.5%;animation-timing-function:cubic-bezier(.45,0,.4,1)}100%{offset-distance:81.5%}}
 .la-fill.st-quick{animation-duration:1.2s}
+.st-fill5{animation:stFill5 3.5s steps(5,end) both}
+@keyframes stFill5{from{transform:translateY(var(--h))}to{transform:none}}
 @keyframes stPress{0%,100%{transform:scale(1)}50%{transform:scale(.92)}}
 @keyframes stCursor{from{offset-distance:0%;opacity:0}20%{opacity:1}to{offset-distance:100%;opacity:1}}
 @keyframes stDraw{to{stroke-dashoffset:0}}
