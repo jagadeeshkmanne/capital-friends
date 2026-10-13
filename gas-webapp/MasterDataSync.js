@@ -183,16 +183,21 @@ function ensureRows_(sheet, rows) {
 // sheet recalculates fast. Searching and checking funds read the shared master copy (see MasterSource.js).
 // ============================================================================
 
-/** Scheme codes used in any portfolio sheet (column A from row 4), as strings. Throws if it can't tell. */
+/**
+ * Scheme codes used in any portfolio sheet (column A from row 4), as strings. Throws if it can't tell.
+ * One Sheets API call for all portfolios (pending writes are sent first so new rows are seen).
+ */
 function heldFundCodes_() {
+  flushSheets_();
+  var ids = getAllPortfolios().map(function (p) { return p.portfolioId; }).filter(Boolean);
   var codes = {};
-  getAllPortfolios().forEach(function (p) {
-    var sh = getSheet(p.portfolioId);
-    if (!sh) return;
-    var n = sh.getLastRow();
-    if (n < 4) return;
-    sh.getRange(4, 1, n - 3, 1).getValues().forEach(function (r) {
-      var c = String(r[0] === null || r[0] === undefined ? '' : r[0]).trim();
+  if (!ids.length) return codes;
+  var res = casRetry_(function () {
+    return Sheets.Spreadsheets.Values.batchGet(_currentUserSpreadsheetId, { ranges: ids.map(function (id) { return "'" + id + "'!A4:A"; }), valueRenderOption: 'UNFORMATTED_VALUE' });
+  });
+  ((res && res.valueRanges) || []).forEach(function (vr) {
+    ((vr && vr.values) || []).forEach(function (r) {
+      var c = String(r && r[0] !== undefined && r[0] !== null ? r[0] : '').trim();
       if (/^\d+(\.0+)?$/.test(c)) codes[String(parseInt(c, 10))] = true;
     });
   });
@@ -206,12 +211,18 @@ function masterRowsForCodes_(userTab, codes) {
   return rows.filter(function (r) { return codes[String(parseInt(String(r[0]).trim(), 10))]; });
 }
 
-/** Codes actually present in the user's own tab (raw Sheets read: the adapter serves these tabs from the master copy). */
-function userTabCodes_(userTab) {
-  var res = casRetry_(function () { return Sheets.Spreadsheets.Values.get(_currentUserSpreadsheetId, "'" + userTab + "'!A2:A", { valueRenderOption: 'UNFORMATTED_VALUE' }); });
-  var have = {}, vals = (res && res.values) || [];
-  vals.forEach(function (r) { var c = String(r && r[0] !== undefined ? r[0] : '').trim(); if (c) have[String(parseInt(c, 10))] = true; });
-  return { have: have, rows: vals.length }; // rows = last used row - 1 (the API stops at the last value)
+/** Codes actually present in the user's own tabs, one call for all (the adapter serves these tabs from the master copy). */
+function userTabsCodes_(tabs) {
+  var res = casRetry_(function () {
+    return Sheets.Spreadsheets.Values.batchGet(_currentUserSpreadsheetId, { ranges: tabs.map(function (t) { return "'" + t + "'!A2:A"; }), valueRenderOption: 'UNFORMATTED_VALUE' });
+  });
+  var out = {};
+  tabs.forEach(function (t, i) {
+    var vals = (res && res.valueRanges && res.valueRanges[i] && res.valueRanges[i].values) || [], have = {};
+    vals.forEach(function (r) { var c = String(r && r[0] !== undefined ? r[0] : '').trim(); if (c) have[String(parseInt(c, 10))] = true; });
+    out[t] = { have: have, rows: vals.length }; // rows = last used row - 1 (the API stops at the last value)
+  });
+  return out;
 }
 
 /**
@@ -240,11 +251,14 @@ function replaceHeldTabFromMaster_(sheet, userTab, masterTab, numCols, label) {
 function ensureHeldFundsListed_() {
   var added = 0, codes;
   try { codes = heldFundCodes_(); } catch (e) { log('ensureHeldFundsListed_: ' + e.message); return 0; }
-  Object.keys(HELD_ONLY_TABS_).forEach(function (userTab) {
+  if (!Object.keys(codes).length) return 0;
+  var tabs = Object.keys(HELD_ONLY_TABS_).filter(function (t) { return !!getSheet(t); }), present;
+  if (!tabs.length) return 0;
+  try { present = userTabsCodes_(tabs); } catch (e) { log('ensureHeldFundsListed_ read: ' + e.message); return 0; }
+  tabs.forEach(function (userTab) {
     try {
       var sheet = getSheet(userTab);
-      if (!sheet) return;
-      var got = userTabCodes_(userTab), have = got.have, missing = {};
+      var got = present[userTab], have = got.have, missing = {};
       Object.keys(codes).forEach(function (c) { if (!have[c]) missing[c] = true; });
       if (!Object.keys(missing).length) return;
       var cols = HELD_ONLY_TABS_[userTab];
