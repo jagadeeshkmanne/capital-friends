@@ -19,6 +19,9 @@ const INVESTMENT_TYPES = [
   { value: 'Bonds', category: 'Debt' },
   { value: 'Physical Silver', category: 'Silver' },
   { value: 'Digital Silver', category: 'Silver' },
+  { value: 'Equity', category: 'Equity' },              // shares held elsewhere, foreign equity, PMS… (counted as equity)
+  { value: 'ESOP / RSU', category: 'Equity' },
+  { value: 'Unlisted Shares', category: 'Equity' },
   { value: 'Crypto', category: 'Alternative' },
   { value: 'Other', category: 'Other' },
 ]

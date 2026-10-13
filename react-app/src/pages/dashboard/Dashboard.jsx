@@ -253,6 +253,7 @@ export default function Dashboard() {
       else if (t.includes('silver') || t.includes('commodity')) assetClasses.Commodities += inv.currentValue
       else if (t.includes('fd') || t.includes('fixed') || t.includes('bond') || t.includes('ppf') || t.includes('epf') || t.includes('nps') || t.includes('rd') || t.includes('nsc') || t.includes('ssy')) assetClasses.Debt += inv.currentValue
       else if (t.includes('real estate') || t.includes('property')) assetClasses['Real Estate'] += inv.currentValue
+      else if (inv.investmentCategory === 'Equity' || /equity|esop|rsu|shares/.test(t)) assetClasses.Equity += inv.currentValue
       else assetClasses.Other += inv.currentValue
     })
 
