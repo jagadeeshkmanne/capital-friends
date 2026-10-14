@@ -19,6 +19,8 @@ import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import GoalForm from '../../components/forms/GoalForm'
+import { goalRoad } from '../../utils/goalPlan'
+import { getGoalAllocation } from '../../data/glidePath'
 
 const L = (v) => (v ? formatINR(Math.round(v)) : '—')
 const U = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -516,6 +518,8 @@ function GoalDetail({ p, ctx }) {
         </> : <div className="gp-ok">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
       </div>
 
+      <PlanByYear p={p} />
+
       {p.isRet && <BucketsPanel p={p} />}
 
       <div className="gp-panel">
@@ -536,6 +540,32 @@ function GoalDetail({ p, ctx }) {
       </div>
 
     </>
+  )
+}
+
+/** Plan by year: the coming moves of this goal's glide path (one short line each), then the goal year(s). */
+function PlanByYear({ p }) {
+  const g = p.goal, n = Math.max(1, Number(g.payYears) || 1)
+  const stops = goalRoad(p).filter((r) => !['today', 'quiet'].includes(r.k))
+  if (!stops.length) return null
+  const rows = []
+  for (const r of stops) {
+    if (r.k === 'safer') rows.push([r.y, `${r.yl} yr${r.yl > 1 ? 's' : ''} left`, `${r.eq0}% → ${r.eq}%`, `Move about ${L(r.amount)} from equity to safe funds`])
+    else if (r.k === 'ease') rows.push([r.y, `${r.yl} yrs left`, '85% → 75%', 'Equity eases about 2 points a year'])
+    else if (r.k === 'bucket') rows.push([`${r.y0}–${r.y}`, 'last 5 yrs', 'buckets', 'Each quarter, fill Income and Stability from Growth'])
+    else if (r.k === 'goal') {
+      if (p.isRet) rows.push([r.y, 'retire', '', r.bucket?.monthly ? `Start the monthly ${L(r.bucket.monthly)} from Income` : 'Start the monthly withdrawal from Income'])
+      else if (n > 1) for (let k = 0; k < n; k++) rows.push([r.y + k, k === 0 ? 'goal year' : `payment ${k + 1}`, `${getGoalAllocation({ ...g, payYears: n - k }, 0).equity}%`, `Withdraw this year's part (${k + 1} of ${n}), about ${L(p.target / n)}`])
+      else rows.push([r.y, 'goal year', '0%', `Withdraw ${L(p.target)} (the Withdraw button lists each step)`])
+    }
+  }
+  return (
+    <div className="gp-panel">
+      <div className="gp-ph"><h2>Plan by year</h2><span className="gp-hs">From your glide path · amounts are estimates, the exact units show in that year's steps</span></div>
+      <div className="gp-pby">
+        {rows.map(([y, yl, eq, what], i) => <div key={i}><b>{y}</b><small>{yl}</small><em>{eq}</em><span>{what}</span></div>)}
+      </div>
+    </div>
   )
 }
 
@@ -663,7 +693,7 @@ const CSS = `
 .gp-mix{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:10px;font-size:12px;color:var(--text-secondary,var(--text-muted))}.gp-mix i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.gp-mix-t{margin-left:auto;color:var(--text-muted)}
 .gp-lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 .gp-nw{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.gp-nwv{display:block;font-size:26px;margin-top:4px;color:var(--text-primary)}
-.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws>div{max-width:280px}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
+.gp-pby>div{display:grid;grid-template-columns:90px 90px 90px 1fr;gap:10px;align-items:center;padding:9px 4px;border-top:1px solid var(--border-light);font-size:13px}.gp-pby>div:first-child{border-top:0}.gp-pby b{color:var(--text-primary)}.gp-pby small{color:var(--text-dim);font-size:12px}.gp-pby em{font-style:normal;color:var(--accent-violet);font-variant-numeric:tabular-nums}.gp-pby span{color:var(--text-secondary)}@media(max-width:640px){.gp-pby>div{grid-template-columns:60px 1fr 60px}.gp-pby span{grid-column:1/-1}}\n.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws>div{max-width:280px}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
 .gp-tiles{display:grid;grid-template-columns:repeat(4,1fr) 2fr;gap:12px;margin-bottom:16px}
 .gp-tile{border:1px solid var(--border);background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}.gp-tile b{font-size:17px;color:var(--text-primary);font-variant-numeric:tabular-nums}.gp-tile small{font-size:12px;color:var(--text-muted)}
 .gp-tile-or{flex-direction:row;align-items:center;justify-content:space-between}.gp-tile-or>div{display:flex;flex-direction:column;gap:4px}.gp-tile-or>em{font-style:normal;font-size:12px;font-weight:700;color:var(--text-muted)}
