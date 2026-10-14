@@ -7,6 +7,7 @@ import { formatINR } from '../../data/familyData'
 import { getGoalAllocation } from '../../data/glidePath'
 import { useMask } from '../../context/MaskContext'
 import { calculateGoalFundingProjection } from '../../utils/goalProjection'
+import { needTodayN, sipForAmount } from '../../utils/goalPlan'
 
 const GOAL_TYPES = [
   'Retirement', 'Emergency Fund', 'Child Education', 'Home Purchase',
@@ -108,7 +109,7 @@ function retirementAgeAtDate(dob, targetDate) {
   return age > 0 ? String(age) : ''
 }
 
-export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent, defaultType }) {
+export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent, defaultType, live }) {
   const { mv } = useMask()
   const isEdit = !!initial
   const { activeMembers, settings } = useData()
@@ -338,7 +339,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
     inflatedTarget = Math.round(inflatedTarget)
 
-    const linkedCurrentValue = isEdit ? (Number(initial?.currentValue) || 0) : 0
+    const linkedCurrentValue = isEdit ? (live ? Math.max(0, Number(live.has) || 0) : (Number(initial?.currentValue) || 0)) : 0
     const funding = calculateGoalFundingProjection({
       targetAmount: inflatedTarget,
       months,
@@ -346,7 +347,22 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
       plannedLumpsum: lumpsum,
       linkedCurrentValue,
     })
-    const { existingValue, futureExistingValue, requiredSIP, requiredLumpsum, coversGoal } = funding
+    let { existingValue, futureExistingValue, requiredSIP, requiredLumpsum, coversGoal } = funding
+    // editing a goal in the money pool: use what the goal really has today and its running SIP, and the same
+    // formula as the goal page (paid over several years too), so the form and the goal page show the same numbers
+    if (live && isEdit && !isEmergency) {
+      const n = isRetirement ? 1 : Math.max(1, Number(payYears) || 1)
+      const has = Math.max(0, Number(live.has) || 0), sipNow = Math.max(0, Number(live.sip) || 0)
+      const need0 = needTodayN({ target: inflatedTarget, years: yearsToGo, annualReturn: cagrRate, sip: 0, payYears: n })
+      const needWithSip = needTodayN({ target: inflatedTarget, years: yearsToGo, annualReturn: cagrRate, sip: sipNow, payYears: n })
+      const tol = Math.max(1000, 0.02 * needWithSip) // the goal page's "on plan" band: a few rupees short is on plan
+      const short = needWithSip - has > tol
+      requiredSIP = short ? Math.max(0, sipForAmount({ amountToday: Math.max(0, need0 - has), years: yearsToGo, annualReturn: cagrRate }) - sipNow) : 0
+      requiredLumpsum = short ? Math.max(0, Math.round(needWithSip - has)) : 0
+      coversGoal = requiredLumpsum <= 0
+      existingValue = has
+      futureExistingValue = has * Math.pow(1 + cagrRate, yearsToGo)
+    }
 
     // Projection: what happens if you follow the required SIP
     const fvRequiredSIP = requiredSIP > 0 && monthlyRate > 0 && months > 0
@@ -370,7 +386,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
     }
   }, [form.todaysCost, form.targetDate, form.lumpsum,
       form.inflation, form.cagr, form.monthlyExpenses, form.emergencyMonths,
-      form.retirementAge, isRetirement, isEmergency, isEdit, initial?.currentValue])
+      form.retirementAge, isRetirement, isEmergency, isEdit, initial?.currentValue, live?.has, live?.sip, payYears])
 
   // ── Validation ──
   function validateStep(s) {

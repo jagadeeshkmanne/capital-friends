@@ -4,6 +4,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // these test files use Node's own test runner (node --test, see "npm test"); vitest skips them
+  test: {
+    exclude: ['**/node_modules/**', 'demo/**', 'src/data/bucketDemo.test.js', 'src/data/glidePath.test.js', 'src/utils/bucketCheck.test.js',
+      'src/utils/bucketRefill.test.js', 'src/utils/buyOpportunities.test.js', 'src/utils/fundsDashboard.test.js', 'src/utils/goalProjection.test.js',
+      'src/utils/goalWithdrawal.test.js', 'src/utils/incomePlan.test.js', 'src/utils/mfMetrics.test.js', 'src/utils/retirementBuckets.test.js'],
+  },
   base: '/',
   server: {
     port: 5173,

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && echo 'Copy dist/ contents to your GitHub Pages repo /app/ folder'"
+    "deploy": "vite build && echo 'Copy dist/ contents to your GitHub Pages repo /app/ folder'",
+    "test": "npx vitest run && node --test src/data/bucketDemo.test.js src/data/glidePath.test.js src/utils/bucketCheck.test.js src/utils/bucketRefill.test.js src/utils/buyOpportunities.test.js src/utils/fundsDashboard.test.js src/utils/goalProjection.test.js src/utils/goalWithdrawal.test.js src/utils/incomePlan.test.js src/utils/mfMetrics.test.js src/utils/retirementBuckets.test.js"
   },
   "dependencies": {
     "@ionic/react": "^9.0.6",
