@@ -1085,6 +1085,20 @@ function buildDashboardReportData() {
       }
     });
 
+    // Goals coming up (the app shows the withdraw steps: which platform, how many units, which bank)
+    activeGoals.forEach(function(g) {
+      if (g.status === 'Achieved' || g.goalType === 'Emergency Fund' || !g.targetDate) return;
+      var days = Math.ceil((new Date(g.targetDate) - now) / (24 * 60 * 60 * 1000));
+      if (days < -30 || days > 90) return;
+      actionItems.push({
+        type: days <= 30 ? 'critical' : 'warning',
+        title: (g.goalName || 'Goal') + (days > 0 ? ' in ' + days + ' day' + (days !== 1 ? 's' : '') : ' date reached'),
+        description: days > 0
+          ? 'Get ready: open Goals in Capital Friends to see the withdraw steps (which platform, how much, which bank).'
+          : 'Open Goals in Capital Friends and press Withdraw: it lists each step. Mark it done so the money counts for your other goals again.'
+      });
+    });
+
     // Limit to top 6 action items
     const topActionItems = actionItems.slice(0, 6);
 
@@ -1160,6 +1174,17 @@ function buildDashboardReportData() {
       { maxYears: Infinity, equity: 85, label: 'Long-term' }
     ];
 
+    // goals paid over several years (Settings → GoalExtras): each year's part has its own glide path (same as the app)
+    var goalExtras = {};
+    try { goalExtras = JSON.parse((getAllSettings() || {}).GoalExtras || '{}') || {}; } catch (e) { goalExtras = {}; }
+    var stepEq = function(y) { var st = GLIDE_PATH.find(function(s) { return y <= s.maxYears; }); return st.equity; };
+    var goalEquity = function(g, y) {
+      var n = Math.max(1, Math.round(Number((goalExtras[g.goalId] || {}).payYears) || 1));
+      if (n === 1 || g.goalType === 'Retirement') return stepEq(y);
+      var r = Number(g.expectedCAGR) > 0 ? Number(g.expectedCAGR) : 0.12, w = 0, eq = 0;
+      for (var k = 0; k < n; k++) { var yk = y + k, wk = 1 / Math.pow(1 + r, Math.max(0, yk)); w += wk; eq += wk * (yk > 0 ? stepEq(yk) : 0); }
+      return Math.round(eq / w);
+    };
     var goalHealth = {};
     activeGoals.forEach(function(g) {
       if (g.status === 'Achieved') return;
@@ -1172,7 +1197,8 @@ function buildDashboardReportData() {
       if (g.goalType === 'Emergency Fund') { rec = { equity: 0, debt: 100, label: 'Safety' }; }
       else {
         var step = GLIDE_PATH.find(function(s) { return yearsLeft <= s.maxYears; });
-        rec = { equity: step.equity, debt: 100 - step.equity, label: step.label };
+        var geq = goalEquity(g, yearsLeft);
+        rec = { equity: geq, debt: 100 - geq, label: step.label };
       }
 
       // Actual allocation from mapped portfolios (use fund breakdown when available)
