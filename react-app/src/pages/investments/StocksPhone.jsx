@@ -139,7 +139,7 @@ const sumOf = (list) => {
   return { invested, current, unrealizedPL, realizedPL, totalPL, totalPLPct: invested > 0 ? (totalPL / invested) * 100 : 0 }
 }
 
-export default function StocksPhone({ portfolioData, allHoldings, allTxns, setModal, mv }) {
+export default function StocksPhone({ portfolioData, allHoldings, allTxns, setModal, mv, onDeleteTxn }) {
   const [open, setOpen] = useState(null) // portfolioId
   const [tab, setTab] = useState('portfolios')
   const [add, setAdd] = useState(false)
@@ -162,8 +162,9 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
       ]} />
       <IonActionSheet isOpen={!!txn} onDidDismiss={() => setTxn(null)} header={txn ? `${txn.companyName || txn.symbol}` : ''} buttons={[
         { text: 'Edit transaction', handler: () => setModal({ editTxn: txn }) },
+        onDeleteTxn && { text: 'Delete transaction', role: 'destructive', handler: () => onDeleteTxn(txn.transactionId) },
         { text: 'Cancel', role: 'cancel' },
-      ]} />
+      ].filter(Boolean)} />
     </>
   )
 

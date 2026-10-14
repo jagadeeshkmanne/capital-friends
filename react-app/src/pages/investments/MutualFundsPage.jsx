@@ -971,7 +971,7 @@ export default function MutualFundsPage() {
           selectedPortfolioId={selectedPortfolioId} setSelectedPortfolioId={setSelectedPortfolioId}
           setModal={setModal} goalLinks={goalLinks} navigate={navigate} mv={mv} mt={mt} dn={dn}
           journeyOf={(t, cv) => ({ data: buildJourney(t, cv), vt: toValueTxns(t) })}
-          onToggleLump={handleToggleLumpsumRestricted} onToggleSip={handleToggleSipRestricted} onDeleteFund={handleDeleteFund}
+          onToggleLump={handleToggleLumpsumRestricted} onToggleSip={handleToggleSipRestricted} onDeleteFund={handleDeleteFund} onDeleteTxn={handleDeleteTransaction}
         /></Suspense>
         {modals}
         {(() => {

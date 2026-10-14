@@ -312,7 +312,7 @@ export default function StocksPage() {
   </>)
   if (isPhone) return (<>
     <Suspense fallback={null}><StocksPhone portfolioData={portfolioData} allHoldings={(stockHoldings || []).filter((h) => portfolios.some((p) => p.portfolioId === h.portfolioId))}
-      allTxns={(stockTransactions || []).filter((t) => portfolios.some((p) => p.portfolioId === t.portfolioId)).sort((a, b) => new Date(b.date) - new Date(a.date))} setModal={setModal} mv={mv} /></Suspense>
+      allTxns={(stockTransactions || []).filter((t) => portfolios.some((p) => p.portfolioId === t.portfolioId)).sort((a, b) => new Date(b.date) - new Date(a.date))} setModal={setModal} mv={mv} onDeleteTxn={handleDeleteTransaction} /></Suspense>
     {modals}
   </>)
   return (

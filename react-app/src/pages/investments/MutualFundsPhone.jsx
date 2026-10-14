@@ -185,7 +185,17 @@ function FundSheet({ h, onClose, onDetails, setModal }) {
   )
 }
 
-function Activity({ txns, fundName = true, limit = 40 }) {
+/** Tap a transaction: edit it or delete it (the same as the ⋮ menu on the laptop). */
+function TxnSheet({ t, onClose, setModal, onDeleteTxn }) {
+  return (
+    <IonActionSheet isOpen={!!t} onDidDismiss={onClose} header={t ? `${splitFundName(t.fundName).main} · ${formatINR(t.totalAmount)}` : ''} buttons={[
+      { text: 'Edit transaction', handler: () => setModal({ editTxn: t }) },
+      onDeleteTxn && { text: 'Delete transaction', role: 'destructive', handler: () => onDeleteTxn(t.transactionId) },
+      { text: 'Cancel', role: 'cancel' },
+    ].filter(Boolean)} />
+  )
+}
+function Activity({ txns, fundName = true, limit = 40, onTxn }) {
   const [n, setN] = useState(limit)
   const groups = useMemo(() => {
     const out = []
@@ -208,7 +218,7 @@ function Activity({ txns, fundName = true, limit = 40 }) {
               const sell = String(t.type).toUpperCase() === 'SELL'
               const I = sell ? ArrowUpRight : ArrowDownLeft
               return (
-                <IonItem key={t.transactionId || i}>
+                <IonItem key={t.transactionId || i} button={!!onTxn} detail={false} onClick={() => onTxn?.(t)}>
                   <span slot="start" className={`flex h-10 w-10 items-center justify-center rounded-full ${sell ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400'}`}><I size={18} /></span>
                   <IonLabel>
                     <h3 className="!text-[15px] !font-semibold">{fundName ? splitFundName(t.fundName).main : label(t)}</h3>
@@ -299,8 +309,9 @@ function SignalRows({ ind, onBuy, onRebalance, extra = [], empty }) {
 }
 
 // ── 1. all portfolios ──
-function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, stats, returns, enrichedHoldings, allFilteredTxns, setModal, open, dn, mv }) {
+function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, stats, returns, enrichedHoldings, allFilteredTxns, setModal, open, dn, mv, onDeleteTxn }) {
   const navigate = useNavigate()
+  const [txn, setTxn] = useState(null)
   const [tab, setTab] = useState('portfolios')
   const [sheet, setSheet] = useState(null)
   const [add, setAdd] = useState(false)
@@ -347,7 +358,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
             })}
           </IonList>
         </>)}
-        {tab === 'activity' && <Activity txns={allFilteredTxns} />}
+        {tab === 'activity' && <Activity txns={allFilteredTxns} onTxn={setTxn} />}
       </FadeIn>
 
       <IonActionSheet isOpen={add} onDidDismiss={() => setAdd(false)} header="Add" buttons={[
@@ -358,13 +369,15 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
         { text: 'Cancel', role: 'cancel' },
       ]} />
       <FundSheet h={sheet} onClose={() => setSheet(null)} setModal={setModal} onDetails={() => open({ p: sheet.portfolioId, f: sheet._key })} />
+      <TxnSheet t={txn} onClose={() => setTxn(null)} setModal={setModal} onDeleteTxn={onDeleteTxn} />
     </div>
   )
 }
 
 // ── 2. one portfolio ──
-function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allFilteredTxns, currentIndicators, setModal, goalLinks, navigate, dn, mv, mt }) {
+function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allFilteredTxns, currentIndicators, setModal, goalLinks, navigate, dn, mv, mt, onDeleteTxn }) {
   const [tab, setTab] = useState('holdings')
+  const [txn, setTxn] = useState(null)
   const [menu, setMenu] = useState(false)
   const [sheet, setSheet] = useState(null)
   const right = useMemo(() => <IonButton className="cf-icon-btn" onClick={() => setMenu(true)} aria-label="More"><MoreVertical size={22} /></IonButton>, [])
@@ -390,7 +403,7 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
               ? <Holdings funds={funds} sub={(h) => (h.targetAllocationPct > 0 ? `${h.currentAllocationPct.toFixed(0)}% of ${h.targetAllocationPct.toFixed(0)}% target` : null)} onOpen={setSheet} />
               : <p className="py-10 text-center text-[14px] text-[var(--ion-color-medium)]">No funds yet</p>}
           </>)}
-          {tab === 'activity' && <Activity txns={allFilteredTxns} />}
+          {tab === 'activity' && <Activity txns={allFilteredTxns} onTxn={setTxn} />}
         </FadeIn>
       </div>
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header={dn(p.portfolioName)} buttons={[
@@ -403,6 +416,7 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
         { text: 'Cancel', role: 'cancel' },
       ]} />
       <FundSheet h={sheet} onClose={() => setSheet(null)} setModal={setModal} onDetails={() => open({ p: p.portfolioId, f: sheet._key })} />
+      <TxnSheet t={txn} onClose={() => setTxn(null)} setModal={setModal} onDeleteTxn={onDeleteTxn} />
     </Screen>
   )
 }
@@ -451,8 +465,9 @@ function KV({ k, v, cls = '', sub }) {
 }
 const Dash = () => <div className="my-2 border-t border-dashed border-[var(--ion-color-step-250)]" />
 
-function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal, onToggleLump, onToggleSip, onDeleteFund, dn }) {
+function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal, onToggleLump, onToggleSip, onDeleteFund, onDeleteTxn, dn }) {
   const [menu, setMenu] = useState(null)
+  const [txn, setTxn] = useState(null)
   const [all, setAll] = useState(false)
   const n = splitFundName(h.fundName)
   const right = useMemo(() => <IonButton className="cf-icon-btn" onClick={(e) => setMenu(e.nativeEvent)} aria-label="More"><MoreVertical size={22} /></IonButton>, [])
@@ -526,7 +541,7 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
             const d = parseD(t.date)
             const sell = String(t.type).toUpperCase() === 'SELL'
             return (
-              <IonItem key={t.transactionId || i}>
+              <IonItem key={t.transactionId || i} button detail={false} onClick={() => setTxn(t)}>
                 <IonLabel className="!my-3"><h3 className="!text-[15px] !font-semibold">{sell ? label(t) : label(t) === 'Lump sum' ? 'Invested' : label(t)}</h3><p>{d ? shortDate(d) : t.date}</p></IonLabel>
                 <div slot="end" className="text-right tabular-nums">
                   <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{sell ? '−' : '+'}{formatINR(t.totalAmount)}</div>
@@ -547,6 +562,7 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <IonItem button detail={false} onClick={() => { setMenu(null); onDeleteFund(h.portfolioId, h.schemeCode || h.fundCode, h.fundName) }}><span slot="start" className="text-rose-400"><Trash2 size={20} /></span><IonLabel color="danger">Delete fund</IonLabel></IonItem>
         </IonList>
       </IonPopover>
+      <TxnSheet t={txn} onClose={() => setTxn(null)} setModal={setModal} onDeleteTxn={onDeleteTxn} />
     </Screen>
   )
 }

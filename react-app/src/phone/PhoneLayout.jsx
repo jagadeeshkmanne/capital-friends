@@ -9,7 +9,7 @@ import {
   IonTabBar, IonTabButton, IonLabel, IonBadge, IonModal, IonList, IonListHeader, IonItem, IonRadioGroup, IonRadio,
   IonToggle, IonAvatar, IonNote, IonRefresher, IonRefresherContent,
 } from '@ionic/react'
-import { LayoutDashboard, Wallet, CreditCard, Target, Menu, ChevronLeft, Bell, TrendingDown, Scale, Settings, LogOut, Eye, Moon, X } from 'lucide-react'
+import { LayoutDashboard, Wallet, BarChart3, Target, Menu, ChevronLeft, Bell, TrendingDown, Scale, Settings, LogOut, Eye, Moon, X } from 'lucide-react'
 import './ionic-setup'
 import { usePhoneBar } from '../components/native'
 import { mobileTitle, isTabPath } from '../components/Header'
@@ -29,11 +29,11 @@ import GoalsReachBanner from '../components/GoalsReachBanner'
 const TABS = [
   { key: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { key: '/investments/mutual-funds', label: 'Funds', icon: Wallet },
-  { key: '/accounts/bank', label: 'Accounts', icon: CreditCard },
+  { key: '/investments/stocks', label: 'Stocks', icon: BarChart3 },
   { key: '/goals', label: 'Goals', icon: Target },
   { key: '/more', label: 'More', icon: Menu },
 ]
-const tabOf = (path) => (path.startsWith('/investments/funds') ? TABS[1] : path.startsWith('/retirement-buckets') ? TABS[3] : TABS.find((t) => path === t.key || path.startsWith(t.key + '/')) || (/^\/(family|insurance|investments\/(stocks|other)|liabilities|reminders|settings|import|health-check|about|accounts\/investment)/.test(path) ? TABS[4] : TABS[0])).key
+const tabOf = (path) => (path.startsWith('/investments/funds') ? TABS[1] : path.startsWith('/retirement-buckets') ? TABS[3] : TABS.find((t) => path === t.key || path.startsWith(t.key + '/')) || (/^\/(family|insurance|investments\/other|liabilities|reminders|settings|import|health-check|about|accounts\/(investment|bank))/.test(path) ? TABS[4] : TABS[0])).key
 
 const LOGO = `${import.meta.env.BASE_URL}logo-new.png`
 

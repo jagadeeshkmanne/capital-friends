@@ -140,7 +140,7 @@ function inferMFCategory(name) {
 const DIALOG_TITLES = { buyopp: 'Funds below their peak', rebalance: 'Rebalance Alerts' }
 
 // Phone app bar: the page's title, and a back arrow on pages that aren't one of the bottom tabs
-const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/accounts/bank', '/goals', '/more']
+const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/investments/stocks', '/goals', '/more']
 const TITLES = [
   ['/dashboard', 'Home'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
   ['/accounts/bank', 'Bank Accounts'], ['/accounts/investment', 'Investment Accounts'], ['/goals', 'Goals'], ['/more', 'More'], ['/family', 'Family'],
