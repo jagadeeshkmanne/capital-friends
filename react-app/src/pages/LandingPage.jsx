@@ -496,8 +496,9 @@ export const LANDING_FAQ = [
   ['Is Capital Friends really free?', 'Yes, free forever with no ads. It is a personal project shared openly; you can support it with a voluntary donation if it helps you.'],
 ]
 export const YOUTUBE_URL = 'https://www.youtube.com/@capitalfriendsin'
-// the full app walkthrough on YouTube: put its video id here (the part after watch?v=) and the hero's button plays it on the page
-export const DEMO_VIDEO_ID = ''
+// Demo video: switched off until the walkthrough is on YouTube. To turn it on, put the video id (the part after watch?v=)
+// below, uncomment it, and add  videoId={DEMO_VIDEO_ID} videoLabel="Watch the demo · 12 min"  to <StoryHero /> further down.
+// export const DEMO_VIDEO_ID = 'PUT-VIDEO-ID-HERE'
 export const INSTAGRAM_URL = 'https://www.instagram.com/jags.manne/'
 
 // Live usage count: plain numbers the server publishes to the public master sheet (App_Stats tab).
@@ -540,7 +541,7 @@ export default function LandingPage() {
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#f8fafc', color: '#0f172a', WebkitFontSmoothing: 'antialiased' }}>
       {/* ─── HEADER + HERO: logo, families count, socials; then the animated story of what the app does ─── */}
       <LandingHeader signIn={signIn} isMobile={isMobile} youtube={YOUTUBE_URL} instagram={INSTAGRAM_URL} families={families?.families} />
-      <StoryHero signIn={signIn} isMobile={isMobile} GoogleIcon={HERO_G} families={families?.families} videoUrl={YOUTUBE_URL} videoId={DEMO_VIDEO_ID} videoLabel="Watch the demo · 12 min" />
+      <StoryHero signIn={signIn} isMobile={isMobile} GoogleIcon={HERO_G} families={families?.families} videoUrl={YOUTUBE_URL} />
 
       {/* ─── ABOUT (collapsed): purpose of the app + how it uses Google data.
            Kept on the home page for Google OAuth verification, but folded away so the page stays clean. ─── */}
