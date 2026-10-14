@@ -69,6 +69,7 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
     const kid = it.kind === 'pool' && !!it.owner && kids.has(norm(it.owner))
     const kind = kid ? 'out' : it.kind
     if (kind === 'property') return { ...it, kind, kid, eq: 0, selling: sell.has(it.id), included: sell.has(it.id) }
+    if (kind === 'retirement') return { ...it, kind, kid, included: true }   // EPF / PPF / NPS always count, for retirement only
     return { ...it, kind, kid, included: kind === 'out' ? on.has(it.id) : !off.has(it.id) }
   })
 }
