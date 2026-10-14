@@ -4,7 +4,9 @@
  * 1. poolItems(): every investment, sorted automatically —
  *      mutual fund portfolios, stock portfolios, FDs / bonds / cash  -> in the pool (each can be switched off)
  *      EPF, PPF, NPS, VPF, Sukanya                                   -> retirement only, never moved
- *      gold, silver, real estate, crypto, other                      -> left out (can be switched on)
+ *      gold, silver, crypto, other                                   -> left out (can be switched on)
+ *      real estate (your home, land)                                 -> never for goals, until you mark it "Selling"
+ *                                                                       (then its value counts as safe money)
  * 2. sharePool(): shares the pool across goals, no input needed —
  *      A. safe money first to the nearest goals (Emergency Fund first), up to the safe part each needs
  *         (retirement takes its EPF / PPF / NPS here, counted in full)
@@ -21,25 +23,28 @@ import { needTodayN } from './goalPlan'
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
 const RET_ONLY = ['epf', 'ppf', 'nps', 'vpf', 'sukanya samriddhi', 'sukanya', 'ssy']
-const LEFT_OUT = ['physical gold', 'digital gold', 'sovereign gold bond', 'physical silver', 'digital silver', 'real estate', 'crypto', 'other']
+const LEFT_OUT = ['physical gold', 'digital gold', 'sovereign gold bond', 'physical silver', 'digital silver', 'crypto', 'other']
+const PROPERTY = ['real estate', 'property', 'land', 'plot', 'house', 'flat', 'apartment']
 const norm = (s) => String(s || '').trim().toLowerCase()
 
-/** How an Other Investment is treated by default: 'pool' | 'retirement' | 'out' */
+/** How an Other Investment is treated by default: 'pool' | 'retirement' | 'out' | 'property' */
 export function otherKind(inv) {
   const t = norm(inv?.investmentType)
   if (RET_ONLY.includes(t)) return 'retirement'
+  if (PROPERTY.includes(t) || norm(inv?.investmentCategory) === 'property') return 'property'   // a home is not sold for a goal
   if (LEFT_OUT.includes(t)) return 'out'
   const c = norm(inv?.investmentCategory)
-  if (['gold', 'silver', 'property', 'alternative'].includes(c)) return 'out'
+  if (['gold', 'silver', 'alternative'].includes(c)) return 'out'
   return 'pool' // FD, bonds, cash / savings, debt or equity entries
 }
 
 /**
- * @param choice { off: [ids], on: [ids] } the person's switches (off = left out, on = put in although left out by default)
+ * @param choice { off: [ids], on: [ids], sell: [ids] } the person's switches (off = left out, on = put in although left out
+ *   by default, sell = real estate being sold: only then its value counts. A property ticked 'on' before this rule counts as selling.)
  * @returns [{ id, type: 'MF'|'Stock'|'Other', name, owner, value, eq (0..1), kind: 'pool'|'retirement'|'out', included, locked }]
  */
 export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, eqOf, choice = {}, kidNames = [] }) {
-  const off = new Set(choice.off || []), on = new Set(choice.on || [])
+  const off = new Set(choice.off || []), on = new Set(choice.on || []), sell = new Set([...(choice.sell || []), ...(choice.on || [])])
   // a son's / daughter's own money is theirs: left out by default (switch it on to use it for a goal)
   const kids = new Set((kidNames || []).map(norm))
   const items = []
@@ -63,6 +68,7 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
   return items.map((it) => {
     const kid = it.kind === 'pool' && !!it.owner && kids.has(norm(it.owner))
     const kind = kid ? 'out' : it.kind
+    if (kind === 'property') return { ...it, kind, kid, eq: 0, selling: sell.has(it.id), included: sell.has(it.id) }
     return { ...it, kind, kid, included: kind === 'out' ? on.has(it.id) : !off.has(it.id) }
   })
 }

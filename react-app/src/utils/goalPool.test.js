@@ -284,3 +284,26 @@ describe('corner cases (ages, timelines, shortages)', () => {
     expect(r3.byGoal.EF.got).toBeCloseTo(6e5, -2) // in full (the family plan then moves any equity part to safe)
   })
 })
+
+describe('real estate: not for goals unless it is being sold', () => {
+  const home = { investmentId: 'HOME', investmentType: 'Real Estate', investmentCategory: 'Property', currentValue: 16000000, status: 'Active', familyMemberName: 'Jagadeesh' }
+  const fd = { investmentId: 'FD1', investmentType: 'Fixed Deposit', investmentCategory: 'Debt', currentValue: 1200000, status: 'Active', familyMemberName: 'Jagadeesh' }
+  const items = (choice) => poolItems({ otherInvList: [home, fd], eqOf, choice })
+  it('is its own kind and left out by default', () => {
+    expect(otherKind(home)).toBe('property')
+    const h = items({}).find((i) => i.id === 'HOME')
+    expect(h.included).toBe(false)
+    expect(h.selling).toBe(false)
+  })
+  it('counts as safe money only when marked selling', () => {
+    const h = items({ sell: ['HOME'] }).find((i) => i.id === 'HOME')
+    expect(h.included).toBe(true)
+    expect(h.eq).toBe(0)
+  })
+  it('a home ticked on before this rule keeps counting (treated as selling)', () => {
+    expect(items({ on: ['HOME'] }).find((i) => i.id === 'HOME').included).toBe(true)
+  })
+  it('FD, mutual funds, stocks and cash are unchanged', () => {
+    expect(items({}).find((i) => i.id === 'FD1').included).toBe(true)
+  })
+})
