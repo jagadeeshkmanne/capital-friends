@@ -17,11 +17,11 @@ const GROUPS = [
   { key: 'Cash', title: 'Cash, FDs and bonds', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Other' && i.eq < 0.5 },
   { key: 'Eq', title: 'Other equity', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Other' && i.eq >= 0.5 },
   { key: 'Out', title: 'You decide', badge: 'Left out', has: (i) => i.kind === 'out',
-    note: "Not counted unless you tick them: your kids' own money, ESOP / RSU (tick only if it is vested and you can sell it) and anything marked Other." },
+    note: "Not counted unless you tick them: your kids' own money, ESOP / RSU (tick only if it is vested and you can sell it), SGB and digital gold or silver (counted as growth money, never as safe money) and anything marked Other." },
   { key: 'Ret', title: 'For retirement only', badge: 'Retirement', has: (i) => i.kind === 'retirement',
     note: 'EPF, PPF, NPS and similar accounts are locked until retirement, so they count only for your Retirement goal. They are never used for other goals and never part of a sell step.' },
   { key: 'Locked', title: 'Not used for goals', badge: 'Not liquid', has: (i) => i.kind === 'locked',
-    note: 'A goal needs money you can take out on the day. Real estate, gold, silver, unlisted shares and crypto are not easy to sell at a fair price when you need it, so they are not counted. If you sell one, add the money as cash or FD in Other Investments: it counts for your goals from then.' },
+    note: 'A goal needs money you can take out on the day. Real estate, physical gold and silver (jewellery, coins), unlisted shares and crypto are not easy to sell at a fair price when you need it, so they are not counted. If you sell one, add the money as cash or FD in Other Investments: it counts for your goals from then.' },
 ]
 const BADGE = {
   Counted: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', 'Left out': 'bg-slate-500/10 text-[var(--text-muted)] border-[var(--border-light)]',
@@ -50,7 +50,7 @@ export default function MoneyForGoals({ pool, onSaved }) {
   }
   const total = pool.items.filter((i) => isOn(i) && i.kind !== 'retirement').reduce((t, i) => t + i.value, 0)
   const retTotal = pool.items.filter((i) => i.kind === 'retirement' && isOn(i)).reduce((t, i) => t + i.value, 0)
-  const tag = (it) => (it.kind === 'locked' ? `${it.why || 'Not liquid'} · not used for goals` : it.kind === 'retirement' ? 'Only for your Retirement goal · never sold' : it.kid ? "Kids' own money · left out by default" : it.kind === 'out' ? (/esop|rsu/i.test(it.otherType || '') ? 'Left out by default · tick it if it is vested and you can sell it' : 'Left out by default') : it.eq >= 0.5 ? 'Equity' : 'Safe')
+  const tag = (it) => (it.kind === 'locked' ? `${it.why || 'Not liquid'} · not used for goals` : it.kind === 'retirement' ? 'Only for your Retirement goal · never sold' : it.kid ? "Kids' own money · left out by default" : it.kind === 'out' ? (/esop|rsu/i.test(it.otherType || '') ? 'Left out by default · tick it if it is vested and you can sell it' : /sovereign|sgb/i.test(it.otherType || '') ? 'Left out by default · can be sold on the exchange · counted as growth, not safe money' : /digital (gold|silver)/i.test(it.otherType || '') ? 'Left out by default · counted as growth, not safe money' : 'Left out by default') : it.eq >= 0.5 ? 'Equity' : 'Safe')
   const goals = (goalList || []).filter((g) => g.isActive !== false)
   const hasRet = goals.some((g) => g.goalType === 'Retirement')
 

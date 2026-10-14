@@ -6,8 +6,9 @@
  *      mutual fund portfolios, stock portfolios, FD / RD / bonds / cash / savings, other listed equity
  *                                                                    -> in the pool (each can be switched off)
  *      EPF, PPF, NPS, VPF, Sukanya                                   -> retirement only, never moved
- *      ESOP / RSU, 'Other', a child's own money                      -> left out (can be switched on)
- *      real estate, gold, silver, unlisted shares, crypto            -> never for goals ('locked': not easy to sell
+ *      ESOP / RSU, SGB, digital gold / silver, 'Other', a child's own money -> left out (can be switched on;
+ *        gold counts as growth money, never as safe money)
+ *      real estate, physical gold / silver, unlisted shares, crypto  -> never for goals ('locked': not easy to sell
  *        at a fair price on the day). Once sold, the money is added as cash / FD in Other Investments and counts then.
  * 2. sharePool(): shares the pool across goals, no input needed —
  *      A. safe money first to the nearest goals (Emergency Fund first), up to the safe part each needs
@@ -25,17 +26,17 @@ import { needTodayN } from './goalPlan'
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
 const RET_ONLY = ['epf', 'ppf', 'nps', 'vpf', 'sukanya samriddhi', 'sukanya', 'ssy']
-const LEFT_OUT = ['esop / rsu', 'esop', 'rsu', 'other']
+const LEFT_OUT = ['esop / rsu', 'esop', 'rsu', 'other', 'sovereign gold bond', 'sgb', 'digital gold', 'digital silver']
 const LOCKED = ['real estate', 'property', 'land', 'plot', 'house', 'flat', 'apartment',
-  'physical gold', 'digital gold', 'sovereign gold bond', 'gold', 'physical silver', 'digital silver', 'silver', 'unlisted shares', 'crypto']
+  'physical gold', 'gold', 'physical silver', 'silver', 'unlisted shares', 'crypto']
 const norm = (s) => String(s || '').trim().toLowerCase()
 
 /** How an Other Investment is treated: 'pool' | 'retirement' | 'out' (can be switched on) | 'locked' (never for goals) */
 export function otherKind(inv) {
   const t = norm(inv?.investmentType), c = norm(inv?.investmentCategory)
   if (RET_ONLY.includes(t)) return 'retirement'
+  if (LEFT_OUT.includes(t)) return 'out'   // SGB / digital gold can be sold, so the person decides
   if (LOCKED.includes(t) || ['property', 'gold', 'silver', 'alternative'].includes(c)) return 'locked'   // not liquid: never sold for a goal
-  if (LEFT_OUT.includes(t)) return 'out'
   return 'pool' // FD, RD, bonds, cash / savings, other listed equity
 }
 

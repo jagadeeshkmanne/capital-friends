@@ -262,8 +262,8 @@ describe('corner cases (ages, timelines, shortages)', () => {
     expect(after.byGoal.EDU.got).toBeCloseTo(before.byGoal.EDU.got, -2)
     expect(after.byGoal.CAR.got).toBeLessThan(1000)
   })
-  it('gold / SGB / silver / unlisted / crypto are never used for goals (not liquid), even if ticked before', () => {
-    const list = [['SGB', 'Sovereign Gold Bond', 'Gold'], ['DG', 'Digital Gold', 'Gold'], ['SIL', 'Physical Silver', 'Silver'], ['UNL', 'Unlisted Shares', 'Equity'], ['CR', 'Crypto', 'Alternative']]
+  it('physical gold / silver, unlisted shares and crypto are never used for goals (not liquid), even if ticked before', () => {
+    const list = [['PG', 'Physical Gold', 'Gold'], ['SIL', 'Physical Silver', 'Silver'], ['UNL', 'Unlisted Shares', 'Equity'], ['CR', 'Crypto', 'Alternative']]
       .map(([id, t, c]) => ({ investmentId: id, investmentType: t, investmentCategory: c, currentValue: 1e6, status: 'Active' }))
     const items = poolItems({ otherInvList: list, eqOf, choice: { on: list.map((x) => x.investmentId) } })
     expect(items.every((i) => i.kind === 'locked' && !i.included)).toBe(true)
@@ -308,5 +308,16 @@ describe('real estate: never used for goals', () => {
     const it2 = poolItems({ otherInvList: [epf], eqOf, choice: { off: ['EPF1'] } })[0]
     expect(it2.kind).toBe('retirement')
     expect(it2.included).toBe(true)
+  })
+})
+
+describe('SGB and digital gold: optional', () => {
+  it('left out by default, counted as growth (never safe money) when ticked', () => {
+    const sgb = { investmentId: 'SGB', investmentType: 'Sovereign Gold Bond', investmentCategory: 'Gold', currentValue: 1e6, status: 'Active' }
+    const dg = { investmentId: 'DG', investmentType: 'Digital Gold', investmentCategory: 'Gold', currentValue: 5e5, status: 'Active' }
+    expect(otherKind(sgb)).toBe('out'); expect(otherKind(dg)).toBe('out')
+    expect(poolItems({ otherInvList: [sgb, dg], eqOf }).every((i) => !i.included)).toBe(true)
+    const on = poolItems({ otherInvList: [sgb, dg], eqOf, choice: { on: ['SGB', 'DG'] } })
+    expect(on.every((i) => i.included && i.eq === 1)).toBe(true)
   })
 })
