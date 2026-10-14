@@ -338,33 +338,51 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
 
         {p.isRet && <><IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Buckets</IonLabel></IonListHeader><BucketsGlance retired={retired} goal={g} onOpen={() => setBk(true)} /></>}
 
-        {/* the money counted for this goal, right here (no extra tap) */}
+        {/* the money counted for this goal, right here (no extra tap): one card, every row the same shape */}
         <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Investments · {items.length}</IonLabel></IonListHeader>
-        {items.length ? (
-          <IonList lines="full" className="cf-flat -mx-4">
-            {items.map((it) => {
-              const h = it.holding
-              const name = it.kind === 'mf' ? String(h.fundName || '').replace(/\s*-\s*(Direct|Regular).*$/i, '') : it.kind === 'stock' ? (h.companyName || h.symbol || h.stockName) : mt(h.investmentName || h.investmentType || 'Investment')
-              const part = it.fraction != null && it.fraction < 0.999 && it.fraction > 0
-              const go = it.kind === 'mf' && h.portfolioId ? () => navigate(`/investments/mutual-funds?p=${encodeURIComponent(h.portfolioId)}&f=${encodeURIComponent(h.holdingId || `${h.portfolioId}::${h.schemeCode || h.fundCode}`)}`, { state: { cfFrom: '' } }) : undefined
-              return (
-                <IonItem key={it.key} button={!!go} detail={false} onClick={go}>
-                  <IonLabel className="!my-3.5">
-                    <h3 className="!text-[15px] !font-medium !whitespace-normal !leading-snug">{name}</h3>
-                    <p className="!flex !flex-wrap !items-center !gap-x-1.5 !gap-y-1 !mt-1">
-                      <span>{Math.round((it.eq || 0) * 100)}% equity{it.portfolioId && pname(it.portfolioId) ? ` · ${pname(it.portfolioId)}` : ''}</span>
-                      {part && <span className="px-1.5 rounded bg-violet-500/15 text-violet-300 text-[11px] font-semibold">{Math.round(it.fraction * 100)}% for this goal</span>}
-                    </p>
-                  </IonLabel>
-                  <div slot="end" className="ml-2 shrink-0 text-right tabular-nums">
-                    <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{L(it.value)}</div>
-                    {part && <div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">(of {L(it.value / it.fraction)})</div>}
-                  </div>
-                </IonItem>
-              )
-            })}
-          </IonList>
-        ) : <p className="px-1 py-3 text-[14px] text-[var(--ion-color-medium)]">No investments counted for this goal yet. Map funds to it from Money for goals.</p>}
+        {items.length ? (() => {
+          const growth = items.reduce((a, it) => a + it.value * (it.eq || 0), 0)
+          const tot = items.reduce((a, it) => a + it.value, 0) || 1
+          return (
+            <div className="rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)]">
+              <div className="px-4 pt-3.5 pb-3">
+                <div className="flex items-baseline justify-between text-[13px] tabular-nums">
+                  <span className="text-[var(--ion-color-medium)]">Counted for this goal</span>
+                  <span className="text-[16px] font-bold text-[var(--ion-text-color)]">{L(tot)}</span>
+                </div>
+                <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-sky-400/70"><i className="block h-full bg-emerald-400" style={{ width: `${Math.round((growth / tot) * 100)}%` }} /></div>
+                <div className="mt-1.5 flex justify-between text-[12px] tabular-nums text-[var(--ion-color-medium)]">
+                  <span><b className="font-semibold text-emerald-400">●</b> Growth {L(growth)}</span>
+                  <span><b className="font-semibold text-sky-400">●</b> Safe {L(tot - growth)}</span>
+                </div>
+              </div>
+              {items.map((it) => {
+                const h = it.holding
+                const name = it.kind === 'mf' ? String(h.fundName || '').replace(/\s*-\s*(Direct|Regular).*$/i, '').replace(/\s+Fund$/i, '') : it.kind === 'stock' ? (h.companyName || h.symbol || h.stockName) : mt(h.investmentName || h.investmentType || 'Investment')
+                const part = it.fraction != null && it.fraction < 0.999 && it.fraction > 0
+                const eq = Math.round((it.eq || 0) * 100)
+                const grow = eq >= 50
+                const where = it.portfolioId && pname(it.portfolioId) ? pname(it.portfolioId) : it.kind === 'stock' ? 'Stocks' : it.kind === 'mf' ? 'Mutual fund' : 'Other investment'
+                const go = it.kind === 'mf' && h.portfolioId ? () => navigate(`/investments/mutual-funds?p=${encodeURIComponent(h.portfolioId)}&f=${encodeURIComponent(h.holdingId || `${h.portfolioId}::${h.schemeCode || h.fundCode}`)}`, { state: { cfFrom: '' } }) : undefined
+                const Row = go ? 'button' : 'div'
+                return (
+                  <Row key={it.key} type={go ? 'button' : undefined} onClick={go} className={`${go ? 'ion-activatable relative overflow-hidden ' : ''}flex w-full items-center gap-3 border-t border-[var(--row-divider,var(--ion-border-color))] px-4 py-3 text-left`}>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${grow ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'}`}>{grow ? <TrendingUp size={17} /> : <ShieldCheck size={17} />}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14.5px] font-medium text-[var(--ion-text-color)]">{name}</span>
+                      <span className="mt-0.5 block truncate text-[12.5px] text-[var(--ion-color-medium)]">{where}{eq > 0 && eq < 100 ? ` · ${eq}% equity` : ''}</span>
+                    </span>
+                    <span className="shrink-0 text-right tabular-nums">
+                      <span className="block text-[15px] font-semibold text-[var(--ion-text-color)]">{L(it.value)}</span>
+                      <span className={`mt-0.5 block text-[12px] ${part ? 'text-violet-300' : 'text-[var(--ion-color-medium)]'}`}>{part ? `${Math.round(it.fraction * 100)}% of ${L(it.value / it.fraction)}` : 'all of it'}</span>
+                    </span>
+                    {go && <IonRippleEffect />}
+                  </Row>
+                )
+              })}
+            </div>
+          )
+        })() : <p className="px-1 py-3 text-[14px] text-[var(--ion-color-medium)]">No investments counted for this goal yet. Map funds to it from Money for goals.</p>}
       </div>
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header={mt(g.goalName)} buttons={[
         { text: 'Edit goal', handler: () => onEdit(g) },

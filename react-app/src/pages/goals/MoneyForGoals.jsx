@@ -10,14 +10,17 @@ const L = (v) => formatINR(Math.round(v || 0))
 // Groups by how the money is used, so it is clear what counts for goals:
 //   counted (liquid: funds, stocks, cash / FD, listed equity) · you decide (left out until ticked) ·
 //   retirement only (EPF / PPF / NPS) · not used (not liquid: real estate, gold, silver, unlisted, crypto)
-const POOL = (i) => i.kind === 'pool'
+const POOL = (i) => i.kind === 'pool' && !i.kidGoal
+const KID = (i) => !!(i.kid || i.kidGoal)
 const GROUPS = [
   { key: 'MF', title: 'Mutual funds', badge: 'Counted', has: (i) => POOL(i) && i.type === 'MF' },
   { key: 'Stock', title: 'Stocks', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Stock' },
   { key: 'Cash', title: 'Cash, FDs and bonds', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Other' && i.eq < 0.5 },
   { key: 'Eq', title: 'Other equity', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Other' && i.eq >= 0.5 },
-  { key: 'Out', title: 'You decide', badge: 'Left out', has: (i) => i.kind === 'out',
-    note: "Not counted unless you tick them: your kids' own money, ESOP / RSU (tick only if it is vested and you can sell it), SGB and digital gold or silver (counted as growth money, never as safe money) and anything marked Other." },
+  { key: 'Kids', title: "Kids' own money", badge: 'You decide', has: KID,
+    note: "Each child's portfolio, together. A ticked one counts for that child's own goal first. A child with no goal in their name is left out until you tick it. Untick any that are just for long-term growth." },
+  { key: 'Out', title: 'You decide', badge: 'Left out', has: (i) => i.kind === 'out' && !KID(i),
+    note: "Not counted unless you tick them: ESOP / RSU (tick only if it is vested and you can sell it), SGB and digital gold or silver (counted as growth money, never as safe money) and anything marked Other." },
   { key: 'Ret', title: 'For retirement only', badge: 'Retirement', has: (i) => i.kind === 'retirement',
     note: 'EPF, PPF, NPS and similar accounts are locked until retirement, so they count only for your Retirement goal. They are never used for other goals and never part of a sell step.' },
   { key: 'Locked', title: 'Not used for goals', badge: 'Not liquid', has: (i) => i.kind === 'locked',
@@ -25,7 +28,7 @@ const GROUPS = [
 ]
 const BADGE = {
   Counted: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', 'Left out': 'bg-slate-500/10 text-[var(--text-muted)] border-[var(--border-light)]',
-  Retirement: 'bg-amber-500/10 text-amber-400 border-amber-500/30', 'Not liquid': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+  'You decide': 'bg-violet-500/10 text-violet-300 border-violet-500/30', Retirement: 'bg-amber-500/10 text-amber-400 border-amber-500/30', 'Not liquid': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
 }
 
 export default function MoneyForGoals({ pool, onSaved }) {
@@ -50,7 +53,7 @@ export default function MoneyForGoals({ pool, onSaved }) {
   }
   const total = pool.items.filter((i) => isOn(i) && i.kind !== 'retirement').reduce((t, i) => t + i.value, 0)
   const retTotal = pool.items.filter((i) => i.kind === 'retirement' && isOn(i)).reduce((t, i) => t + i.value, 0)
-  const tag = (it) => (it.kind === 'locked' ? `${it.why || 'Not liquid'} · not used for goals` : it.kind === 'retirement' ? 'Only for your Retirement goal · never sold' : it.kid ? "Kids' own money · left out by default (no goal in their name)" : it.kidGoal ? `Kid's own money · counts for their own goal first${it.included ? '' : ' · tick to count it'}` : it.kind === 'out' ? (/esop|rsu/i.test(it.otherType || '') ? 'Left out by default · tick it if it is vested and you can sell it' : /sovereign|sgb/i.test(it.otherType || '') ? 'Left out by default · can be sold on the exchange · counted as growth, not safe money' : /digital (gold|silver)/i.test(it.otherType || '') ? 'Left out by default · counted as growth, not safe money' : 'Left out by default') : it.eq >= 0.5 ? 'Equity' : 'Safe')
+  const tag = (it) => (it.kind === 'locked' ? `${it.why || 'Not liquid'} · not used for goals` : it.kind === 'retirement' ? 'Only for your Retirement goal · never sold' : it.kid ? (isOn(it) ? 'Counted · no goal in their name' : 'Left out · no goal in their name') : it.kidGoal ? (isOn(it) ? 'Counted · for their own goal first' : 'Left out · has a goal in their name') : it.kind === 'out' ? (/esop|rsu/i.test(it.otherType || '') ? 'Left out by default · tick it if it is vested and you can sell it' : /sovereign|sgb/i.test(it.otherType || '') ? 'Left out by default · can be sold on the exchange · counted as growth, not safe money' : /digital (gold|silver)/i.test(it.otherType || '') ? 'Left out by default · counted as growth, not safe money' : 'Left out by default') : it.eq >= 0.5 ? 'Equity' : 'Safe')
   const goals = (goalList || []).filter((g) => g.isActive !== false)
   const hasRet = goals.some((g) => g.goalType === 'Retirement')
 
