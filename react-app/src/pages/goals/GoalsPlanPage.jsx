@@ -3,7 +3,9 @@ import { Wallet, Pencil, Plus } from 'lucide-react'
 // Main Goals page (/goals, goal detail at /goals/plan/:goalId; the classic page is /goals/classic): one road for all goals, this month's steps from today's fund
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
 // All numbers come from utils/goalPlan.js (tested in goalPlan.test.js).
-import { useMemo, useRef, useLayoutEffect, useState, useId, useEffect } from 'react'
+import { useMemo, useRef, useLayoutEffect, useState, useId, useEffect, lazy, Suspense } from 'react'
+import { useIsPhone } from '../../components/native'
+const GoalsPhone = lazy(() => import('./GoalsPhone'))
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useData } from '../../context/DataContext'
@@ -22,17 +24,17 @@ import GoalForm from '../../components/forms/GoalForm'
 import { goalRoad } from '../../utils/goalPlan'
 import { getGoalAllocation } from '../../data/glidePath'
 
-const L = (v) => (v ? formatINR(Math.round(v)) : '—')
+export const L = (v) => (v ? formatINR(Math.round(v)) : '—')
 const U = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const fname = (h) => (h ? splitFundName(h.fundName || h.schemeName || '').main : 'a fund of your choice')
-const icon = goalIcon
-const STATUS = { off: ['Off your plan', 'var(--accent-rose)'], step: ['Step due', 'var(--accent-amber)'], good: ['On plan', '#22c55e'] }
-const gapTxt = (p) => {
+export const icon = goalIcon
+export const STATUS = { off: ['Off your plan', 'var(--accent-rose)'], step: ['Step due', 'var(--accent-amber)'], good: ['On plan', '#22c55e'] }
+export const gapTxt = (p) => {
   const gs = goalStatus(p)
   if (gs.due || gs.retired) return gs.short > 0 ? [gs.gap[1], 'var(--accent-rose)'] : [gs.due ? 'Due now' : 'On plan', gs.due ? 'var(--accent-amber)' : '#22c55e']
   return p.state === 'short' ? [`${L(-p.gap)} short`, 'var(--accent-rose)'] : p.state === 'extra' ? [`${L(p.gap)} extra`, 'var(--accent-blue)'] : p.state === 'achieved' ? ['Fully funded', '#22c55e'] : ['On plan', '#22c55e']
 }
-const realSteps = (p) => p.steps.filter((s) => s.t !== 'buckets')
+export const realSteps = (p) => p.steps.filter((s) => s.t !== 'buckets')
 
 export default function GoalsPlanPage() {
   const { goalId } = useParams()
@@ -77,6 +79,7 @@ export default function GoalsPlanPage() {
   const [rebal, setRebal] = useState(null)
   // add / edit goals right here (no trip to the classic page): null | 'add' | 'list' | { edit: goal }
   const [form, setForm] = useState(null)
+  const phone = useIsPhone()
 
   if (!plan) return <PageLoading title="Loading goals" />
   const shown = plan.goals.filter((p) => selectedMember === 'all' || p.goal.familyMemberId === selectedMember)
@@ -188,9 +191,7 @@ export default function GoalsPlanPage() {
   const ctx = { mt, navigate: go, pname, netWorth, openRebalance: setRebal, closeGoal, aside: pool.aside }
   const sel = goalId ? plan.goals.find((p) => p.goal.goalId === goalId) : null
 
-  return (
-    <div className="gp space-y-4">
-      <style>{CSS}</style>
+  const modals = (<>
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
       <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} onSaved={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} />}</Modal>
       <Modal open={!!form && form !== 'list'} onClose={() => setForm(null)} title={form?.edit ? 'Edit Goal' : 'Add Goal'} wide>
@@ -208,6 +209,20 @@ export default function GoalsPlanPage() {
           <button onClick={() => setForm('add')} className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-semibold text-violet-400 border border-dashed border-[var(--border)] rounded-lg"><Plus size={14} /> Add Goal</button>
         </div>
       </Modal>
+  </>)
+  if (phone) return (
+    <>
+      <style>{GP_CSS}</style>
+      {modals}
+      <Suspense fallback={null}><GoalsPhone plan={plan} todo={todo} pool={pool} shown={shown} ctx={ctx} sel={sel}
+        onAdd={() => setForm('add')} onEditList={() => setForm('list')} onMoney={() => setMoneyOpen(true)} onEdit={(g) => setForm({ edit: g })} /></Suspense>
+    </>
+  )
+
+  return (
+    <div className="gp space-y-4">
+      <style>{GP_CSS}</style>
+      {modals}
       {sel && <div className="gp-bar"><div><h1><a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a></h1></div></div>}
       {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome actions={<><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
           <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('list')}><Pencil size={14} /> Edit goals</button>
@@ -324,7 +339,7 @@ function Jar({ cls, f }) {
 }
 
 /** Retirement goals: the 3 buckets the money moves into in the last 5 years, and a way to open the full buckets page. */
-function BucketsPanel({ p, onOpen }) {
+export function BucketsPanel({ p, onOpen }) {
   const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal')
   const b = stop?.bucket
   const start = p.bucketMode ? 'now' : stop?.y0 ? String(stop.y0) : null
@@ -345,7 +360,7 @@ function BucketsPanel({ p, onOpen }) {
   )
 }
 
-const pctSaved = (p) => (p.target > 0 ? Math.min(100, Math.round((p.has / p.target) * 100)) : 0)
+export const pctSaved = (p) => (p.target > 0 ? Math.min(100, Math.round((p.has / p.target) * 100)) : 0)
 
 /** Small ring around the goal icon: how much of the goal amount is saved. */
 function Ring({ p, big }) {
@@ -375,7 +390,7 @@ function MixRow({ p }) {
   )
 }
 
-const goalCells = (p, gp) => [
+export const goalCells = (p, gp) => [
   ['Goal amount', L(p.target)], ['Have today', L(p.has)],
   ['Should have today', L(p.need)], ['Gap', <span style={{ color: gp[1] }}>{gp[0]}</span>],
 ]
@@ -412,7 +427,7 @@ function GoalCard({ p, mt, navigate }) {
 }
 
 /* ───────── one step as a row: Action | From → To | Amount ───────── */
-function StepRow({ s, p, n, mt, pname, onRebalance, onClose, navigate }) {
+export function StepRow({ s, p, n, mt, pname, onRebalance, onClose, navigate }) {
   let k, fr, to, am, amS, extra = null
   if (s.t === 'ready' || s.t === 'protect') {
     const ready = s.t === 'ready'
@@ -560,7 +575,7 @@ function GoalDetail({ p, ctx }) {
 }
 
 /** Plan by year: the coming moves of this goal's glide path (one short line each), then the goal year(s). */
-function PlanByYear({ p }) {
+export function PlanByYear({ p }) {
   const g = p.goal, n = Math.max(1, Number(g.payYears) || 1)
   const stops = goalRoad(p).filter((r) => !['today', 'quiet'].includes(r.k))
   if (!stops.length) return null
@@ -585,7 +600,7 @@ function PlanByYear({ p }) {
   )
 }
 
-function StopCard({ r, p }) {
+export function StopCard({ r, p }) {
   const eqRow = (a, b) => ['Equity', a != null && a !== b ? `${a}% → ${b}%` : `${b}%`]
   let chip, rows, act = null, why = null
   const yl = r.yl
@@ -610,7 +625,7 @@ const Dot = ({ c, children }) => <span className="gp-dot" style={{ '--c': c }}>{
 const Grid = ({ cells, six, four }) => <div className={`gp-grid ${six ? 'six' : ''} ${four ? 'four' : ''}`}>{cells.map(([k, v], i) => <div key={i}><span>{k}</span><b>{v}</b></div>)}</div>
 
 /** Vertical road: stops alternate left / right on wide screens, run down the left on phones. */
-function Road({ items }) {
+export function Road({ items }) {
   const ref = useRef(null)
   const [d, setD] = useState({ path: '', w: 0, h: 0, narrow: false })
   useLayoutEffect(() => {
@@ -646,7 +661,7 @@ function Road({ items }) {
   )
 }
 
-const CSS = `
+export const GP_CSS = `
 .gp{--gp-road:color-mix(in srgb,var(--text-muted) 22%,transparent);--gp-roadln:color-mix(in srgb,var(--text-primary) 40%,transparent);--gp-in:var(--bg-inset)}
 .gp>*+*{margin-top:16px}.gp a{cursor:pointer}.gp-link{color:var(--accent-violet);font-weight:600}
 .gp-bar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -709,7 +724,7 @@ const CSS = `
 .gp-mix{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:10px;font-size:12px;color:var(--text-secondary,var(--text-muted))}.gp-mix i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.gp-mix-t{margin-left:auto;color:var(--text-muted)}
 .gp-lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 .gp-nw{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.gp-nwv{display:block;font-size:26px;margin-top:4px;color:var(--text-primary)}
-.gp-pby>div{display:grid;grid-template-columns:90px 90px 90px 1fr;gap:10px;align-items:center;padding:9px 4px;border-top:1px solid var(--border-light);font-size:13px}.gp-pby>div:first-child{border-top:0}.gp-pby b{color:var(--text-primary)}.gp-pby small{color:var(--text-dim);font-size:12px}.gp-pby em{font-style:normal;color:var(--accent-violet);font-variant-numeric:tabular-nums}.gp-pby span{color:var(--text-secondary)}@media(max-width:640px){.gp-pby>div{grid-template-columns:60px 1fr 60px}.gp-pby span{grid-column:1/-1}}\n.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws>div{max-width:280px}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
+.gp-pby>div{display:grid;grid-template-columns:90px 90px 90px 1fr;gap:10px;align-items:center;padding:9px 4px;border-top:1px solid var(--border-light);font-size:13px}.gp-pby>div:first-child{border-top:0}.gp-pby b{color:var(--text-primary)}.gp-pby small{color:var(--text-dim);font-size:12px}.gp-pby em{font-style:normal;color:var(--accent-violet);font-variant-numeric:tabular-nums}.gp-pby span{color:var(--text-secondary)}@media(max-width:640px){.gp-pby>div{grid-template-columns:48px 1fr auto}.gp-pby em{white-space:nowrap}.gp-pby span{grid-column:1/-1}}\n.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws>div{max-width:280px}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
 .gp-tiles{display:grid;grid-template-columns:repeat(4,1fr) 2fr;gap:12px;margin-bottom:16px}
 .gp-tile{border:1px solid var(--border);background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}.gp-tile b{font-size:17px;color:var(--text-primary);font-variant-numeric:tabular-nums}.gp-tile small{font-size:12px;color:var(--text-muted)}
 .gp-tile-or{flex-direction:row;align-items:center;justify-content:space-between}.gp-tile-or>div{display:flex;flex-direction:column;gap:4px}.gp-tile-or>em{font-style:normal;font-size:12px;font-weight:700;color:var(--text-muted)}

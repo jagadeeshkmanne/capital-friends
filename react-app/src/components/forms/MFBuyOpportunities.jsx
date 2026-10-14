@@ -45,7 +45,7 @@ export default function MFBuyOpportunities() {
   if (totalOpps === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-[var(--text-muted)]">No buy opportunities right now</p>
+        <p className="text-sm text-[var(--text-muted)]">No funds far below their peak right now</p>
         <p className="text-xs text-[var(--text-dim)] mt-1">All funds are near their all-time highs</p>
       </div>
     )

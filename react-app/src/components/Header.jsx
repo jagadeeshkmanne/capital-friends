@@ -1,5 +1,4 @@
-import { openMobileMenu } from './MobileMenu'
-import { Menu as MenuIcon } from 'lucide-react'
+import { usePhoneBar } from './native'
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
@@ -141,12 +140,12 @@ function inferMFCategory(name) {
 const DIALOG_TITLES = { buyopp: 'Funds below their peak', rebalance: 'Rebalance Alerts' }
 
 // Phone app bar: the page's title, and a back arrow on pages that aren't one of the bottom tabs
-const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/investments/stocks', '/goals', '/more']
+const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/accounts/bank', '/goals', '/more']
 const TITLES = [
-  ['/dashboard', 'Dashboard'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
+  ['/dashboard', 'Home'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
   ['/accounts/bank', 'Bank Accounts'], ['/accounts/investment', 'Investment Accounts'], ['/goals', 'Goals'], ['/more', 'More'], ['/family', 'Family'],
-  ['/insurance', 'Insurance'], ['/liabilities', 'Liabilities'], ['/reminders', 'Reminders'], ['/settings', 'Settings'], ['/import', 'Import Statement'],
-  ['/health-check', 'Health Check'], ['/about', 'About'], ['/investments/funds', 'All Funds'], ['/reports', 'Reports'], ['/retirement-buckets', 'Retirement'],
+  ['/insurance', 'Insurance'], ['/liabilities', 'Liabilities'], ['/reminders', 'Reminders'], ['/settings', 'Settings'], ['/investments/funds', 'All Funds'], ['/reports', 'Reports'], ['/retirement-buckets', 'Retirement Buckets'], ['/import', 'Import Statement'],
+  ['/health-check', 'Health Check'], ['/about', 'About'],
 ]
 export function mobileTitle(pathname) {
   const hit = TITLES.filter(([p]) => pathname === p || pathname.startsWith(p + '/')).sort((a, b) => b[0].length - a[0].length)[0]
@@ -164,6 +163,7 @@ export default function Header() {
   const navigate = useNavigate()
   const location = useLocation()
   const { criticalAlerts, upcomingReminders, investmentSignals } = useAlerts()
+  const phoneBar = usePhoneBar()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -317,12 +317,15 @@ export default function Header() {
         <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-[52px] lg:h-14">
           {/* Phone: back arrow on sub-pages, then the page title */}
           <div className="flex lg:hidden items-center gap-1 min-w-0">
-            {(!isTabPath(location.pathname) || /[?&](p|f)=/.test(location.search)) ? (
-              <button type="button" onClick={() => { if (window.history.state?.idx > 0) return navigate(-1); const q = new URLSearchParams(location.search); if (q.has('f')) { q.delete('f'); return navigate(`${location.pathname}?${q}`) } if (q.has('p')) return navigate(location.pathname); navigate('/dashboard') }} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
+            {phoneBar?.onBack || !isTabPath(location.pathname) ? (
+              <button type="button" onClick={() => (phoneBar?.onBack ? phoneBar.onBack() : window.history.length > 1 ? navigate(-1) : navigate('/more'))} aria-label="Back" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><ChevronLeft size={24} /></button>
             ) : (
-              <button type="button" onClick={openMobileMenu} aria-label="Menu" className="-ml-1.5 p-1.5 rounded-full text-[var(--text-primary)] active:bg-[var(--bg-hover)]"><MenuIcon size={23} /></button>
+              <Link to="/dashboard" className="shrink-0"><img src={LOGO_ICON} alt="Capital Friends" className="h-7 w-auto" /></Link>
             )}
-            <h1 className="ml-1 text-[19px] font-bold tracking-tight text-[var(--text-primary)] truncate">{mobileTitle(location.pathname)}</h1>
+            <div className="ml-1 min-w-0">
+              <h1 className={`${phoneBar?.subtitle ? 'text-[16px] leading-tight' : 'text-[19px]'} font-bold tracking-tight text-[var(--text-primary)] truncate`}>{phoneBar?.title || mobileTitle(location.pathname)}</h1>
+              {phoneBar?.subtitle && <p className="text-[12px] leading-tight text-[var(--text-dim)] truncate">{phoneBar.subtitle}</p>}
+            </div>
           </div>
           {/* Left: logo (clickable → Dashboard) */}
           <Link to="/dashboard" className="hidden lg:flex items-center gap-2">
@@ -337,6 +340,8 @@ export default function Header() {
           <div className="flex items-center gap-1 sm:gap-2">
             {/* YouTube + Instagram — eye-catching pills (on phones they live in More) */}
             <span className="hidden lg:contents"><HeaderSocial /></span>
+            {phoneBar?.right && <span className="lg:hidden flex items-center">{phoneBar.right}</span>}
+            <span className={phoneBar?.right ? 'hidden lg:contents' : 'contents'}>
 
             {/* Below peak — icon button with count badge (phones: only on Dashboard and Mutual Funds) */}
             {buyOppCount > 0 && (
@@ -347,7 +352,7 @@ export default function Header() {
                     ? 'text-emerald-300 bg-emerald-500/20'
                     : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
                 }`}
-                title={`${buyOppCount} Buy Opportunit${buyOppCount === 1 ? 'y' : 'ies'}${strongBuyCount > 0 ? ` (${strongBuyCount} Strong)` : ''}`}
+                title={`${buyOppCount} fund${buyOppCount === 1 ? '' : 's'} below peak${strongBuyCount > 0 ? ` (${strongBuyCount} far below)` : ''}`}
               >
                 <TrendingDown size={18} />
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-emerald-500 rounded-full px-1">{buyOppCount}</span>
@@ -443,6 +448,7 @@ export default function Header() {
               </div>
             )}
 
+            </span>
             {/* Member avatar + dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button

@@ -25,7 +25,7 @@ window.addEventListener('vite:preloadError', (e) => {
 window.addEventListener('load', () => { setTimeout(() => { try { sessionStorage.removeItem('cf-reloaded-for-update') } catch { /* ignore */ } }, 10000) })
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
+  <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
     <AuthProvider>
       <ThemeProvider>
         <MaskProvider>

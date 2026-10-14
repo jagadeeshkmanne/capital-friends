@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
+import { useIsPhone } from './native'
+const PhoneLayout = lazy(() => import('../phone/PhoneLayout'))
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useRef as useRefScroll, useLayoutEffect as useLayoutEffectScroll } from 'react'
 import { useScreenMask } from '../hooks/useScreenMask'
@@ -22,6 +24,7 @@ export default function Layout() {
   useLayoutEffectScroll(() => { if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0) }, [pathname, search])
 
   const { loading, error, settling } = useData()
+  const phone = useIsPhone()
   const [showDonate, setShowDonate] = useState(false)
 
   // Show donate banner once per browser session
@@ -54,6 +57,9 @@ export default function Layout() {
       </div>
     )
   }
+
+  // phones: Ionic app shell (native app bar, tab bar, sheets)
+  if (phone) return <Suspense fallback={<BrandedLoading />}><PhoneLayout /></Suspense>
 
   return (
     <div className="cf-app flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">

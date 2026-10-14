@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "./preflight-cf.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
 
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -300,75 +303,4 @@ header { padding-top: env(safe-area-inset-top); }        /* under the notch when
   /* iPhone zooms into inputs under 16px: keep form fields at 16px on phones */
   input, select, textarea { font-size: 16px !important; }
   main { -webkit-overflow-scrolling: touch; }
-}
-
-/* phones: buy / rebalance badges only on Dashboard and Mutual Funds, so page titles have room */
-@media (max-width: 1023.98px) { [data-signal="off"] { display: none !important; } }
-
-/* ── phones: dialogs as full pages ── */
-@keyframes slide-up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
-.animate-slide-up { animation: slide-up .22s cubic-bezier(.2,.8,.2,1); }
-.cf-mpage .cf-form-actions { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 !important; padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px); background: var(--bg-base); border-top: 1px solid var(--border); gap: 12px; z-index: 5; }
-.cf-mpage .cf-form-actions > button { flex: 1; white-space: nowrap; height: 48px; font-size: 15px; border-radius: 12px; justify-content: center; }
-.cf-mpage .cf-form-actions > button:first-child { border: 1px solid var(--border-input); }
-.cf-mpage input:not([type=checkbox]):not([type=radio]), .cf-mpage select, .cf-mpage textarea { min-height: 46px; font-size: 16px; border-radius: 12px; }
-.cf-mpage label { font-size: 13px; }
-
-/* phones: summary tiles in a compact grid, all visible and lined up (3 across; 2 + 2 when there are exactly 4) */
-@media (max-width: 639.98px) {
-  .cf-stats { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
-  .cf-stats:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  .cf-stats > * { min-width: 0; padding: 10px 12px !important; }
-  .cf-stats > * > p:first-child { font-size: 12px !important; letter-spacing: 0 !important; line-height: 1.25; margin-bottom: 4px !important; overflow-wrap: anywhere; }
-  .cf-stats > * > p:nth-child(2) { font-size: 15px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-}
-
-.cf-mpage:has(.cf-form-actions) > .overflow-y-auto { padding-bottom: calc(env(safe-area-inset-bottom) + 96px); }
-
-/* ── phones: native-app look (system font, readable sizes, sentence-case headings, comfy touch targets) ── */
-@media (max-width: 639.98px) {
-  :root { --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", system-ui, sans-serif; }
-  body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-  .text-\[9px\], .text-\[10px\] { font-size: 11px !important; }
-  .text-\[11px\], .text-\[11\.5px\] { font-size: 12px !important; }
-  .text-xs, .text-\[12px\], .text-\[12\.5px\] { font-size: 13px !important; line-height: 1.4 !important; }
-  .text-sm, .text-\[13px\], .text-\[13\.5px\] { font-size: 15px !important; line-height: 1.4 !important; }
-  .text-base { font-size: 16px !important; }
-  /* headings and labels in sentence case, like native apps (no small spaced capitals) */
-  .uppercase.tracking-wider, .uppercase.tracking-widest, .uppercase.tracking-wide { text-transform: none !important; letter-spacing: 0 !important; }
-  p.uppercase.font-bold.text-sm, p.uppercase.font-semibold.text-sm { font-size: 17px !important; font-weight: 700 !important; color: var(--text-primary) !important; }
-  /* touch targets: bordered and filled buttons at least 38px tall */
-  main button.border:not(.rounded-full):not([role="switch"]):not([class*="py-0"]), main button[class*="bg-violet-6"]:not(.rounded-full), main button[class*="bg-emerald-6"]:not(.rounded-full) { min-height: 38px; }
-  .rounded-xl { border-radius: 16px !important; }
-  .rounded-lg { border-radius: 12px !important; }
-}
-@media (max-width: 639.98px) {
-  /* goals pages: same sentence-case headings and readable labels */
-  .g2-lbl, .g2-lbl *, .g2-q, .g2-hiwh, .g2 .k, .gp-thd, .gp-lbl { text-transform: none !important; letter-spacing: 0 !important; }
-  .g2-lbl { font-size: 17px !important; }
-  .g2-q, .g2-hiwh, .g2 .k, .gp-lbl, .gp-thd { font-size: 13px !important; }
-}
-@media (max-width: 639.98px) {
-  /* cards: more air, like native list rows — rows 16px top/bottom, 4–6px between a title and its sub-lines */
-  .divide-y > [class*="py-"] { padding-top: 16px !important; padding-bottom: 16px !important; }
-  .mt-0\.5 { margin-top: 4px !important; }
-  .mb-0\.5 { margin-bottom: 4px !important; }
-  .mt-1 { margin-top: 6px !important; }
-  .mb-1 { margin-bottom: 6px !important; }
-  .gap-0\.5 { gap: 4px !important; }
-  .gap-1 { gap: 6px !important; }
-  .cf-stats > * { padding: 12px 14px !important; }
-  /* space between cards on a page */
-  .space-y-3 > :not(:last-child) { margin-bottom: 14px !important; }
-  .space-y-4 > :not(:last-child) { margin-bottom: 18px !important; }
-  /* card bodies: at least 16px inside */
-  .rounded-xl.border.p-3, .rounded-xl.border.px-3 { padding-left: 16px !important; padding-right: 16px !important; }
-}
-
-/* phones: five stat tiles = 3 + 2 wide; no one-word last lines */
-@media (max-width: 639.98px) {
-  .cf-stats:has(> :nth-child(5):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
-  .cf-stats:has(> :nth-child(5):last-child) > * { grid-column: span 2; }
-  .cf-stats:has(> :nth-child(5):last-child) > :nth-child(n+4) { grid-column: span 3; }
-  main p, main span, main h1, main h2, main h3 { text-wrap-style: pretty; }
 }

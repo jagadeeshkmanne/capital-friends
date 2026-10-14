@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../../components/native'
+const PhoneList = lazyP(() => import('../../phone/PhoneList'))
 import { Plus, Pencil, Package, ArrowDownToLine } from 'lucide-react'
 import ReceivedForm from '../../components/forms/ReceivedForm'
 import { otherKind } from '../../utils/goalPool'
@@ -24,6 +27,7 @@ const catBadge = {
 export default function OtherInvestmentsTab() {
   const { selectedMember, member } = useFamily()
   const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment, goalList, goalPortfolioMappings, settings, updateSettings } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -129,6 +133,13 @@ export default function OtherInvestmentsTab() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Current value', value: formatINR(filtered.reduce((t, i) => t + (Number(i.currentValue) || 0), 0)) }, { label: 'Invested', value: formatINR(filtered.reduce((t, i) => t + (Number(i.investedAmount) || 0), 0)) }]} onAdd={() => setModal('add')} addLabel="Add investment"
+        empty={{ icon: Package, title: 'No other investments yet', text: 'FD, EPF, PPF, NPS, gold, property.' }}
+        groups={Object.entries(filtered.reduce((g, i) => { (g[i.investmentCategory || 'Other'] = g[i.investmentCategory || 'Other'] || []).push(i); return g }, {})).map(([cat, list]) => ({ title: cat, items: list.map((i) => {
+          const pl = (i.currentValue || 0) - (i.investedAmount || 0)
+          return { key: i.investmentId, title: mv(i.investmentName, 'name'), sub: `${i.investmentType} · ${mv(i.familyMemberName, 'name')}`, value: formatINR(i.currentValue), note: i.investedAmount > 0 ? `${pl >= 0 ? '+' : ''}${formatINR(pl)}` : null, noteTone: pl >= 0 ? 'text-emerald-400' : 'text-rose-400', lead: { text: i.investmentType },
+            ...(canReceive(i) ? { menu: [{ text: 'Edit', handler: () => setModal({ edit: i }) }, { text: 'Mark as received', handler: () => setReceived(i) }] } : { onClick: () => setModal({ edit: i }) }) }
+        }) }))} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Package size={32} className="text-[var(--text-dim)]" />
@@ -295,6 +306,7 @@ export default function OtherInvestmentsTab() {
         </>
       )}
 
+      </>)}
       <Modal open={!!received} onClose={() => setReceived(null)} title={`${received?.investmentType || ''} received`}>
         {received && <ReceivedForm inv={received} cashList={cashList} onSave={saveReceived} onCancel={() => setReceived(null)} />}
       </Modal>

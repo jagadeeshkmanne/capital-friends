@@ -1,4 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, lazy, Suspense } from 'react'
+import { useIsPhone } from '../../components/native'
+import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
+const DashboardPhone = lazy(() => import('./DashboardPhone'))
 import { useNavigate } from 'react-router-dom'
 import { Trophy, Star, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
@@ -139,6 +142,8 @@ export default function Dashboard() {
   }, [goalsTodo, mt])
 
   const [showRebalanceDialog, setShowRebalanceDialog] = useState(false)
+  const [showBuyOpp, setShowBuyOpp] = useState(false)
+  const phone = useIsPhone()
   const [openRebalance, setOpenRebalance] = useState({ 0: true })
 
   // ── Filter helper ──
@@ -619,6 +624,17 @@ export default function Dashboard() {
   }, [selectedMember, reminderList])
 
   if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading dashboard" cards={4} />
+
+  if (phone) return (
+    <>
+      <Suspense fallback={null}>
+        <DashboardPhone data={data} actionItems={actionItems} upcomingReminders={upcomingReminders} goalCards={goalCards} goalTodos={goalTodos}
+          navigate={navigate} mt={mt} onRebalance={() => setShowRebalanceDialog(true)} onBuyOpp={() => setShowBuyOpp(true)} />
+      </Suspense>
+      <Modal open={showRebalanceDialog} onClose={() => setShowRebalanceDialog(false)} title="Rebalance" wide>{showRebalanceDialog && <MFRebalanceDialog />}</Modal>
+      <Modal open={showBuyOpp} onClose={() => setShowBuyOpp(false)} title="Funds below their peak" wide>{showBuyOpp && <MFBuyOpportunities />}</Modal>
+    </>
+  )
 
   return (
     <>

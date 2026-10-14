@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../../components/native'
+const PhoneList = lazyP(() => import('../../phone/PhoneList'))
 import { Plus, Pencil, CreditCard } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -22,6 +25,7 @@ const typeBadge = {
 export default function LiabilitiesTab() {
   const { selectedMember, member } = useFamily()
   const { liabilityList, otherInvList, addLiability, updateLiability, deleteLiability } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -92,6 +96,9 @@ export default function LiabilitiesTab() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Outstanding', value: formatINR(filtered.reduce((t, l) => t + (Number(l.outstandingBalance) || 0), 0)), tone: 'text-rose-400' }, { label: 'EMI / month', value: formatINR(filtered.reduce((t, l) => t + (Number(l.emiAmount) || 0), 0)) }]} onAdd={() => setModal('add')} addLabel="Add loan"
+        empty={{ icon: CreditCard, title: 'No loans', text: 'Home, car or personal loans go here.' }}
+        groups={[{ items: filtered.map((l) => ({ key: l.liabilityId, title: l.lenderName, sub: `${l.liabilityType} · ${mv(l.familyMemberName, 'name')}`, value: formatINR(l.outstandingBalance), note: l.emiAmount > 0 ? `EMI ${formatINR(l.emiAmount)}${l.outstandingBalance > 0 ? ` · ${Math.ceil(l.outstandingBalance / l.emiAmount)} mo` : ''}` : null, lead: { icon: CreditCard, color: '#fb7185' }, onClick: () => setModal({ edit: l }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <CreditCard size={32} className="text-[var(--text-dim)]" />
@@ -213,6 +220,7 @@ export default function LiabilitiesTab() {
         </>
       )}
 
+      </>)}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Liability' : 'Add Liability'}>
         <LiabilityForm
           initial={modal?.edit || undefined}

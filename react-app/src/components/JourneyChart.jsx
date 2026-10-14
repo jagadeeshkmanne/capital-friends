@@ -28,7 +28,7 @@ function cssVar(name, fallback) {
   try { const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fallback } catch { return fallback }
 }
 
-export default function JourneyChart({ data, txns, height = 240, formatMoney = (v) => `₹${Math.round(v).toLocaleString('en-IN')}` }) {
+export default function JourneyChart({ data, txns, height = 240, compact = false, formatMoney = (v) => `₹${Math.round(v).toLocaleString('en-IN')}` }) {
   const mt = useMaskText()
   // value over time: NAV history of every fund in these transactions (loaded once a day, cached)
   const [navMap, setNavMap] = useState(null)
@@ -217,7 +217,7 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
   return (
     <div className="select-none">
       {/* headline: follows the cursor / finger, like broker apps */}
-      <div className="flex items-end justify-between gap-3 mb-1 h-[64px] overflow-hidden">
+      <div className={`flex items-end justify-between gap-3 mb-1 overflow-hidden ${compact ? "h-[66px]" : "h-[64px]"}`}>
         {h ? (
           <div>
             <p className="text-[11px] text-[var(--text-dim)]">{fmtDay(hover.time)}{h.now ? ' · today' : ''}</p>
@@ -232,8 +232,14 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
             ) : (
               <p className="text-xl font-bold tabular-nums text-[var(--text-primary)]">{formatMoney(h.invested)} <span className="text-xs font-medium text-[var(--text-dim)]">invested</span></p>
             )}
+            {compact && hTx.length > 0 && (
+              <p className="text-[12px] truncate max-w-[300px]">
+                <span className={hTx[0].isBuy ? 'text-emerald-400' : 'text-rose-400'}>{hTx[0].isBuy ? (hTx[0].txnType === 'SIP' ? 'SIP' : 'Bought') : 'Sold'} {formatMoney(hTx[0].amount)}</span>
+                <span className="text-[var(--text-dim)]"> · {hTx[0].fundName}{hTx.length > 1 ? ` +${hTx.length - 1} more` : ''}</span>
+              </p>
+            )}
           </div>
-        ) : (
+        ) : compact ? null : (
           <div>
             <p className="text-[11px] text-[var(--text-dim)]">Value today</p>
             <p className="text-xl font-bold tabular-nums text-[var(--text-primary)]">{formatMoney(value || last.invested)}</p>
@@ -244,8 +250,8 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
           </div>
         )}
         {!h && (
-          <div className="hidden sm:block text-right space-y-1">
-            <div className="flex items-center justify-end gap-3 text-[11px] text-[var(--text-dim)]">
+          <div className={compact ? 'w-full' : 'text-right space-y-1'}>
+            <div className={`flex items-center gap-3 text-[11px] text-[var(--text-dim)] ${compact ? 'justify-start h-6' : 'justify-end'}`}>
               <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-violet-500 inline-block" /> Invested</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Bought</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Sold</span>
@@ -253,24 +259,16 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
                 ? <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 inline-block" /> Value</span>
                 : <span className="flex items-center gap-1.5"><span className="w-3 border-t-2 border-dashed border-emerald-500 inline-block" /> Value today{codesSig && !navMap ? ' (loading history…)' : ''}</span>)}
             </div>
-            {addedInRange !== null && (
+            {addedInRange !== null && !compact && (
               <p className="text-xs text-[var(--text-dim)] tabular-nums">{addedInRange >= 0 ? 'Added' : 'Taken out'} in last {range}: <b className="text-[var(--text-primary)]">{formatMoney(Math.abs(addedInRange))}</b></p>
             )}
           </div>
         )}
       </div>
 
-      {/* phones: the legend goes under the headline (beside it there is no room) */}
-      <div className="sm:hidden flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[11px] text-[var(--text-dim)]">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-violet-500 inline-block" /> Invested</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Bought</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Sold</span>
-        {value > 0 && <span className="flex items-center gap-1.5"><span className={`w-3 inline-block ${navMap && navMap.size ? 'h-0.5 bg-emerald-500' : 'border-t-2 border-dashed border-emerald-500'}`} /> Value</span>}
-        {addedInRange !== null && <span className="tabular-nums">{addedInRange >= 0 ? 'Added' : 'Taken out'} in {range}: <b className="text-[var(--text-primary)]">{formatMoney(Math.abs(addedInRange))}</b></span>}
-      </div>
       <div className="relative" style={{ height }} onMouseLeave={() => setHover(null)}>
         <div ref={boxRef} className="absolute inset-0" />
-        {hover && hTx.length > 0 && (() => {
+        {!compact && hover && hTx.length > 0 && (() => {
           const w = boxRef.current?.clientWidth || 600
           const cardW = Math.min(320, w - 16)
           const left = hover.x + 16 + cardW > w ? Math.max(8, hover.x - 16 - cardW) : hover.x + 16
@@ -314,13 +312,22 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
         })()}
       </div>
 
+      {/* phones (compact): plain range chips like broker apps; the selected one gets a soft outline */}
+      {compact && (
+        <div className="mt-3 flex items-center justify-between px-1">
+          {RANGES.filter((r) => !r[1] || r[1] < spanYears + 0.05).map(([k]) => (
+            <button key={k} type="button" onClick={() => pick(k)}
+              className={`min-w-[44px] h-8 px-2.5 rounded-full text-[13px] font-semibold transition-colors ${range === k ? 'border border-[var(--text-dim)]/50 text-[var(--text-primary)] bg-white/5' : 'text-[var(--text-dim)]'}`}>{k}</button>
+          ))}
+        </div>
+      )}
       {/* range tabs joined to the chart, like Groww: one row, equal widths, active one highlighted */}
-      <div className="mt-2 p-1 rounded-xl bg-[var(--bg-inset,rgba(0,0,0,0.25))] border border-[var(--border-light)] flex items-stretch gap-1">
+      {!compact && <div className="mt-2 p-1 rounded-xl bg-[var(--bg-inset,rgba(0,0,0,0.25))] border border-[var(--border-light)] flex items-stretch gap-1">
         {RANGES.filter((r) => !r[1] || r[1] < spanYears + 0.05).map(([k]) => (
           <button key={k} onClick={() => pick(k)}
             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${range === k ? 'bg-gradient-to-r from-violet-600 to-indigo-500 text-white shadow-md shadow-violet-900/40' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}>{k}</button>
         ))}
-      </div>
+      </div>}
     </div>
   )
 }

@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
+import { useIsPhone } from '../components/native'
+const SettingsPhone = lazy(() => import('./SettingsPhone'))
 import { useNavigate } from 'react-router-dom'
 import { Moon, Sun, Mail, BellRing, ChevronDown, ChevronRight, RefreshCw, Database, User, LogOut, Zap, EyeOff, Eye, CloudDownload, Heart, Send, Palette, FileUp } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
@@ -14,6 +16,12 @@ import { suggestCasDay } from '../utils/incomePlan'
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export default function SettingsPage() {
+  // phones: Android-style settings screen
+  const phone = useIsPhone()
+  return phone ? <Suspense fallback={null}><SettingsPhone /></Suspense> : <SettingsDesktop />
+}
+
+function SettingsDesktop() {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
   const { members, settings, updateSettings, updateMember, healthCheckCompleted, refreshData, isRefreshing, refreshSettings } = useData()

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
+import { useIsPhone } from '../components/native'
+const PhoneMore = lazy(() => import('../phone/PhoneMore'))
 import { useNavigate } from 'react-router-dom'
 import { Bell, Settings, Info, Heart, Zap, Users, Briefcase, Shield, BarChart3, Package, CreditCard, ChevronRight, FileUp } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
@@ -42,6 +44,8 @@ function NavItem({ item, onClick }) {
 export default function MorePage() {
   const navigate = useNavigate()
   const [showDonate, setShowDonate] = useState(false)
+  const phone = useIsPhone()
+  if (phone) return <Suspense fallback={null}><PhoneMore /></Suspense>
 
   return (
     <div className="space-y-5">

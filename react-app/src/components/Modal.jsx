@@ -3,8 +3,18 @@ import { X, Calendar, ArrowLeft } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useMask } from '../context/MaskContext'
+import { lazy, Suspense } from 'react'
+import { useIsPhone } from './native'
+const PhoneSheet = lazy(() => import('../phone/PhoneSheet'))
 
-export default function Modal({ open, onClose, title, children, wide, maxWidth, maxHeight }) {
+export default function Modal(props) {
+  // phones: every dialog in the app opens as a bottom sheet you can drag down to close
+  const phone = useIsPhone()
+  if (phone) return <Suspense fallback={null}><PhoneSheet open={!!props.open} onClose={props.onClose} title={props.title} full={!props.sheet}>{props.children}</PhoneSheet></Suspense>
+  return <DesktopModal {...props} />
+}
+
+function DesktopModal({ open, onClose, title, children, wide, maxWidth, maxHeight }) {
   const overlayRef = useRef(null)
 
   useEffect(() => {
@@ -182,11 +192,11 @@ export function FormCheckbox({ checked, onChange, label }) {
 
 export function FormActions({ onCancel, onSubmit, submitLabel = 'Save', loading, disabled }) {
   return (
-    <div className="cf-form-actions flex items-center justify-end gap-2 pt-4 mt-4 border-t border-[var(--border-light)]">
-      <button onClick={onCancel} disabled={loading} className="px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40">
+    <div className="cf-form-actions flex items-center justify-end gap-2 pt-4 mt-4 border-t border-[var(--border-light)] max-lg:gap-3">
+      <button onClick={onCancel} disabled={loading} className="max-lg:flex-1 max-lg:h-12 max-lg:text-[15px] max-lg:rounded-xl max-lg:border max-lg:border-[var(--border-input)] px-4 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40">
         Cancel
       </button>
-      <button onClick={onSubmit} disabled={loading || disabled} className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+      <button onClick={onSubmit} disabled={loading || disabled} className="max-lg:flex-1 max-lg:h-12 max-lg:text-[15px] max-lg:rounded-xl max-lg:justify-center px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
         {loading && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
         {loading ? 'Saving...' : submitLabel}
       </button>

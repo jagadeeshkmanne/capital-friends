@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../../components/native'
+const PhoneList = lazyP(() => import('../../phone/PhoneList'))
 import { Plus, Pencil, Users } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
@@ -27,6 +30,7 @@ const relationBadge = {
 
 export default function Family() {
   const { members, addMember, updateMember, deleteMember } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -75,6 +79,9 @@ export default function Family() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'People', value: activeMembers.length }]} onAdd={() => setModal('add')} addLabel="Add member"
+        empty={{ icon: Users, title: 'No family members yet', text: 'Add yourself first, then the family.' }}
+        groups={[{ items: activeMembers.map((m) => ({ key: m.memberId, title: mv(m.memberName, 'name'), sub: [m.relationship, mv(m.email, 'email')].filter(Boolean).join(' · '), lead: { text: m.memberName }, onClick: () => setModal({ edit: m }) })) }]} /></SuspenseP> : (<>
       {/* Header with Add */}
       <div className="flex items-center justify-end px-1">
         <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
@@ -198,6 +205,7 @@ export default function Family() {
         </div>
       )}
 
+      </>)}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Member' : 'Add Family Member'} wide>
         <MemberForm
           initial={modal?.edit || undefined}

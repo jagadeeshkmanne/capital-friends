@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../components/native'
+const PhoneList = lazyP(() => import('../phone/PhoneList'))
 import { Plus, Pencil, Bell, BellOff } from 'lucide-react'
 import { useFamily } from '../context/FamilyContext'
 import { useData } from '../context/DataContext'
@@ -31,6 +34,7 @@ function daysUntil(dateStr) {
 export default function RemindersPage() {
   const { selectedMember, member } = useFamily()
   const { reminderList, addReminder, updateReminder, deleteReminder } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const [modal, setModal] = useState(null)
@@ -91,6 +95,12 @@ export default function RemindersPage() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Overdue', value: overdue, tone: overdue ? 'text-rose-400' : '' }, { label: 'This week', value: dueSoon, tone: dueSoon ? 'text-amber-400' : '' }, { label: 'This month', value: upcoming }]} onAdd={() => setModal('add')} addLabel="Add reminder"
+        empty={{ icon: Bell, title: 'No reminders', text: 'SIP dates, premiums, renewals. You get an email before they are due.' }}
+        groups={[['Overdue', (d) => d < 0], ['Next 7 days', (d) => d >= 0 && d <= 7], ['Later', (d) => d > 7]].map(([title, f]) => ({ title, items: sorted.filter((r) => f(daysUntil(r.dueDate))).map((r) => {
+          const due = getDueBadge(r.dueDate)
+          return { key: r.reminderId, title: r.title, sub: `${r.reminderType} · ${r.familyMemberName} · ${r.frequency}`, note: due.label, noteTone: daysUntil(r.dueDate) < 0 ? 'text-rose-400' : daysUntil(r.dueDate) <= 7 ? 'text-amber-400' : '', lead: { icon: Bell, color: '#fbbf24' }, onClick: () => setModal({ edit: r }) }
+        }) }))} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <BellOff size={32} className="text-[var(--text-dim)]" />
@@ -203,6 +213,7 @@ export default function RemindersPage() {
         </>
       )}
 
+      </>)}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Reminder' : 'Add Reminder'} wide>
         <ReminderForm
           initial={modal?.edit || undefined}

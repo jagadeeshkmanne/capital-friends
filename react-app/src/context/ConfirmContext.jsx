@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, lazy, Suspense } from 'react'
+import { useIsPhone } from '../components/native'
+const PhoneConfirm = lazy(() => import('../phone/PhoneOverlays').then((m) => ({ default: m.PhoneConfirm })))
 import { AlertTriangle } from 'lucide-react'
 
 const ConfirmContext = createContext()
@@ -6,6 +8,7 @@ const ConfirmContext = createContext()
 export function ConfirmProvider({ children }) {
   const [dialog, setDialog] = useState(null)
   const resolveRef = useRef(null)
+  const phone = useIsPhone()
 
   const confirm = useCallback((message, { title = 'Confirm', confirmLabel = 'Yes, proceed', cancelLabel = 'Cancel', destructive = true } = {}) => {
     return new Promise((resolve) => {
@@ -30,7 +33,8 @@ export function ConfirmProvider({ children }) {
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
 
-      {dialog && (
+      {phone && <Suspense fallback={null}><PhoneConfirm dialog={dialog} onConfirm={handleConfirm} onCancel={handleCancel} /></Suspense>}
+      {!phone && dialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center px-4" onClick={handleCancel}>
           <div className="fixed inset-0 bg-black/60" />
           <div

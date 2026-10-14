@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Plus, Pencil, Shield } from 'lucide-react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../../components/native'
+const PhoneList = lazyP(() => import('../../phone/PhoneList'))
+import { Plus, Pencil, Shield, HeartPulse } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -23,6 +26,7 @@ const typeBadge = {
 export default function InsurancePage() {
   const { selectedMember, member } = useFamily()
   const { insurancePolicies, addInsurance, updateInsurance, deleteInsurance } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -72,6 +76,9 @@ export default function InsurancePage() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Policies', value: filtered.length }, { label: 'Total cover', value: formatINR(filtered.reduce((t, p) => t + (Number(p.sumAssured) || 0), 0)) }]} onAdd={() => setModal('add')} addLabel="Add policy"
+        empty={{ icon: Shield, title: 'No insurance policies yet', text: 'Add term life and health cover so the family knows what to claim.' }}
+        groups={[{ items: filtered.map((p) => ({ key: p.policyId, title: p.policyName, sub: `${p.company}${!member ? ` · ${mv(p.insuredMember, 'name')}` : ''}`, value: formatINR(p.sumAssured), note: p.policyType, lead: /health/i.test(p.policyType || '') ? { icon: HeartPulse, color: '#22d3ee' } : { icon: Shield, color: '#a78bfa' }, onClick: () => setModal({ edit: p }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Shield size={32} className="text-[var(--text-dim)]" />
@@ -183,6 +190,7 @@ export default function InsurancePage() {
         </>
       )}
 
+      </>)}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Insurance Policy' : 'Add Insurance Policy'} wide>
         <InsuranceForm
           initial={modal?.edit || undefined}

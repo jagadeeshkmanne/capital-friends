@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../../components/native'
+const PhoneList = lazyP(() => import('../../phone/PhoneList'))
 import { Plus, Pencil, Briefcase } from 'lucide-react'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -21,6 +24,7 @@ const typeBadge = {
 export default function InvestmentAccountsPage() {
   const { selectedMember, member } = useFamily()
   const { investmentAccounts, addInvestmentAccount, updateInvestmentAccount, deleteInvestmentAccount } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -69,6 +73,9 @@ export default function InvestmentAccountsPage() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Accounts', value: filtered.length }]} onAdd={() => setModal('add')} addLabel="Add account"
+        empty={{ icon: Briefcase, title: 'No investment accounts yet', text: 'Zerodha, Groww, Kuvera or your distributor.' }}
+        groups={[{ items: filtered.map((a) => ({ key: a.accountId, title: mv(a.accountName, 'name'), sub: `${a.platformBroker}${!member ? ` · ${mv(a.memberName, 'name')}` : ''}`, note: a.accountType, lead: { icon: Briefcase, color: '#60a5fa' }, onClick: () => setModal({ edit: a }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Briefcase size={32} className="text-[var(--text-dim)]" />
@@ -157,6 +164,7 @@ export default function InvestmentAccountsPage() {
         </>
       )}
 
+      </>)}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Investment Account' : 'Add Investment Account'} wide>
         <InvestmentAccountForm
           initial={modal?.edit || undefined}

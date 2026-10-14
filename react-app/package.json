@@ -10,6 +10,7 @@
     "deploy": "vite build && echo 'Copy dist/ contents to your GitHub Pages repo /app/ folder'"
   },
   "dependencies": {
+    "@ionic/react": "^9.0.6",
     "ag-grid-community": "^35.1.0",
     "ag-grid-react": "^35.1.0",
     "fuse.js": "^7.1.0",
@@ -17,13 +18,15 @@
     "jspdf": "^4.2.0",
     "lightweight-charts": "^5.2.1",
     "lucide-react": "^0.574.0",
+    "motion": "^12.43.0",
     "pdfjs-dist": "4.10.38",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-datepicker": "^9.1.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",

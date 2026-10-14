@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, lazy, Suspense } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { FileUp, Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
@@ -24,6 +24,9 @@ import { isBuyOpportunity } from '../../utils/buyOpportunities'
 import { buildFundsModel } from '../../utils/fundsDashboard'
 import JourneyChartLW from '../../components/JourneyChart'
 import ImportNudge from '../../components/ImportNudge'
+import { useIsPhone } from '../../components/native'
+const MutualFundsPhone = lazy(() => import('./MutualFundsPhone'))
+const PhoneTrade = lazy(() => import('../../phone/PhoneTrade'))
 
 // Strip PFL- prefix for display
 const displayName = (name) => name?.replace(/^PFL-/, '') || name
@@ -264,6 +267,7 @@ export default function MutualFundsPage() {
     if (!id || id === 'all') q.delete('p'); else q.set('p', id)
     setSp(q)
   }
+  const isPhone = useIsPhone()
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [txnFundFilter, setTxnFundFilter] = useState('all')
@@ -873,6 +877,113 @@ export default function MutualFundsPage() {
     }
   }
 
+  const modals = (<>
+      {/* Modals */}
+      <Modal open={modal === 'addPortfolio' || !!modal?.editPortfolio} onClose={() => setModal(null)} title={modal?.editPortfolio ? 'Edit Portfolio' : 'New MF Portfolio'}>
+        <MFPortfolioForm
+          initial={modal?.editPortfolio || undefined}
+          onSave={handleSavePortfolio}
+          onDelete={modal?.editPortfolio ? handleDeletePortfolio : undefined}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal?.invest && !(isPhone && modal.invest?.fundCode)} onClose={() => setModal(null)} title="Invest in Mutual Fund" wide>
+        <MFInvestForm
+          key={modal?.invest?.fundCode || modal?.invest?.portfolioId || modal?.invest}
+          portfolioId={typeof modal?.invest === 'object' ? modal.invest.portfolioId : typeof modal?.invest === 'string' ? modal.invest : undefined}
+          fundCode={typeof modal?.invest === 'object' ? modal.invest.fundCode : undefined}
+          fundName={typeof modal?.invest === 'object' ? modal.invest.fundName : undefined}
+          transactionType={typeof modal?.invest === 'object' ? modal.invest.type : undefined}
+          onSave={handleInvest}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal?.redeem && !(isPhone && modal.redeem?.fundCode)} onClose={() => setModal(null)} title="Redeem Mutual Fund" wide>
+        <MFRedeemForm
+          key={modal?.redeem?.fundCode || modal?.redeem?.portfolioId || modal?.redeem}
+          portfolioId={typeof modal?.redeem === 'object' ? modal.redeem.portfolioId : typeof modal?.redeem === 'string' ? modal.redeem : undefined}
+          fundCode={typeof modal?.redeem === 'object' ? modal.redeem.fundCode : undefined}
+          onSave={handleRedeem}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal?.switchFunds} onClose={() => setModal(null)} title="Switch Funds" wide>
+        <MFSwitchForm
+          portfolioId={typeof modal?.switchFunds === 'string' ? modal.switchFunds : undefined}
+          onSave={handleSwitch}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal?.allocations} onClose={() => setModal(null)} title="Manage Portfolio Allocation" wide>
+        {modal?.allocations && (
+          <MFAllocationManager
+            portfolioId={modal.allocations}
+            onSave={handleSaveAllocations}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
+
+      <Modal open={modal === 'rebalance' || !!modal?.rebalance} onClose={() => setModal(null)} title="Rebalance Alerts" wide>
+        {(modal === 'rebalance' || !!modal?.rebalance) && <MFRebalanceDialog filterPortfolioId={typeof modal?.rebalance === 'string' ? modal.rebalance : null} />}
+      </Modal>
+
+      <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Funds below their peak" wide>
+        {modal === 'buyOpp' && <MFBuyOpportunities />}
+      </Modal>
+
+      <Modal open={!!modal?.editTxn} onClose={() => setModal(null)} title="Edit Transaction">
+        {modal?.editTxn && (
+          <EditTxnForm
+            txn={modal.editTxn}
+            onSave={handleEditTransaction}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
+
+      <Modal open={!!modal?.classifyFund} onClose={() => setModal(null)} title="Classify Fund" maxWidth="max-w-4xl">
+        {modal?.classifyFund && (
+          <FundAllocationForm
+            fund={modal.classifyFund.fund}
+            initial={modal.classifyFund.existing}
+            onSave={handleSaveClassification}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
+
+  </>)
+
+  // phones: native-style stack (list → portfolio → fund) with the same data and dialogs
+  if (isPhone && portfolios.length > 0) {
+    return (
+      <>
+        <Suspense fallback={null}><MutualFundsPhone
+          portfolioData={portfolioData} portfolioIndicators={portfolioIndicators} currentIndicators={currentIndicators}
+          stats={stats} returns={returns} insights={insights} breakdown={breakdown}
+          enrichedHoldings={enrichedHoldings} allFilteredTxns={allFilteredTxns}
+          selectedPortfolioId={selectedPortfolioId} setSelectedPortfolioId={setSelectedPortfolioId}
+          setModal={setModal} goalLinks={goalLinks} navigate={navigate} mv={mv} mt={mt} dn={dn}
+          journeyOf={(t, cv) => ({ data: buildJourney(t, cv), vt: toValueTxns(t) })}
+          onToggleLump={handleToggleLumpsumRestricted} onToggleSip={handleToggleSipRestricted} onDeleteFund={handleDeleteFund}
+        /></Suspense>
+        {modals}
+        {(() => {
+          const t = modal?.invest?.fundCode ? ['invest', modal.invest] : modal?.redeem?.fundCode ? ['redeem', modal.redeem] : null
+          if (!t) return null
+          const h = (mfHoldings || []).find((x) => x.portfolioId === t[1].portfolioId && String(x.schemeCode) === String(t[1].fundCode))
+          const pn = dn(portfolioData.find((p) => p.portfolioId === t[1].portfolioId)?.portfolioName || '')
+          return <Suspense fallback={null}><PhoneTrade key={t[0] + t[1].fundCode} open={t[1]} mode={t[0]} holding={h || { ...t[1], schemeCode: t[1].fundCode }} portfolioName={pn} onSave={t[0] === 'invest' ? handleInvest : handleRedeem} onClose={() => setModal(null)} /></Suspense>
+        })()}
+      </>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {portfolios.length === 0 ? (
@@ -938,7 +1049,7 @@ export default function MutualFundsPage() {
                                 <p className={`text-sm ${selectedPortfolioId === p.portfolioId ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                                   {dn(p.portfolioName)}
                                 </p>
-                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
+                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} below peak`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
                               <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
@@ -1001,6 +1112,9 @@ export default function MutualFundsPage() {
 
           {/* ── Phones: one summary card (current value, invested, returns), the rest on tap ── */}
           {!fundDetailHolding && <MobileSummary stats={stats} returns={returns} navigate={navigate} />}
+
+          {/* ── Phones: one summary card (current value, invested, returns), the rest on tap ── */}
+          <MobileSummary stats={stats} returns={returns} navigate={navigate} />
 
           {/* ── Stat Cards ── */}
           <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -1147,7 +1261,7 @@ export default function MutualFundsPage() {
                             <td className="py-2.5 px-3">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-semibold text-[var(--text-primary)]">{dn(p.portfolioName)}</span>
-                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} buy opportunities`} />}
+                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} below peak`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
                               <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform}</p>
@@ -2260,84 +2374,7 @@ export default function MutualFundsPage() {
         </>
       )}
 
-      {/* Modals */}
-      <Modal open={modal === 'addPortfolio' || !!modal?.editPortfolio} onClose={() => setModal(null)} title={modal?.editPortfolio ? 'Edit Portfolio' : 'New MF Portfolio'}>
-        <MFPortfolioForm
-          initial={modal?.editPortfolio || undefined}
-          onSave={handleSavePortfolio}
-          onDelete={modal?.editPortfolio ? handleDeletePortfolio : undefined}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal?.invest} onClose={() => setModal(null)} title="Invest in Mutual Fund" wide>
-        <MFInvestForm
-          key={modal?.invest?.fundCode || modal?.invest?.portfolioId || modal?.invest}
-          portfolioId={typeof modal?.invest === 'object' ? modal.invest.portfolioId : typeof modal?.invest === 'string' ? modal.invest : undefined}
-          fundCode={typeof modal?.invest === 'object' ? modal.invest.fundCode : undefined}
-          fundName={typeof modal?.invest === 'object' ? modal.invest.fundName : undefined}
-          onSave={handleInvest}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal?.redeem} onClose={() => setModal(null)} title="Redeem Mutual Fund" wide>
-        <MFRedeemForm
-          key={modal?.redeem?.fundCode || modal?.redeem?.portfolioId || modal?.redeem}
-          portfolioId={typeof modal?.redeem === 'object' ? modal.redeem.portfolioId : typeof modal?.redeem === 'string' ? modal.redeem : undefined}
-          fundCode={typeof modal?.redeem === 'object' ? modal.redeem.fundCode : undefined}
-          onSave={handleRedeem}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal?.switchFunds} onClose={() => setModal(null)} title="Switch Funds" wide>
-        <MFSwitchForm
-          portfolioId={typeof modal?.switchFunds === 'string' ? modal.switchFunds : undefined}
-          onSave={handleSwitch}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal?.allocations} onClose={() => setModal(null)} title="Manage Portfolio Allocation" wide>
-        {modal?.allocations && (
-          <MFAllocationManager
-            portfolioId={modal.allocations}
-            onSave={handleSaveAllocations}
-            onCancel={() => setModal(null)}
-          />
-        )}
-      </Modal>
-
-      <Modal open={modal === 'rebalance' || !!modal?.rebalance} onClose={() => setModal(null)} title="Rebalance Alerts" wide>
-        {(modal === 'rebalance' || !!modal?.rebalance) && <MFRebalanceDialog filterPortfolioId={typeof modal?.rebalance === 'string' ? modal.rebalance : null} />}
-      </Modal>
-
-      <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Funds below their peak" wide>
-        {modal === 'buyOpp' && <MFBuyOpportunities />}
-      </Modal>
-
-      <Modal open={!!modal?.editTxn} onClose={() => setModal(null)} title="Edit Transaction">
-        {modal?.editTxn && (
-          <EditTxnForm
-            txn={modal.editTxn}
-            onSave={handleEditTransaction}
-            onCancel={() => setModal(null)}
-          />
-        )}
-      </Modal>
-
-      <Modal open={!!modal?.classifyFund} onClose={() => setModal(null)} title="Classify Fund" maxWidth="max-w-4xl">
-        {modal?.classifyFund && (
-          <FundAllocationForm
-            fund={modal.classifyFund.fund}
-            initial={modal.classifyFund.existing}
-            onSave={handleSaveClassification}
-            onCancel={() => setModal(null)}
-          />
-        )}
-      </Modal>
-
+      {modals}
     </div>
   )
 }

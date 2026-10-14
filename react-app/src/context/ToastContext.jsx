@@ -1,4 +1,7 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, lazy, Suspense } from 'react'
+import { useIsPhone } from '../components/native'
+const PhoneToasts = lazy(() => import('../phone/PhoneOverlays').then((m) => ({ default: m.PhoneToasts })))
+const PhoneLoading = lazy(() => import('../phone/PhoneOverlays').then((m) => ({ default: m.PhoneLoading })))
 import { CheckCircle2, XCircle, AlertTriangle, X } from 'lucide-react'
 
 const ToastContext = createContext()
@@ -7,6 +10,7 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
   const [blockUI, setBlockUI] = useState(null)
   const idRef = useRef(0)
+  const phone = useIsPhone()
 
   const showToast = useCallback((message, type = 'success', duration = 3000) => {
     const id = ++idRef.current
@@ -30,8 +34,9 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ showToast, showBlockUI, hideBlockUI }}>
       {children}
 
+      {phone && <Suspense fallback={null}><PhoneLoading message={blockUI} /><PhoneToasts toasts={toasts} dismiss={dismiss} /></Suspense>}
       {/* Block UI overlay */}
-      {blockUI && (
+      {!phone && blockUI && (
         <div className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 bg-[var(--bg-card)] rounded-xl px-8 py-6 border border-[var(--border)] shadow-2xl">
             <span className="w-7 h-7 border-[2.5px] border-violet-400/30 border-t-violet-400 rounded-full animate-spin" />
@@ -41,8 +46,8 @@ export function ToastProvider({ children }) {
       )}
 
       {/* Toast container */}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
+      {!phone && toasts.length > 0 && (
+        <div className="fixed top-[calc(env(safe-area-inset-top)+60px)] lg:top-auto lg:bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
           {toasts.map((t) => (
             <div
               key={t.id}

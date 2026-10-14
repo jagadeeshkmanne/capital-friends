@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { lazy as lazyP, Suspense as SuspenseP } from 'react'
+import { useIsPhone } from '../../components/native'
+const PhoneList = lazyP(() => import('../../phone/PhoneList'))
 import { Plus, Pencil, Landmark } from 'lucide-react'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
@@ -21,6 +24,7 @@ const typeBadge = {
 export default function BankAccountsPage() {
   const { selectedMember, member } = useFamily()
   const { banks, addBankAccount, updateBankAccount, deleteBankAccount } = useData()
+  const phone = useIsPhone()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -75,6 +79,9 @@ export default function BankAccountsPage() {
 
   return (
     <div className="space-y-4">
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Accounts', value: filtered.length }, { label: 'Banks', value: uniqueBanks }]} onAdd={() => setModal('add')} addLabel="Add bank account"
+        empty={{ icon: Landmark, title: 'No bank accounts yet', text: 'Add the family\'s accounts so everyone knows which bank to call.' }}
+        groups={[{ items: filtered.map((a) => ({ key: a.accountId, title: mv(a.accountName, 'name'), sub: `${a.bankName}${!member ? ` · ${mv(a.memberName, 'name')}` : ''}`, value: mv(a.accountNumber, 'account'), note: a.accountType, lead: { icon: Landmark, color: '#38bdf8' }, onClick: () => setModal({ edit: a }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Landmark size={32} className="text-[var(--text-dim)]" />
@@ -164,6 +171,7 @@ export default function BankAccountsPage() {
         </>
       )}
 
+      </>)}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Bank Account' : 'Add Bank Account'}>
         <BankAccountForm
           initial={modal?.edit || undefined}

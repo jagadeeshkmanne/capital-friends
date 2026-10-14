@@ -103,7 +103,7 @@ function useApplyIncomeOnce() {
 }
 
 // money set aside for goals whose date has come (utils/goalSetAside.js), per goal: { was, now, goneShare, date }
-const AsideCtx = createContext({})
+export const AsideCtx = createContext({})
 
 export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   useApplyIncomeOnce()
@@ -128,7 +128,7 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
 
   return (
     <AsideCtx.Provider value={pool?.aside || {}}><div className="g2">
-      <style>{CSS}</style>
+      <style>{GOALS_HOME_CSS}</style>
 
       {/* one row like the other pages: what waits on a goal card (left), the page's buttons (right) */}
       <div className="g2-top">
@@ -300,7 +300,7 @@ const incomeOptions = (incItems, mt) => incItems.map((it) => it.kind === 'mf'
   : { kind: 'cash', ref: it.holding?.investmentId, name: mt(it.holding?.investmentName || it.holding?.investmentType || 'Savings'), value: it.value, share: shareOf(it) })
   .filter((o) => o.ref)
 
-function Buckets({ p, items, retired, mt, pname, onOpen }) {
+export function Buckets({ p, items, retired, mt, pname, onOpen }) {
   const { settings, updateSettings, mfTransactions, assetAllocations } = useData()
   const allocMap = Object.fromEntries((assetAllocations || []).filter((a) => a.assetAllocation).map((a) => [a.fundCode, a.assetAllocation]))
   const stop = (p.road || []).find((r) => r.k === 'bucket') || (p.road || []).find((r) => r.k === 'goal') || (p.road || []).find((r) => r.k === 'spend')
@@ -362,7 +362,7 @@ function EmptyGoals({ navigate, actions }) {
   const add = (t) => navigate(`/goals/classic?add=1${t ? `&type=${encodeURIComponent(t)}` : ''}`)
   return (
     <div className="g2">
-      <style>{CSS}</style>
+      <style>{GOALS_HOME_CSS}</style>
       <div className="g2-card g2-empty">
         <div className="g2-emh">
           <div><h2>Plan your first goal</h2><p>Tell the app what the money is for and when. It works out how much is needed today, takes it from your investments in priority order, and shows the steps for each month.</p></div>
@@ -514,7 +514,7 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   )
 }
 
-function Step({ s, n, mt, pname, closeGoal, navigate }) {
+export function Step({ s, n, mt, pname, closeGoal, navigate }) {
   if (s.t === 'ready') return <ReadyStep s={s} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} />
   if (s.t === 'short') return <ShortStep s={s} n={n} pname={pname} />
   if (s.t === 'cash') return (
@@ -555,7 +555,7 @@ function Step({ s, n, mt, pname, closeGoal, navigate }) {
 }
 const Row = ({ chip, k, a, b, v }) => <div className="g2-row"><span className={`g2-chip ${chip}`}>{k}</span><div><b>{a}</b><small>{b}</small></div><span className="g2-v">{v}</span></div>
 
-const CSS = `
+export const GOALS_HOME_CSS = `
 .g2-empty{padding:22px}.g2-emh{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
 .g2-emh h2{font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px}.g2-emh p{font-size:13px;line-height:1.55;color:var(--text-muted);max-width:620px;margin:0}
 .g2-ema{display:flex;gap:8px;flex-wrap:wrap}

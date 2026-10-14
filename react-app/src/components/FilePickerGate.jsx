@@ -77,7 +77,7 @@ export default function FilePickerGate() {
     Promise.resolve()
       .then(() => idb.clearAll())
       .catch(() => {})
-      .finally(() => { window.location.replace('/dashboard') })
+      .finally(() => { window.location.replace(`${import.meta.env.BASE_URL}dashboard`) })
   }
 
   async function createNewSheet() {
