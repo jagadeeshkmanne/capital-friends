@@ -254,8 +254,7 @@ export default function FundsDashboardPage() {
         <PhoneSummary label={`Funds (${model.funds.length})`} value={amt(t.currentValue)} rows={[
           { k: 'Total gain', v: hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)} (${pct(t.totalGain != null ? t.totalGainPct : t.plPct)})`, cls: (t.totalGain ?? t.pl) >= 0 ? 'text-emerald-400' : 'text-rose-400' },
           { k: 'Invested', v: amt(t.netInvested ?? t.invested) },
-          { k: 'XIRR', v: ratePct(t.xirr) },
-          { k: 'CAGR', v: ratePct(t.cagr) },
+          { k: 'XIRR / CAGR', v: `${ratePct(t.xirr)} / ${ratePct(t.cagr)}` },
         ]} />
         <div className="cf-stats max-lg:hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <Stat sz={sz} label="Invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
@@ -382,7 +381,7 @@ export default function FundsDashboardPage() {
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-[var(--text-dim)] tabular-nums">
-                    {f.xirr != null && <span>XIRR <b className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</b></span>}
+                    {(f.xirr != null || f.cagr != null) && <span>XIRR <b className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</b> · CAGR <b className={`font-semibold ${plClass(f.cagr)}`}>{ratePct(f.cagr)}</b></span>}
                     <span>{f.weight.toFixed(1)}% of total</span>
                     {f.athNav > 0 && <span className={athTextClass(f.belowATHPct)}>{f.belowATHPct <= 0 ? 'At its high' : `${f.belowATHPct.toFixed(1)}% below high`}</span>}
                   </div>
@@ -600,6 +599,7 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
               <span className="text-[var(--text-dim)]">Inv {amt(r.invested)}</span>
               <span className={plClass(r.gain)}>{hideAmounts ? '' : `${r.gain >= 0 ? '+' : ''}${formatINR(r.gain)} `}{pct(r.gainPct)}</span>
               <span className={plClass(r.xirr)}>XIRR {ratePct(r.xirr)}</span>
+              <span className={plClass(r.cagr)}>CAGR {ratePct(r.cagr)}</span>
               <span className="text-[var(--text-dim)]">{r.weight.toFixed(1)}%</span>
             </div>
           </div>
@@ -637,7 +637,7 @@ function FundDetail({ fund, amt, hideAmounts, onOpen, compact }) {
               </div>
               <div className="text-right shrink-0">
                 <p className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{amt(p.currentValue)}</p>
-                <p className={`text-[11px] font-semibold tabular-nums ${plClass(p.pl)}`}>{pct(p.plPct)} · XIRR {ratePct(p.xirr)}</p>
+                <p className={`text-[11px] font-semibold tabular-nums ${plClass(p.pl)}`}>{pct(p.plPct)} · XIRR {ratePct(p.xirr)} · CAGR {ratePct(p.cagr)}</p>
               </div>
             </div>
           ))}

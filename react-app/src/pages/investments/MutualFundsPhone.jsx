@@ -541,8 +541,7 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <Dash />
           <KV k="Total returns" v={`${signed(h.pl)} (${pctTxt(h.plPct)})`} cls={upCls(h.pl)} />
           <KV k="Invested" v={formatINR(h.investment)} />
-          <KV k="XIRR" v={pos?.xirr == null ? 'N/A' : rate(pos.xirr)} cls={pos?.xirr == null ? 'text-[var(--ion-color-medium)]' : upCls(pos.xirr)} />
-          <KV k="CAGR" v={pos?.cagr == null ? 'N/A' : rate(pos.cagr)} cls={pos?.cagr == null ? 'text-[var(--ion-color-medium)]' : upCls(pos.cagr)} />
+          <KV k="XIRR / CAGR" v={`${pos?.xirr == null ? 'N/A' : rate(pos.xirr)} / ${pos?.cagr == null ? 'N/A' : rate(pos.cagr)}`} cls={pos?.xirr == null && pos?.cagr == null ? 'text-[var(--ion-color-medium)]' : upCls(pos?.xirr ?? pos?.cagr)} />
           {terms.ok && <><Dash /><KV k="Long term" sub="(>1Y)" v={formatINR(terms.lt)} /><KV k="Short term" sub="(<1Y)" v={formatINR(terms.st)} /></>}
         </div>
 

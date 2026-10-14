@@ -211,7 +211,7 @@ function MobileSummary({ stats, returns, navigate }) {
         <div className="text-right"><p className="text-[var(--text-dim)]">Total returns</p><p className={`font-semibold ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{sign(stats.totalPL)}{formatINR(stats.totalPL)} ({sign(stats.totalPLPct)}{stats.totalPLPct.toFixed(1)}%)</p></div>
       </div>
       <div className="mt-3 pt-3 border-t border-[var(--border-light)] flex items-center justify-between text-[13px] tabular-nums">
-        <span className="text-[var(--text-dim)]">XIRR {returns?.xirr == null ? <button onClick={() => navigate('/import')} className="underline text-violet-400">import statement</button> : <b className={returns.xirr >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{pct(returns.xirr)}</b>}</span>
+        <span className="text-[var(--text-dim)]">XIRR {returns?.xirr == null ? <button onClick={() => navigate('/import')} className="underline text-violet-400">import statement</button> : <><b className={returns.xirr >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{pct(returns.xirr)}</b>{returns?.cagr != null && <> · CAGR <b className={returns.cagr >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{pct(returns.cagr)}</b></>}</>}</span>
         <span className="text-[var(--text-dim)]">SIP <b className="text-[var(--text-secondary)]">{formatINR(stats.monthlySIP)}</b>/mo</span>
         <button type="button" onClick={() => setMore((v) => !v)} className="flex items-center gap-0.5 text-violet-400 font-semibold">{more ? 'Less' : 'More'}<ChevronDown size={14} className={more ? 'rotate-180' : ''} /></button>
       </div>
