@@ -321,3 +321,33 @@ describe('SGB and digital gold: optional', () => {
     expect(on.every((i) => i.included && i.eq === 1)).toBe(true)
   })
 })
+
+describe('funds keep their own mix (hybrid funds are sold whole)', () => {
+  const now = new Date('2026-10-12T00:00:00Z')
+  const inYrs = (y) => new Date(now.getTime() + y * 365.25 * 864e5).toISOString()
+  const mixEq = (h) => h.eqPct
+  const P = [{ portfolioId: 'MIX', portfolioName: 'Mixed', status: 'Active' }]
+  const H = [
+    { portfolioId: 'MIX', schemeCode: 'EQ', units: 1, currentValue: 6000000, eqPct: 1 },
+    { portfolioId: 'MIX', schemeCode: 'LIQ', units: 1, currentValue: 1000000, eqPct: 0 },
+    { portfolioId: 'MIX', schemeCode: 'HYB', units: 1, currentValue: 1000000, eqPct: 0.3 },
+  ]
+  const near = { goalId: 'NEAR', goalName: 'Car', goalType: 'Vehicle', targetDate: inYrs(1), targetAmount: 1200000, isActive: true }
+  const far = { goalId: 'FAR', goalName: 'Retire', goalType: 'Retirement', targetDate: inYrs(20), targetAmount: 50000000, isActive: true }
+  it('a near goal in a mostly-equity portfolio gets its debt and conservative hybrid funds first', () => {
+    const items = poolItems({ mfPortfolios: P, mfHoldings: H, eqOf: mixEq })
+    const r = sharePool({ goals: [near, far], items, now })
+    const m = r.byGoal.NEAR
+    expect(m.got).toBeGreaterThan(0)
+    // mostly safe money: far less equity than the portfolio's 78%
+    expect(m.gotEq / m.got).toBeLessThan(0.3)
+    // the link is still one per portfolio
+    expect(r.mappings.filter((x) => x.goalId === 'NEAR').map((x) => x.portfolioId)).toEqual(['MIX'])
+  })
+  it('a hybrid fund counts with its own equity: 30% equity gives 70% safe money', () => {
+    const items = poolItems({ mfPortfolios: P, mfHoldings: [H[2]], eqOf: mixEq })
+    const r = sharePool({ goals: [near], items, now })
+    const m = r.byGoal.NEAR
+    expect(Math.round((m.gotSafe / m.got) * 100)).toBe(70)
+  })
+})
