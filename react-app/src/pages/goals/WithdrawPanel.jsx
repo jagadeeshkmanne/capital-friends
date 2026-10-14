@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Landmark, Wallet, BarChart3 } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useData } from '../../context/DataContext'
+import { alreadyTaken } from '../../utils/goalOutsideSales'
 
 // The withdraw window of a goal whose date has come. Every investment the goal holds is listed with an editable
 // "taking" amount, filled with what the goal holds there. People change it to what they really took (part of the FD,
@@ -27,8 +28,11 @@ export const rowKey = (r) => `${r.kind}:${r.portfolioId || ''}:${r.holding?.fund
 
 /** What to record for the amounts taken: [{ kind, label, amount, ... }] (rows taking 0 are skipped).
  *  taken: { [rowKey]: '1,23,000' } (an array by row index works too) */
-export function withdrawActions(rows, taken, today = localDay()) {
+export function withdrawActions(rows, taken, today = localDay(), already = {}) {
   const out = []
+  // what the statement already shows sold (or a deposit already lowered) is not recorded again
+  const left = { ...already }
+  const use = (k, want) => { const a = Math.min(want, left[k] || 0); left[k] = (left[k] || 0) - a; return want - a }
   const val = (r, i) => (Array.isArray(taken) ? taken[i] : taken[rowKey(r)])
   rows.forEach((r, i) => {
     const amt = Math.min(num(val(r, i)), r.value * 1.0001)
@@ -39,19 +43,24 @@ export function withdrawActions(rows, taken, today = localDay()) {
       if (!(nav > 0)) return
       // all of it: the exact units (never rounded up past what is held); part: rounded DOWN to 4 decimals
       const held = Number(r.holding.units) || 0
-      const units = allOfIt ? (r.all ? held : Math.min(held, r.units)) : Math.floor(Math.min(r.units, amt / nav) * 10000) / 10000
-      if (!(units > 0)) return
+      const units0 = allOfIt ? (r.all ? held : Math.min(held, r.units)) : Math.floor(Math.min(r.units, amt / nav) * 10000) / 10000
+      const rest = use(`${r.portfolioId}::${r.holding.fundCode || r.holding.schemeCode}`, units0)
+      const units = rest === units0 ? units0 : Math.floor(rest * 10000) / 10000 // exact when nothing was sold already
+      if (!(units > 0.0001)) return
       out.push({ kind: 'mf', label: splitFundName(r.name).main, amount: units * nav, redeem: { portfolioId: r.portfolioId, fundCode: r.holding.fundCode || r.holding.schemeCode, units, price: nav, date: today } })
     } else if (r.kind === 'stock') {
       const px = priceOf(r.holding)
       const maxQ = Math.floor(r.units + 1e-9)
-      const qty = allOfIt ? maxQ : Math.min(maxQ, Math.floor(amt / (px || 1) + 1e-9))   // never more than typed
+      const qty0 = allOfIt ? maxQ : Math.min(maxQ, Math.floor(amt / (px || 1) + 1e-9))   // never more than typed
+      const qty = Math.floor(use(`${r.portfolioId}::${r.holding.symbol}`, qty0) + 1e-9)
       if (!(px > 0) || !(qty > 0)) return
       out.push({ kind: 'stock', label: r.name, amount: qty * px, sell: { portfolioId: r.portfolioId, symbol: r.holding.symbol, quantity: qty, price: px, date: today } })
     } else {
       const inv = r.holding
       const cur = Number(inv.currentValue) || 0
-      const left = Math.max(0, Math.round(cur - amt))
+      const amt2 = use(inv.investmentId, amt)
+      if (!(amt2 >= 1)) return
+      const left = Math.max(0, Math.round(cur - amt2))
       const scale = cur > 0 ? left / cur : 0
       const patch = { currentValue: left, status: left < 1 ? (/fixed deposit|\bfd\b|bond|recurring|\brd\b|deposit/i.test(inv.investmentType || '') ? 'Matured' : 'Sold') : inv.status || 'Active' }
       // invested shrinks in the same proportion (else the rest shows a big loss)
@@ -60,7 +69,7 @@ export function withdrawActions(rows, taken, today = localDay()) {
       const dyn = parseDyn(inv.dynamicFields)
       if (Number(dyn.weightGrams) > 0) patch.dynamicFields = { ...dyn, weightGrams: Math.round(Number(dyn.weightGrams) * scale * 1000) / 1000 }
       else if (inv.dynamicFields) patch.dynamicFields = dyn
-      out.push({ kind: 'other', label: r.name, amount: amt, update: { inv, currentValue: left, status: patch.status, patch } })
+      out.push({ kind: 'other', label: r.name, amount: amt2, update: { inv, currentValue: left, status: patch.status, patch } })
     }
   })
   return out
@@ -105,7 +114,9 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
   }, [rows, n, s.has, g.targetAmount])
   // a completed goal is withdrawn in full: everything it holds (a goal paid over years: this year's part). No editing.
   const taken = fill
-  const [record, setRecord] = useState(true)
+  // Done always records the sales (no tick box), minus anything the statement already shows taken out
+  let cashOuts = []; try { cashOuts = JSON.parse(data.settings?.GoalCashOut || '[]') || [] } catch { cashOuts = [] }
+  const already = useMemo(() => alreadyTaken({ goal: g, mfTransactions: data.mfTransactions, stockTransactions: data.stockTransactions, cashOuts }), [g, data.mfTransactions, data.stockTransactions, data.settings?.GoalCashOut]) // eslint-disable-line react-hooks/exhaustive-deps
   const total = rows.reduce((t, r) => t + Math.min(num(taken[rowKey(r)]), r.value), 0)
   const leftover = Math.max(0, s.has - total)
   // one step per platform / account (where you sell), deposits first, then funds, then shares
@@ -119,7 +130,7 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
   const steps = groups.flatMap((x) => x.items)
   const nDone = steps.filter(({ r }) => done[rowKey(r)]).length
   const gain = steps.reduce((t, { r }) => t + gainOf(r, Math.min(num(taken[rowKey(r)]), r.value)), 0)
-  const finish = (how) => onDone(how, { amount: Math.round(total), actions: record ? withdrawActions(rows, taken) : [] })
+  const finish = (how) => { const actions = withdrawActions(rows, taken, undefined, already); onDone(how, { amount: Math.round(total), actions, fromStatement: !actions.length && Object.keys(already).length > 0 }) }
 
   return (
     <div className="g2 wdp">
@@ -151,9 +162,7 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
 
       {gain > 1000 && <p className="wdp-help">Gain on what you sell: about <b>{L(gain)}</b>. Tax may apply (equity funds and shares held over a year: 12.5% above ₹1.25 L of gains a year per person; within a year: 20%; debt funds: your slab), and some funds charge an exit load within a year. So the money you receive can be a little less.</p>}
 
-      <label className="wdp-rec"><input type="checkbox" checked={record} onChange={(e) => setRecord(e.target.checked)} />
-        <span><b>Record these in the app</b><small>Lowers the FD / savings value, redeems the fund units at today's NAV and sells the shares at today's price. The real price is usually the next day's: when the money arrives, import your CAS statement and the app replaces these with the exact amounts.</small></span>
-      </label>
+      <div className="wdp-rec"><span><b>When you mark it done</b><small>The app takes these out of your holdings (fund units at today's NAV, shares at today's price, the FD / savings value), so your net worth drops. Anything your statement already shows as sold is not taken out twice. Your next CAS import puts in the exact amounts, and if you did not sell after all, those units simply come back as free money.</small></span></div>
       {steps.length > 0 && <p className="wdp-help">{nDone === steps.length ? 'All steps done.' : `${nDone} of ${steps.length} done. You can still press Done if you did them already.`}</p>}
 
       <div className="wdp-acts">

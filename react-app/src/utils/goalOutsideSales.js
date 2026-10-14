@@ -33,3 +33,21 @@ export function outsideSales({ goal, portfolioIds, mfTransactions, cashOuts = []
   }
   return { total: items.reduce((s, x) => s + x.amount, 0), items }
 }
+
+/**
+ * What the statement already shows as taken out since the goal date (30 days before, like outsideSales), so pressing
+ * Done never records the same sale twice: { 'PF::FUNDCODE': units, 'PF::SYMBOL': quantity, 'INV-ID': ₹ (cash lowered) }.
+ * The app's own "For goal:" records are not counted (they are what Done writes).
+ */
+export function alreadyTaken({ goal, mfTransactions = [], stockTransactions = [], cashOuts = [], daysBefore = 30 }) {
+  const due = parseDate(goal?.targetDate)
+  const out = {}
+  if (!due) return out
+  const from = new Date(due.getTime() - daysBefore * DAY)
+  const add = (k, v) => { if (v > 0) out[k] = (out[k] || 0) + v }
+  const fresh = (t) => { const d = parseDate(t.date); return d && d >= from && !/^For goal:/.test(String(t.notes || '')) && t.type === 'SELL' }
+  for (const t of mfTransactions || []) if (fresh(t) && !/switch/i.test(t.transactionType || '')) add(`${t.portfolioId}::${t.fundCode}`, Number(t.units) || 0)
+  for (const t of stockTransactions || []) if (fresh(t)) add(`${t.portfolioId}::${t.symbol}`, Number(t.quantity) || 0)
+  for (const c of cashOuts || []) { const d = parseDate(c.date); if (d && d >= from) add(c.investmentId, Number(c.amount) || 0) }
+  return out
+}

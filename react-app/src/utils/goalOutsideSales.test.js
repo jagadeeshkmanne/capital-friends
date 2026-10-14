@@ -31,3 +31,23 @@ describe('outsideSales: cash / FD lowered by hand', () => {
     expect(r.items[0].cash).toBe(true)
   })
 })
+
+import { alreadyTaken } from './goalOutsideSales'
+import { withdrawActions } from '../pages/goals/WithdrawPanel'
+it('Done does not record again what the statement already shows sold', () => {
+  const goal = { targetDate: '2026-10-01' }
+  const tx = [
+    { portfolioId: 'PF', fundCode: 'LIQ', type: 'SELL', transactionType: 'WITHDRAWAL', date: '05/10/2026', units: 60 },
+    { portfolioId: 'PF', fundCode: 'LIQ', type: 'SELL', transactionType: 'SWITCH_OUT', date: '05/10/2026', units: 999 },
+    { portfolioId: 'PF', fundCode: 'LIQ', type: 'SELL', transactionType: 'WITHDRAWAL', date: '06/10/2026', units: 5, notes: 'For goal: Car' },
+  ]
+  const already = alreadyTaken({ goal, mfTransactions: tx, cashOuts: [{ investmentId: 'FD1', amount: 30000, date: '2026-10-03' }] })
+  expect(already['PF::LIQ']).toBe(60)
+  const rows = [
+    { kind: 'mf', name: 'Liquid', portfolioId: 'PF', value: 10000, units: 100, all: true, holding: { fundCode: 'LIQ', units: 100, currentNav: 100, currentValue: 10000 } },
+    { kind: 'other', name: 'FD', value: 50000, holding: { investmentId: 'FD1', currentValue: 50000, investmentType: 'Fixed Deposit' } },
+  ]
+  const acts = withdrawActions(rows, { 'mf:PF:LIQ': '10,000', 'other::FD1': '50,000' }, '2026-10-14', already)
+  expect(acts.find((a) => a.kind === 'mf').redeem.units).toBe(40)
+  expect(acts.find((a) => a.kind === 'other').amount).toBe(20000)
+})
