@@ -13,6 +13,7 @@ import { readIncomePlan, readIncomeLog, readRefillLog, incomeStatus, defaultInco
 import { useData } from '../../context/DataContext'
 import * as api from '../../services/api'
 import { classifyRetirementHolding } from '../../utils/retirementBuckets'
+import { outsideSales } from '../../utils/goalOutsideSales'
 
 const L = (v) => formatINR(Math.round(v || 0))
 const U = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -476,12 +477,21 @@ function ShortStep({ s, n, pname }) {
 function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   const [open, setOpen] = useState(false)
   const g = s.goal, n = Math.max(1, Number(g.payYears) || 1)
+  const { mfTransactions } = useData()
+  // already redeemed on the platform (a CAS import brought it in) without pressing Done here?
+  const sold = outsideSales({ goal: g, portfolioIds: [...new Set((s.rows || []).filter((r) => r.kind === 'mf').map((r) => r.portfolioId))], mfTransactions })
   const part = n > 1 ? Math.min(s.has, Math.round((Number(g.targetAmount) || 0) / n)) : s.has
   const ago = monthsPast(g)
   return (
     <div className="g2-rdy">
       <div><b>{n > 1 ? `This year's payment · ${L(part)}` : `Date reached${ago >= 1 ? ` ${agoText(ago)}` : ''} · ${L(s.has)} ready to use`}</b><span>{n > 1 ? `Paid over ${n} years: pay this part, the rest stays invested for the next ${n - 1}.` : ago >= 2 ? 'Already used it? Mark the goal so this money counts for your other goals again.' : 'Withdraw it when you need it, then mark the goal.'}</span></div>
       <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw ›</button>
+      {sold.total >= 1000 && (
+        <div className="g2-sold">
+          <span>We see <b>{L(sold.total)}</b> redeemed from this goal's funds since {new Date(new Date(g.targetDate).getTime() - 30 * 864e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({sold.items.length} redemption{sold.items.length > 1 ? 's' : ''}, from your statement). Was it for this goal?</span>
+          <button onClick={() => closeGoal(g, n > 1 ? 'part' : 'used', { amount: Math.round(sold.total), actions: [], fromStatement: true })} className="px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white">Yes, it was · {n > 1 ? "mark this year's part paid" : 'close the goal'}</button>
+        </div>
+      )}
       {open && createPortal(<Modal open={open} onClose={() => setOpen(false)} title={`Withdraw · ${mt(g.goalName)}`} wide maxHeight="max-h-[92vh]">
         <WithdrawPanel s={s} mt={mt} pname={pname}
           onDone={(how, opts) => { setOpen(false); closeGoal(g, how, opts) }}
@@ -682,6 +692,7 @@ const CSS = `
 @keyframes g2p{0%{box-shadow:0 0 0 0 color-mix(in srgb,#a78bfa 55%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
 @media(prefers-reduced-motion:reduce){.g2-pulse{animation:none}}
 .g2-wdl{margin-top:8px;border-top:1px solid var(--border)}
+.g2-sold{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px dashed var(--border-light);font-size:12.5px;color:var(--text-secondary)}
 .g2-rdy{margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid color-mix(in srgb,var(--due) 35%,var(--border));border-radius:12px;padding:12px 14px;background:color-mix(in srgb,var(--due) 6%,var(--bg-inset))}
 .g2-rdy>div>b{display:block;font-size:14px;color:var(--due)}.g2-rdy>div>span{display:block;font-size:12px;color:var(--text-muted);margin-top:3px}
 .g2-wdmh{font-size:13.5px;color:var(--text-secondary);margin:0 0 6px}.g2-wdmh b{color:var(--text-primary)}.g2-wdf{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
