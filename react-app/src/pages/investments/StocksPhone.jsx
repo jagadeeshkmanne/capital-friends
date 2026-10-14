@@ -50,10 +50,10 @@ function SummaryCard({ count, s }) {
   )
 }
 
-const MODES = [['returns', 'Returns (%)'], ['current', 'Current (Invested)'], ['price', 'Price (Avg)']]
+const MODES = [['current', 'Current (Invested)'], ['returns', 'Returns (%)'], ['price', 'Price (Avg)']]
 function Rows({ holdings, sub, onOpen }) {
-  const [mode, setMode] = useState(() => { try { return localStorage.getItem('cf-stk-col') || 'returns' } catch { return 'returns' } })
-  const next = () => { const i = MODES.findIndex(([m]) => m === mode); const m = MODES[(i + 1) % MODES.length][0]; setMode(m); try { localStorage.setItem('cf-stk-col', m) } catch { /* ignore */ } }
+  const [mode, setMode] = useState(() => { try { return localStorage.getItem('cf-stk-col2') || 'current' } catch { return 'current' } })
+  const next = () => { const i = MODES.findIndex(([m]) => m === mode); const m = MODES[(i + 1) % MODES.length][0]; setMode(m); try { localStorage.setItem('cf-stk-col2', m) } catch { /* ignore */ } }
   const list = [...holdings].sort((a, b) => (b.currentValue || 0) - (a.currentValue || 0))
   if (!list.length) return <p className="py-10 text-center text-[14px] text-[var(--ion-color-medium)]">No shares yet. Press + to buy or import.</p>
   return (

@@ -114,11 +114,19 @@ function SplitSheet({ open, onClose, breakdown }) {
 
 /** Holdings list, Groww style: flat rows, fund name on the left, current value or returns on the right (tap the
  *  header to switch). Tapping a fund opens the quick-action sheet. */
-const MODES = [['returns', 'Returns (%)'], ['current', 'Current (Invested)'], ['xirr', 'XIRR (Current)']]
+const MODES = [['current', 'Current (Invested)'], ['returns', 'Returns (%)'], ['xirr', 'XIRR (CAGR)']]
+// 'On target' when within 2 points of the target, otherwise the share now vs the target, in amber
+function targetSub(h) {
+  const t = h.targetAllocationPct || 0
+  if (!(t > 0)) return null
+  const now = h.currentAllocationPct || 0
+  if (Math.abs(now - t) <= 2) return <span className="text-[var(--ion-color-medium)]">✓ On target · {t.toFixed(0)}%</span>
+  return <span className="text-amber-400">{now.toFixed(0)}% now · target {t.toFixed(0)}%</span>
+}
 function Holdings({ funds, sub, onOpen }) {
   // like Groww: tap the column title (or any number on the right) to switch what the right side shows
-  const [mode, setMode] = useState(() => { try { return localStorage.getItem('cf-mf-col') || 'returns' } catch { return 'returns' } })
-  const next = () => { const i = MODES.findIndex(([m]) => m === mode); const m = MODES[(i + 1) % MODES.length][0]; setMode(m); try { localStorage.setItem('cf-mf-col', m) } catch { /* ignore */ } }
+  const [mode, setMode] = useState(() => { try { return localStorage.getItem('cf-mf-col2') || 'current' } catch { return 'current' } })
+  const next = () => { const i = MODES.findIndex(([m]) => m === mode); const m = MODES[(i + 1) % MODES.length][0]; setMode(m); try { localStorage.setItem('cf-mf-col2', m) } catch { /* ignore */ } }
   const ret = usePositionReturns(funds)
   return (
     <>
@@ -138,7 +146,7 @@ function Holdings({ funds, sub, onOpen }) {
                 <h3 className="!text-[15px] !font-medium !whitespace-normal !leading-snug">{n.main}</h3>
                 <p className="!flex !flex-wrap !items-center !gap-x-1.5 !gap-y-1 !mt-1">
                   {sub && <span>{sub(h)}</span>}
-                  {below >= 5 && <span className="px-1.5 rounded bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold">↓{below.toFixed(0)}% from high</span>}
+                  {below >= 5 && <span className="px-1.5 rounded bg-slate-500/15 text-[var(--ion-color-medium)] text-[11px] font-semibold">{below.toFixed(0)}% below high</span>}
                   {h.ongoingSIP > 0 && <span className="px-1.5 rounded bg-sky-500/15 text-sky-400 text-[11px] font-semibold">SIP</span>}
                 </p>
               </IonLabel>
@@ -147,7 +155,7 @@ function Holdings({ funds, sub, onOpen }) {
                   ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{signed(h.pl)}</div><div className={`mt-0.5 text-[12.5px] font-semibold ${upCls(h.pl)}`}>({pctTxt(h.plPct)})</div></>
                   : mode === 'current'
                     ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(h.currentValue)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({formatINR(h.investment)})</div></>
-                    : (() => { const r = ret[posKey(h)]; return <><div className={`text-[15px] font-semibold ${r?.xirr == null ? 'text-[var(--ion-color-medium)]' : upCls(r.xirr)}`}>{r?.xirr == null ? 'N/A' : rate(r.xirr)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({formatINR(h.currentValue)})</div></> })()}
+                    : (() => { const r = ret[posKey(h)]; return <><div className={`text-[15px] font-semibold ${r?.xirr == null ? 'text-[var(--ion-color-medium)]' : upCls(r.xirr)}`}>{r?.xirr == null ? 'N/A' : rate(r.xirr)}</div><div className={`mt-0.5 text-[12.5px] font-semibold ${r?.cagr == null ? 'text-[var(--ion-color-medium)]' : upCls(r.cagr)}`}>({r?.cagr == null ? (r?.xirr == null ? formatINR(h.currentValue) : 'N/A') : rate(r.cagr)})</div></> })()}
               </div>
             </IonItem>
           )
@@ -309,7 +317,7 @@ function HoldingsCard({ count, stats, returns, onChart }) {
       <Dash />
       <KV k="Total returns" v={`${signed(stats.totalPL)} (${pctTxt(stats.totalPLPct)})`} cls={upCls(stats.totalPL)} />
       <KV k="Invested" v={formatINR(stats.invested)} />
-      <KV k="XIRR" v={returns?.xirr == null ? <button type="button" onClick={() => navigate('/import')} className="text-[14px] font-semibold text-violet-400">Import CAS for XIRR ›</button> : `${(returns.xirr * 100).toFixed(2)}%`} />
+      <KV k="XIRR / CAGR" v={returns?.xirr == null && returns?.cagr == null ? <button type="button" onClick={() => navigate('/import')} className="text-[14px] font-semibold text-violet-400">Import CAS for XIRR ›</button> : `${returns?.xirr == null ? 'N/A' : `${(returns.xirr * 100).toFixed(2)}%`} / ${returns?.cagr == null ? 'N/A' : `${(returns.cagr * 100).toFixed(2)}%`}`} />
       <KV k="Monthly SIP" v={formatINR(stats.monthlySIP)} />
     </div>
   )
@@ -429,7 +437,7 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
           {tab === 'holdings' && (<>
             <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ p: p.portfolioId, v: 'growth' })} />
             {funds.length
-              ? <Holdings funds={funds} sub={(h) => (h.targetAllocationPct > 0 ? `${h.currentAllocationPct.toFixed(0)}% of ${h.targetAllocationPct.toFixed(0)}% target` : null)} onOpen={(h) => open({ p: h.portfolioId, f: h._key })} />
+              ? <Holdings funds={funds} sub={targetSub} onOpen={(h) => open({ p: h.portfolioId, f: h._key })} />
               : <p className="py-10 text-center text-[14px] text-[var(--ion-color-medium)]">No funds yet</p>}
           </>)}
           {tab === 'activity' && <Activity txns={allFilteredTxns} onTxn={setTxn} />}
@@ -546,7 +554,7 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           {h.athNav > 0 && <KV k="All-time high NAV" v={`₹${Number(h.athNav).toFixed(2)}${below > 0 ? ` (↓${below.toFixed(1)}%)` : ''}`} cls={below >= 5 ? 'text-emerald-400' : ''} />}
           <Dash />
           <KV k="Monthly SIP" v={h.ongoingSIP > 0 ? formatINR(h.ongoingSIP) : '—'} />
-          {h.targetAllocationPct > 0 && <KV k="Share of portfolio" v={`${h.currentAllocationPct.toFixed(1)}% of ${h.targetAllocationPct.toFixed(0)}%`} />}
+          {h.targetAllocationPct > 0 && <KV k="Share of portfolio" v={`${h.currentAllocationPct.toFixed(1)}% (target ${h.targetAllocationPct.toFixed(0)}%)`} />}
           {(h.lumpsumRestricted || h.sipRestricted) && <KV k="New money stopped" v={[h.lumpsumRestricted && 'Lump sum', h.sipRestricted && 'SIP'].filter(Boolean).join(', ')} cls="text-amber-400" />}
           <div className="mt-3 grid grid-cols-3 border-t border-[var(--ion-border-color)] pt-3">
             {[[Repeat2, 'Switch', () => setModal({ switchFunds: h.portfolioId })], [Lock, 'Stop / allow', (e) => setMenu(e.nativeEvent)], [ArrowUpRight, 'Redeem', () => setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } })]].map(([I, l, fn]) => (
