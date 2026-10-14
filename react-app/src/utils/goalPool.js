@@ -5,8 +5,8 @@
  *      mutual fund portfolios, stock portfolios, FDs / bonds / cash  -> in the pool (each can be switched off)
  *      EPF, PPF, NPS, VPF, Sukanya                                   -> retirement only, never moved
  *      gold, silver, crypto, other                                   -> left out (can be switched on)
- *      real estate (your home, land)                                 -> never for goals, until you mark it "Selling"
- *                                                                       (then its value counts as safe money)
+ *      real estate (your home, land)                                 -> never for goals (once sold, the money is added
+ *                                                                       as cash / FD in Other Investments and counts then)
  * 2. sharePool(): shares the pool across goals, no input needed —
  *      A. safe money first to the nearest goals (Emergency Fund first), up to the safe part each needs
  *         (retirement takes its EPF / PPF / NPS here, counted in full)
@@ -39,12 +39,12 @@ export function otherKind(inv) {
 }
 
 /**
- * @param choice { off: [ids], on: [ids], sell: [ids] } the person's switches (off = left out, on = put in although left out
- *   by default, sell = real estate being sold: only then its value counts. A property ticked 'on' before this rule counts as selling.)
+ * @param choice { off: [ids], on: [ids] } the person's switches (off = left out, on = put in although left out by default;
+ *   real estate is never put in)
  * @returns [{ id, type: 'MF'|'Stock'|'Other', name, owner, value, eq (0..1), kind: 'pool'|'retirement'|'out', included, locked }]
  */
 export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, eqOf, choice = {}, kidNames = [] }) {
-  const off = new Set(choice.off || []), on = new Set(choice.on || []), sell = new Set([...(choice.sell || []), ...(choice.on || [])])
+  const off = new Set(choice.off || []), on = new Set(choice.on || [])
   // a son's / daughter's own money is theirs: left out by default (switch it on to use it for a goal)
   const kids = new Set((kidNames || []).map(norm))
   const items = []
@@ -68,7 +68,7 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
   return items.map((it) => {
     const kid = it.kind === 'pool' && !!it.owner && kids.has(norm(it.owner))
     const kind = kid ? 'out' : it.kind
-    if (kind === 'property') return { ...it, kind, kid, eq: 0, selling: sell.has(it.id), included: sell.has(it.id) }
+    if (kind === 'property') return { ...it, kind, kid, eq: 0, included: false }   // a home is never sold for a goal
     if (kind === 'retirement') return { ...it, kind, kid, included: true }   // EPF / PPF / NPS always count, for retirement only
     return { ...it, kind, kid, included: kind === 'out' ? on.has(it.id) : !off.has(it.id) }
   })

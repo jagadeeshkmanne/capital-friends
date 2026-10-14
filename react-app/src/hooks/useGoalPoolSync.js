@@ -9,7 +9,7 @@ import { withGoalExtras } from '../utils/goalExtras'
 
 /** The person's "Money for goals" switches, kept in the Settings tab as JSON { off: [ids], on: [ids] }. */
 export function readPoolChoice(settings) {
-  try { const c = JSON.parse(settings?.GoalsPool || '{}'); return { off: Array.isArray(c.off) ? c.off : [], on: Array.isArray(c.on) ? c.on : [], sell: Array.isArray(c.sell) ? c.sell : [] } } catch { return { off: [], on: [], sell: [] } }
+  try { const c = JSON.parse(settings?.GoalsPool || '{}'); return { off: Array.isArray(c.off) ? c.off : [], on: Array.isArray(c.on) ? c.on : [] } } catch { return { off: [], on: [] } }
 }
 
 /** Pool + its share per goal, computed live from today's data (used by the goals page and the sync below). */

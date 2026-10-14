@@ -285,25 +285,22 @@ describe('corner cases (ages, timelines, shortages)', () => {
   })
 })
 
-describe('real estate: not for goals unless it is being sold', () => {
+describe('real estate: never used for goals', () => {
   const home = { investmentId: 'HOME', investmentType: 'Real Estate', investmentCategory: 'Property', currentValue: 16000000, status: 'Active', familyMemberName: 'Jagadeesh' }
   const fd = { investmentId: 'FD1', investmentType: 'Fixed Deposit', investmentCategory: 'Debt', currentValue: 1200000, status: 'Active', familyMemberName: 'Jagadeesh' }
   const items = (choice) => poolItems({ otherInvList: [home, fd], eqOf, choice })
-  it('is its own kind and left out by default', () => {
+  it('is its own kind and never included, even if it was ticked before', () => {
     expect(otherKind(home)).toBe('property')
-    const h = items({}).find((i) => i.id === 'HOME')
-    expect(h.included).toBe(false)
-    expect(h.selling).toBe(false)
+    expect(items({}).find((i) => i.id === 'HOME').included).toBe(false)
+    expect(items({ on: ['HOME'] }).find((i) => i.id === 'HOME').included).toBe(false)
   })
-  it('counts as safe money only when marked selling', () => {
-    const h = items({ sell: ['HOME'] }).find((i) => i.id === 'HOME')
-    expect(h.included).toBe(true)
-    expect(h.eq).toBe(0)
-  })
-  it('a home ticked on before this rule keeps counting (treated as selling)', () => {
-    expect(items({ on: ['HOME'] }).find((i) => i.id === 'HOME').included).toBe(true)
-  })
-  it('FD, mutual funds, stocks and cash are unchanged', () => {
+  it('FD / cash still count (the sale money is added there)', () => {
     expect(items({}).find((i) => i.id === 'FD1').included).toBe(true)
+  })
+  it('EPF always counts, for retirement only', () => {
+    const epf = { investmentId: 'EPF1', investmentType: 'EPF', investmentCategory: 'Debt', currentValue: 3000000, status: 'Active' }
+    const it2 = poolItems({ otherInvList: [epf], eqOf, choice: { off: ['EPF1'] } })[0]
+    expect(it2.kind).toBe('retirement')
+    expect(it2.included).toBe(true)
   })
 })
