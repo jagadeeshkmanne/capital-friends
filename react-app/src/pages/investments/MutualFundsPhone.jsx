@@ -31,6 +31,7 @@ const rate = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toFixe
 import { folioOf, maskFolio } from '../../utils/folio'
 import JourneyChartLW from '../../components/JourneyChart'
 import { Screen, FadeIn, setPhoneBar } from '../../components/native'
+import { Lead, FundLead, PortfolioLead } from '../../phone/LeadIcon'
 
 const pctTxt = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v || 0).toFixed(2)}%`
 const upCls = (v) => (v >= 0 ? 'text-emerald-400' : 'text-rose-400')
@@ -142,6 +143,7 @@ function Holdings({ funds, sub, onOpen }) {
           const below = Math.round((h.belowATHPct || 0) * 10) / 10
           return (
             <IonItem key={h._key} button detail={false} onClick={() => onOpen(h)}>
+              <FundLead h={h} />
               <IonLabel className="!my-3.5">
                 <h3 className="!text-[15px] !font-medium !whitespace-normal !leading-snug">{n.main}</h3>
                 <p className="!flex !flex-wrap !items-center !gap-x-1.5 !gap-y-1 !mt-1">
@@ -176,6 +178,7 @@ function FundSheet({ h, onClose, onDetails, setModal }) {
         <div className="cf-auto-body">
           <IonList lines="full" className="cf-flat">
             <IonItem button detail onClick={() => act(onDetails)}>
+              <FundLead h={h} />
               <IonLabel className="!my-4"><h2 className="!text-[16px] !font-semibold !whitespace-normal">{n.main}</h2>{n.plan && <p>{n.plan}</p>}</IonLabel>
               <div slot="end" className="text-[17px] font-bold tabular-nums text-[var(--ion-text-color)]">{formatINR(h.currentValue)}</div>
             </IonItem>
@@ -381,14 +384,15 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
               const n = p.holdings.filter((h) => h.units > 0).length
               return (
                 <IonItem key={p.portfolioId} button detail onClick={() => open({ p: p.portfolioId })}>
+                  <PortfolioLead />
                   <IonLabel className="!my-3.5">
-                    <h3 className="!text-[16px] !font-semibold">{dn(p.portfolioName)}</h3>
-                    <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}</p>
-                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1.5 flex flex-wrap gap-1.5">{ind.buyOpp > 0 && <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11.5px] font-semibold bg-emerald-500/15 text-emerald-400">{ind.buyOpp} below high</span>}{ind.rebalance > 0 && <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11.5px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
+                    <h3 className="!text-[16px] !font-semibold !whitespace-normal !leading-snug">{dn(p.portfolioName)}</h3>
+                    <p className="!whitespace-normal">{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}</p>
+                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1.5 !flex !flex-wrap gap-1.5">{ind.buyOpp > 0 && <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11.5px] font-semibold bg-slate-500/15 text-[var(--ion-color-medium)]">{ind.buyOpp} below high</span>}{ind.rebalance > 0 && <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11.5px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
                   </IonLabel>
                   <div slot="end" className="text-right tabular-nums">
                     <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(p.currentValue)}</div>
-                    <div className={`text-[12px] font-semibold ${upCls(pl)}`}>{signed(pl)} ({pctTxt(p.totalInvestment > 0 ? (pl / p.totalInvestment) * 100 : 0)})</div>
+                    <div className={`text-[12px] font-semibold ${upCls(pl)}`}>{pctTxt(p.totalInvestment > 0 ? (pl / p.totalInvestment) * 100 : 0)}</div>
                   </div>
                 </IonItem>
               )
@@ -583,6 +587,7 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
             const sell = String(t.type).toUpperCase() === 'SELL'
             return (
               <IonItem key={t.transactionId || i} button detail={false} onClick={() => setTxn(t)}>
+                <Lead I={sell ? ArrowUpRight : ArrowDownLeft} c={sell ? '#fb7185' : '#34d399'} />
                 <IonLabel className="!my-3"><h3 className="!text-[15px] !font-semibold">{sell ? label(t) : label(t) === 'Lump sum' ? 'Invested' : label(t)}</h3><p>{d ? shortDate(d) : t.date}</p></IonLabel>
                 <div slot="end" className="text-right tabular-nums">
                   <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{sell ? '−' : '+'}{formatINR(t.totalAmount)}</div>

@@ -1,5 +1,5 @@
 import { goalStatus, goalIcon } from '../../utils/goalStatus'
-import { Wallet, Pencil, Plus } from 'lucide-react'
+import { Wallet, Pencil, Plus, TrendingUp, ShieldCheck } from 'lucide-react'
 // Main Goals page (/goals, goal detail at /goals/plan/:goalId; the classic page is /goals/classic): one road for all goals, this month's steps from today's fund
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
 // All numbers come from utils/goalPlan.js (tested in goalPlan.test.js).
@@ -212,9 +212,8 @@ export default function GoalsPlanPage() {
     <div className="gp space-y-4">
       <style>{GP_CSS}</style>
       {modals}
-      {sel && <div className="gp-bar"><div><h1><a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a></h1></div></div>}
+      {sel && <div className="gp-bar"><div><h1><a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a></h1></div><div className="flex gap-2"><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm({ edit: sel.goal })}><Pencil size={14} /> Edit goal</button></div></div>}
       {sel ? <GoalDetail p={sel} ctx={ctx} todo={todo} /> : <GoalsHome actions={<><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('list')}><Pencil size={14} /> Edit goals</button>
           <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('add')}><Plus size={14} /> Add Goal</button></>} plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
       {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
     </div>
@@ -531,6 +530,12 @@ function GoalDetail({ p, ctx, todo }) {
         <Grid six four cells={goalCells(p, gp)} />
         <MixRow p={p} />
         <NeedRow p={p} />
+        {(() => { const nx = planRows(p).find((r) => r.kind !== 'today'); return (
+          <button type="button" className="gp-next" onClick={() => document.getElementById('gp-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="gp-next-i">☰</span>
+            <span className="gp-next-t">{nx ? <><i>Next · </i>{nx.y ? `${nx.y}: ` : ''}{nx.title}</> : 'How the money moves to safe funds by the goal year'}</span>
+            <span className="gp-next-b">View plan ↓</span>
+          </button>) })()}
       </div>
 
       <div className="gp-panel">
@@ -538,28 +543,29 @@ function GoalDetail({ p, ctx, todo }) {
         <GoalActionCards p={p} todo={todo} ctx={ctx} onMoreTime={(g0) => navigate(`/goals/classic?edit=${encodeURIComponent(g0.goalId)}`)} />
       </div>
 
-      <PlanByYear p={p} />
-
-      {p.isRet && ((p.years <= 0 || p.bucketMode)
-        ? <div className="gp-panel g2"><style>{GOALS_HOME_CSS}</style><Buckets p={p} items={(p.att?.items || []).filter((it) => it.value > 0.5).sort((a, b) => b.value - a.value)} retired={p.years <= 0} mt={mt} pname={pname} /></div>
-        : <BucketsPanel p={p} />)}
-
       <div className="gp-panel">
-        <div className="gp-ph"><h2>Funds in this goal</h2><span className="gp-hs">{p.att.items.length} holdings · {L(p.att.total)}{fundsEq !== null && ` · ${fundsEq}% equity, ${100 - fundsEq}% safe`}</span></div>
+        <div className="gp-ph"><h2>Investments in this goal · {p.att.items.length}</h2><span className="gp-hs">{L(p.att.total)} counted for this goal</span></div>
+        {fundsEq !== null && <div className="gp-gs"><div className="gp-gs-bar"><i style={{ width: `${fundsEq}%` }} /></div><div className="gp-gs-l"><span><b className="g">●</b> Growth {L(p.att.equity)} · {fundsEq}%</span><span><b className="s">●</b> Safe {L(p.att.total - p.att.equity)} · {100 - fundsEq}%</span></div></div>}
         {p.att.items.length ? <div className="gp-grp">
           {p.att.items.slice().sort((a, b) => b.value - a.value).map((it) => {
             const h = it.holding, d = after[it.key] || 0
             const units = it.kind === 'mf' ? (Number(h.units) || 0) * (it.fraction || 1) : null
             return (
               <div className="gp-fr" key={it.key}>
-                <span className="gp-fd" style={{ background: it.eq >= 0.5 ? 'var(--accent-violet)' : 'var(--accent-blue)' }} />
+                <span className={`gp-fi ${it.eq >= 0.5 ? 'g' : 's'}`}>{it.eq >= 0.5 ? <TrendingUp size={16} /> : <ShieldCheck size={16} />}</span>
                 <div className="gp-fn"><b>{it.kind === 'mf' ? fname(h) : (h.companyName || h.symbol || h.investmentName)}</b><small>{Math.round(it.eq * 100)}% equity{units != null && ` · ${U(units)} units`}{h.currentNav ? ` · NAV ₹${Number(h.currentNav).toFixed(2)}` : ''}{pname(it.portfolioId) && ` · ${pname(it.portfolioId)}`}</small></div>
-                <div className="gp-fv"><b>{L(it.value)}</b>{Math.abs(d) >= 1000 ? <small style={{ color: d < 0 ? 'var(--accent-rose)' : '#22c55e' }}>{d < 0 ? '−' : '+'}{L(Math.abs(d))} → {L(it.value + d)}</small> : st.length ? <small>no change</small> : null}</div>
+                <div className="gp-fv"><b>{L(it.value)}</b>{it.fraction != null && it.fraction < 0.999 && it.fraction > 0 ? <small className="gp-fp">{Math.round(it.fraction * 100)}% of {L(it.value / it.fraction)}</small> : <small>all of it</small>}{Math.abs(d) >= 1000 ? <small style={{ color: d < 0 ? 'var(--accent-rose)' : '#22c55e' }}>{d < 0 ? '−' : '+'}{L(Math.abs(d))} → {L(it.value + d)}</small> : st.length ? <small>no change</small> : null}</div>
               </div>
             )
           })}
         </div> : <div className="gp-ok">No investments linked yet. Link them in <a className="gp-link" onClick={() => navigate('/goals/classic')}>Edit &amp; link goals</a>.</div>}
       </div>
+
+      <div id="gp-plan"><PlanByYear p={p} /></div>
+
+      {p.isRet && ((p.years <= 0 || p.bucketMode)
+        ? <div className="gp-panel g2"><style>{GOALS_HOME_CSS}</style><Buckets p={p} items={(p.att?.items || []).filter((it) => it.value > 0.5).sort((a, b) => b.value - a.value)} retired={p.years <= 0} mt={mt} pname={pname} /></div>
+        : <BucketsPanel p={p} />)}
 
     </>
   )
@@ -785,8 +791,14 @@ export const GP_CSS = `
 .gp-chip{font-size:10.5px;font-weight:800;letter-spacing:.8px;color:var(--accent-violet);border:1px solid color-mix(in srgb,var(--accent-violet) 35%,transparent);border-radius:6px;padding:3px 8px}
 .gp-act{margin-top:10px;font-size:13px;color:var(--text-secondary);padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card)}
 .gp-why{font-size:12px;color:var(--text-muted);margin:8px 0 0}
-.gp-fr{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:11px 14px}.gp-fr+.gp-fr{border-top:1px solid var(--border)}
+.gp-fr{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:11px 14px}.gp-fr+.gp-fr{border-top:1px solid var(--border)}
 .gp-fd{width:8px;height:8px;border-radius:50%}
+.gp-fi{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center}.gp-fi.g{background:rgba(52,211,153,.14);color:#34d399}.gp-fi.s{background:rgba(56,189,248,.14);color:#38bdf8}
+.gp-fv small.gp-fp{color:#c4b5fd}
+.gp-gs{margin-top:10px}.gp-gs-bar{height:6px;border-radius:6px;background:rgba(56,189,248,.7);overflow:hidden}.gp-gs-bar i{display:block;height:100%;background:#34d399}
+.gp-gs-l{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-muted)}.gp-gs-l b.g{color:#34d399}.gp-gs-l b.s{color:#38bdf8}
+.gp-next{margin-top:12px;width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:rgba(139,92,246,.1);border:0;text-align:left;cursor:pointer;font-size:13px;color:var(--text-primary)}
+.gp-next:hover{background:rgba(139,92,246,.16)}.gp-next-i{color:#a78bfa}.gp-next-t{flex:1;min-width:0}.gp-next-t i{font-style:normal;color:var(--text-muted)}.gp-next-b{white-space:nowrap;font-weight:600;color:#a78bfa}
 .gp-fn b{display:block;font-size:14px;color:var(--text-primary);font-weight:600}.gp-fn small{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px}
 .gp-fv{text-align:right}.gp-fv b{display:block;font-size:14.5px;color:var(--text-primary)}.gp-fv small{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px;white-space:nowrap}
 .gp-note{font-size:11.5px;color:var(--text-muted);text-align:center}

@@ -182,6 +182,7 @@ export default function DashboardPhone({ data, actionItems, upcomingReminders, g
           <IonList inset lines="inset" className="cf-inset !mt-0">
             {data.nearATHFunds.map((f) => (
               <IonItem key={f.fundName} button detail onClick={() => navigate('/investments/mutual-funds')}>
+                <span slot="start" className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400"><TrendingUp size={18} /></span>
                 <IonLabel><h3 className="!text-[15px] !font-semibold !whitespace-normal">{f.fundName}</h3><p>At or close to its all-time high NAV</p></IonLabel>
                 <IonNote slot="end" className="!text-[12.5px] !font-semibold !text-amber-400">{f.isAtATH ? 'At its high' : `${f.belowATHPct.toFixed(1)}% below`}</IonNote>
               </IonItem>

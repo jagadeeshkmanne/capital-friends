@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import '../../phone/ionic-setup'
 import { IonSegment, IonSegmentButton, IonLabel, IonList, IonItem, IonButton, IonActionSheet, IonListHeader, IonRippleEffect } from '@ionic/react'
 import { Plus, MoreVertical, ArrowDownLeft, ArrowUpRight, Eye, EyeOff, BarChart3 } from 'lucide-react'
+import { StockLead, PortfolioLead } from '../../phone/LeadIcon'
 import { formatINR } from '../../data/familyData'
 import { useMask } from '../../context/MaskContext'
 import { Screen, FadeIn, setPhoneBar } from '../../components/native'
@@ -69,6 +70,7 @@ function Rows({ holdings, sub, onOpen }) {
           const inv = invOf(h), pl = (h.currentValue || 0) - inv, plPct = inv > 0 ? (pl / inv) * 100 : 0
           return (
             <IonItem key={`${h.portfolioId}-${h.symbol}`} button detail={false} onClick={() => onOpen?.(h)}>
+              <StockLead name={h.companyName || h.symbol} />
               <IonLabel className="!my-3.5">
                 <h3 className="!text-[15px] !font-medium !whitespace-normal !leading-snug">{h.companyName || h.symbol}</h3>
                 <p className="!mt-1">{h.quantity} shares{sub ? ` · ${sub(h)}` : ''}</p>
@@ -197,9 +199,10 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
           <IonList lines="full" className="cf-flat -mx-4 mt-2">
             {portfolioData.map((x) => (
               <IonItem key={x.portfolioId} button detail onClick={() => setOpen(x.portfolioId)}>
+                <PortfolioLead c="#38bdf8" />
                 <IonLabel className="!my-3.5">
-                  <h3 className="!text-[16px] !font-semibold">{x.portfolioName}</h3>
-                  <p>{mv(x.ownerName, 'name')} · {x.stockCount} stock{x.stockCount === 1 ? '' : 's'}{x.platform && x.platform !== '—' ? ` · ${x.platform}` : ''}</p>
+                  <h3 className="!text-[16px] !font-semibold !truncate">{x.portfolioName}</h3>
+                  <p className="!truncate">{mv(x.ownerName, 'name')} · {x.stockCount} stock{x.stockCount === 1 ? '' : 's'}{x.platform && x.platform !== '—' ? ` · ${x.platform}` : ''}</p>
                 </IonLabel>
                 <div slot="end" className="text-right tabular-nums">
                   <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(x.current)}</div>
