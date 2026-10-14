@@ -12,8 +12,8 @@ function belowColor(pct) {
 }
 
 function buySignal(pct) {
-  if (pct >= 10) return { label: 'Strong Buy', cls: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30' }
-  if (pct >= 5) return { label: 'Buy', cls: 'bg-blue-500/20 text-blue-400' }
+  if (pct >= 10) return { label: 'Far below peak', cls: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30' }
+  if (pct >= 5) return { label: 'Below peak', cls: 'bg-blue-500/20 text-blue-400' }
   return null
 }
 

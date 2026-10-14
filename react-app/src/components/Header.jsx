@@ -138,7 +138,7 @@ function inferMFCategory(name) {
   return 'Equity'
 }
 
-const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance Alerts' }
+const DIALOG_TITLES = { buyopp: 'Funds below their peak', rebalance: 'Rebalance Alerts' }
 
 // Phone app bar: the page's title, and a back arrow on pages that aren't one of the bottom tabs
 const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/investments/stocks', '/goals', '/more']
@@ -338,7 +338,7 @@ export default function Header() {
             {/* YouTube + Instagram — eye-catching pills (on phones they live in More) */}
             <span className="hidden lg:contents"><HeaderSocial /></span>
 
-            {/* Buy Opportunities — icon button with count badge (phones: only on Dashboard and Mutual Funds) */}
+            {/* Below peak — icon button with count badge (phones: only on Dashboard and Mutual Funds) */}
             {buyOppCount > 0 && (
               <button data-signal={signalsHere ? undefined : 'off'}
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}

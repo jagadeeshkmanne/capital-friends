@@ -5,7 +5,7 @@ const FEATURES = [
   { icon: Users, color: 'text-blue-400 bg-blue-500/15', text: 'Family member-wise portfolio management' },
   { icon: Target, color: 'text-emerald-400 bg-emerald-500/15', text: 'Goal planning with portfolio mapping' },
   { icon: Shield, color: 'text-cyan-400 bg-cyan-500/15', text: 'Insurance, Liabilities & Bank Accounts' },
-  { icon: Smartphone, color: 'text-amber-400 bg-amber-500/15', text: 'ATH-based Buy Opportunities & Smart Rebalancing' },
+  { icon: Smartphone, color: 'text-amber-400 bg-amber-500/15', text: 'Below-peak (ATH) alerts & Smart Rebalancing' },
   { icon: Mail, color: 'text-rose-400 bg-rose-500/15', text: 'Email reports, Reminders & Financial Health Check' },
 ]
 

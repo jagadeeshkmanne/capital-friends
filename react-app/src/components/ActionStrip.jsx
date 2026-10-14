@@ -9,7 +9,7 @@ const TAB_CONFIG = [
   { key: 'rebalance', label: 'Rebalance', icon: RefreshCw, idle: 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20', active: 'bg-violet-500/25 text-violet-300 ring-1 ring-violet-500/40' },
 ]
 
-const DIALOG_TITLES = { buyopp: 'Buy Opportunities', rebalance: 'Rebalance' }
+const DIALOG_TITLES = { buyopp: 'Funds below their peak', rebalance: 'Rebalance' }
 
 export default function ActionStrip() {
   const { investmentSignals } = useAlerts()

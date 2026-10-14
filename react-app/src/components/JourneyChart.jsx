@@ -244,7 +244,7 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
           </div>
         )}
         {!h && (
-          <div className="text-right space-y-1">
+          <div className="hidden sm:block text-right space-y-1">
             <div className="flex items-center justify-end gap-3 text-[11px] text-[var(--text-dim)]">
               <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-violet-500 inline-block" /> Invested</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Bought</span>
@@ -260,6 +260,14 @@ export default function JourneyChart({ data, txns, height = 240, formatMoney = (
         )}
       </div>
 
+      {/* phones: the legend goes under the headline (beside it there is no room) */}
+      <div className="sm:hidden flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[11px] text-[var(--text-dim)]">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-violet-500 inline-block" /> Invested</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Bought</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Sold</span>
+        {value > 0 && <span className="flex items-center gap-1.5"><span className={`w-3 inline-block ${navMap && navMap.size ? 'h-0.5 bg-emerald-500' : 'border-t-2 border-dashed border-emerald-500'}`} /> Value</span>}
+        {addedInRange !== null && <span className="tabular-nums">{addedInRange >= 0 ? 'Added' : 'Taken out'} in {range}: <b className="text-[var(--text-primary)]">{formatMoney(Math.abs(addedInRange))}</b></span>}
+      </div>
       <div className="relative" style={{ height }} onMouseLeave={() => setHover(null)}>
         <div ref={boxRef} className="absolute inset-0" />
         {hover && hTx.length > 0 && (() => {

@@ -317,7 +317,7 @@ export default function FundsDashboardPage() {
                         <td className={`${sz.row} px-3 w-full max-w-0`}>
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className={`${sz.name} font-semibold text-[var(--text-primary)] truncate`} title={`${f.fundName}\n${fundFacts(f)}`}>{main}</span>
-                            {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Strong Buy' : 'Buy'}</span>}
+                            {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Far below peak' : 'Below peak'}</span>}
                           </div>
                         </td>
                         <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} tabular-nums`}>
@@ -510,7 +510,7 @@ function CategoryTag({ category }) {
 }
 
 function BuyTag({ strong }) {
-  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${strong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>{strong ? 'Strong Buy' : 'Buy'}</span>
+  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${strong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>{strong ? 'Far below peak' : 'Below peak'}</span>
 }
 
 function athTextClass(p) {

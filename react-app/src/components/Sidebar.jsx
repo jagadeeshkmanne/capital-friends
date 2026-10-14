@@ -53,7 +53,7 @@ export default function Sidebar({ open, onClose }) {
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 rounded-lg hover:bg-emerald-500/15 transition-colors"
               >
                 <TrendingDown size={14} />
-                <span className="flex-1 text-left">Buy Opportunities</span>
+                <span className="flex-1 text-left">Below their peak</span>
                 <span className="text-xs bg-emerald-500/25 px-1.5 py-0.5 rounded-full">{buyOppCount}</span>
               </button>
             )}

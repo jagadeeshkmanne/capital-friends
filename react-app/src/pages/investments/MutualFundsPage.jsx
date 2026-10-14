@@ -959,7 +959,7 @@ export default function MutualFundsPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap sm:overflow-x-auto no-scrollbar">
               {selectedPortfolio && (
                 <>
                   <button onClick={() => setModal({ allocations: selectedPortfolio.portfolioId })} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
@@ -974,7 +974,7 @@ export default function MutualFundsPage() {
                 <FileUp size={13} /> Import statement
               </button>
               <button onClick={() => setModal('addPortfolio')} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
-                <Plus size={13} /> New Portfolio
+                <Plus size={13} /> New<span className="max-sm:hidden"> Portfolio</span>
               </button>
               <button onClick={() => navigate('/investments/funds')} className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
                 <Layers size={12} /> All Funds
@@ -984,23 +984,23 @@ export default function MutualFundsPage() {
 
           {/* ── Portfolio Info ── */}
           {selectedPortfolio && (
-            <div className="flex items-center gap-4 text-xs text-[var(--text-dim)] px-1 flex-wrap">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:flex sm:items-center sm:gap-4 text-xs text-[var(--text-dim)] px-1 sm:flex-wrap">
               <span><span className="font-semibold">Platform:</span> {selectedPortfolio.platform}</span>
               <span><span className="font-semibold">Client ID:</span> {mv(selectedPortfolio.clientId, 'clientId')}</span>
               <span><span className="font-semibold">Funds:</span> {selectedPortfolio.fundCount}</span>
               {selectedPortfolio.sipTarget >= 100 && <span><span className="font-semibold">SIP Target:</span> {formatINR(selectedPortfolio.sipTarget)}/mo</span>}
               {selectedPortfolio.lumpsumTarget >= 100 && <span><span className="font-semibold">Lumpsum Target:</span> {formatINR(selectedPortfolio.lumpsumTarget)}</span>}
-              <span><span className="font-semibold">Rebalance Threshold:</span> {(selectedPortfolio.rebalanceThreshold * 100).toFixed(0)}%</span>
-              <GoalChips pid={selectedPortfolio.portfolioId} big {...chipProps} />
+              <span><span className="font-semibold">Rebalance<span className="max-sm:hidden"> Threshold</span>:</span> {(selectedPortfolio.rebalanceThreshold * 100).toFixed(0)}%</span>
+              <span className="col-span-2 sm:contents"><GoalChips pid={selectedPortfolio.portfolioId} big {...chipProps} /></span>
             </div>
           )}
           </>)}
 
           {/* ── Invite to import the CAMS statement (hidden once imported with full history) ── */}
-          <ImportNudge transactions={mfTransactions} returnsReason={returns?.returnsReason} funds={returns?.unreliableFunds} />
+          {!fundDetailHolding && <ImportNudge transactions={mfTransactions} returnsReason={returns?.returnsReason} funds={returns?.unreliableFunds} />}
 
           {/* ── Phones: one summary card (current value, invested, returns), the rest on tap ── */}
-          <MobileSummary stats={stats} returns={returns} navigate={navigate} />
+          {!fundDetailHolding && <MobileSummary stats={stats} returns={returns} navigate={navigate} />}
 
           {/* ── Stat Cards ── */}
           <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -1063,17 +1063,20 @@ export default function MutualFundsPage() {
                       <DonutCard onClick={goBreakdown} title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
                       {breakdown.capList.length > 0
                         ? <DonutCard onClick={goBreakdown} title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
-                        : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                        : <button onClick={goBreakdown} className="max-sm:hidden flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                             <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                           </button>
                       }
                       {breakdown.geoList?.length > 0
                         ? <DonutCard onClick={goBreakdown} title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
-                        : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                        : <button onClick={goBreakdown} className="max-sm:hidden flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                             <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                           </button>
                       }
                     </div>
+                    {(!breakdown.capList.length || !breakdown.geoList?.length) && (
+                      <button onClick={goBreakdown} className="sm:hidden w-full mt-3 py-2 rounded-lg border border-dashed border-[var(--border-light)] text-xs text-[var(--text-dim)]">Market cap and geography: <span className="text-violet-400 font-semibold">add in Fund Breakdown →</span></button>
+                    )}
                     {!breakdown.hasDetailedAlloc && (
                       <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. <button onClick={goBreakdown} className="underline hover:text-violet-400">Go to Fund Breakdown</button> to add detailed data from Morningstar.</p>
                     )}
@@ -1203,7 +1206,7 @@ export default function MutualFundsPage() {
                           <div className="flex-1 min-w-0">
                             <p className="flex items-center gap-1.5 text-[15px] font-semibold text-[var(--text-primary)]">
                               <span className="truncate">{dn(p.portfolioName)}</span>
-                              {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Buy opportunity" />}
+                              {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Below its peak" />}
                               {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title="Rebalance needed" />}
                             </p>
                             <p className="text-[13px] text-[var(--text-dim)] mt-0.5 truncate">{mv(p.ownerName, 'name')} · {p.fundCount} funds</p>
@@ -1245,16 +1248,16 @@ export default function MutualFundsPage() {
             return (
               <div className="space-y-3">
                 {/* Back + Fund Name + Portfolio badge */}
-                <div className="flex items-start gap-2.5">
+                <div className="flex flex-wrap items-start gap-2.5">
                   <button onClick={() => setFundDetailHolding(null)} className="max-lg:hidden p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors mt-0.5 shrink-0">
                     <ArrowLeft size={16} />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
+                    <p className="text-base sm:text-sm font-bold text-[var(--text-primary)] leading-tight">{splitFundName(h.fundName).main}</p>
                     {splitFundName(h.fundName).plan && <p className="text-xs text-[var(--text-dim)] mt-0.5">{splitFundName(h.fundName).plan}</p>}
                   </div>
                   {pData && (
-                    <div className="text-right shrink-0 mt-0.5">
+                    <div className="sm:text-right shrink-0 mt-0.5 max-sm:w-full max-sm:flex max-sm:items-center max-sm:gap-2">
                       <p className="text-xs font-semibold text-[var(--text-secondary)]">{mv(pData.ownerName, 'name')}</p>
                       <p className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded mt-0.5 inline-block">{dn(pData.portfolioName)} · {pData.platform}</p>
                     </div>
@@ -1469,17 +1472,20 @@ export default function MutualFundsPage() {
                     <DonutCard onClick={goBreakdown} title="Asset Class" data={breakdown.assetList} bgMap={ASSET_BG} />
                     {breakdown.capList.length > 0
                       ? <DonutCard onClick={goBreakdown} title="Market Cap" data={breakdown.capList} bgMap={CAP_BG} />
-                      : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                      : <button onClick={goBreakdown} className="max-sm:hidden flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                           <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>market cap breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                         </button>
                     }
                     {breakdown.geoList?.length > 0
                       ? <DonutCard onClick={goBreakdown} title="Geography" data={breakdown.geoList} bgMap={GEO_BG} />
-                      : <button onClick={goBreakdown} className="flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
+                      : <button onClick={goBreakdown} className="max-sm:hidden flex items-center justify-center rounded-lg bg-[var(--bg-inset)] border border-dashed border-[var(--border-light)] p-4 hover:border-violet-500/50 hover:bg-[var(--bg-hover)] transition-colors">
                           <p className="text-xs text-[var(--text-dim)] text-center">Classify funds for<br/>geography breakdown<br/><span className="text-violet-400 font-semibold">Add in Fund Breakdown →</span></p>
                         </button>
                     }
                   </div>
+                  {(!breakdown.capList.length || !breakdown.geoList?.length) && (
+                    <button onClick={goBreakdown} className="sm:hidden w-full mt-3 py-2 rounded-lg border border-dashed border-[var(--border-light)] text-xs text-[var(--text-dim)]">Market cap and geography: <span className="text-violet-400 font-semibold">add in Fund Breakdown →</span></button>
+                  )}
                   {!breakdown.hasDetailedAlloc && (
                     <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. <button onClick={goBreakdown} className="underline hover:text-violet-400">Go to Fund Breakdown</button> to add detailed data from Morningstar.</p>
                   )}
@@ -1533,7 +1539,7 @@ export default function MutualFundsPage() {
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                 }`}
               >
-                <PieChartIcon size={12} /> Fund Breakdown ({uniqueFunds.length})
+                <PieChartIcon size={12} /> <span className="max-sm:hidden">Fund </span>Breakdown ({uniqueFunds.length})
               </button>
             </div>
             <div className="flex items-center gap-1.5 ml-auto shrink-0">
@@ -1882,7 +1888,7 @@ export default function MutualFundsPage() {
               {/* Buy Opportunities */}
               {insights.athDeduped.length > 0 && (
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Buy Opportunities</p>
+                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Below their peak</p>
                   <p className="text-xs text-[var(--text-dim)] mb-3">Funds trading below All-Time High</p>
                   {insights.athDeduped.map((h, idx) => {
                     const { main } = splitFundName(h.fundName)
@@ -1900,7 +1906,7 @@ export default function MutualFundsPage() {
                                   background: isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(251,191,36,0.10)',
                                   color: isStrongBuy ? '#22d3ee' : '#fbbf24',
                                 }}>
-                            {isStrongBuy ? 'Strong Buy' : 'Buy'}
+                            {isStrongBuy ? 'Far below peak' : 'Below peak'}
                           </span>
                           <p className="text-xs mt-0.5 font-medium tabular-nums"
                              style={{ color: isStrongBuy ? '#22d3ee' : '#fbbf24' }}>
@@ -1936,13 +1942,13 @@ export default function MutualFundsPage() {
 
                 return (
                   <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="min-w-0">
                         <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Rebalance Needed</p>
                         <p className="text-xs text-[var(--text-dim)] mt-0.5">Funds drifting more than {threshold}% from target allocation</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 whitespace-nowrap">
                           {rebalanceHoldings.length} fund{rebalanceHoldings.length !== 1 ? 's' : ''}
                         </span>
                         <button
@@ -2307,7 +2313,7 @@ export default function MutualFundsPage() {
         {(modal === 'rebalance' || !!modal?.rebalance) && <MFRebalanceDialog filterPortfolioId={typeof modal?.rebalance === 'string' ? modal.rebalance : null} />}
       </Modal>
 
-      <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Buy Opportunities" wide>
+      <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Funds below their peak" wide>
         {modal === 'buyOpp' && <MFBuyOpportunities />}
       </Modal>
 

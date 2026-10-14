@@ -871,7 +871,7 @@ export default function Dashboard() {
         {data.buyOpportunities.length > 0 && (
           <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 cursor-pointer hover:border-[var(--border-light)] transition-colors${data.nearATHFunds.length === 0 ? ' md:col-span-2' : ''}`}
                onClick={() => navigate('/investments/mutual-funds')}>
-            <SectionHeader label="Buy Opportunities" color="#34d399" badge={data.buyOpportunities.length}
+            <SectionHeader label="Below their peak" color="#34d399" badge={data.buyOpportunities.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
             <div className="text-xs text-[var(--text-dim)] mb-3">Funds 5%+ below All-Time High</div>
             <div className="space-y-0">
@@ -886,7 +886,7 @@ export default function Dashboard() {
                               background: opp.isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(52,211,153,0.10)',
                               color: opp.isStrongBuy ? '#22d3ee' : '#34d399',
                             }}>
-                        {opp.isStrongBuy ? 'Strong Buy' : 'Buy'}
+                        {opp.isStrongBuy ? 'Far below peak' : 'Below peak'}
                       </span>
                       <span className="text-xs font-semibold tabular-nums"
                             style={{ color: opp.isStrongBuy ? '#22d3ee' : '#34d399' }}>
