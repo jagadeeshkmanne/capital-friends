@@ -4,7 +4,7 @@ import { useState } from 'react'
 import '../../phone/ionic-setup'
 import { IonCard, IonCardContent, IonList, IonItem, IonLabel, IonListHeader, IonNote, IonButton, IonRippleEffect } from '@ionic/react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { FileUp, Wallet, Target, HeartPulse, AlertTriangle, AlertCircle, Info, TrendingDown, Scale, Bell, TrendingUp, ChevronRight } from 'lucide-react'
+import { FileUp, Wallet, Target, HeartPulse, AlertTriangle, AlertCircle, Info, TrendingDown, Scale, Bell, TrendingUp, ChevronRight, Trophy } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 
 const TONE = { critical: ['#fb7185', AlertCircle], warning: ['#f59e0b', AlertTriangle], info: ['#60a5fa', Info] }
@@ -69,8 +69,8 @@ export default function DashboardPhone({ data, actionItems, upcomingReminders, g
       {(data.buyOpportunities.length > 0 || data.rebalanceItems.length > 0) && (
         <div className="grid grid-cols-2 gap-3 px-4 mt-3">
           {data.buyOpportunities.length > 0 && (
-            <button type="button" onClick={onBuyOpp} className="ion-activatable relative overflow-hidden text-left rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3">
-              <TrendingDown size={20} className="text-emerald-400" />
+            <button type="button" onClick={onBuyOpp} className="ion-activatable relative overflow-hidden text-left rounded-2xl border border-sky-500/25 bg-sky-500/10 p-3">
+              <TrendingDown size={20} className="text-sky-400" />
               <div className="mt-1.5 text-[22px] font-bold text-[var(--ion-text-color)] leading-none">{data.buyOpportunities.length}</div>
               <div className="text-[12px] text-[var(--ion-color-medium)] mt-0.5">Below their high</div>
               <IonRippleEffect />
@@ -171,6 +171,39 @@ export default function DashboardPhone({ data, actionItems, upcomingReminders, g
                 <div slot="end" className="text-right tabular-nums"><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(f.currentValue)}</div><div className={`text-[12px] font-semibold ${f.pl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{f.pl >= 0 ? '+' : ''}{f.plPct.toFixed(1)}%</div></div>
               </IonItem>
             ))}
+          </IonList>
+        </>
+      )}
+
+      {/* portfolios: best and weakest returns (the laptop's Portfolio performance) */}
+      {data.portfolioLeaderboard?.length > 0 && (
+        <>
+          <IonListHeader className="!pl-5"><IonLabel className="cf-group">Portfolio performance</IonLabel></IonListHeader>
+          <IonList inset lines="inset" className="cf-inset !mt-0">
+            {data.portfolioLeaderboard.slice(0, 5).map((p, i) => (
+              <IonItem key={p.portfolioId} button detail onClick={() => navigate(`/investments/mutual-funds?p=${encodeURIComponent(p.portfolioId)}`)}>
+                <span slot="start" className={`flex h-9 w-9 items-center justify-center rounded-xl text-[13px] font-bold ${i === 0 && p.plPct > 0 ? 'bg-amber-500/15 text-amber-400' : 'bg-[var(--ion-color-step-150)] text-[var(--ion-color-medium)]'}`}>{i === 0 && p.plPct > 0 ? <Trophy size={17} /> : i + 1}</span>
+                <IonLabel><h3 className="!text-[15px] !font-semibold !truncate">{mt(p.portfolioName)}</h3><p className="!truncate">{p.ownerName ? `${mt(p.ownerName)} · ` : ''}{formatINR(p.invested)} in</p></IonLabel>
+                <div slot="end" className="text-right tabular-nums"><div className={`text-[15px] font-semibold ${p.plPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{p.plPct >= 0 ? '+' : ''}{p.plPct.toFixed(1)}%</div><div className="text-[12px] text-[var(--ion-color-medium)]">{p.pl >= 0 ? '+' : '−'}{formatINR(Math.abs(p.pl))}</div></div>
+              </IonItem>
+            ))}
+          </IonList>
+        </>
+      )}
+
+      {/* funds furthest below their own high (top 5, the rest on the Mutual Funds page) */}
+      {data.buyOpportunities?.length > 0 && (
+        <>
+          <IonListHeader className="!pl-5"><IonLabel className="cf-group">Below their high · {data.buyOpportunities.length}</IonLabel></IonListHeader>
+          <IonList inset lines="inset" className="cf-inset !mt-0">
+            {data.buyOpportunities.slice(0, 5).map((f) => (
+              <IonItem key={f.fundName} button detail onClick={() => navigate('/investments/mutual-funds')}>
+                <span slot="start" className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400"><TrendingDown size={18} /></span>
+                <IonLabel><h3 className="!text-[15px] !font-semibold !whitespace-normal">{f.fundName}</h3></IonLabel>
+                <IonNote slot="end" className="!text-[12.5px] !font-semibold !text-sky-400">{f.belowATHPct.toFixed(1)}% below</IonNote>
+              </IonItem>
+            ))}
+            {data.buyOpportunities.length > 5 && <IonItem button detail onClick={() => navigate('/investments/mutual-funds')}><IonLabel className="!text-[14px] !font-semibold !text-violet-400">+{data.buyOpportunities.length - 5} more in Mutual Funds</IonLabel></IonItem>}
           </IonList>
         </>
       )}

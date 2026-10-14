@@ -889,11 +889,11 @@ export default function Dashboard() {
                onClick={() => navigate('/investments/mutual-funds')}>
             <SectionHeader label="Below their high" color="#34d399" badge={data.buyOpportunities.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
-            <div className="text-xs text-[var(--text-dim)] mb-3">Funds 5%+ below All-Time High</div>
+            <div className="text-xs text-[var(--text-dim)] mb-3">Funds 5%+ below their all-time high · furthest first</div>
             <div className="space-y-0">
-              {data.buyOpportunities.map((opp, idx) => (
+              {data.buyOpportunities.slice(0, 5).map((opp, idx, top) => (
                 <div key={idx} className="py-2"
-                     style={{ borderBottom: idx < data.buyOpportunities.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
+                     style={{ borderBottom: idx < top.length - 1 ? '1px solid rgba(128,128,128,0.06)' : 'none' }}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs text-[var(--text-primary)] font-medium min-w-0 break-words leading-snug">{opp.fundName}</div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -913,6 +913,7 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+            {data.buyOpportunities.length > 5 && <div className="mt-2 text-xs font-semibold text-violet-400">+{data.buyOpportunities.length - 5} more in Mutual Funds ›</div>}
           </div>
         )}
 
