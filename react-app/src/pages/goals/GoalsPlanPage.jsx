@@ -204,7 +204,9 @@ function GoalsHeader({ plans, netWorth, extra = 0 }) {
   const target = plans.reduce((t, p) => t + p.target, 0), has = plans.reduce((t, p) => t + p.has, 0)
   const short = plans.filter((p) => p.lumpToday > 0)
   const sipNeed = short.reduce((t, p) => t + (p.sipNeeded || 0), 0), lump = short.reduce((t, p) => t + p.lumpToday, 0)
-  const nw = Math.max(netWorth || 0, 0), free = Math.max(0, nw - has), pc = (v) => (nw > 0 ? Math.round((v / nw) * 100) : 0)
+  // free money = liquid money ticked in Money for goals that no goal needs yet (funds, stocks, cash, FD);
+  // the rest of the net worth (home, gold, EPF beyond retirement's need, unticked money) is not for goals
+  const nw = Math.max(netWorth || 0, 0), free = Math.max(0, extra), notFor = Math.max(0, nw - has - free), pc = (v) => (nw > 0 ? Math.round((v / nw) * 100) : 0)
   const prog = target > 0 ? (has / target) * 100 : 0
   return (
     <>
@@ -212,7 +214,8 @@ function GoalsHeader({ plans, netWorth, extra = 0 }) {
         <div><span className="gp-lbl">Total net worth</span><b className="gp-nwv">{L(nw)}</b></div>
         <div className="gp-nws">
           <div><span><i style={{ background: '#8b5cf6' }} />Allocated to goals</span><b style={{ color: 'var(--accent-violet)' }}>{L(has)} <small>({pc(has)}%)</small></b></div>
-          <div><span><i style={{ background: 'var(--border)' }} />Unallocated surplus</span><b>{L(free)} <small>({pc(free)}%)</small></b>{extra > 1000 && <small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>{L(extra)} of it is in Money for goals but not needed yet: you could lower a SIP or add a goal</small>}</div>
+          <div><span><i style={{ background: '#34d399' }} />Free money</span><b style={{ color: '#34d399' }}>{L(free)} <small>({pc(free)}%)</small></b><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>{free > 1000 ? 'Liquid money (funds, stocks, cash, FD) no goal needs yet: you could lower a SIP or add a goal' : 'Only liquid money counts: funds, stocks, cash, FD'}</small></div>
+          <div><span><i style={{ background: 'var(--border)' }} />Not for goals</span><b>{L(notFor)} <small>({pc(notFor)}%)</small></b><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>Home, physical gold, retirement-only money and anything you left out</small></div>
         </div>
       </div>
       <div className="gp-tiles">
@@ -660,7 +663,7 @@ const CSS = `
 .gp-mix{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:10px;font-size:12px;color:var(--text-secondary,var(--text-muted))}.gp-mix i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.gp-mix-t{margin-left:auto;color:var(--text-muted)}
 .gp-lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 .gp-nw{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.gp-nwv{display:block;font-size:26px;margin-top:4px;color:var(--text-primary)}
-.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
+.gp-nws{display:flex;gap:28px;flex-wrap:wrap}.gp-nws>div{max-width:280px}.gp-nws span{display:block;font-size:13px;color:var(--text-muted)}.gp-nws i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.gp-nws b{display:block;font-size:15px;margin-top:3px;color:var(--text-primary)}.gp-nws small{font-size:11px;opacity:.8}
 .gp-tiles{display:grid;grid-template-columns:repeat(4,1fr) 2fr;gap:12px;margin-bottom:16px}
 .gp-tile{border:1px solid var(--border);background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}.gp-tile b{font-size:17px;color:var(--text-primary);font-variant-numeric:tabular-nums}.gp-tile small{font-size:12px;color:var(--text-muted)}
 .gp-tile-or{flex-direction:row;align-items:center;justify-content:space-between}.gp-tile-or>div{display:flex;flex-direction:column;gap:4px}.gp-tile-or>em{font-style:normal;font-size:12px;font-weight:700;color:var(--text-muted)}
