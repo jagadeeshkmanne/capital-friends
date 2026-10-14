@@ -176,7 +176,7 @@ function casLoad_(isins) {
       row: i + 3, raw: r,
       date: casSerialToIso_(r[0]), pid: String(r[1] || ''), pname: r[2] || '', code: String(r[3] || ''),
       type: String(r[5] || ''), ttype: String(r[6] || ''), units: +r[7] || 0, price: +r[8] || 0, amount: +r[9] || 0,
-      txnId: String(r[13] || ''), folio: String(r[14] || ''), imp: String(r[15] || '')
+      txnId: String(r[13] || ''), folio: String(r[14] || ''), imp: String(r[15] || ''), notes: String(r[10] || '')
     });
   });
 
@@ -493,6 +493,14 @@ function casBuildPlan_(statement, data, mapping) {
     if (Math.abs(b.after.units - b.expectedUnits) > 0.01) b.problems.push('Units after import (' + b.after.units + ') would not match the statement (' + b.expectedUnits + ').');
     b.replaceRows = replace;
     b.manualReplaced = replace.filter(function (r) { return !r.folio; }).length;
+    // a withdrawal you marked for a goal (Goals → Withdraw → Done) that the statement does not show: the units are
+    // still yours, so after the import they count as free money for your other goals. Say so.
+    replace.forEach(function (r) {
+      if (r.folio || r.type !== 'SELL' || !r.date || !/^For goal:/.test(r.notes || '')) return;
+      var from = new Date(new Date(r.date).getTime() - 5 * 864e5).toISOString().slice(0, 10);
+      var sold = newRows.some(function (n) { return n.type === 'SELL' && n.date >= from && n.units >= r.units * 0.9; });
+      if (!sold) (plan.goalNotSold = plan.goalNotSold || []).push({ fund: getBaseFundName(b.fundName), units: casR4_(r.units), date: r.date, goal: String(r.notes).replace(/^For goal:\s*/, '') });
+    });
     b.keptOtherFolios = keep.length;
     b.newRows = newRows;
     b.blocked = b.problems.length > 0;
@@ -577,7 +585,7 @@ function casPlanForClient_(plan, token) {
   return {
     token: token, meta: plan.meta, blocked: plan.blocked, needsBank: !!plan.needsBank, groups: plan.groups, missingMembers: plan.missingMembers,
     unknownFunds: plan.unknownFunds, skipped: plan.skipped, warnings: plan.warnings, kept: plan.kept,
-    resetInitial: plan.resetInitial, goals: plan.goals, totals: plan.totals,
+    resetInitial: plan.resetInitial, goals: plan.goals, totals: plan.totals, goalNotSold: plan.goalNotSold || [],
     funds: plan.buckets.map(function (b) {
       return {
         portfolioId: b.portfolioId, groupKey: b.groupKey, isNew: b.isNew, code: b.code, fundName: getBaseFundName(b.fundName), folios: b.folioList,

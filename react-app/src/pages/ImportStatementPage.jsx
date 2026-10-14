@@ -458,6 +458,12 @@ export default function ImportStatementPage() {
                 })}
               </div>
 
+              {(preview.goalNotSold || []).length > 0 && (
+                <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 space-y-1.5 text-xs text-[var(--text-primary)]">
+                  <p className="font-semibold">Withdrawals the statement does not show</p>
+                  {preview.goalNotSold.map((x, i) => <p key={i}>• <b>{x.fund}</b>: {Number(x.units).toLocaleString('en-IN', { maximumFractionDigits: 3 })} units marked as withdrawn for <b>{x.goal}</b> on {x.date}. The statement still has them, so they stay yours and count as free money for your other goals. If you did sell them, the sale may not be in the statement yet: import a newer one in a few days.</p>)}
+                </div>
+              )}
               {(preview.resetInitial.length > 0 || preview.warnings.length > 0 || blockedFunds.length > 0) && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2 text-xs text-[var(--text-primary)]">
                   <p className="font-semibold flex items-center gap-1.5"><AlertTriangle size={14} className="text-amber-400" /> Please read</p>
