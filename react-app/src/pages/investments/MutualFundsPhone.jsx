@@ -2,7 +2,7 @@
 // Same data and the same dialogs as the desktop page (MutualFundsPage passes everything in); only the layout differs.
 // The open portfolio / fund lives in the URL (?p=…&f=…), so the phone's Back button and swipe-back work.
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   IonCard, IonCardContent, IonLabel, IonSegment, IonSegmentButton, IonList, IonItem, IonButton,
   IonActionSheet, IonPopover, IonContent, IonModal, IonListHeader, IonToggle, IonRippleEffect,
@@ -43,8 +43,16 @@ export default function MutualFundsPhone(props) {
   const navigate = useNavigate()
   const pid = sp.get('p'), fkey = sp.get('f')
   useEffect(() => { setSelectedPortfolioId(pid || 'all') }, [pid, setSelectedPortfolioId])
-  const back = () => (window.history.state?.idx > 0 ? navigate(-1) : setSp({}))
-  const open = (q) => setSp(q)
+  const location = useLocation()
+  // Back goes one level up: fund (or its chart) → its portfolio → all portfolios. When we opened the screen
+  // ourselves the previous page is that parent, so the phone's own Back and this arrow do the same thing.
+  const back = () => {
+    if (location.state?.cfFrom != null) return navigate(-1)
+    const v = sp.get('v')
+    const up = v && fkey ? { p: pid, f: fkey } : fkey && pid ? { p: pid } : {}
+    setSp(up, { replace: true })
+  }
+  const open = (q) => setSp(q, { state: { cfFrom: sp.toString() } })
   const portfolio = pid ? portfolioData.find((p) => p.portfolioId === pid) : null
   const ready = (pid || 'all') === selectedPortfolioId
   const fund = fkey && ready ? enrichedHoldings.find((h) => h._key === fkey) : null
@@ -348,7 +356,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
       <FadeIn k={tab}>
         {tab === 'holdings' && (<>
           <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ v: 'growth' })} />
-          <div className="-mx-4"><div className="px-4"><Holdings funds={funds} sub={(h) => pname[h.portfolioId]} onOpen={setSheet} /></div></div>
+          <div className="-mx-4"><div className="px-4"><Holdings funds={funds} sub={(h) => pname[h.portfolioId]} onOpen={(h) => open({ p: h.portfolioId, f: h._key })} /></div></div>
         </>)}
         {tab === 'actions' && (<>
           <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal('rebalance')}
@@ -368,7 +376,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
                   <IonLabel className="!my-3.5">
                     <h3 className="!text-[16px] !font-semibold">{dn(p.portfolioName)}</h3>
                     <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}</p>
-                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1 flex gap-1.5">{ind.buyOpp > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400">{ind.buyOpp} below high</span>}{ind.rebalance > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
+                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1.5 flex flex-wrap gap-1.5">{ind.buyOpp > 0 && <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11.5px] font-semibold bg-emerald-500/15 text-emerald-400">{ind.buyOpp} below high</span>}{ind.rebalance > 0 && <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11.5px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
                   </IonLabel>
                   <div slot="end" className="text-right tabular-nums">
                     <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(p.currentValue)}</div>
@@ -421,7 +429,7 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
           {tab === 'holdings' && (<>
             <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ p: p.portfolioId, v: 'growth' })} />
             {funds.length
-              ? <Holdings funds={funds} sub={(h) => (h.targetAllocationPct > 0 ? `${h.currentAllocationPct.toFixed(0)}% of ${h.targetAllocationPct.toFixed(0)}% target` : null)} onOpen={setSheet} />
+              ? <Holdings funds={funds} sub={(h) => (h.targetAllocationPct > 0 ? `${h.currentAllocationPct.toFixed(0)}% of ${h.targetAllocationPct.toFixed(0)}% target` : null)} onOpen={(h) => open({ p: h.portfolioId, f: h._key })} />
               : <p className="py-10 text-center text-[14px] text-[var(--ion-color-medium)]">No funds yet</p>}
           </>)}
           {tab === 'activity' && <Activity txns={allFilteredTxns} onTxn={setTxn} />}
