@@ -348,3 +348,19 @@ header { padding-top: env(safe-area-inset-top); }        /* under the notch when
   .g2-lbl { font-size: 17px !important; }
   .g2-q, .g2-hiwh, .g2 .k, .gp-lbl, .gp-thd { font-size: 13px !important; }
 }
+@media (max-width: 639.98px) {
+  /* cards: more air, like native list rows — rows 16px top/bottom, 4–6px between a title and its sub-lines */
+  .divide-y > [class*="py-"] { padding-top: 16px !important; padding-bottom: 16px !important; }
+  .mt-0\.5 { margin-top: 4px !important; }
+  .mb-0\.5 { margin-bottom: 4px !important; }
+  .mt-1 { margin-top: 6px !important; }
+  .mb-1 { margin-bottom: 6px !important; }
+  .gap-0\.5 { gap: 4px !important; }
+  .gap-1 { gap: 6px !important; }
+  .cf-stats > * { padding: 12px 14px !important; }
+  /* space between cards on a page */
+  .space-y-3 > :not(:last-child) { margin-bottom: 14px !important; }
+  .space-y-4 > :not(:last-child) { margin-bottom: 18px !important; }
+  /* card bodies: at least 16px inside */
+  .rounded-xl.border.p-3, .rounded-xl.border.px-3 { padding-left: 16px !important; padding-right: 16px !important; }
+}
