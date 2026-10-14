@@ -190,7 +190,7 @@ export default function SettingsPage() {
             <button
               onClick={() => refreshData(true)}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap"
             >
               <CloudDownload size={12} className={isRefreshing ? 'animate-pulse' : ''} />
               {isRefreshing ? 'Syncing...' : 'Sync Now'}
@@ -209,7 +209,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap"
               >
                 <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
                 {refreshing ? 'Refreshing...' : 'Refresh Now'}
@@ -248,7 +248,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() => api.installUserTriggers()}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0 whitespace-nowrap"
               >
                 {daily ? 'Turn on again' : 'Turn on'}
               </button>
@@ -343,7 +343,7 @@ export default function SettingsPage() {
                   }
                 }}
                 disabled={sendingEmail}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap"
                 style={{
                   background: emailStatus === 'sent' ? 'rgba(16,185,129,0.1)' : emailStatus === 'error' ? 'rgba(248,113,113,0.1)' : 'rgba(139,92,246,0.1)',
                   color: emailStatus === 'sent' ? '#34d399' : emailStatus === 'error' ? '#f87171' : '#a78bfa',

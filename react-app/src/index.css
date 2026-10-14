@@ -314,11 +314,13 @@ header { padding-top: env(safe-area-inset-top); }        /* under the notch when
 .cf-mpage input:not([type=checkbox]):not([type=radio]), .cf-mpage select, .cf-mpage textarea { min-height: 46px; font-size: 16px; border-radius: 12px; }
 .cf-mpage label { font-size: 13px; }
 
-/* phones: summary tiles as one swipeable row instead of a tall grid */
+/* phones: summary tiles in a compact grid, all visible and lined up (3 across; 2 + 2 when there are exactly 4) */
 @media (max-width: 639.98px) {
-  .cf-stats { display: flex !important; overflow-x: auto; gap: 8px !important; margin: 0 -12px; padding: 0 12px 2px; scrollbar-width: none; }
-  .cf-stats::-webkit-scrollbar { display: none; }
-  .cf-stats > * { flex: 0 0 auto; min-width: 42%; padding: 10px 12px !important; }
+  .cf-stats { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .cf-stats:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .cf-stats > * { min-width: 0; padding: 10px 12px !important; }
+  .cf-stats > * > p:first-child { font-size: 10px !important; letter-spacing: .04em !important; line-height: 1.25; margin-bottom: 4px !important; overflow-wrap: anywhere; }
+  .cf-stats > * > p:nth-child(2) { font-size: 15px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 .cf-mpage:has(.cf-form-actions) > .overflow-y-auto { padding-bottom: calc(env(safe-area-inset-bottom) + 96px); }
