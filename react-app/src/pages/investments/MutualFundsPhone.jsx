@@ -106,7 +106,7 @@ function SplitSheet({ open, onClose, breakdown }) {
 
 /** Holdings list, Groww style: flat rows, fund name on the left, current value or returns on the right (tap the
  *  header to switch). Tapping a fund opens the quick-action sheet. */
-const MODES = [['returns', 'Returns (%)'], ['current', 'Current (Invested)'], ['xirr', 'XIRR (CAGR)']]
+const MODES = [['returns', 'Returns (%)'], ['current', 'Current (Invested)'], ['xirr', 'XIRR (Current)']]
 function Holdings({ funds, sub, onOpen }) {
   // like Groww: tap the column title (or any number on the right) to switch what the right side shows
   const [mode, setMode] = useState(() => { try { return localStorage.getItem('cf-mf-col') || 'returns' } catch { return 'returns' } })
@@ -139,7 +139,7 @@ function Holdings({ funds, sub, onOpen }) {
                   ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{signed(h.pl)}</div><div className={`mt-0.5 text-[12.5px] font-semibold ${upCls(h.pl)}`}>({pctTxt(h.plPct)})</div></>
                   : mode === 'current'
                     ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(h.currentValue)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({formatINR(h.investment)})</div></>
-                    : (() => { const r = ret[posKey(h)]; return r?.xirr == null ? <div className="text-[13px] text-[var(--ion-color-medium)]">needs history</div> : <><div className={`text-[15px] font-semibold ${upCls(r.xirr)}`}>{rate(r.xirr)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({rate(r?.cagr)})</div></> })()}
+                    : (() => { const r = ret[posKey(h)]; return <><div className={`text-[15px] font-semibold ${r?.xirr == null ? 'text-[var(--ion-color-medium)]' : upCls(r.xirr)}`}>{r?.xirr == null ? 'N/A' : rate(r.xirr)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({formatINR(h.currentValue)})</div></> })()}
               </div>
             </IonItem>
           )
@@ -312,7 +312,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
   const funds = enrichedHoldings.filter((h) => h.units > 0).sort((a, b) => b.currentValue - a.currentValue)
   return (
     <div className="pb-6">
-      <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['portfolios', 'Portfolios'], ['actions', 'Actions', nSignals(currentIndicators)], ['activity', 'Activity']]} />
+      <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['portfolios', 'Portfolios'], ['actions', 'Actions', nSignals(currentIndicators)], ['activity', 'History']]} />
       <FadeIn k={tab}>
         {tab === 'holdings' && (<>
           <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ v: 'growth' })} />
@@ -371,7 +371,7 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
   return (
     <Screen k={p.portfolioId} title={dn(p.portfolioName)} subtitle={`${mv(p.ownerName, 'name')} · ${p.platform}`} onBack={back} right={right}>
       <div className="pb-6">
-        <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['actions', 'Actions', nSignals(currentIndicators)], ['goals', `Goals${goals.length ? ` (${goals.length})` : ''}`], ['activity', 'Activity']]} />
+        <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['actions', 'Actions', nSignals(currentIndicators)], ['goals', `Goals${goals.length ? ` (${goals.length})` : ''}`], ['activity', 'History']]} />
         <FadeIn k={tab}>
           {tab === 'actions' && (<>
             <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal({ rebalance: p.portfolioId })}
@@ -484,8 +484,8 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <Dash />
           <KV k="Total returns" v={`${signed(h.pl)} (${pctTxt(h.plPct)})`} cls={upCls(h.pl)} />
           <KV k="Invested" v={formatINR(h.investment)} />
-          <KV k="XIRR" v={pos?.xirr == null ? 'needs full history' : rate(pos.xirr)} cls={pos?.xirr == null ? 'text-[var(--ion-color-medium)] !font-normal !text-[13px]' : upCls(pos.xirr)} />
-          {pos?.cagr != null && <KV k="CAGR" v={rate(pos.cagr)} cls={upCls(pos.cagr)} />}
+          <KV k="XIRR" v={pos?.xirr == null ? 'N/A' : rate(pos.xirr)} cls={pos?.xirr == null ? 'text-[var(--ion-color-medium)]' : upCls(pos.xirr)} />
+          <KV k="CAGR" v={pos?.cagr == null ? 'N/A' : rate(pos.cagr)} cls={pos?.cagr == null ? 'text-[var(--ion-color-medium)]' : upCls(pos.cagr)} />
           {terms.ok && <><Dash /><KV k="Long term" sub="(>1Y)" v={formatINR(terms.lt)} /><KV k="Short term" sub="(<1Y)" v={formatINR(terms.st)} /></>}
         </div>
 

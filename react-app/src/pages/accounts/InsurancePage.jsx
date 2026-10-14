@@ -76,7 +76,8 @@ export default function InsurancePage() {
 
   return (
     <div className="space-y-4">
-      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Policies', value: filtered.length }, { label: 'Total cover', value: formatINR(filtered.reduce((t, p) => t + (Number(p.sumAssured) || 0), 0)) }]} onAdd={() => setModal('add')} addLabel="Add policy"
+      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Life cover', value: formatINR(lifeCover) }, { label: 'Health cover', value: formatINR(healthCover) }, { label: 'Premium / yr', value: formatINR(totalPremium) }]}
+        tabs={[{ key: 'list', label: `Policies (${filtered.length})` }, { key: 'cover', label: 'Coverage', badge: (lifeCover > 0 ? 0 : 1) + (healthCover >= 5000000 ? 0 : 1), content: <PhoneCoverage life={lifeCover} health={healthCover} premium={totalPremium} /> }]} onAdd={() => setModal('add')} addLabel="Add policy"
         empty={{ icon: Shield, title: 'No insurance policies yet', text: 'Add term life and health cover so the family knows what to claim.' }}
         groups={[{ items: filtered.map((p) => ({ key: p.policyId, title: p.policyName, sub: `${p.company}${!member ? ` · ${mv(p.insuredMember, 'name')}` : ''}`, value: formatINR(p.sumAssured), note: p.policyType, lead: /health/i.test(p.policyType || '') ? { icon: HeartPulse, color: '#22d3ee' } : { icon: Shield, color: '#a78bfa' }, onClick: () => setModal({ edit: p }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
@@ -229,3 +230,25 @@ function StatCard({ label, value, bold }) {
     </div>
   )
 }
+
+/** Phones: is the family's cover enough? Life cover against 10–15× yearly income, health against a ₹50 L–1 Cr floater. */
+function PhoneCoverage({ life, health, premium }) {
+  const Card = ({ title, have, ok, okText, needText, rec }) => (
+    <div className="mt-3 rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] px-4 py-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[16px] font-semibold text-[var(--ion-text-color)]">{title}</span>
+        <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${ok ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>{ok ? okText : needText}</span>
+      </div>
+      <div className="mt-2 text-[26px] font-bold tabular-nums text-[var(--ion-text-color)]">{formatINR(have)}</div>
+      <div className="mt-1 text-[13.5px] leading-snug text-[var(--ion-color-medium)]">Recommended: {rec}</div>
+    </div>
+  )
+  return (
+    <div className="pb-4">
+      <Card title="Life (term) cover" have={life} ok={life > 0} okText="Has cover" needText="No term cover" rec="10–15 × your yearly income, so the family can live on it if the earner is gone. Check it against your income." />
+      <Card title="Health cover" have={health} ok={health >= 5000000} okText="Good" needText={health > 0 ? 'Low' : 'No health cover'} rec="a ₹50 L – ₹1 Cr family floater: hospital costs rise about 12% a year." />
+      <p className="mt-3 px-1 text-[13px] text-[var(--ion-color-medium)]">You pay about {formatINR(premium)} a year for all policies.</p>
+    </div>
+  )
+}
+

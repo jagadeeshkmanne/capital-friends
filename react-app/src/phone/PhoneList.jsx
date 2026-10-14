@@ -4,7 +4,7 @@
 //   onAdd / addLabel: floating + button (Android FAB)
 import '../phone/ionic-setup'
 import { useState } from 'react'
-import { IonList, IonItem, IonLabel, IonListHeader, IonFab, IonFabButton, IonBadge, IonButton, IonActionSheet } from '@ionic/react'
+import { IonList, IonItem, IonLabel, IonListHeader, IonFab, IonFabButton, IonBadge, IonButton, IonActionSheet, IonSegment, IonSegmentButton } from '@ionic/react'
 import { Plus } from 'lucide-react'
 
 const PALETTE = ['#8b5cf6', '#10b981', '#f59e0b', '#38bdf8', '#ec4899', '#14b8a6', '#f97316']
@@ -21,12 +21,27 @@ function Lead({ lead, title }) {
   )
 }
 
-export default function PhoneList({ summary = [], groups = [], onAdd, addLabel = 'Add', empty, children, top }) {
+//   tabs (optional): [{ key, label, badge?, groups?, summary?, content? }] — top tabs like Mutual Funds; a tab shows its
+//   own groups / summary (or the page's), or its own content instead of the list
+export default function PhoneList({ summary: summary0 = [], groups: groups0 = [], onAdd, addLabel = 'Add', empty, children, top, tabs }) {
+  const [tabKey, setTabKey] = useState(tabs?.[0]?.key)
+  const tab = tabs?.find((t) => t.key === tabKey) || tabs?.[0]
+  const groups = tab?.groups || groups0
+  const summary = tab?.summary || summary0
+  const all = groups0.reduce((n, g) => n + g.items.length, 0)
   const count = groups.reduce((n, g) => n + g.items.length, 0)
   const [menu, setMenu] = useState(null) // item whose action menu is open
   return (
     <div className="-mx-4 pb-24">
+      {tabs && all > 0 && (
+        <div className="cf-top-tabs-wrap -mt-2 mb-1">
+          <IonSegment value={tab.key} onIonChange={(e) => setTabKey(String(e.detail.value))} className="cf-top-tabs" scrollable>
+            {tabs.map((t) => <IonSegmentButton key={t.key} value={t.key}><IonLabel>{t.label}{t.badge > 0 && <span className="cf-tab-badge">{t.badge}</span>}</IonLabel></IonSegmentButton>)}
+          </IonSegment>
+        </div>
+      )}
       {top}
+      {tab?.content ? <div className="px-4">{tab.content}</div> : <>
       {summary.length > 0 && count > 0 && (
         // one summary card, equal columns (like Groww's holdings card): label on top, number below, lined up
         <div className="mx-4 mt-3 grid rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] py-3.5"
@@ -39,7 +54,8 @@ export default function PhoneList({ summary = [], groups = [], onAdd, addLabel =
           ))}
         </div>
       )}
-      {count === 0 && empty && (
+      {tabs && count === 0 && all > 0 && <p className="px-8 py-12 text-center text-[14px] text-[var(--ion-color-medium)]">{tab?.none || 'Nothing here'}</p>}
+      {all === 0 && empty && (
         <div className="flex flex-col items-center gap-3 px-8 pt-20 text-center">
           {empty.icon && <span className="flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-500/15 text-violet-400"><empty.icon size={30} /></span>}
           <p className="text-[16px] font-semibold text-[var(--ion-text-color)]">{empty.title}</p>
@@ -73,10 +89,11 @@ export default function PhoneList({ summary = [], groups = [], onAdd, addLabel =
           </IonList>
         </div>
       ))}
+      </>}
       {children}
       <IonActionSheet isOpen={!!menu} onDidDismiss={() => setMenu(null)} header={menu?.title}
         buttons={[...(menu?.menu || []).map((m) => ({ text: m.text, role: m.danger ? 'destructive' : undefined, handler: m.handler })), { text: 'Cancel', role: 'cancel' }]} />
-      {onAdd && count > 0 && (
+      {onAdd && all > 0 && (
         <IonFab className="cf-fab" style={{ position: 'fixed', right: 16, bottom: 'calc(var(--cf-fab-bottom, 84px) + env(safe-area-inset-bottom))' }}>
           <IonFabButton onClick={onAdd} aria-label={addLabel}><Plus size={26} /></IonFabButton>
         </IonFab>

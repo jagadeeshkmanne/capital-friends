@@ -93,14 +93,16 @@ export default function RemindersPage() {
     return { label: `${days}d`, cls: 'bg-slate-500/20 text-[var(--text-muted)]' }
   }
 
+  const remGroups = [['Overdue', (d) => d < 0], ['Next 7 days', (d) => d >= 0 && d <= 7], ['Later', (d) => d > 7]].map(([title, f]) => ({ title, items: sorted.filter((r) => f(daysUntil(r.dueDate))).map((r) => {
+          const due = getDueBadge(r.dueDate)
+          return { key: r.reminderId, title: r.title, sub: `${r.reminderType} · ${r.familyMemberName} · ${r.frequency}`, chip: { text: due.label, color: daysUntil(r.dueDate) < 0 ? '#fb7185' : daysUntil(r.dueDate) <= 7 ? '#fbbf24' : '#94a3b8' }, lead: { icon: Bell, color: '#fbbf24' }, onClick: () => setModal({ edit: r }) }
+        }) }))
   return (
     <div className="space-y-4">
       {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Overdue', value: overdue, tone: overdue ? 'text-rose-400' : '' }, { label: 'This week', value: dueSoon, tone: dueSoon ? 'text-amber-400' : '' }, { label: 'This month', value: upcoming }]} onAdd={() => setModal('add')} addLabel="Add reminder"
         empty={{ icon: Bell, title: 'No reminders', text: 'SIP dates, premiums, renewals. You get an email before they are due.' }}
-        groups={[['Overdue', (d) => d < 0], ['Next 7 days', (d) => d >= 0 && d <= 7], ['Later', (d) => d > 7]].map(([title, f]) => ({ title, items: sorted.filter((r) => f(daysUntil(r.dueDate))).map((r) => {
-          const due = getDueBadge(r.dueDate)
-          return { key: r.reminderId, title: r.title, sub: `${r.reminderType} · ${r.familyMemberName} · ${r.frequency}`, chip: { text: due.label, color: daysUntil(r.dueDate) < 0 ? '#fb7185' : daysUntil(r.dueDate) <= 7 ? '#fbbf24' : '#94a3b8' }, lead: { icon: Bell, color: '#fbbf24' }, onClick: () => setModal({ edit: r }) }
-        }) }))} /></SuspenseP> : (<>
+        tabs={[{ key: 'due', label: 'Due', badge: overdue + dueSoon, none: '✓ Nothing due this week', groups: null }, { key: 'later', label: 'Upcoming', none: 'Nothing later' }, { key: 'all', label: 'All' }].map((t) => ({ ...t, groups: remGroups.filter((g) => (t.key === 'due' ? g.title !== 'Later' : t.key === 'later' ? g.title === 'Later' : true)) }))}
+        groups={remGroups} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <BellOff size={32} className="text-[var(--text-dim)]" />

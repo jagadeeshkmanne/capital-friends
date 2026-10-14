@@ -1,4 +1,7 @@
 import PhoneSummary from '../../components/PhoneSummary'
+import { lazy, Suspense } from 'react'
+import { useIsPhone } from '../../components/native'
+const StocksPhone = lazy(() => import('./StocksPhone'))
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -34,6 +37,7 @@ export default function StocksPage() {
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
+  const isPhone = useIsPhone()
   const [modal, setModal] = useState(null)
   const [selectedPortfolioId, setSelectedPortfolioId] = useState('all')
   const [subTab, setSubTab] = useState('holdings')
@@ -254,6 +258,63 @@ export default function StocksPage() {
     }
   }
 
+  const modals = (<>
+      {/* Modals */}
+      <Modal open={modal === 'addPortfolio' || !!modal?.editPortfolio} onClose={() => setModal(null)} title={modal?.editPortfolio ? 'Edit Portfolio' : 'New Stock Portfolio'}>
+        <StockPortfolioForm
+          initial={modal?.editPortfolio || undefined}
+          onSave={handleSavePortfolio}
+          onDelete={modal?.editPortfolio ? handleDeletePortfolio : undefined}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal?.buy} onClose={() => setModal(null)} title="Buy Stock" wide>
+        <BuyStockForm
+          portfolioId={typeof modal?.buy === 'string' ? modal.buy : undefined}
+          onSave={handleBuy}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal && typeof modal === 'object' && 'importFile' in modal} onClose={() => setModal(null)} title="Import Stocks from Excel / CSV" wide>
+        {modal && typeof modal === 'object' && 'importFile' in modal && (
+          <ImportStocksForm
+            portfolioId={modal.importFile || undefined}
+            onImport={(data) => importStocks(data)}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
+
+      <Modal open={!!modal?.importDemat} onClose={() => setModal(null)} title="Import shares from a CDSL / NSDL statement" wide>
+        {modal?.importDemat && <ImportDematForm onCancel={() => setModal(null)} />}
+      </Modal>
+
+      <Modal open={!!modal?.sell} onClose={() => setModal(null)} title="Sell Stock" wide>
+        <SellStockForm
+          portfolioId={typeof modal?.sell === 'string' ? modal.sell : undefined}
+          onSave={handleSell}
+          onCancel={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={!!modal?.editTxn} onClose={() => setModal(null)} title="Edit Transaction">
+        {modal?.editTxn && (
+          <EditStockTxnForm
+            txn={modal.editTxn}
+            onSave={handleEditTransaction}
+            onCancel={() => setModal(null)}
+          />
+        )}
+      </Modal>
+
+  </>)
+  if (isPhone) return (<>
+    <Suspense fallback={null}><StocksPhone portfolioData={portfolioData} allHoldings={(stockHoldings || []).filter((h) => portfolios.some((p) => p.portfolioId === h.portfolioId))}
+      allTxns={(stockTransactions || []).filter((t) => portfolios.some((p) => p.portfolioId === t.portfolioId)).sort((a, b) => new Date(b.date) - new Date(a.date))} setModal={setModal} mv={mv} /></Suspense>
+    {modals}
+  </>)
   return (
     <div className="space-y-4">
       {portfolios.length === 0 ? (
@@ -680,56 +741,7 @@ export default function StocksPage() {
         </>
       )}
 
-      {/* Modals */}
-      <Modal open={modal === 'addPortfolio' || !!modal?.editPortfolio} onClose={() => setModal(null)} title={modal?.editPortfolio ? 'Edit Portfolio' : 'New Stock Portfolio'}>
-        <StockPortfolioForm
-          initial={modal?.editPortfolio || undefined}
-          onSave={handleSavePortfolio}
-          onDelete={modal?.editPortfolio ? handleDeletePortfolio : undefined}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal?.buy} onClose={() => setModal(null)} title="Buy Stock" wide>
-        <BuyStockForm
-          portfolioId={typeof modal?.buy === 'string' ? modal.buy : undefined}
-          onSave={handleBuy}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal && typeof modal === 'object' && 'importFile' in modal} onClose={() => setModal(null)} title="Import Stocks from Excel / CSV" wide>
-        {modal && typeof modal === 'object' && 'importFile' in modal && (
-          <ImportStocksForm
-            portfolioId={modal.importFile || undefined}
-            onImport={(data) => importStocks(data)}
-            onCancel={() => setModal(null)}
-          />
-        )}
-      </Modal>
-
-      <Modal open={!!modal?.importDemat} onClose={() => setModal(null)} title="Import shares from a CDSL / NSDL statement" wide>
-        {modal?.importDemat && <ImportDematForm onCancel={() => setModal(null)} />}
-      </Modal>
-
-      <Modal open={!!modal?.sell} onClose={() => setModal(null)} title="Sell Stock" wide>
-        <SellStockForm
-          portfolioId={typeof modal?.sell === 'string' ? modal.sell : undefined}
-          onSave={handleSell}
-          onCancel={() => setModal(null)}
-        />
-      </Modal>
-
-      <Modal open={!!modal?.editTxn} onClose={() => setModal(null)} title="Edit Transaction">
-        {modal?.editTxn && (
-          <EditStockTxnForm
-            txn={modal.editTxn}
-            onSave={handleEditTransaction}
-            onCancel={() => setModal(null)}
-          />
-        )}
-      </Modal>
-
+      {modals}
       {/* Signal modals temporarily disabled */}
     </div>
   )

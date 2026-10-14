@@ -1399,7 +1399,7 @@ export default function MutualFundsPage() {
                     const r = (x) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`
                     const folio = folioOf(ftx)
                     return <>
-                      <DetailRow label="XIRR / CAGR" value={pos?.xirr == null ? 'Needs the full history (import your CAS)' : `${r(pos.xirr)} / ${pos.cagr == null ? '—' : r(pos.cagr)}`} />
+                      <DetailRow label="XIRR / CAGR" value={`${pos?.xirr == null ? 'N/A' : r(pos.xirr)} / ${pos?.cagr == null ? 'N/A' : r(pos.cagr)}`} />
                       {folio && <DetailRow label="Folio" value={mv(folio, 'account')} />}
                     </>
                   })()}
