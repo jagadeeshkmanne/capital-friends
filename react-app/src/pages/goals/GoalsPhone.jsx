@@ -269,7 +269,7 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
   const g = p.goal
   const [menu, setMenu] = useState(false)
   const [bk, setBk] = useState(false)
-  const [sub, setSub] = useState(null) // 'plan' | 'funds'
+  const [sub, setSub] = useState(null) // 'plan'
   const gp = gapTxt(p)
   const [t, c] = tone(p)
   const own = (todo?.steps || []).filter((x) => (x.t === 'protect' || x.t === 'ready') && x.goal?.goalId === g.goalId) // family-plan steps that belong to this goal
@@ -289,24 +289,6 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
       {!p.isRet && n === 1 && <p className="px-1 pb-6 text-[13px] text-[var(--ion-color-medium)]">Paid over several years (like college fees)? Edit the goal and set Withdraw to "Over 4 years": each year's part then gets its own glide path.</p>}
     </Screen>
   )
-  if (sub === 'funds') return (
-    <Screen k={`${g.goalId}-funds`} title={`Investments · ${items.length}`} subtitle={`${L(p.has)} · ${p.eqNow ?? '—'}% equity`} onBack={() => setSub(null)}>
-      <IonList lines="full" className="cf-flat -mx-4 pb-6">
-        {items.map((it) => {
-          const h = it.holding
-          const name = it.kind === 'mf' ? String(h.fundName || '').replace(/\s*-\s*(Direct|Regular).*$/i, '') : it.kind === 'stock' ? (h.companyName || h.symbol || h.stockName) : mt(h.investmentName || h.investmentType || 'Investment')
-          return (
-            <IonItem key={it.key}>
-              <IonLabel className="!my-3"><h3 className="!text-[15px] !font-medium !whitespace-normal">{name}</h3><p>{Math.round((it.eq || 0) * 100)}% equity{it.portfolioId && pname(it.portfolioId) ? ` · ${pname(it.portfolioId)}` : ''}{it.fraction != null && it.fraction < 0.999 ? ` · ${Math.round(it.fraction * 100)}% for this goal` : ''}</p></IonLabel>
-              <div slot="end" className="text-[15px] font-semibold tabular-nums">{L(it.value)}</div>
-            </IonItem>
-          )
-        })}
-      </IonList>
-      {!items.length && <p className="py-6 text-center text-[14px] text-[var(--ion-color-medium)]">No investments counted for this goal yet. Open Money for goals.</p>}
-    </Screen>
-  )
-
   const Tile = ({ k, v, sub: s2 }) => (
     <div className="min-w-0 rounded-xl border border-[var(--ion-border-color)] bg-[var(--ion-background-color)] px-3 py-2.5">
       <div className="text-[12px] text-[var(--ion-color-medium)]">{k}</div>
@@ -342,6 +324,12 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
             </div>
           )}
           {p.isRet && <div className="g2"><style>{GOALS_HOME_CSS}</style><div className="g2-stats mt-2.5"><RetirementActions goal={g} slot="stat" /></div></div>}
+          <button type="button" onClick={() => setSub('plan')} className="ion-activatable relative overflow-hidden mt-3 flex w-full items-center gap-2.5 rounded-xl bg-violet-500/10 px-3 py-2.5 text-left">
+            <ListChecks size={17} className="shrink-0 text-violet-400" />
+            <span className="min-w-0 flex-1 text-[13px] leading-snug text-[var(--ion-text-color)]">{nextMove ? <><span className="text-[var(--ion-color-medium)]">Next · </span>{nextMove}</> : (n > 1 ? `How the money moves and the ${n} payments` : 'How the money moves to safe funds')}</span>
+            <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-violet-400">View plan ›</span>
+            <IonRippleEffect />
+          </button>
         </div>
 
         {/* what to do now: everything for this goal in one place */}
@@ -350,12 +338,33 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
 
         {p.isRet && <><IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Buckets</IonLabel></IonListHeader><BucketsGlance retired={retired} goal={g} onOpen={() => setBk(true)} /></>}
 
-        {/* more about this goal */}
-        <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">More</IonLabel></IonListHeader>
-        <Rows rows={[
-          [ListChecks, 'Plan by year', nextMove || (n > 1 ? `How the money moves and the ${n} payments` : 'How the money moves to safe funds by the goal year'), '#a78bfa', () => setSub('plan')],
-          [Wallet, `Investments · ${items.length}`, `${L(p.has)} · ${p.eqNow ?? '—'}% equity`, '#38bdf8', () => setSub('funds')],
-        ].filter(Boolean)} />
+        {/* the money counted for this goal, right here (no extra tap) */}
+        <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Investments · {items.length}</IonLabel></IonListHeader>
+        {items.length ? (
+          <IonList lines="full" className="cf-flat -mx-4">
+            {items.map((it) => {
+              const h = it.holding
+              const name = it.kind === 'mf' ? String(h.fundName || '').replace(/\s*-\s*(Direct|Regular).*$/i, '') : it.kind === 'stock' ? (h.companyName || h.symbol || h.stockName) : mt(h.investmentName || h.investmentType || 'Investment')
+              const part = it.fraction != null && it.fraction < 0.999 && it.fraction > 0
+              const go = it.kind === 'mf' && h.portfolioId ? () => navigate(`/investments/mutual-funds?p=${encodeURIComponent(h.portfolioId)}&f=${encodeURIComponent(h.holdingId || `${h.portfolioId}::${h.schemeCode || h.fundCode}`)}`, { state: { cfFrom: '' } }) : undefined
+              return (
+                <IonItem key={it.key} button={!!go} detail={false} onClick={go}>
+                  <IonLabel className="!my-3.5">
+                    <h3 className="!text-[15px] !font-medium !whitespace-normal !leading-snug">{name}</h3>
+                    <p className="!flex !flex-wrap !items-center !gap-x-1.5 !gap-y-1 !mt-1">
+                      <span>{Math.round((it.eq || 0) * 100)}% equity{it.portfolioId && pname(it.portfolioId) ? ` · ${pname(it.portfolioId)}` : ''}</span>
+                      {part && <span className="px-1.5 rounded bg-violet-500/15 text-violet-300 text-[11px] font-semibold">{Math.round(it.fraction * 100)}% for this goal</span>}
+                    </p>
+                  </IonLabel>
+                  <div slot="end" className="ml-2 shrink-0 text-right tabular-nums">
+                    <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{L(it.value)}</div>
+                    {part && <div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">(of {L(it.value / it.fraction)})</div>}
+                  </div>
+                </IonItem>
+              )
+            })}
+          </IonList>
+        ) : <p className="px-1 py-3 text-[14px] text-[var(--ion-color-medium)]">No investments counted for this goal yet. Map funds to it from Money for goals.</p>}
       </div>
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header={mt(g.goalName)} buttons={[
         { text: 'Edit goal', handler: () => onEdit(g) },

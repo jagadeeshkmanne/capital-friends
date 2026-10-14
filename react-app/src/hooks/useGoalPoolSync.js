@@ -28,7 +28,8 @@ export function computeGoalPool(d) {
   const stP = (stockPortfolios || []).map((p) => ({ ...p, ownerName: p.ownerName || people.find((m) => m.memberId === p.ownerId)?.memberName || '' }))
   const withGoal = new Set(goals.map((g) => String(g.familyMemberName || '').trim().toLowerCase()))
   const kidNames = people.filter((m) => /^(son|daughter)$/i.test(String(m.relationship || '').trim()) && !withGoal.has(String(m.memberName || '').trim().toLowerCase())).map((m) => m.memberName)
-  const items = poolItems({ mfPortfolios: mfP, mfHoldings, stockPortfolios: stP, stockHoldings, otherInvList, eqOf, choice, kidNames })
+  const kidGoalNames = people.filter((m) => /^(son|daughter)$/i.test(String(m.relationship || '').trim()) && withGoal.has(String(m.memberName || '').trim().toLowerCase())).map((m) => m.memberName)
+  const items = poolItems({ mfPortfolios: mfP, mfHoldings, stockPortfolios: stP, stockHoldings, otherInvList, eqOf, choice, kidNames, kidGoalNames })
   // pass 1 without SIPs tells which funds (and so which running SIPs) each goal gets; pass 2 counts those SIPs,
   // so a goal's share is what it needs today with its SIP (same "Need today" the goal shows). Both passes
   // use today's data only, so the result is stable.

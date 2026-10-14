@@ -56,10 +56,11 @@ export function lockedWhy(inv) {
  *   real estate is never put in)
  * @returns [{ id, type: 'MF'|'Stock'|'Other', name, owner, value, eq (0..1), kind: 'pool'|'retirement'|'out', included, locked }]
  */
-export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, eqOf, choice = {}, kidNames = [] }) {
+export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, eqOf, choice = {}, kidNames = [], kidGoalNames = [] }) {
   const off = new Set(choice.off || []), on = new Set(choice.on || [])
   // a son's / daughter's own money is theirs: left out by default (switch it on to use it for a goal)
   const kids = new Set((kidNames || []).map(norm))
+  const kidsWithGoal = new Set((kidGoalNames || []).map(norm)) // a child who has a goal of their own: their money counts, for that goal first
   const items = []
   for (const p of (mfPortfolios || []).filter((x) => x.status !== 'Inactive')) {
     const hs = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && Number(h.units) > 0)
@@ -85,9 +86,10 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
   return items.map((it) => {
     const kid = it.kind === 'pool' && !!it.owner && kids.has(norm(it.owner))
     const kind = kid ? 'out' : it.kind
+    const kidGoal = !kid && it.kind === 'pool' && !!it.owner && kidsWithGoal.has(norm(it.owner))
     if (kind === 'locked') return { ...it, kind, kid, included: false }   // not liquid: never sold for a goal
     if (kind === 'retirement') return { ...it, kind, kid, included: true }   // EPF / PPF / NPS always count, for retirement only
-    return { ...it, kind, kid, included: kind === 'out' ? on.has(it.id) : !off.has(it.id) }
+    return { ...it, kind, kid, kidGoal, included: kind === 'out' ? on.has(it.id) : !off.has(it.id) }
   })
 }
 
