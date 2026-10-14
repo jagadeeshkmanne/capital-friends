@@ -762,3 +762,61 @@ function StatCard({ label, value, sub, positive, bold, title }) {
     </div>
   )
 }
+
+/* ── Transaction row menu (Edit / Delete) ── */
+function StockTxnActionMenu({ txn, isOpen, onToggle, onEdit, onDelete }) {
+  const buttonRef = useRef(null)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+
+  if (!txn.transactionId) return null
+
+  function handleToggle(e) {
+    e.stopPropagation()
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    onToggle()
+  }
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={handleToggle}
+        className="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Actions"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {isOpen && createPortal(
+        <>
+          {/* Transparent backdrop to catch outside clicks */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            onClick={(e) => { e.stopPropagation(); onToggle() }}
+          />
+          {/* Menu */}
+          <div
+            style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
+            className="bg-[var(--bg-dropdown)] border border-white/10 rounded-lg shadow-2xl py-1 min-w-[120px] animate-fade-in"
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit() }}
+              className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] flex items-center gap-2 transition-colors"
+            >
+              <Pencil size={12} /> Edit
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="w-full text-left px-3 py-2 text-xs text-[var(--accent-rose)] hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  )
+}
