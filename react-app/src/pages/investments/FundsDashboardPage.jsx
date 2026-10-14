@@ -74,7 +74,7 @@ const COLUMNS = [
   { key: 'pl', label: 'Gain', sub: 'Amount / %', align: 'right' },
   { key: 'xirr', label: 'Returns', sub: 'XIRR / CAGR', align: 'right' },
   { key: 'weight', label: 'Weight', align: 'right' },
-  { key: 'belowATHPct', label: 'ATH', sub: 'Below peak', align: 'right' },
+  { key: 'belowATHPct', label: 'High', sub: 'Below it', align: 'right' },
 ]
 
 export default function FundsDashboardPage() {
@@ -324,7 +324,7 @@ export default function FundsDashboardPage() {
                         <td className={`${sz.row} px-3 w-full max-w-0`}>
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className={`${sz.name} font-semibold text-[var(--text-primary)] truncate`} title={`${f.fundName}\n${fundFacts(f)}`}>{main}</span>
-                            {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Far below peak' : 'Below peak'}</span>}
+                            {f.isBuyOpp && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${f.isStrongBuy ? 'text-emerald-400 bg-emerald-500/15' : 'text-blue-400 bg-blue-500/15'}`}>{f.isStrongBuy ? 'Far below high' : 'Below high'}</span>}
                           </div>
                         </td>
                         <td className={`${sz.row} px-3 text-right whitespace-nowrap ${sz.num} tabular-nums`}>
@@ -513,7 +513,7 @@ function CategoryTag({ category }) {
 }
 
 function BuyTag({ strong }) {
-  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${strong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>{strong ? 'Far below peak' : 'Below peak'}</span>
+  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${strong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>{strong ? 'Far below high' : 'Below high'}</span>
 }
 
 function athTextClass(p) {
@@ -527,7 +527,7 @@ function ATHBadge({ fund, cls = 'text-xs' }) {
   if (!(fund.athNav > 0)) return <span className={`${cls} text-[var(--text-dim)]`}>—</span>
   return (
     <span className={`${cls} tabular-nums ${athTextClass(fund.belowATHPct)}`}>
-      {fund.belowATHPct <= 0 ? 'At ATH' : `↓${fund.belowATHPct.toFixed(1)}%`}
+      {fund.belowATHPct <= 0 ? 'At its high' : `↓${fund.belowATHPct.toFixed(1)}%`}
     </span>
   )
 }

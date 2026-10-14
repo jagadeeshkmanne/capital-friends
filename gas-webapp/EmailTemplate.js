@@ -450,13 +450,13 @@ function buildDashboardPDFHTML(data) {
   // ══════════════════════════════════════════════════════════════════
   if (buyOpportunities.length > 0) {
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + _cs + '"><tbody><tr><td style="padding:20px">';
-    h += _secH('Funds below their peak (ATH)', '#d97706');
+    h += _secH('Funds below their all-time high', '#d97706');
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px"><tbody>';
-    h += '<tr style="background:#f8fafc"><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Fund Name</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Portfolio</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Below ATH</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Signal</th></tr>';
+    h += '<tr style="background:#f8fafc"><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Fund Name</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:left">Portfolio</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Below high</th><th style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;text-align:right">Signal</th></tr>';
     for (var boi = 0; boi < buyOpportunities.length; boi++) {
       var bo = buyOpportunities[boi];
       var boColor = bo.isStrongBuy ? '#ea580c' : '#b45309';
-      var boLabel = bo.isStrongBuy ? 'FAR BELOW PEAK' : 'BELOW PEAK';
+      var boLabel = bo.isStrongBuy ? 'FAR BELOW HIGH' : 'BELOW HIGH';
       h += '<tr' + (boi < buyOpportunities.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
       h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b">' + _escHtml(bo.fundName) + '</td>';
       h += '<td style="padding:8px 10px;font-size:13px;color:#475569">' + _escHtml(bo.portfolioName) + '</td>';
@@ -605,7 +605,7 @@ function buildDashboardPDFHTML(data) {
           h += '<th style="' + _mfThS + ';text-align:left">Fund</th>';
           h += '<th style="' + _mfThS + ';text-align:right">Units</th>';
           h += '<th style="' + _mfThS + ';text-align:right">NAV (Cur/Avg)</th>';
-          h += '<th style="' + _mfThS + ';text-align:right">ATH / Below Peak</th>';
+          h += '<th style="' + _mfThS + ';text-align:right">All-time high / below</th>';
           h += '<th style="' + _mfThS + ';text-align:right">Alloc (Cur/Tgt)</th>';
           h += '<th style="' + _mfThS + ';text-align:right">Amount (Cur/Inv)</th>';
           h += '<th style="' + _mfThS + ';text-align:right">P&amp;L</th>';

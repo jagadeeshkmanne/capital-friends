@@ -229,8 +229,8 @@ export default function MFInvestForm({ portfolioId, fundCode: initialFundCode, f
             {existingHolding.lumpsumRestricted && existingHolding.sipRestricted
               ? 'This fund is blocked from both SIP and Lumpsum investments'
               : existingHolding.lumpsumRestricted
-                ? 'Lumpsum restricted — only SIP investment allowed'
-                : 'SIP restricted — only Lumpsum investment allowed'}
+                ? 'Lump sum stopped for this fund — only SIP'
+                : 'SIP stopped for this fund — only lump sum'}
           </p>
         </div>
       )}

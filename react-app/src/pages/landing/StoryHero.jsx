@@ -220,15 +220,15 @@ function SceneCas() {
   )
 }
 
-/* 4 · alerts: a fund falls 5% / 10% below its peak (all-time high), and a rebalance alert — facts by colour, no buy/sell calls */
+/* 4 · alerts: a fund falls 5% / 10% below its high (all-time high), and a rebalance alert — facts by colour, no buy/sell calls */
 G.bell = <path d="M-8 5 V-2 A8 8 0 0 1 8 -2 V5 L11 8 H-11 Z M-3.2 10 A3.2 3.2 0 0 0 3.2 10 Z" fill="currentColor" />
 function SceneAlerts() {
   const y = (pct) => 96 + pct * 12          // 0% below the high at y 96, every 1% lower = 12px
   const line = 'M70 300 C120 280 150 240 196 200 S270 104 320 96 S400 132 444 156 S520 172 556 210 S612 236 640 240'
   const area = `${line} V330 H70 Z`
-  // how far below its peak, by colour: amber 5–10%, rose 10%+; violet for a rebalance
-  const NOTE = [['Small cap fund', '12%', 'below its peak', '#e11d48', 4.3, 'down'],
-    ['Flexi cap fund', '6%', 'below its peak', '#d97706', 5.0, 'down'],
+  // how far below its high, by colour: amber 5–10%, rose 10%+; violet for a rebalance
+  const NOTE = [['Small cap fund', '12%', 'below its high', '#e11d48', 4.3, 'down'],
+    ['Flexi cap fund', '6%', 'below its high', '#d97706', 5.0, 'down'],
     ['Equity vs. your target', '8%', 'above target · rebalance', C.violet, 5.7, 'up']]
   return (
     <svg viewBox={VB} className="st-svg" aria-label="The app watches each fund's peak (all-time high) and alerts you on your phone when it falls 5% or 10% below it">
@@ -244,7 +244,7 @@ function SceneAlerts() {
       <line x1="70" x2="650" y1={y(0)} y2={y(0)} stroke={C.navy} strokeOpacity=".5" strokeWidth="1.5" strokeDasharray="6 6" />
       <line x1="70" x2="650" y1={y(5)} y2={y(5)} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 6" />
       <line x1="70" x2="650" y1={y(10)} y2={y(10)} stroke="#e11d48" strokeOpacity=".7" strokeWidth="1.5" strokeDasharray="3 6" />
-      <Tx x={656} y={y(0) + 4} s={10.5} w={800} c={C.navy}>Peak</Tx>
+      <Tx x={656} y={y(0) + 4} s={10.5} w={800} c={C.navy}>High</Tx>
       <Tx x={656} y={y(5) + 4} s={10.5} w={800} c="#d97706">−5%</Tx>
       <Tx x={656} y={y(10) + 4} s={10.5} w={800} c="#e11d48">−10%</Tx>
       <path d={area} fill="url(#st-area)" className="st-pop" style={T(1.8)} />
@@ -253,13 +253,13 @@ function SceneAlerts() {
       <g transform={`translate(320 ${y(0)})`}><g className="st-pop" style={T(1.3)}>
         <circle r="7" fill="#fff" stroke={C.navy} strokeWidth="3" />
         <path d="M-12 -18 L-12 -30 L-6 -24 L0 -32 L6 -24 L12 -30 L12 -18 Z" fill="#f59e0b" />
-        <Tx y={-40} s={11} w={800} c={C.navy} a="middle">Peak ₹52.10</Tx>
+        <Tx y={-40} s={11} w={800} c={C.navy} a="middle">High ₹52.10</Tx>
       </g></g>
       {/* today's price walks down the line; each line it crosses sends an alert */}
       <g className="st-walk" style={{ offsetPath: `path('${line}')`, animationDelay: '.6s' }}>
         <circle className="st-halo" r="14" fill={C.rose} opacity=".25" /><circle r="7" fill={C.rose} stroke="#fff" strokeWidth="2.5" />
       </g>
-      {[[412, y(5), '5% below peak', '#d97706', 3.3], [556, y(10), '10% below peak', '#e11d48', 4.1]].map(([x, yy, l, c, t]) => (
+      {[[412, y(5), '5% below high', '#d97706', 3.3], [556, y(10), '10% below high', '#e11d48', 4.1]].map(([x, yy, l, c, t]) => (
         <g key={l} transform={`translate(${x + 96} ${yy - 30})`}><g className="st-pop" style={T(t)}>
           <rect x={-(l.length * 3.2) - 24} y="-14" width={l.length * 6.4 + 48} height="26" rx="13" fill={c} />
           <g transform={`translate(${-(l.length * 3.2) - 10} -1) scale(.55)`} style={{ color: '#fff' }}>{G.bell}</g>

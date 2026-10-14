@@ -440,7 +440,7 @@ export default function Dashboard() {
     const nearATHMap = {}
     activeMFPortfolios.forEach(p => {
       activeMFHoldings.filter(h => h.portfolioId === p.portfolioId).forEach(h => {
-        // debt / liquid funds sit at their high almost every day, so "near peak" says nothing useful for them
+        // debt / liquid funds sit at their high almost every day, so "near high" says nothing useful for them
         if (isSteadyFund(h)) return
         if (h.athNav > 0 && h.belowATHPct >= 0 && h.belowATHPct < 1.5) {
           const name = splitFundName(h.fundName).main
@@ -632,7 +632,7 @@ export default function Dashboard() {
           navigate={navigate} mt={mt} onRebalance={() => setShowRebalanceDialog(true)} onBuyOpp={() => setShowBuyOpp(true)} />
       </Suspense>
       <Modal open={showRebalanceDialog} onClose={() => setShowRebalanceDialog(false)} title="Rebalance" wide>{showRebalanceDialog && <MFRebalanceDialog />}</Modal>
-      <Modal open={showBuyOpp} onClose={() => setShowBuyOpp(false)} title="Funds below their peak" wide>{showBuyOpp && <MFBuyOpportunities />}</Modal>
+      <Modal open={showBuyOpp} onClose={() => setShowBuyOpp(false)} title="Funds below their high" wide>{showBuyOpp && <MFBuyOpportunities />}</Modal>
     </>
   )
 
@@ -887,7 +887,7 @@ export default function Dashboard() {
         {data.buyOpportunities.length > 0 && (
           <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 cursor-pointer hover:border-[var(--border-light)] transition-colors${data.nearATHFunds.length === 0 ? ' md:col-span-2' : ''}`}
                onClick={() => navigate('/investments/mutual-funds')}>
-            <SectionHeader label="Below their peak" color="#34d399" badge={data.buyOpportunities.length}
+            <SectionHeader label="Below their high" color="#34d399" badge={data.buyOpportunities.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
             <div className="text-xs text-[var(--text-dim)] mb-3">Funds 5%+ below All-Time High</div>
             <div className="space-y-0">
@@ -902,7 +902,7 @@ export default function Dashboard() {
                               background: opp.isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(52,211,153,0.10)',
                               color: opp.isStrongBuy ? '#22d3ee' : '#34d399',
                             }}>
-                        {opp.isStrongBuy ? 'Far below peak' : 'Below peak'}
+                        {opp.isStrongBuy ? 'Far below high' : 'Below high'}
                       </span>
                       <span className="text-xs font-semibold tabular-nums"
                             style={{ color: opp.isStrongBuy ? '#22d3ee' : '#34d399' }}>
@@ -920,7 +920,7 @@ export default function Dashboard() {
         {data.nearATHFunds.length > 0 && (
           <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 cursor-pointer hover:border-[var(--border-light)] transition-colors${data.buyOpportunities.length === 0 ? ' md:col-span-2' : ''}`}
                onClick={() => navigate('/investments/mutual-funds')}>
-            <SectionHeader label="Near Peak" color="#fbbf24" badge={data.nearATHFunds.length}
+            <SectionHeader label="Near high" color="#fbbf24" badge={data.nearATHFunds.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
             <div className="text-xs text-[var(--text-dim)] mb-3">At or near their all-time high NAV</div>
             <div className="space-y-0">
@@ -933,7 +933,7 @@ export default function Dashboard() {
                           background: f.isAtATH ? 'rgba(251,191,36,0.15)' : 'rgba(245,158,11,0.08)',
                           color: f.isAtATH ? '#fbbf24' : '#f59e0b',
                         }}>
-                    {f.isAtATH ? 'At ATH' : `${f.belowATHPct.toFixed(1)}% below`}
+                    {f.isAtATH ? 'At its high' : `${f.belowATHPct.toFixed(1)}% below`}
                   </span>
                 </div>
               ))}

@@ -5,11 +5,11 @@ import MFBuyOpportunities from './forms/MFBuyOpportunities'
 import MFRebalanceDialog from './forms/MFRebalanceDialog'
 
 const TAB_CONFIG = [
-  { key: 'buyopp', label: 'Buy Opps', icon: TrendingDown, idle: 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20', active: 'bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-500/40' },
+  { key: 'buyopp', label: 'Below high', icon: TrendingDown, idle: 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20', active: 'bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-500/40' },
   { key: 'rebalance', label: 'Rebalance', icon: RefreshCw, idle: 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20', active: 'bg-violet-500/25 text-violet-300 ring-1 ring-violet-500/40' },
 ]
 
-const DIALOG_TITLES = { buyopp: 'Funds below their peak', rebalance: 'Rebalance' }
+const DIALOG_TITLES = { buyopp: 'Funds below their high', rebalance: 'Rebalance' }
 
 export default function ActionStrip() {
   const { investmentSignals } = useAlerts()

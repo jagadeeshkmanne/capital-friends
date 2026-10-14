@@ -137,7 +137,7 @@ function inferMFCategory(name) {
   return 'Equity'
 }
 
-const DIALOG_TITLES = { buyopp: 'Funds below their peak', rebalance: 'Rebalance Alerts' }
+const DIALOG_TITLES = { buyopp: 'Funds below their high', rebalance: 'Rebalance Alerts' }
 
 // Phone app bar: the page's title, and a back arrow on pages that aren't one of the bottom tabs
 const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/investments/stocks', '/goals', '/more']
@@ -343,7 +343,7 @@ export default function Header() {
             {phoneBar?.right && <span className="lg:hidden flex items-center">{phoneBar.right}</span>}
             <span className={phoneBar?.right ? 'hidden lg:contents' : 'contents'}>
 
-            {/* Below peak — icon button with count badge (phones: only on Dashboard and Mutual Funds) */}
+            {/* Below high — icon button with count badge (phones: only on Dashboard and Mutual Funds) */}
             {buyOppCount > 0 && (
               <button data-signal={signalsHere ? undefined : 'off'}
                 onClick={() => { setDialogKey(dialogKey === 'buyopp' ? null : 'buyopp'); closeAll() }}
@@ -352,7 +352,7 @@ export default function Header() {
                     ? 'text-emerald-300 bg-emerald-500/20'
                     : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
                 }`}
-                title={`${buyOppCount} fund${buyOppCount === 1 ? '' : 's'} below peak${strongBuyCount > 0 ? ` (${strongBuyCount} far below)` : ''}`}
+                title={`${buyOppCount} fund${buyOppCount === 1 ? '' : 's'} below high${strongBuyCount > 0 ? ` (${strongBuyCount} far below)` : ''}`}
               >
                 <TrendingDown size={18} />
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-xs font-bold text-white bg-emerald-500 rounded-full px-1">{buyOppCount}</span>

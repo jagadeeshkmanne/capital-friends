@@ -12,8 +12,8 @@ function belowColor(pct) {
 }
 
 function buySignal(pct) {
-  if (pct >= 10) return { label: 'Far below peak', cls: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30' }
-  if (pct >= 5) return { label: 'Below peak', cls: 'bg-blue-500/20 text-blue-400' }
+  if (pct >= 10) return { label: 'Far below high', cls: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30' }
+  if (pct >= 5) return { label: 'Below high', cls: 'bg-blue-500/20 text-blue-400' }
   return null
 }
 
@@ -45,7 +45,7 @@ export default function MFBuyOpportunities() {
   if (totalOpps === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-[var(--text-muted)]">No funds far below their peak right now</p>
+        <p className="text-sm text-[var(--text-muted)]">No funds far below their high right now</p>
         <p className="text-xs text-[var(--text-dim)] mt-1">All funds are near their all-time highs</p>
       </div>
     )
@@ -54,7 +54,7 @@ export default function MFBuyOpportunities() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-[var(--text-dim)] px-1">
-        Funds 5% or more below their All-Time High NAV. Higher discount = stronger opportunity.
+        Funds 5% or more below their all-time high NAV. This is information, not a buy or sell call.
       </p>
 
       {portfolioGroups.map((p, i) => (
@@ -74,8 +74,8 @@ export default function MFBuyOpportunities() {
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                   <th className="text-left py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Fund</th>
                   <th className="text-center py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Signal</th>
-                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Below ATH</th>
-                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">ATH NAV</th>
+                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Below high</th>
+                  <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">All-time high</th>
                   <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Current</th>
                   <th className="text-right py-1.5 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase">Value</th>
                 </tr>

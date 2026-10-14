@@ -118,13 +118,13 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
   async function handleToggleLumpsum(a) {
     const newVal = !a.lumpsumRestricted
-    showBlockUI(newVal ? 'Restricting lumpsum...' : 'Enabling lumpsum...')
+    showBlockUI(newVal ? 'Stopping lump sum...' : 'Allowing lump sum...')
     try {
       await toggleLumpsumRestricted(portfolioId, a.schemeCode, newVal)
       setAllocations((prev) => prev.map((x) =>
         x.schemeCode === a.schemeCode ? { ...x, lumpsumRestricted: newVal } : x
       ))
-      showToast(newVal ? 'Lumpsum restricted across all portfolios' : 'Lumpsum enabled across all portfolios')
+      showToast(newVal ? 'Lump sum stopped across all portfolios' : 'Lump sum allowed across all portfolios')
     } catch (err) {
       showToast(err.message || 'Failed to update restriction', 'error')
     } finally {
@@ -134,13 +134,13 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
 
   async function handleToggleSip(a) {
     const newVal = !a.sipRestricted
-    showBlockUI(newVal ? 'Restricting SIP...' : 'Enabling SIP...')
+    showBlockUI(newVal ? 'Stopping SIP...' : 'Allowing SIP...')
     try {
       await toggleSipRestricted(portfolioId, a.schemeCode, newVal)
       setAllocations((prev) => prev.map((x) =>
         x.schemeCode === a.schemeCode ? { ...x, sipRestricted: newVal } : x
       ))
-      showToast(newVal ? 'SIP restricted across all portfolios' : 'SIP enabled across all portfolios')
+      showToast(newVal ? 'SIP stopped across all portfolios' : 'SIP allowed across all portfolios')
     } catch (err) {
       showToast(err.message || 'Failed to update restriction', 'error')
     } finally {
@@ -216,14 +216,14 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                             <button
                               onClick={() => handleToggleLumpsum(a)}
                               className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${a.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                              title={a.lumpsumRestricted ? 'Lumpsum restricted — click to allow' : 'Click to restrict lumpsum'}
+                              title={a.lumpsumRestricted ? 'Lump sum stopped — click to allow' : 'Click to stop new lump sum'}
                             >
                               <IndianRupee size={11} strokeWidth={2.5} />
                             </button>
                             <button
                               onClick={() => handleToggleSip(a)}
                               className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${a.sipRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                              title={a.sipRestricted ? 'SIP restricted — click to allow' : 'Click to restrict SIP'}
+                              title={a.sipRestricted ? 'SIP stopped — click to allow' : 'Click to stop new SIP'}
                             >
                               <Repeat size={11} strokeWidth={2.5} />
                             </button>
@@ -292,14 +292,14 @@ export default function MFAllocationManager({ portfolioId, onSave, onCancel }) {
                         <button
                           onClick={() => handleToggleLumpsum(a)}
                           className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${a.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                          title={a.lumpsumRestricted ? 'Lumpsum restricted — click to allow' : 'Click to restrict lumpsum'}
+                          title={a.lumpsumRestricted ? 'Lump sum stopped — click to allow' : 'Click to stop new lump sum'}
                         >
                           <IndianRupee size={12} strokeWidth={2.5} />
                         </button>
                         <button
                           onClick={() => handleToggleSip(a)}
                           className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${a.sipRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                          title={a.sipRestricted ? 'SIP restricted — click to allow' : 'Click to restrict SIP'}
+                          title={a.sipRestricted ? 'SIP stopped — click to allow' : 'Click to stop new SIP'}
                         >
                           <Repeat size={12} strokeWidth={2.5} />
                         </button>

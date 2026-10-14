@@ -97,7 +97,7 @@ export default function PhoneLayout() {
             </IonTitle>
             <IonButtons slot="end">
               {bar?.right ? bar.right : (<>
-                {signals && buyOppCount > 0 && <IonButton className="cf-icon-btn" onClick={() => setDialog('buyopp')} aria-label="Funds below their peak"><span className="relative text-emerald-400"><TrendingDown size={21} /><IonBadge color="success" className="cf-badge">{buyOppCount}</IonBadge></span></IonButton>}
+                {signals && buyOppCount > 0 && <IonButton className="cf-icon-btn" onClick={() => setDialog('buyopp')} aria-label="Funds below their high"><span className="relative text-emerald-400"><TrendingDown size={21} /><IonBadge color="success" className="cf-badge">{buyOppCount}</IonBadge></span></IonButton>}
                 {signals && rebalanceCount > 0 && <IonButton className="cf-icon-btn" onClick={() => setDialog('rebalance')} aria-label="Rebalance"><span className="relative text-violet-300"><Scale size={21} /><IonBadge color="primary" className="cf-badge">{rebalanceCount}</IonBadge></span></IonButton>}
                 <IonButton className="cf-icon-btn" onClick={() => navigate('/reminders')} aria-label="Notifications"><span className="relative"><Bell size={21} />{notif > 0 && <IonBadge color="danger" className="cf-badge">{notif}</IonBadge>}</span></IonButton>
               </>)}
@@ -142,7 +142,7 @@ export default function PhoneLayout() {
       </div>
 
       <AccountSheet open={me} onClose={() => setMe(false)} navigate={navigate} />
-      <Modal open={dialog === 'buyopp'} onClose={() => setDialog(null)} title="Funds below their peak" wide>{dialog === 'buyopp' && <MFBuyOpportunities />}</Modal>
+      <Modal open={dialog === 'buyopp'} onClose={() => setDialog(null)} title="Funds below their high" wide>{dialog === 'buyopp' && <MFBuyOpportunities />}</Modal>
       <Modal open={dialog === 'rebalance'} onClose={() => setDialog(null)} title="Rebalance" wide>{dialog === 'rebalance' && <MFRebalanceDialog />}</Modal>
     </IonApp>
   )

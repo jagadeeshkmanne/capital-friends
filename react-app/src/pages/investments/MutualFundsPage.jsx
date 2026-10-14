@@ -829,10 +829,10 @@ export default function MutualFundsPage() {
 
   async function handleToggleLumpsumRestricted(h) {
     const newVal = !h.lumpsumRestricted
-    showBlockUI(newVal ? 'Restricting lumpsum...' : 'Enabling lumpsum...')
+    showBlockUI(newVal ? 'Stopping lump sum...' : 'Allowing lump sum...')
     try {
       await toggleLumpsumRestricted(h.portfolioId, h.fundCode || h.schemeCode, newVal)
-      showToast(newVal ? 'Lumpsum restricted across all portfolios' : 'Lumpsum enabled across all portfolios')
+      showToast(newVal ? 'Lump sum stopped across all portfolios' : 'Lump sum allowed across all portfolios')
     } catch (err) {
       showToast(err.message || 'Failed to update restriction', 'error')
     } finally {
@@ -842,10 +842,10 @@ export default function MutualFundsPage() {
 
   async function handleToggleSipRestricted(h) {
     const newVal = !h.sipRestricted
-    showBlockUI(newVal ? 'Restricting SIP...' : 'Enabling SIP...')
+    showBlockUI(newVal ? 'Stopping SIP...' : 'Allowing SIP...')
     try {
       await toggleSipRestricted(h.portfolioId, h.fundCode || h.schemeCode, newVal)
-      showToast(newVal ? 'SIP restricted across all portfolios' : 'SIP enabled across all portfolios')
+      showToast(newVal ? 'SIP stopped across all portfolios' : 'SIP allowed across all portfolios')
     } catch (err) {
       showToast(err.message || 'Failed to update restriction', 'error')
     } finally {
@@ -933,7 +933,7 @@ export default function MutualFundsPage() {
         {(modal === 'rebalance' || !!modal?.rebalance) && <MFRebalanceDialog filterPortfolioId={typeof modal?.rebalance === 'string' ? modal.rebalance : null} />}
       </Modal>
 
-      <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Funds below their peak" wide>
+      <Modal open={modal === 'buyOpp'} onClose={() => setModal(null)} title="Funds below their high" wide>
         {modal === 'buyOpp' && <MFBuyOpportunities />}
       </Modal>
 
@@ -1050,7 +1050,7 @@ export default function MutualFundsPage() {
                                 <p className={`text-sm ${selectedPortfolioId === p.portfolioId ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                                   {dn(p.portfolioName)}
                                 </p>
-                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} below peak`} />}
+                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} below high`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
                               <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform} · {p.fundCount} funds</p>
@@ -1262,7 +1262,7 @@ export default function MutualFundsPage() {
                             <td className="py-2.5 px-3">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-semibold text-[var(--text-primary)]">{dn(p.portfolioName)}</span>
-                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} below peak`} />}
+                                {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title={`${ind.buyOpp} below high`} />}
                                 {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title={`${ind.rebalance} funds need rebalancing`} />}
                               </div>
                               <p className="text-xs text-[var(--text-dim)]">{mv(p.ownerName, 'name')} · {p.platform}</p>
@@ -1321,7 +1321,7 @@ export default function MutualFundsPage() {
                           <div className="flex-1 min-w-0">
                             <p className="line-clamp-2 break-words text-[15px] font-semibold text-[var(--text-primary)]">
                               {dn(p.portfolioName)}
-                              {ind.buyOpp > 0 && <span className="inline-block align-middle ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400" title="Below its peak" />}
+                              {ind.buyOpp > 0 && <span className="inline-block align-middle ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400" title="Below its high" />}
                               {ind.rebalance > 0 && <span className="inline-block align-middle ml-1 w-1.5 h-1.5 rounded-full bg-violet-400" title="Rebalance needed" />}
                             </p>
                             <p className="text-[13px] text-[var(--text-dim)] mt-0.5 truncate">{mv(p.ownerName, 'name')} · {p.fundCount} funds</p>
@@ -1407,8 +1407,8 @@ export default function MutualFundsPage() {
                   <DetailRow label="Allocation (Current / Target)" value={`${h.currentAllocationPct.toFixed(1)}% / ${h.targetAllocationPct.toFixed(1)}%`} />
                   {h.athNav > 0 && (
                     <DetailRow
-                      label="ATH"
-                      value={Math.round(h.belowATHPct * 10) / 10 > 0 ? `↓${h.belowATHPct.toFixed(1)}% (₹${h.athNav.toFixed(2)})` : 'At All-Time High'}
+                      label="All-time high"
+                      value={Math.round(h.belowATHPct * 10) / 10 > 0 ? `↓${h.belowATHPct.toFixed(1)}% (₹${h.athNav.toFixed(2)})` : 'At its all-time high'}
                       valueStyle={Math.round(h.belowATHPct * 10) / 10 > 0 ? ath : { color: '#34d399' }}
                     />
                   )}
@@ -1434,7 +1434,7 @@ export default function MutualFundsPage() {
                     onClick={() => setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } })}
                     className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors ${h.lumpsumRestricted && h.sipRestricted ? 'text-[var(--text-dim)] cursor-not-allowed opacity-50' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
                     disabled={h.lumpsumRestricted && h.sipRestricted}
-                    title={h.lumpsumRestricted && h.sipRestricted ? 'Both SIP and Lumpsum are restricted' : 'Buy / Invest'}
+                    title={h.lumpsumRestricted && h.sipRestricted ? 'New money stopped: both SIP and lump sum' : 'Buy / Invest'}
                   >
                     <Plus size={14} /> Invest
                   </button>
@@ -1744,8 +1744,8 @@ export default function MutualFundsPage() {
                             <div className="text-xs font-medium text-[var(--text-dim)]">Current / Avg</div>
                           </th>
                           <th className="text-center py-2 px-2 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
-                            <div>ATH</div>
-                            <div className="text-xs font-medium text-[var(--text-dim)]">Below Peak</div>
+                            <div>All-time high</div>
+                            <div className="text-xs font-medium text-[var(--text-dim)]">Below high</div>
                           </th>
                           <th className="text-right py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                             <div>Allocation %</div>
@@ -1871,7 +1871,7 @@ export default function MutualFundsPage() {
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setModal({ invest: { portfolioId: h.portfolioId, fundCode: h.schemeCode, fundName: h.fundName } }) }}
                                     className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.lumpsumRestricted && h.sipRestricted ? 'bg-slate-500/15 text-[var(--text-dim)] cursor-not-allowed' : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'}`}
-                                    title={h.lumpsumRestricted && h.sipRestricted ? 'Blocked — both SIP and Lumpsum restricted' : 'Buy / Invest'}
+                                    title={h.lumpsumRestricted && h.sipRestricted ? 'New money stopped: both SIP and lump sum' : 'Buy / Invest'}
                                     disabled={h.lumpsumRestricted && h.sipRestricted}
                                   >
                                     <Plus size={14} strokeWidth={2.5} />
@@ -1895,14 +1895,14 @@ export default function MutualFundsPage() {
                                       <button
                                         onClick={(e) => { e.stopPropagation(); handleToggleLumpsumRestricted(h) }}
                                         className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.lumpsumRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                                        title={h.lumpsumRestricted ? 'Lumpsum restricted — click to allow' : 'Click to restrict lumpsum'}
+                                        title={h.lumpsumRestricted ? 'Lump sum stopped — click to allow' : 'Click to stop new lump sum'}
                                       >
                                         <IndianRupee size={11} strokeWidth={2.5} className={h.lumpsumRestricted ? 'line-through' : ''} />
                                       </button>
                                       <button
                                         onClick={(e) => { e.stopPropagation(); handleToggleSipRestricted(h) }}
                                         className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${h.sipRestricted ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-[var(--bg-inset)] text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/15'}`}
-                                        title={h.sipRestricted ? 'SIP restricted — click to allow' : 'Click to restrict SIP'}
+                                        title={h.sipRestricted ? 'SIP stopped — click to allow' : 'Click to stop new SIP'}
                                       >
                                         <Repeat size={11} strokeWidth={2.5} className={h.sipRestricted ? 'line-through' : ''} />
                                       </button>
@@ -2015,7 +2015,7 @@ export default function MutualFundsPage() {
               {/* Buy Opportunities */}
               {insights.athDeduped.length > 0 && (
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Below their peak</p>
+                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Below their high</p>
                   <p className="text-xs text-[var(--text-dim)] mb-3">Funds trading below All-Time High</p>
                   {insights.athDeduped.map((h, idx) => {
                     const { main } = splitFundName(h.fundName)
@@ -2033,7 +2033,7 @@ export default function MutualFundsPage() {
                                   background: isStrongBuy ? 'rgba(34,211,238,0.12)' : 'rgba(251,191,36,0.10)',
                                   color: isStrongBuy ? '#22d3ee' : '#fbbf24',
                                 }}>
-                            {isStrongBuy ? 'Far below peak' : 'Below peak'}
+                            {isStrongBuy ? 'Far below high' : 'Below high'}
                           </span>
                           <p className="text-xs mt-0.5 font-medium tabular-nums"
                              style={{ color: isStrongBuy ? '#22d3ee' : '#fbbf24' }}>

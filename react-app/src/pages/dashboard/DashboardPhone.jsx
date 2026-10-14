@@ -72,7 +72,7 @@ export default function DashboardPhone({ data, actionItems, upcomingReminders, g
             <button type="button" onClick={onBuyOpp} className="ion-activatable relative overflow-hidden text-left rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3">
               <TrendingDown size={20} className="text-emerald-400" />
               <div className="mt-1.5 text-[22px] font-bold text-[var(--ion-text-color)] leading-none">{data.buyOpportunities.length}</div>
-              <div className="text-[12px] text-[var(--ion-color-medium)] mt-0.5">Below their peak</div>
+              <div className="text-[12px] text-[var(--ion-color-medium)] mt-0.5">Below their high</div>
               <IonRippleEffect />
             </button>
           )}

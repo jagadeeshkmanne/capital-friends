@@ -212,7 +212,7 @@ function SettingsDesktop() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-[var(--text-primary)]">Refresh Market Data</p>
-                <p className="text-xs text-[var(--text-dim)] mt-0.5">Update MF NAVs, ATH, stock prices and the stock & ETF list</p>
+                <p className="text-xs text-[var(--text-dim)] mt-0.5">Update MF NAVs, all-time highs, stock prices and the stock & ETF list</p>
               </div>
               <button
                 onClick={handleRefresh}

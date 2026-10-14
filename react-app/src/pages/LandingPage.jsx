@@ -161,7 +161,7 @@ function Slide0() {
   )
 }
 
-// ─── Slide 1: how far each fund is below its peak (ATH) ───
+// ─── Slide 1: how far each fund is below its high (ATH) ───
 function Slide1() {
   return (
     <div style={{ display: 'flex', background: '#080d1a', color: '#e2e8f0', flex: 1 }}>
@@ -172,7 +172,7 @@ function Slide1() {
             Growth Portfolio — Jagadeesh
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
           </div>
-          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(198,40,40,.12)', color: '#c62828' }}>3 below peak</span>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 100, display: 'inline-block', background: 'rgba(198,40,40,.12)', color: '#c62828' }}>3 below high</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: 'rgba(255,255,255,.04)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
           {[['Invested','₹12.4L','#f1f5f9'],['Current Value','₹15.6L','#f1f5f9'],['Unrealized P&L','+₹3.2L +25.8%','#34d399'],['Monthly SIP','₹20,000','#34d399']].map(([label, val, color], i) => (
@@ -185,11 +185,11 @@ function Slide1() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: 'rgba(0,0,0,.15)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
           <div style={{ width: 3, height: 10, borderRadius: 2, flexShrink: 0, background: '#c62828' }} />
-          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#c62828' }}>ATH Tracker</span>
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#c62828' }}>All-time high tracker</span>
           <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 100, background: 'rgba(198,40,40,.1)', color: '#c62828' }}>3 signals</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 58px 60px 76px', padding: '4px 14px', borderBottom: '1px solid rgba(255,255,255,.04)', gap: 8 }}>
-          {['Fund','ATH NAV','Current','Signal'].map((h, i) => (
+          {['Fund','All-time high','Current','Signal'].map((h, i) => (
             <span key={h} style={{ fontSize: 8.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#475569', textAlign: i > 0 ? 'right' : 'left' }}>{h}</span>
           ))}
         </div>
@@ -197,8 +197,8 @@ function Slide1() {
           { name: 'Axis Small Cap Fund', sub: 'Dec 2024', pct: '▼26.6%', pctColor: '#c62828', ath: '₹52.10', cur: '₹38.22', signal: '20%+ below', sigBg: 'rgba(198,40,40,.12)', sigColor: '#c62828' },
           { name: 'HDFC Mid-Cap Opp.', sub: 'Jan 2025', pct: '▼15.5%', pctColor: '#d84315', ath: '₹168.50', cur: '₹142.35', signal: '10–20% below', sigBg: 'rgba(216,67,21,.1)', sigColor: '#d84315' },
           { name: 'Kotak Emerging Eq.', sub: 'Feb 2025', pct: '▼3.6%', pctColor: '#b8860b', ath: '₹92.40', cur: '₹89.10', signal: '5–10% below', sigBg: 'rgba(184,134,11,.1)', sigColor: '#b8860b' },
-          { name: 'Parag Parikh Flexi Cap', sub: 'Mar 2025 · ▼0.4%', pct: null, pctColor: null, ath: '₹82.80', cur: '₹82.45', signal: 'Near ATH', sigBg: 'rgba(71,85,105,.1)', sigColor: '#475569' },
-          { name: 'Mirae Asset Large Cap', sub: 'At all-time high today', pct: null, pctColor: null, ath: '₹105.80', curBold: true, cur: '₹105.80', curColor: '#34d399', signal: 'At ATH', sigBg: 'rgba(52,211,153,.1)', sigColor: '#34d399' },
+          { name: 'Parag Parikh Flexi Cap', sub: 'Mar 2025 · ▼0.4%', pct: null, pctColor: null, ath: '₹82.80', cur: '₹82.45', signal: 'Near high', sigBg: 'rgba(71,85,105,.1)', sigColor: '#475569' },
+          { name: 'Mirae Asset Large Cap', sub: 'At all-time high today', pct: null, pctColor: null, ath: '₹105.80', curBold: true, cur: '₹105.80', curColor: '#34d399', signal: 'At its high', sigBg: 'rgba(52,211,153,.1)', sigColor: '#34d399' },
         ].map((r, i, arr) => (
           <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '1fr 58px 60px 76px', padding: '8px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', gap: 8, alignItems: 'center' }}>
             <div>
@@ -397,11 +397,11 @@ const SLIDES = [
   },
   {
     id: 1,
-    tabLabel: 'ATH Alerts',
+    tabLabel: 'Below-high alerts',
     dotColor: '#c62828',
-    tag: 'ATH Tracking',
+    tag: 'All-time high tracking',
     tagStyle: { background: '#fff5f5', color: '#c62828', border: '1px solid #fecaca' },
-    heading: 'See how far each fund is from its peak',
+    heading: 'See how far each fund is from its all-time high',
     para: 'Daily NAV from AMFI. See, by colour, how far each fund you hold is below its all-time high — facts, not tips.',
     bullets: [
       { ck: '▼', ckColor: '#c62828', text: '20%+ below its all-time high' },
@@ -476,7 +476,7 @@ const TRACK_CARDS = [
 
 const SMART_CARDS = [
   { color: '#16a34a', title: 'Import from CAMS Statement', desc: 'Upload your CAMS + KFintech statement PDF and every purchase, SIP, switch and redemption since day one comes in — with true XIRR, CAGR and profit. Read on your device; undo anytime.', uniq: true },
-  { color: '#c62828', title: 'ATH Alerts', desc: 'See how far each fund is below its All-Time High NAV, colour-coded by distance and updated daily from AMFI.', uniq: true },
+  { color: '#c62828', title: 'Below-high alerts', desc: 'See how far each fund is below its All-Time High NAV, colour-coded by distance and updated daily from AMFI.', uniq: true },
   { color: '#7c3aed', title: 'Smart Rebalancing — 3 Modes', desc: 'Set target allocation per fund. Get exact SIP adjustment, lumpsum top-up, or buy/sell units when portfolio drifts beyond threshold.', uniq: true },
   { color: '#0891b2', title: 'Goals from one pool', desc: 'Your investments are shared across all goals by priority, each on its own glide path. Every month: the exact SIP, one-time amount or switch, and a withdraw plan when a goal\'s date comes.', uniq: true },
   { color: '#ea580c', title: 'Retirement Buckets', desc: 'Growth, Stability and Income buckets for a steady monthly income. Built step by step before you retire, refilled once a year, and Growth is never sold in a fall.', uniq: true },

@@ -130,7 +130,7 @@ function Holdings({ funds, sub, onOpen }) {
                 <h3 className="!text-[15px] !font-medium !whitespace-normal !leading-snug">{n.main}</h3>
                 <p className="!flex !flex-wrap !items-center !gap-x-1.5 !gap-y-1 !mt-1">
                   {sub && <span>{sub(h)}</span>}
-                  {below >= 5 && <span className="px-1.5 rounded bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold">↓{below.toFixed(0)}% ATH</span>}
+                  {below >= 5 && <span className="px-1.5 rounded bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold">↓{below.toFixed(0)}% from high</span>}
                   {h.ongoingSIP > 0 && <span className="px-1.5 rounded bg-sky-500/15 text-sky-400 text-[11px] font-semibold">SIP</span>}
                 </p>
               </IonLabel>
@@ -307,12 +307,12 @@ function HoldingsCard({ count, stats, returns, onChart }) {
   )
 }
 
-/** Below peak / rebalance as tappable rows (not chips). */
+/** Below high / rebalance as tappable rows (not chips). */
 const importRow = (navigate) => [FileUp, 'Import CAMS statement', 'Every purchase, SIP and switch since day one: exact invested, XIRR', '#a78bfa', () => navigate('/import')]
 const nSignals = (ind) => (ind?.buyOpp > 0 ? 1 : 0) + (ind?.rebalance > 0 ? 1 : 0)
 function SignalRows({ ind, onBuy, onRebalance, extra = [], empty }) {
   const rows = [
-    ind.buyOpp > 0 && [TrendingDown, `${ind.buyOpp} fund${ind.buyOpp === 1 ? '' : 's'} below peak`, 'Funds well below their all-time high', '#34d399', onBuy],
+    ind.buyOpp > 0 && [TrendingDown, `${ind.buyOpp} fund${ind.buyOpp === 1 ? '' : 's'} below high`, 'Funds well below their all-time high', '#34d399', onBuy],
     ind.rebalance > 0 && [Scale, `${ind.rebalance} fund${ind.rebalance === 1 ? '' : 's'} to rebalance`, 'Split has drifted from the target', '#a78bfa', onRebalance],
     ...extra,
   ].filter(Boolean)
@@ -352,7 +352,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
         </>)}
         {tab === 'actions' && (<>
           <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal('rebalance')}
-            empty={<p className="pt-6 pb-2 text-center text-[14px] text-[var(--ion-color-medium)]">✓ Nothing to do: no fund far below its peak, no split off its target.</p>} />
+            empty={<p className="pt-6 pb-2 text-center text-[14px] text-[var(--ion-color-medium)]">✓ Nothing to do: no fund far below its high, no split off its target.</p>} />
           <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Keep it exact</IonLabel></IonListHeader>
           <SignalRows ind={{}} extra={[importRow(navigate)]} />
         </>)}
@@ -368,7 +368,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
                   <IonLabel className="!my-3.5">
                     <h3 className="!text-[16px] !font-semibold">{dn(p.portfolioName)}</h3>
                     <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}</p>
-                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1 flex gap-1.5">{ind.buyOpp > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400">{ind.buyOpp} below peak</span>}{ind.rebalance > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
+                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1 flex gap-1.5">{ind.buyOpp > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400">{ind.buyOpp} below high</span>}{ind.rebalance > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
                   </IonLabel>
                   <div slot="end" className="text-right tabular-nums">
                     <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(p.currentValue)}</div>
@@ -539,9 +539,9 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <Dash />
           <KV k="Monthly SIP" v={h.ongoingSIP > 0 ? formatINR(h.ongoingSIP) : '—'} />
           {h.targetAllocationPct > 0 && <KV k="Share of portfolio" v={`${h.currentAllocationPct.toFixed(1)}% of ${h.targetAllocationPct.toFixed(0)}%`} />}
-          {(h.lumpsumRestricted || h.sipRestricted) && <KV k="Restricted" v={[h.lumpsumRestricted && 'Lump sum', h.sipRestricted && 'SIP'].filter(Boolean).join(', ')} cls="text-amber-400" />}
+          {(h.lumpsumRestricted || h.sipRestricted) && <KV k="New money stopped" v={[h.lumpsumRestricted && 'Lump sum', h.sipRestricted && 'SIP'].filter(Boolean).join(', ')} cls="text-amber-400" />}
           <div className="mt-3 grid grid-cols-3 border-t border-[var(--ion-border-color)] pt-3">
-            {[[Repeat2, 'Switch', () => setModal({ switchFunds: h.portfolioId })], [Lock, 'Restrict', (e) => setMenu(e.nativeEvent)], [ArrowUpRight, 'Redeem', () => setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } })]].map(([I, l, fn]) => (
+            {[[Repeat2, 'Switch', () => setModal({ switchFunds: h.portfolioId })], [Lock, 'Stop / allow', (e) => setMenu(e.nativeEvent)], [ArrowUpRight, 'Redeem', () => setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } })]].map(([I, l, fn]) => (
               <button key={l} type="button" onClick={fn} className="ion-activatable relative overflow-hidden flex flex-col items-center gap-1.5 py-1 rounded-xl">
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--ion-color-step-100)] text-[var(--ion-text-color)]"><I size={20} /></span>
                 <span className="text-[13px] text-[var(--ion-text-color)]">{l}</span>
@@ -583,8 +583,8 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
       <IonPopover isOpen={!!menu} event={menu} onDidDismiss={() => setMenu(null)} alignment="end" className="cf-popover">
         <IonList lines="none">
           <IonItem button detail={false} onClick={() => { setMenu(null); setModal({ switchFunds: h.portfolioId }) }}><span slot="start" className="text-violet-400"><Repeat2 size={20} /></span><IonLabel>Record a switch</IonLabel></IonItem>
-          <IonItem><IonToggle checked={!!h.lumpsumRestricted} onIonChange={() => { setMenu(null); onToggleLump(h) }}>Restrict lump sum<span className="block text-[12px] text-[var(--ion-color-medium)]">No new one-time money into this fund</span></IonToggle></IonItem>
-          <IonItem><IonToggle checked={!!h.sipRestricted} onIonChange={() => { setMenu(null); onToggleSip(h) }}>Restrict SIP<span className="block text-[12px] text-[var(--ion-color-medium)]">No new SIP into this fund</span></IonToggle></IonItem>
+          <IonItem><IonToggle checked={!!h.lumpsumRestricted} onIonChange={() => { setMenu(null); onToggleLump(h) }}>Stop lump sum<span className="block text-[12px] text-[var(--ion-color-medium)]">No new one-time money into this fund</span></IonToggle></IonItem>
+          <IonItem><IonToggle checked={!!h.sipRestricted} onIonChange={() => { setMenu(null); onToggleSip(h) }}>Stop SIP<span className="block text-[12px] text-[var(--ion-color-medium)]">No new SIP into this fund</span></IonToggle></IonItem>
           <IonItem button detail={false} onClick={() => { setMenu(null); onDeleteFund(h.portfolioId, h.schemeCode || h.fundCode, h.fundName) }}><span slot="start" className="text-rose-400"><Trash2 size={20} /></span><IonLabel color="danger">Delete fund</IonLabel></IonItem>
         </IonList>
       </IonPopover>
