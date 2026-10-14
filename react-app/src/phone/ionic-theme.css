@@ -327,3 +327,9 @@ ion-select.cf-select { --placeholder-opacity: 1; font-size: 15px; }
 ion-select.cf-select::part(text) { color: var(--ion-color-medium); }
 ion-toggle { --track-background-checked: var(--ion-color-primary); --handle-background-checked: #fff; }
 ion-toggle::part(label) { white-space: normal; }
+/* small count pill on a top tab: "Actions (2)" */
+.cf-tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px; background: #f59e0b; color: #111827; font-size: 11px; font-weight: 800; vertical-align: 2px; }
+/* four top tabs fit a 390px phone */
+ion-segment.cf-top-tabs ion-segment-button { padding: 0 8px; font-size: 15px; }
+ion-segment.cf-top-tabs ion-segment-button { --padding-start: 6px; --padding-end: 6px; min-width: 0; }
+ion-segment.cf-top-tabs { padding: 0 4px; }

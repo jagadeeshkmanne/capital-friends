@@ -9,7 +9,7 @@ import {
 } from '@ionic/react'
 import { useMask } from '../../context/MaskContext'
 import '../../phone/ionic-setup'
-import { Plus, MoreVertical, Repeat2, TrendingDown, Scale, Target, ChevronRight, ArrowDownLeft, ArrowUpRight, Lock, Trash2, X, List as ListIcon, Eye, EyeOff, LineChart } from 'lucide-react'
+import { FileUp, Plus, MoreVertical, Repeat2, TrendingDown, Scale, Target, ChevronRight, ArrowDownLeft, ArrowUpRight, Lock, Trash2, X, List as ListIcon, Eye, EyeOff, LineChart } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useData } from '../../context/DataContext'
 import { buildFundsModel } from '../../utils/fundsDashboard'
@@ -245,7 +245,7 @@ function TopTabs({ value, onChange, options }) {
   return (
     <div className="cf-top-tabs-wrap -mx-4 -mt-2 mb-1">
       <IonSegment value={value} onIonChange={(e) => onChange(String(e.detail.value))} className="cf-top-tabs" scrollable>
-        {options.map(([k, l]) => <IonSegmentButton key={k} value={k}><IonLabel>{l}</IonLabel></IonSegmentButton>)}
+        {options.map(([k, l, badge]) => <IonSegmentButton key={k} value={k}><IonLabel>{l}{badge > 0 && <span className="cf-tab-badge">{badge}</span>}</IonLabel></IonSegmentButton>)}
       </IonSegment>
     </div>
   )
@@ -254,6 +254,7 @@ function TopTabs({ value, onChange, options }) {
 /** HOLDINGS (n) card: value big, eye (hide numbers) and chart (growth page) buttons, then the returns rows. */
 function HoldingsCard({ count, stats, returns, onChart }) {
   const { masked, toggleMask } = useMask()
+  const navigate = useNavigate()
   return (
     <div className="mt-3 rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] px-4 pt-4 pb-2">
       <div className="flex items-start justify-between">
@@ -269,20 +270,22 @@ function HoldingsCard({ count, stats, returns, onChart }) {
       <Dash />
       <KV k="Total returns" v={`${signed(stats.totalPL)} (${pctTxt(stats.totalPLPct)})`} cls={upCls(stats.totalPL)} />
       <KV k="Invested" v={formatINR(stats.invested)} />
-      <KV k="XIRR" v={returns?.xirr == null ? '—' : `${(returns.xirr * 100).toFixed(2)}%`} />
+      <KV k="XIRR" v={returns?.xirr == null ? <button type="button" onClick={() => navigate('/import')} className="text-[14px] font-semibold text-violet-400">Import CAS for XIRR ›</button> : `${(returns.xirr * 100).toFixed(2)}%`} />
       <KV k="Monthly SIP" v={formatINR(stats.monthlySIP)} />
     </div>
   )
 }
 
 /** Below peak / rebalance as tappable rows (not chips). */
-function SignalRows({ ind, onBuy, onRebalance, extra = [] }) {
+const importRow = (navigate) => [FileUp, 'Import CAMS statement', 'Every purchase, SIP and switch since day one: exact invested, XIRR', '#a78bfa', () => navigate('/import')]
+const nSignals = (ind) => (ind?.buyOpp > 0 ? 1 : 0) + (ind?.rebalance > 0 ? 1 : 0)
+function SignalRows({ ind, onBuy, onRebalance, extra = [], empty }) {
   const rows = [
     ind.buyOpp > 0 && [TrendingDown, `${ind.buyOpp} fund${ind.buyOpp === 1 ? '' : 's'} below peak`, 'Funds well below their all-time high', '#34d399', onBuy],
     ind.rebalance > 0 && [Scale, `${ind.rebalance} fund${ind.rebalance === 1 ? '' : 's'} to rebalance`, 'Split has drifted from the target', '#a78bfa', onRebalance],
     ...extra,
   ].filter(Boolean)
-  if (!rows.length) return null
+  if (!rows.length) return empty || null
   return (
     <IonList lines="full" className="cf-flat -mx-4 mt-2">
       {rows.map(([I, t, sub, c, fn]) => (
@@ -309,12 +312,17 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
   const funds = enrichedHoldings.filter((h) => h.units > 0).sort((a, b) => b.currentValue - a.currentValue)
   return (
     <div className="pb-6">
-      <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['portfolios', 'Portfolios'], ['activity', 'Activity']]} />
+      <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['portfolios', 'Portfolios'], ['actions', 'Actions', nSignals(currentIndicators)], ['activity', 'Activity']]} />
       <FadeIn k={tab}>
         {tab === 'holdings' && (<>
           <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ v: 'growth' })} />
-          <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal('rebalance')} />
           <div className="-mx-4"><div className="px-4"><Holdings funds={funds} sub={(h) => pname[h.portfolioId]} onOpen={setSheet} /></div></div>
+        </>)}
+        {tab === 'actions' && (<>
+          <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal('rebalance')}
+            empty={<p className="pt-6 pb-2 text-center text-[14px] text-[var(--ion-color-medium)]">✓ Nothing to do: no fund far below its peak, no split off its target.</p>} />
+          <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Keep it exact</IonLabel></IonListHeader>
+          <SignalRows ind={{}} extra={[importRow(navigate)]} />
         </>)}
         {tab === 'portfolios' && (
           <IonList lines="full" className="cf-flat -mx-4 mt-1">
@@ -363,12 +371,19 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
   return (
     <Screen k={p.portfolioId} title={dn(p.portfolioName)} subtitle={`${mv(p.ownerName, 'name')} · ${p.platform}`} onBack={back} right={right}>
       <div className="pb-6">
-        <TopTabs value={tab} onChange={setTab} options={[['holdings', `Holdings (${funds.length})`], ['activity', 'Activity']]} />
+        <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['actions', 'Actions', nSignals(currentIndicators)], ['goals', `Goals${goals.length ? ` (${goals.length})` : ''}`], ['activity', 'Activity']]} />
         <FadeIn k={tab}>
+          {tab === 'actions' && (<>
+            <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal({ rebalance: p.portfolioId })}
+              empty={<p className="pt-6 pb-2 text-center text-[14px] text-[var(--ion-color-medium)]">✓ Nothing to do in this portfolio.</p>} />
+            <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Keep it exact</IonLabel></IonListHeader>
+            <SignalRows ind={{}} extra={[importRow(navigate)]} />
+          </>)}
+          {tab === 'goals' && (goals.length
+            ? <SignalRows ind={{}} extra={goals.map((g) => [Target, mt(g.goal.goalName), `${g.pct}% of this portfolio is for this goal`, '#38bdf8', () => navigate(`/goals/plan/${encodeURIComponent(g.goal.goalId)}`)])} />
+            : <p className="py-10 text-center text-[14px] text-[var(--ion-color-medium)]">No goal uses this portfolio yet. Goals take money from it by themselves (Goals → Money for goals).</p>)}
           {tab === 'holdings' && (<>
             <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ p: p.portfolioId, v: 'growth' })} />
-            <SignalRows ind={currentIndicators} onBuy={() => setModal('buyOpp')} onRebalance={() => setModal({ rebalance: p.portfolioId })}
-              extra={goals.map((g) => [Target, mt(g.goal.goalName), `${g.pct}% of this portfolio is for this goal`, '#38bdf8', () => navigate(`/goals/plan/${encodeURIComponent(g.goal.goalId)}`)])} />
             {funds.length
               ? <Holdings funds={funds} sub={(h) => (h.targetAllocationPct > 0 ? `${h.currentAllocationPct.toFixed(0)}% of ${h.targetAllocationPct.toFixed(0)}% target` : null)} onOpen={setSheet} />
               : <p className="py-10 text-center text-[14px] text-[var(--ion-color-medium)]">No funds yet</p>}
