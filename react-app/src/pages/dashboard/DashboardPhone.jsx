@@ -175,6 +175,21 @@ export default function DashboardPhone({ data, actionItems, upcomingReminders, g
         </>
       )}
 
+      {/* funds at or near their all-time high (the laptop's Near peak) */}
+      {data.nearATHFunds?.length > 0 && (
+        <>
+          <IonListHeader className="!pl-5"><IonLabel className="cf-group">Near their high · {data.nearATHFunds.length}</IonLabel></IonListHeader>
+          <IonList inset lines="inset" className="cf-inset !mt-0">
+            {data.nearATHFunds.map((f) => (
+              <IonItem key={f.fundName} button detail onClick={() => navigate('/investments/mutual-funds')}>
+                <IonLabel><h3 className="!text-[15px] !font-semibold !whitespace-normal">{f.fundName}</h3><p>At or close to its all-time high NAV</p></IonLabel>
+                <IonNote slot="end" className="!text-[12.5px] !font-semibold !text-amber-400">{f.isAtATH ? 'At its high' : `${f.belowATHPct.toFixed(1)}% below`}</IonNote>
+              </IonItem>
+            ))}
+          </IonList>
+        </>
+      )}
+
       {/* reminders */}
       {upcomingReminders.length > 0 && (
         <>

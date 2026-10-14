@@ -64,7 +64,7 @@ export default function GoalsPhone(props) {
 }
 
 // ── all goals ──
-function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, openView }) {
+function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, openView, closed = [] }) {
   const { mt, navigate, pname, closeGoal } = ctx
   const [menu, setMenu] = useState(false)
   const [tab, setTab] = useState('goals')
@@ -117,6 +117,7 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
         <KV k="SIPs running" v={`${L(todo.runningSip)}/mo`} />
         {asideNow > 1000 && <KV k="Set aside (date reached)" v={L(asideNow)} />}
         {extra > 1000 && <KV k="Free money · liquid" v={L(extra)} cls="text-sky-400" />}
+        {ctx.netWorth > 0 && <><Dash /><KV k="Net worth" v={L(ctx.netWorth)} /><KV k="Not for goals" v={L(Math.max(0, ctx.netWorth - has - Math.max(0, extra)))} cls="text-[var(--ion-color-medium)]" /></>}
       </Card>
       <Rows rows={[
         nToDo > 0 && [ListChecks, `${nToDo} thing${nToDo > 1 ? 's' : ''} to do this month`, [steps.length && 'make goals safer / rebalance', ready.length && 'money ready to withdraw', shortStep && `${L(shortStep.gap)} short`].filter(Boolean).join(' · '), '#f59e0b', () => setTab('steps')],
@@ -143,6 +144,22 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
           )
         })}
       </IonList>
+      {closed.length > 0 && <>
+        <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Completed · {closed.length}</IonLabel></IonListHeader>
+        <IonList lines="full" className="cf-flat -mx-4">
+          {closed.map((g) => {
+            const nm = String(g.notes || ''), used = /withdrawn/i.test(nm)
+            const when = (nm.match(/(?:Withdrawn|Not needed) on ([0-9/]+)/) || [])[1]
+            const amt = (nm.match(/used (₹[0-9,]+)/) || [])[1]
+            return (
+              <IonItem key={g.goalId}>
+                <IonLabel className="!my-3"><h3 className="!text-[15px] !font-medium !whitespace-normal">{mt(g.goalName)}</h3><p>{used ? `Withdrawn${amt ? ` · ${amt} used` : ''}` : 'Closed · not needed'}{when ? ` · ${when}` : ''}</p></IonLabel>
+                <span slot="end" className={`text-[12.5px] font-semibold ${used ? 'text-emerald-400' : 'text-[var(--ion-color-medium)]'}`}>{used ? '✓ Done' : 'Closed'}</span>
+              </IonItem>
+            )
+          })}
+        </IonList>
+      </>}
       </>}
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header="Goals" buttons={[
         { text: 'Add a goal', handler: onAdd },

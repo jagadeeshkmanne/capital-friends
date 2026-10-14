@@ -922,7 +922,7 @@ export default function Dashboard() {
                onClick={() => navigate('/investments/mutual-funds')}>
             <SectionHeader label="Near Peak" color="#fbbf24" badge={data.nearATHFunds.length}
                            linkText="Mutual Funds" onClick={(e) => { e.stopPropagation(); navigate('/investments/mutual-funds') }} />
-            <div className="text-xs text-[var(--text-dim)] mb-3">At or near ATH — book profits or redirect to other funds</div>
+            <div className="text-xs text-[var(--text-dim)] mb-3">At or near their all-time high NAV</div>
             <div className="space-y-0">
               {data.nearATHFunds.map((f, idx) => (
                 <div key={idx} className="flex items-center justify-between gap-2 py-2"

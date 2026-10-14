@@ -185,6 +185,27 @@ function FundSheet({ h, onClose, onDetails, setModal }) {
   )
 }
 
+/** A fund's own split (equity / debt / gold..., market cap, India / global) as plain numbers, with Edit — the same
+ *  data the laptop's Fund Breakdown tab saves (no charts on the phone). */
+function FundSplitCard({ alloc, onEdit }) {
+  const part = (o) => Object.entries(o || {}).map(([k, v]) => [k, Number(v) || 0]).filter(([, v]) => v > 0.05).sort((a, b) => b[1] - a[1])
+  const rows = [['Asset class', part(alloc?.assetAllocation)], ['Market cap', part(alloc?.equityAllocation)], ['Where', part(alloc?.geoAllocation)]].filter(([, l]) => l.length)
+  return (
+    <div className="mt-3 rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[16px] font-semibold text-[var(--ion-text-color)]">Fund breakdown</span>
+        <button type="button" onClick={onEdit} className="rounded-full border border-[var(--ion-border-color)] px-3 py-1 text-[13px] font-semibold text-violet-400">{rows.length ? 'Edit' : 'Add'}</button>
+      </div>
+      {rows.length ? rows.map(([t, l]) => (
+        <div key={t} className="mt-2.5">
+          <div className="text-[12.5px] text-[var(--ion-color-medium)]">{t}</div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[14px] tabular-nums text-[var(--ion-text-color)]">{l.map(([k, v]) => <span key={k}>{k} <b className="font-semibold">{v.toFixed(v < 10 ? 1 : 0)}%</b></span>)}</div>
+        </div>
+      )) : <p className="mt-1.5 text-[13.5px] leading-snug text-[var(--ion-color-medium)]">Not set yet. Add how much is in equity, debt, gold..., which market caps and India / abroad (from the fund's page on morningstar.in → Portfolio). Until then the app guesses from the fund's category.</p>}
+    </div>
+  )
+}
+
 /** Tap a transaction: edit it or delete it (the same as the ⋮ menu on the laptop). */
 function TxnSheet({ t, onClose, setModal, onDeleteTxn }) {
   return (
@@ -485,6 +506,9 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
   const held = first ? (() => { const m = Math.max(0, Math.round((Date.now() - first) / (30.44 * 864e5))); return `${Math.floor(m / 12) ? `${Math.floor(m / 12)} years ` : ''}${m % 12} months` })() : null
   const list = all ? txns : txns.slice(0, 8)
   const pos = usePositionReturns(useMemo(() => [h], [h]))[posKey(h)]
+  const { assetAllocations } = useData()
+  const code = String(h.schemeCode || h.fundCode || '')
+  const alloc = (assetAllocations || []).find((a) => String(a.fundCode) === code)
   const folio = folioOf(txns)
   const { masked } = useMask()
   return (
@@ -515,9 +539,9 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <Dash />
           <KV k="Monthly SIP" v={h.ongoingSIP > 0 ? formatINR(h.ongoingSIP) : '—'} />
           {h.targetAllocationPct > 0 && <KV k="Share of portfolio" v={`${h.currentAllocationPct.toFixed(1)}% of ${h.targetAllocationPct.toFixed(0)}%`} />}
-          {(h.lumpsumRestricted || h.sipRestricted) && <KV k="Blocked" v={[h.lumpsumRestricted && 'Lump sum', h.sipRestricted && 'SIP'].filter(Boolean).join(', ')} cls="text-amber-400" />}
+          {(h.lumpsumRestricted || h.sipRestricted) && <KV k="Restricted" v={[h.lumpsumRestricted && 'Lump sum', h.sipRestricted && 'SIP'].filter(Boolean).join(', ')} cls="text-amber-400" />}
           <div className="mt-3 grid grid-cols-3 border-t border-[var(--ion-border-color)] pt-3">
-            {[[Repeat2, 'Switch', () => setModal({ switchFunds: h.portfolioId })], [Lock, h.lumpsumRestricted || h.sipRestricted ? 'Unblock' : 'Block', (e) => setMenu(e.nativeEvent)], [ArrowUpRight, 'Redeem', () => setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } })]].map(([I, l, fn]) => (
+            {[[Repeat2, 'Switch', () => setModal({ switchFunds: h.portfolioId })], [Lock, 'Restrict', (e) => setMenu(e.nativeEvent)], [ArrowUpRight, 'Redeem', () => setModal({ redeem: { portfolioId: h.portfolioId, fundCode: h.schemeCode } })]].map(([I, l, fn]) => (
               <button key={l} type="button" onClick={fn} className="ion-activatable relative overflow-hidden flex flex-col items-center gap-1.5 py-1 rounded-xl">
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--ion-color-step-100)] text-[var(--ion-text-color)]"><I size={20} /></span>
                 <span className="text-[13px] text-[var(--ion-text-color)]">{l}</span>
@@ -525,6 +549,8 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
             ))}
           </div>
         </div>
+
+        <FundSplitCard alloc={alloc} onEdit={() => setModal({ classifyFund: { fund: { fundCode: code, fundName: h.fundName }, existing: alloc } })} />
 
         {below >= 5 && (
           <div className="mt-3 flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
@@ -557,8 +583,8 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
       <IonPopover isOpen={!!menu} event={menu} onDidDismiss={() => setMenu(null)} alignment="end" className="cf-popover">
         <IonList lines="none">
           <IonItem button detail={false} onClick={() => { setMenu(null); setModal({ switchFunds: h.portfolioId }) }}><span slot="start" className="text-violet-400"><Repeat2 size={20} /></span><IonLabel>Record a switch</IonLabel></IonItem>
-          <IonItem><IonToggle checked={!h.lumpsumRestricted} onIonChange={() => { setMenu(null); onToggleLump(h) }}>Allow lump sum</IonToggle></IonItem>
-          <IonItem><IonToggle checked={!h.sipRestricted} onIonChange={() => { setMenu(null); onToggleSip(h) }}>Allow SIP</IonToggle></IonItem>
+          <IonItem><IonToggle checked={!!h.lumpsumRestricted} onIonChange={() => { setMenu(null); onToggleLump(h) }}>Restrict lump sum<span className="block text-[12px] text-[var(--ion-color-medium)]">No new one-time money into this fund</span></IonToggle></IonItem>
+          <IonItem><IonToggle checked={!!h.sipRestricted} onIonChange={() => { setMenu(null); onToggleSip(h) }}>Restrict SIP<span className="block text-[12px] text-[var(--ion-color-medium)]">No new SIP into this fund</span></IonToggle></IonItem>
           <IonItem button detail={false} onClick={() => { setMenu(null); onDeleteFund(h.portfolioId, h.schemeCode || h.fundCode, h.fundName) }}><span slot="start" className="text-rose-400"><Trash2 size={20} /></span><IonLabel color="danger">Delete fund</IonLabel></IonItem>
         </IonList>
       </IonPopover>

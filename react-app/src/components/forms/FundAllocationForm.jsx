@@ -111,7 +111,7 @@ export default function FundAllocationForm({ fund, initial, onSave, onCancel }) 
       <p className="text-xs text-[var(--text-dim)] px-1">Copy allocation data from <span className="font-semibold text-[var(--text-muted)]">morningstar.in</span> → Fund → Portfolio tab. All sections are auto-normalized to 100% on save.</p>
 
       {/* 3-column layout: Asset Class | Market Cap | Geography */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <AllocSection
           title="Asset Class"
           fields={asset}
@@ -241,7 +241,7 @@ function AllocSection({ title, fields, setFields, standardKeys, colors, total, v
           return (
             <div key={key} className="flex items-center gap-2 group">
               <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-              <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{key}</span>
+              <span className="text-sm lg:text-xs text-[var(--text-secondary)] flex-1 truncate">{key}</span>
               {isCustom && (
                 <button onClick={() => removeCustomField(key)} className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-rose-400 transition-all shrink-0"><X size={11} /></button>
               )}

@@ -137,7 +137,7 @@ export default function OtherInvestmentsTab() {
         empty={{ icon: Package, title: 'No other investments yet', text: 'FD, EPF, PPF, NPS, gold, property.' }}
         groups={Object.entries(filtered.reduce((g, i) => { (g[i.investmentCategory || 'Other'] = g[i.investmentCategory || 'Other'] || []).push(i); return g }, {})).map(([cat, list]) => ({ title: cat, items: list.map((i) => {
           const pl = (i.currentValue || 0) - (i.investedAmount || 0)
-          return { key: i.investmentId, title: mv(i.investmentName, 'name'), sub: `${i.investmentType} · ${mv(i.familyMemberName, 'name')}`, value: formatINR(i.currentValue), note: i.investedAmount > 0 ? `${pl >= 0 ? '+' : ''}${formatINR(pl)}` : null, noteTone: pl >= 0 ? 'text-emerald-400' : 'text-rose-400', lead: { text: i.investmentType },
+          return { key: i.investmentId, title: mv(i.investmentName, 'name'), sub: `${i.investmentType} · ${mv(i.familyMemberName, 'name')}`, chip: (() => { const ls = String(i.linkedLiabilityId || '').split(',').map((x) => liabilityMap[x.trim()]).filter(Boolean); const out = ls.reduce((t, l) => t + (Number(l.outstandingBalance) || 0), 0); return out > 0 ? { text: `Loan ${formatINR(out)}`, color: '#fb7185' } : null })(), value: formatINR(i.currentValue), note: i.investedAmount > 0 ? `${pl >= 0 ? '+' : ''}${formatINR(pl)}` : null, noteTone: pl >= 0 ? 'text-emerald-400' : 'text-rose-400', lead: { text: i.investmentType },
             ...(canReceive(i) ? { menu: [{ text: 'Edit', handler: () => setModal({ edit: i }) }, { text: 'Mark as received', handler: () => setReceived(i) }] } : { onClick: () => setModal({ edit: i }) }) }
         }) }))} /></SuspenseP> : (<>
       {filtered.length === 0 ? (

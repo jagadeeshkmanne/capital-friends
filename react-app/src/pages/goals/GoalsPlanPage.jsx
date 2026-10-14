@@ -202,7 +202,7 @@ export default function GoalsPlanPage() {
     <>
       <style>{GP_CSS}</style>
       {modals}
-      <Suspense fallback={null}><GoalsPhone plan={plan} todo={todo} pool={pool} shown={shown} ctx={ctx} sel={sel}
+      <Suspense fallback={null}><GoalsPhone plan={plan} todo={todo} pool={pool} shown={shown} ctx={ctx} sel={sel} closed={(goalList || []).filter((g) => g.isActive === false)}
         onAdd={() => setForm('add')} onEditList={() => setForm('list')} onMoney={() => setMoneyOpen(true)} onEdit={(g) => setForm({ edit: g })} /></Suspense>
     </>
   )
