@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import '../../phone/ionic-setup'
-import { IonList, IonItem, IonLabel, IonButton, IonActionSheet, IonListHeader } from '@ionic/react'
+import { IonList, IonItem, IonLabel, IonButton, IonActionSheet, IonListHeader, IonRippleEffect } from '@ionic/react'
 import { Plus, MoreVertical, ListChecks, Layers, Wallet } from 'lucide-react'
 import { Screen, setPhoneBar } from '../../components/native'
 import { Step, GOALS_HOME_CSS, Buckets, AsideCtx } from './GoalsHome'
@@ -124,26 +124,14 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
         [Wallet, 'Money for goals', 'Which investments count for your goals', '#a78bfa', onMoney],
       ].filter(Boolean)} />
       <IonListHeader className="!pl-1"><IonLabel className="cf-group">Your goals</IonLabel></IonListHeader>
-      <IonList lines="full" className="cf-flat -mx-4">
-        {sorted.map((p) => {
-          const [t, c] = tone(p)
-          const n = realSteps(p).length
-          return (
-            // same row as a Mutual Funds portfolio: name and when on the left, what it has and how it is doing on the right
-            <IonItem key={p.goal.goalId} button detail onClick={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)}>
-              <IonLabel className="!my-3.5">
-                <h3 className="!text-[16px] !font-semibold !whitespace-normal">{mt(p.goal.goalName)}</h3>
-                <p>{L(p.target)} by {yearOf(p.goal)} · {left(p)}{n > 0 && <span className="text-amber-400"> · {n} step{n > 1 ? 's' : ''}</span>}</p>
-                <div className="mt-2 h-1.5 w-full max-w-[180px] overflow-hidden rounded-full bg-[var(--ion-color-step-150)]"><div className="h-full rounded-full" style={{ width: `${Math.min(100, pctSaved(p))}%`, background: c }} /></div>
-              </IonLabel>
-              <div slot="end" className="ml-2 shrink-0 text-right tabular-nums">
-                <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{L(p.has)}</div>
-                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: c }}>{pctSaved(p)}% · {t}</div>
-              </div>
-            </IonItem>
-          )
-        })}
-      </IonList>
+      {/* the same goal cards as the laptop, made smaller: a year stop on the road, then the card */}
+      <div className="mt-1">
+        {/* the road starts today; nearest goal first */}
+        <div className="flex flex-col items-center">
+          <span className="rounded-full border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] px-3 py-1 text-[12.5px] font-semibold text-[var(--ion-text-color)]">📍 Today · {new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span>
+        </div>
+        {sorted.map((p) => <GoalCard key={p.goal.goalId} p={p} mt={mt} nTodo={todo.steps.filter((x) => (x.t === 'protect' || x.t === 'ready') && x.goal?.goalId === p.goal.goalId).length} onOpen={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)} />)}
+      </div>
       {closed.length > 0 && <>
         <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Completed · {closed.length}</IonLabel></IonListHeader>
         <IonList lines="full" className="cf-flat -mx-4">
@@ -167,6 +155,61 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
         { text: 'Money for goals', handler: onMoney },
         { text: 'Cancel', role: 'cancel' },
       ]} />
+    </div>
+  )
+}
+
+/** One goal, like the laptop card but compact: icon, name, when, status, ring; Have / Need / Gap / Goal amount;
+ *  the equity mix against its glide path. A small year stop sits above it, like the road on the laptop. */
+function GoalCard({ p, mt, onOpen, nTodo = 0 }) {
+  const g = p.goal
+  const [t, c] = tone(p)
+  const gp = gapTxt(p)
+  const n = realSteps(p).filter((x) => x.t !== 'ready').length + nTodo
+  const eqOff = p.eqNow != null && !p.bucketMode ? p.eqNow - p.eqTarget : 0
+  const due = new Date(g.targetDate)
+  const Tile = ({ k, v, sub, cls = '' }) => (
+    <div className="min-w-0 rounded-xl border border-[var(--ion-border-color)] bg-[var(--ion-background-color)] px-3 py-2.5">
+      <div className="text-[12px] text-[var(--ion-color-medium)]">{k}</div>
+      <div className={`mt-0.5 truncate text-[16px] font-bold tabular-nums ${cls || 'text-[var(--ion-text-color)]'}`}>{v}</div>
+      {sub && <div className="truncate text-[11.5px] text-[var(--ion-color-medium)]">{sub}</div>}
+    </div>
+  )
+  return (
+    <div className="relative">
+      <div className="flex flex-col items-center">
+        {/* a piece of road: grey with a dashed middle line, like the laptop */}
+        <div className="flex h-7 w-2.5 justify-center rounded-sm bg-[var(--ion-color-step-200)]"><div className="h-full w-0 border-l-2 border-dashed border-[var(--ion-color-step-400)]" /></div>
+        <span className="rounded-full border-2 bg-[var(--ion-background-color)] px-2.5 py-0.5 text-[12.5px] font-bold tabular-nums" style={{ borderColor: c, color: 'var(--ion-text-color)' }}>{icon(g)} {due.getFullYear()}{p.years > 0 ? ` · ${left(p)}` : ''}</span>
+        <div className="flex h-3 w-2.5 justify-center rounded-sm bg-[var(--ion-color-step-200)]"><div className="h-full w-0 border-l-2 border-dashed border-[var(--ion-color-step-400)]" /></div>
+      </div>
+      <button type="button" onClick={onOpen} className="ion-activatable relative w-full overflow-hidden rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] px-4 pt-3.5 pb-3 text-left">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[16px] font-semibold leading-snug text-[var(--ion-text-color)]">{mt(g.goalName)}</div>
+            <div className="mt-0.5 text-[13px] text-[var(--ion-color-medium)]">{due.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · {left(p)}{g.familyMemberName ? ` · ${mt(g.familyMemberName)}` : ''}</div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold" style={{ background: `${c}22`, color: c }}>{p.state === 'achieved' ? 'Fully funded' : t}</span>
+              {n > 0 && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[12px] font-semibold text-amber-400">{n} step{n > 1 ? 's' : ''}</span>}
+            </div>
+          </div>
+          <Ring p={p} size={50} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Tile k="Have today" v={L(p.has)} sub="from the pool" />
+          <Tile k="Need today" v={L(p.state === 'due' ? p.has : p.need)} sub={p.sip > 0 ? `with SIP ${L(p.sip)}/mo` : p.years > 0 ? 'no SIP' : 'all of it, today'} />
+          <Tile k="Gap" v={gp[0]} cls="" sub={p.state === 'short' ? 'add SIP or a lump sum' : 'nothing to add'} />
+          <Tile k="Goal amount" v={L(p.target)} sub={`in ${due.getFullYear()}${Number(g.payYears) > 1 ? ` · over ${g.payYears} yrs` : ''}`} />
+        </div>
+        {p.eqNow != null && (
+          <div className="mt-2.5 flex items-center justify-between gap-2 text-[13px] tabular-nums">
+            <span className="text-[var(--ion-color-medium)]">Mix <b className="font-semibold text-[var(--ion-text-color)]">Equity {p.eqNow}%</b> · {p.bucketMode ? 'buckets plan' : `target ${p.eqTarget}%`}</span>
+            {/* same rule as the laptop card: a quiet tick when within 10 points; when it is off, the goal's own step says what to do */}
+            {!p.bucketMode && Math.abs(eqOff) <= 10 && <span className="font-semibold text-emerald-400">✓ On target</span>}
+          </div>
+        )}
+        <IonRippleEffect />
+      </button>
     </div>
   )
 }
