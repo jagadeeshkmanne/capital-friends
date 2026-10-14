@@ -495,7 +495,7 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
       {aside && aside.was > 0 && (
         <div className="g2-sold">
           <span>{aside.goneShare >= 0.02
-            ? <>Your statement shows <b>{L(aside.was * aside.goneShare)}</b> of the <b>{L(aside.was)}</b> set aside already withdrawn. When all of it is out, the goal closes by itself.</>
+            ? <>Looks withdrawn? Your statement shows <b>{L(aside.was * aside.goneShare)}</b> of the <b>{L(aside.was)}</b> set aside already sold. If that was for this goal, mark it done: nothing is taken out twice.</>
             : <>Set aside on {new Date(aside.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}: <b>{L(aside.now)}</b>. It is not used for your other goals and still counts in your net worth until you withdraw it.</>}</span>
         </div>
       )}

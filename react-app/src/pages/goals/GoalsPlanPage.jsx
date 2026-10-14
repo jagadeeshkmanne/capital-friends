@@ -60,21 +60,9 @@ export default function GoalsPlanPage() {
   }, [mfHoldings, stockHoldings, otherInvList, banks, liabilityList, mfPortfolios, stockPortfolios])
 
   const { plan, todo } = useGoalsPlan()
-  // a goal whose set-aside money is all gone (the statement shows it sold, or the deposit lowered): close it by itself
-  const { freshLoad } = useData()
-  const closeRef = useRef(null), autoDone = useRef(new Set())
-  useEffect(() => {
-    if (!plan || !freshLoad?.at || !closeRef.current) return
-    try { if (sessionStorage.getItem('cf-record') === '1') return } catch { /* ignore */ }
-    for (const p of plan.goals) {
-      const a = pool.aside?.[p.goal.goalId]
-      if (!a || !(a.was > 0) || a.goneShare < 0.98 || autoDone.current.has(p.goal.goalId)) continue
-      autoDone.current.add(p.goal.goalId)
-      const n = Math.max(1, Number(p.goal.payYears) || 1)
-      closeRef.current(p.goal, n > 1 ? 'part' : 'used', { amount: Math.round(a.was * a.goneShare), actions: [], auto: true, fromStatement: true })
-      break
-    }
-  }, [plan, pool.aside, freshLoad?.at])
+  // a goal closes only when the person presses Withdrawn / Done (never by itself); if the statement shows its
+  // set-aside money already sold, the goal card shows a hint with a button (GoalsHome ReadyStep)
+  const closeRef = useRef(null)
   const active = useMemo(() => (goalList || []).filter((g) => g.isActive !== false), [goalList])
   const [rebal, setRebal] = useState(null)
   // add / edit goals right here (no trip to the classic page): null | 'add' | 'list' | { edit: goal }
