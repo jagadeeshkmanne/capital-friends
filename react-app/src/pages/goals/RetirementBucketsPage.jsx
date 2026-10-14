@@ -377,6 +377,19 @@ export function useGoalAttribution() {
   }, [goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations])
 }
 
+/** Is a bucket refill due for this retirement goal? (the same check RetirementActions uses for its alert row) */
+export function useRetirementDue(goal) {
+  const data = useData()
+  const goalAttribution = useGoalAttribution()
+  const { goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, settings } = data
+  return useMemo(() => {
+    if (!goal || goal.goalType !== 'Retirement') return false
+    const plan = computeRetirementPlan({ goal, data, goalAttribution })
+    const noPlan = !plan || plan.noExpenses || plan.status === 'not-started'
+    return !noPlan && plan.operations.length > 0 && plan.status !== 'not-due'
+  }, [goal, goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, goalAttribution, settings]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export function RetirementActions({ goal, slot = 'alert', fallback }) {
   const data = useData()
   const { goalPortfolioMappings, mfHoldings, mfPortfolios, mfTransactions, assetAllocations, otherInvList, settings } = data

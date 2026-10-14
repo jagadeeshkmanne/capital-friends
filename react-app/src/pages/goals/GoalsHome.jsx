@@ -327,7 +327,7 @@ export function Buckets({ p, items, retired, mt, pname, onOpen }) {
   const free = live ? Math.max(0, sum('inc') - tgt.inc) : 0
   const shown = (k) => (k === 'inc' && live ? Math.min(sum('inc'), tgt.inc) : sum(k))
   const tot = sum('inc') + sum('stb') + sum('gro') || 1
-  const name = (it) => (it.kind === 'mf' ? fname(it.holding) : `${isLocked(it) ? '🔒 ' : ''}${mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}`)
+  const name = (it) => (it.kind === 'mf' ? fname(it.holding) : it.kind === 'stock' ? (it.holding?.companyName || it.holding?.symbol || it.holding?.stockName || 'Shares') : `${isLocked(it) ? '🔒 ' : ''}${mt(it.holding?.investmentName || it.holding?.investmentType || 'Investment')}`)
   const payFund = [...hold.inc].filter((it) => it.kind === 'mf').sort((a, c) => c.value - a.value)[0]
   const jar = (k, label, sub) => (
     <div className={`g2-jar ${k}`}>
