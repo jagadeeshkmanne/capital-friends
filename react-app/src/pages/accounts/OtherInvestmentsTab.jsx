@@ -256,19 +256,19 @@ export default function OtherInvestmentsTab() {
                     </div>
                     <p className="text-xs text-[var(--text-muted)]">{mv(i.familyMemberName, 'name')} · {i.investmentType}
                       {canReceive(i) && <button onClick={(e) => { e.stopPropagation(); setReceived(i) }} className="ml-2 px-2 py-0.5 text-[11px] font-semibold rounded border border-[var(--border-light)] text-violet-400">Received</button>}</p>
-                    <div className="flex items-center justify-between mt-1.5">
+                    <div className="flex items-center justify-between mt-2.5">
                       <div>
                         <p className="text-xs text-[var(--text-dim)]">Invested</p>
-                        <p className="text-xs text-[var(--text-muted)] tabular-nums">{formatINR(i.investedAmount)}</p>
+                        <p className="text-sm text-[var(--text-muted)] tabular-nums mt-0.5">{formatINR(i.investedAmount)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-[var(--text-dim)]">Current</p>
-                        <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(i.currentValue)}</p>
+                        <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums mt-0.5">{formatINR(i.currentValue)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-[var(--text-dim)]">P&L</p>
                         {i.investedAmount > 0 ? (
-                          <p className={`text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
+                          <p className={`text-sm font-semibold tabular-nums mt-0.5 ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
                             {up ? '+' : ''}{formatINR(pl)}
                           </p>
                         ) : (

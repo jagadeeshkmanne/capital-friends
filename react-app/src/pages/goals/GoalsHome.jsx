@@ -713,7 +713,7 @@ const CSS = `
 .g2-bkh{display:flex;justify-content:flex-end;margin-bottom:8px}
 .g2-mv{padding:14px 0 6px}.g2-mv+.g2-mv{border-top:1px solid var(--border)}
 .g2-mvh{display:flex;align-items:center;gap:12px}.g2-mvi{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--bg-inset);border:1px solid var(--border)}
-.g2-mvt{flex:1;min-width:0}.g2-mvt small{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}.g2-mvt b{display:block;font-size:15px;color:var(--text-primary);margin:2px 0}.g2-mvt span{font-size:12.5px;color:var(--text-secondary)}
+.g2-mvt{flex:1;min-width:0}.g2-mvt small{display:block;font-size:12px;font-weight:600;color:var(--text-muted)}.g2-mvt b{display:block;font-size:16px;color:var(--text-primary);margin:4px 0}.g2-mvt span{display:block;font-size:12.5px;line-height:1.45;color:var(--text-secondary)}
 .g2-mva{text-align:right}.g2-mva b{display:block;font-size:18px;color:var(--text-primary)}.g2-mva small{font-size:11px;color:var(--text-muted)}
 .g2-mv .g2-two{margin-left:0}.g2-pk.sell{border-top:3px solid var(--sell)!important}.g2-pkr small{display:block;font-size:11px;color:var(--text-muted);margin-top:1px}
 .g2-hiw{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}.g2-hiwh{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
@@ -750,6 +750,7 @@ div:has(> .g2-grp .g2-lrow.due) > .g2-yr{border-color:var(--warn);animation:g2du
 .g2-mx2 b{color:var(--text-primary);font-weight:600}.g2-mx2 small{color:var(--text-muted);font-size:12px}.g2-mx2 .sep{width:1px;height:14px;background:var(--border)}
 .g2-mx2 em{font-style:normal;font-size:12px;font-weight:600;margin-left:auto}.g2-mx2 em.ok{color:var(--ok)}.g2-mx2 em.warn{color:var(--warn)}.g2-mx2 em.soft{color:var(--text-muted);font-weight:500}.g2-mx2 .g2-mxn{flex-basis:100%;margin-top:2px}.g2-mx2 .g2-mxn{color:var(--text-muted)}
 @media(max-width:640px){
+ .g2-mvh{flex-wrap:wrap;align-items:flex-start}.g2-mvt{flex:1 1 calc(100% - 52px)}.g2-mva{width:100%;padding-left:52px;text-align:left;display:flex;gap:6px;align-items:baseline}.g2-mva b{display:inline}
  .g2-gh{gap:10px;margin-top:34px}.g2-gt{padding-right:4px}.g2-gi{width:40px;height:40px;font-size:20px}.g2-ring{transform:scale(.85)}.g2-mt{padding:4px 7px;font-size:11.5px}
  .g2-two{grid-template-columns:1fr;margin-left:0}.g2-orw{text-align:center}
  .g2-sum3,.g2-sum3.one{grid-template-columns:1fr}.g2-sum3>div{padding:0;border-left:0}.g2-sum3>div+div{border-top:1px solid var(--border);margin-top:14px}.g2-sum3 .g2-lbl,.g2-sum3>div:first-child .g2-lbl,.g2-sum3>div:last-child .g2-lbl{margin:0 -16px 12px}

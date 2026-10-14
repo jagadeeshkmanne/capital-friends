@@ -1214,11 +1214,11 @@ export default function Dashboard() {
                   <span className="relative shrink-0" style={{ width: 40, height: 40 }}>
                     <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r={r} fill="none" stroke="var(--bg-inset)" strokeWidth="4" />
                       <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 20 20)" /></svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-[var(--text-primary)] tabular-nums tracking-tight">{pct}%</span>
+                    <span className={`absolute inset-0 flex items-center justify-center ${pct >= 100 ? 'text-[8px]' : 'text-[9px]'} font-bold text-[var(--text-primary)] tabular-nums tracking-tight`}>{pct}%</span>
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">{mt(p.goal.goalName)}</span>
-                    <span className="block text-xs text-[var(--text-dim)] mt-0.5 tabular-nums">{formatINR(Math.round(p.has))} of {formatINR(Math.round(p.target))} · {yrs}</span>
+                    <span className="block text-xs text-[var(--text-dim)] mt-0.5 tabular-nums">{formatINR(Math.round(p.has))} of {formatINR(Math.round(p.target))} <span className="whitespace-nowrap max-sm:block"><span className="max-sm:hidden">· </span>{yrs}</span></span>
                   </span>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ background: `color-mix(in srgb, ${tone} 14%, transparent)`, color: 'var(--text-primary)' }}>{label}</span>
                 </button>

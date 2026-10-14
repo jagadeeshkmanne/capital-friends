@@ -1075,7 +1075,7 @@ export default function MutualFundsPage() {
                       }
                     </div>
                     {(!breakdown.capList.length || !breakdown.geoList?.length) && (
-                      <button onClick={goBreakdown} className="sm:hidden w-full mt-3 py-2 rounded-lg border border-dashed border-[var(--border-light)] text-xs text-[var(--text-dim)]">Market cap and geography: <span className="text-violet-400 font-semibold">add in Fund Breakdown →</span></button>
+                      <button onClick={goBreakdown} className="sm:hidden w-full mt-3 py-2 rounded-lg border border-dashed border-[var(--border-light)] text-xs text-[var(--text-dim)]">Market cap and geography: <span className="text-violet-400 font-semibold whitespace-nowrap">add in Fund Breakdown →</span></button>
                     )}
                     {!breakdown.hasDetailedAlloc && (
                       <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. <button onClick={goBreakdown} className="underline hover:text-violet-400">Go to Fund Breakdown</button> to add detailed data from Morningstar.</p>
@@ -1204,10 +1204,10 @@ export default function MutualFundsPage() {
                         {/* Groww-style row: name and who / funds on the left, value and return on the right */}
                         <div className="flex items-center gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="flex items-center gap-1.5 text-[15px] font-semibold text-[var(--text-primary)]">
-                              <span className="truncate">{dn(p.portfolioName)}</span>
-                              {ind.buyOpp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Below its peak" />}
-                              {ind.rebalance > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" title="Rebalance needed" />}
+                            <p className="line-clamp-2 break-words text-[15px] font-semibold text-[var(--text-primary)]">
+                              {dn(p.portfolioName)}
+                              {ind.buyOpp > 0 && <span className="inline-block align-middle ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400" title="Below its peak" />}
+                              {ind.rebalance > 0 && <span className="inline-block align-middle ml-1 w-1.5 h-1.5 rounded-full bg-violet-400" title="Rebalance needed" />}
                             </p>
                             <p className="text-[13px] text-[var(--text-dim)] mt-0.5 truncate">{mv(p.ownerName, 'name')} · {p.fundCount} funds</p>
                           </div>
@@ -1484,7 +1484,7 @@ export default function MutualFundsPage() {
                     }
                   </div>
                   {(!breakdown.capList.length || !breakdown.geoList?.length) && (
-                    <button onClick={goBreakdown} className="sm:hidden w-full mt-3 py-2 rounded-lg border border-dashed border-[var(--border-light)] text-xs text-[var(--text-dim)]">Market cap and geography: <span className="text-violet-400 font-semibold">add in Fund Breakdown →</span></button>
+                    <button onClick={goBreakdown} className="sm:hidden w-full mt-3 py-2 rounded-lg border border-dashed border-[var(--border-light)] text-xs text-[var(--text-dim)]">Market cap and geography: <span className="text-violet-400 font-semibold whitespace-nowrap">add in Fund Breakdown →</span></button>
                   )}
                   {!breakdown.hasDetailedAlloc && (
                     <p className="text-xs text-[var(--text-dim)]/50 mt-2 text-center">Based on fund category. <button onClick={goBreakdown} className="underline hover:text-violet-400">Go to Fund Breakdown</button> to add detailed data from Morningstar.</p>
@@ -1942,7 +1942,7 @@ export default function MutualFundsPage() {
 
                 return (
                   <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4">
-                    <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Rebalance Needed</p>
                         <p className="text-xs text-[var(--text-dim)] mt-0.5">Funds drifting more than {threshold}% from target allocation</p>

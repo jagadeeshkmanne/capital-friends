@@ -265,8 +265,8 @@ export default function FundsDashboardPage() {
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5 shrink-0">
             <TabButton active={tab === 'funds'} onClick={() => setTab('funds')} icon={<Layers size={12} />} label={`Funds (${model.funds.length})`} />
-            {model.breakdown.byMember.length > 1 && <TabButton active={tab === 'member'} onClick={() => setTab('member')} icon={<Users size={12} />} label={`By Member (${model.breakdown.byMember.length})`} />}
-            {model.breakdown.byPortfolio.length > 1 && <TabButton active={tab === 'portfolio'} onClick={() => setTab('portfolio')} icon={<Wallet size={12} />} label={`By Portfolio (${model.breakdown.byPortfolio.length})`} />}
+            {model.breakdown.byMember.length > 1 && <TabButton active={tab === 'member'} onClick={() => setTab('member')} icon={<Users size={12} />} label={<><span className="max-sm:hidden">By Member</span><span className="sm:hidden">Members</span> ({model.breakdown.byMember.length})</>} />}
+            {model.breakdown.byPortfolio.length > 1 && <TabButton active={tab === 'portfolio'} onClick={() => setTab('portfolio')} icon={<Wallet size={12} />} label={<><span className="max-sm:hidden">By Portfolio</span><span className="sm:hidden">Portfolios</span> ({model.breakdown.byPortfolio.length})</>} />}
           </div>
           {tab === 'funds' && (
             <div className="relative ml-auto shrink-0 w-48 sm:w-60">

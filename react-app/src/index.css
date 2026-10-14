@@ -364,3 +364,11 @@ header { padding-top: env(safe-area-inset-top); }        /* under the notch when
   /* card bodies: at least 16px inside */
   .rounded-xl.border.p-3, .rounded-xl.border.px-3 { padding-left: 16px !important; padding-right: 16px !important; }
 }
+
+/* phones: five stat tiles = 3 + 2 wide; no one-word last lines */
+@media (max-width: 639.98px) {
+  .cf-stats:has(> :nth-child(5):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+  .cf-stats:has(> :nth-child(5):last-child) > * { grid-column: span 2; }
+  .cf-stats:has(> :nth-child(5):last-child) > :nth-child(n+4) { grid-column: span 3; }
+  main p, main span, main h1, main h2, main h3 { text-wrap-style: pretty; }
+}

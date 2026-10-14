@@ -369,9 +369,9 @@ export default function SettingsPage() {
             <Zap size={15} className="text-amber-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">Financial Health Check</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Financial Health Check</p>
             <p className="text-xs text-[var(--text-dim)]">
-              {healthCheckCompleted ? 'Completed — update your answers' : 'Take the health check questionnaire'}
+              {healthCheckCompleted ? 'Update your answers any time' : 'Take the health check questionnaire'}
             </p>
           </div>
           {healthCheckCompleted && <span className="text-xs font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 shrink-0">Done</span>}
