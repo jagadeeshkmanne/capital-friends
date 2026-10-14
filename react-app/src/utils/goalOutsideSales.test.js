@@ -21,3 +21,13 @@ describe('outsideSales: redeemed on the platform without pressing Done', () => {
     expect(outsideSales({ goal, portfolioIds: [], mfTransactions: tx }).total).toBe(0)
   })
 })
+
+describe('outsideSales: cash / FD lowered by hand', () => {
+  const goal = { goalId: 'CAR', targetDate: '2026-10-01' }
+  it('counts noted cash-outs of the goal\'s deposits from 30 days before its date', () => {
+    const cashOuts = [{ investmentId: 'FD1', name: 'HDFC FD', amount: 200000, date: '2026-09-20' }, { investmentId: 'FD1', name: 'HDFC FD', amount: 50000, date: '2026-05-01' }, { investmentId: 'FD9', amount: 70000, date: '2026-10-02' }]
+    const r = outsideSales({ goal, portfolioIds: ['FD1'], mfTransactions: [], cashOuts })
+    expect(r.total).toBe(200000)
+    expect(r.items[0].cash).toBe(true)
+  })
+})

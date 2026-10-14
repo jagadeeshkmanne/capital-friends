@@ -477,9 +477,11 @@ function ShortStep({ s, n, pname }) {
 function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   const [open, setOpen] = useState(false)
   const g = s.goal, n = Math.max(1, Number(g.payYears) || 1)
-  const { mfTransactions } = useData()
-  // already redeemed on the platform (a CAS import brought it in) without pressing Done here?
-  const sold = outsideSales({ goal: g, portfolioIds: [...new Set((s.rows || []).filter((r) => r.kind === 'mf').map((r) => r.portfolioId))], mfTransactions })
+  const { mfTransactions, settings } = useData()
+  // already redeemed on the platform (a CAS import brought it in) or cash / FD lowered by hand, without pressing Done here?
+  let cashOuts = []; try { cashOuts = JSON.parse(settings?.GoalCashOut || '[]') || [] } catch { cashOuts = [] }
+  const ids = [...new Set((s.rows || []).map((r) => (r.kind === 'other' ? r.holding?.investmentId : r.portfolioId)).filter(Boolean))]
+  const sold = outsideSales({ goal: g, portfolioIds: ids, mfTransactions, cashOuts })
   const part = n > 1 ? Math.min(s.has, Math.round((Number(g.targetAmount) || 0) / n)) : s.has
   const ago = monthsPast(g)
   return (
@@ -488,7 +490,7 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
       <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw ›</button>
       {sold.total >= 1000 && (
         <div className="g2-sold">
-          <span>We see <b>{L(sold.total)}</b> redeemed from this goal's funds since {new Date(new Date(g.targetDate).getTime() - 30 * 864e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({sold.items.length} redemption{sold.items.length > 1 ? 's' : ''}, from your statement). Was it for this goal?</span>
+          <span>We see <b>{L(sold.total)}</b> redeemed from this goal's funds since {new Date(new Date(g.targetDate).getTime() - 30 * 864e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({sold.items.length} {sold.items.every((x) => x.cash) ? `deposit${sold.items.length > 1 ? 's' : ''} lowered by you` : `redemption${sold.items.length > 1 ? 's' : ''}${sold.items.some((x) => x.cash) ? ' and deposits lowered by you' : ', from your statement'}`}). Was it for this goal?</span>
           <button onClick={() => closeGoal(g, n > 1 ? 'part' : 'used', { amount: Math.round(sold.total), actions: [], fromStatement: true })} className="px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white">Yes, it was · {n > 1 ? "mark this year's part paid" : 'close the goal'}</button>
         </div>
       )}

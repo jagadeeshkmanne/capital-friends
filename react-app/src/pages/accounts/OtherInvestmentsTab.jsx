@@ -23,7 +23,7 @@ const catBadge = {
 
 export default function OtherInvestmentsTab() {
   const { selectedMember, member } = useFamily()
-  const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment } = useData()
+  const { otherInvList, liabilityList, addOtherInvestment, updateOtherInvestment, deleteOtherInvestment, goalList, goalPortfolioMappings, settings, updateSettings } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
   const { mv } = useMask()
@@ -81,10 +81,27 @@ export default function OtherInvestmentsTab() {
     return s + ids.reduce((sum, id) => sum + (liabilityMap[id]?.outstandingBalance || 0), 0)
   }, 0)
 
+  // cash / FD taken out by hand for a goal whose date is near or past (not through Goals → Withdraw): note it, so the
+  // goal card can ask "Was it for this goal?" — there is no statement for cash, so this is the only trace
+  async function noteCashOut(old, data) {
+    const before = Number(old.currentValue) || 0
+    const after = String(data.status || 'Active') === 'Active' ? Number(data.currentValue) || 0 : 0
+    const drop = before - after
+    if (!(drop >= 1000)) return
+    const soon = Date.now() + 30 * 864e5
+    const linked = (goalPortfolioMappings || []).some((m) => m.portfolioId === old.investmentId && (goalList || []).some((g) => g.goalId === m.goalId && g.isActive !== false && new Date(g.targetDate).getTime() <= soon))
+    if (!linked) return
+    let log = []
+    try { log = JSON.parse(settings?.GoalCashOut || '[]') || [] } catch { log = [] }
+    const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    log.push({ investmentId: old.investmentId, name: old.investmentName || old.investmentType, amount: Math.round(drop), date: day })
+    try { await updateSettings({ GoalCashOut: JSON.stringify(log.slice(-50)) }) } catch { /* only a hint for the goal card */ }
+  }
+
   async function handleSave(data) {
     showBlockUI('Saving...')
     try {
-      if (modal?.edit) await updateOtherInvestment(modal.edit.investmentId, data)
+      if (modal?.edit) { await updateOtherInvestment(modal.edit.investmentId, data); await noteCashOut(modal.edit, data) }
       else await addOtherInvestment(data)
       showToast(modal?.edit ? 'Investment updated' : 'Investment added')
       setModal(null)

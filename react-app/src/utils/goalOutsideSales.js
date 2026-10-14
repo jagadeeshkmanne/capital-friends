@@ -8,12 +8,13 @@ import { parseDate } from './mfMetrics'
 const DAY = 864e5
 /**
  * @param goal          the goal (targetDate)
- * @param portfolioIds  portfolios this goal holds money in
+ * @param portfolioIds  portfolios / investments this goal holds money in
+ * @param cashOuts      [{ investmentId, name, amount, date }] cash / FD values lowered by hand (Settings → GoalCashOut)
  * @param mfTransactions all fund transactions
  * @returns { total, items: [{ date, fundName, amount, units }] } redemptions (not switches, not the app's own
  *          "For goal:" records) in those portfolios from 30 days before the goal date on
  */
-export function outsideSales({ goal, portfolioIds, mfTransactions, daysBefore = 30 }) {
+export function outsideSales({ goal, portfolioIds, mfTransactions, cashOuts = [], daysBefore = 30 }) {
   const due = parseDate(goal?.targetDate)
   if (!due) return { total: 0, items: [] }
   const from = new Date(due.getTime() - daysBefore * DAY)
@@ -25,5 +26,10 @@ export function outsideSales({ goal, portfolioIds, mfTransactions, daysBefore = 
     const d = parseDate(t.date)
     return d && d >= from
   }).map((t) => ({ date: t.date, fundName: t.fundName, amount: Number(t.totalAmount) || 0, units: Number(t.units) || 0 }))
+  // cash / FD lowered by hand (Other Investments) for this goal's deposits: noted in Settings → GoalCashOut
+  for (const c of cashOuts || []) {
+    const d = parseDate(c.date)
+    if (ids.has(c.investmentId) && d && d >= from) items.push({ date: c.date, fundName: c.name, amount: Number(c.amount) || 0, units: 0, cash: true })
+  }
   return { total: items.reduce((s, x) => s + x.amount, 0), items }
 }
