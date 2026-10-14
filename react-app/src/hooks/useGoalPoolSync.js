@@ -6,6 +6,7 @@ import { poolItems, sharePool, linksChanged } from '../utils/goalPool'
 import { resolvePortfolioOwners } from '../utils/fundsDashboard'
 import { withPortfolioSip, itemsMonthly } from '../utils/portfolioSip'
 import { withGoalExtras } from '../utils/goalExtras'
+import { readSetAside, nextSetAside, soldSinceOf } from '../utils/goalSetAside'
 
 /** The person's "Money for goals" switches, kept in the Settings tab as JSON { off: [ids], on: [ids] }. */
 export function readPoolChoice(settings) {
@@ -15,7 +16,7 @@ export function readPoolChoice(settings) {
 /** Pool + its share per goal, computed live from today's data (used by the goals page and the sync below). */
 /** The pool share for all goals, from plain data (no React): used by useGoalPool and by the validation tests. */
 export function computeGoalPool(d) {
-  const { goalList, mfPortfolios, mfHoldings: rawHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
+  const { goalList, mfPortfolios, mfHoldings: rawHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks, mfTransactions, stockTransactions } = d
   const mfHoldings = withPortfolioSip(rawHoldings, mfPortfolios) // same SIPs as the goals page
   const allocMap = {}; (assetAllocations || []).forEach((a) => { if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation })
   const eqOf = (h) => riskFraction(h, allocMap) // gold counts as growth, not safe
@@ -38,13 +39,15 @@ export function computeGoalPool(d) {
     return Object.fromEntries(goals.map((g) => [g.goalId, itemsMonthly(att[g.goalId]?.items)]))
   }
   const reserved = savedLinks || [] // goals past their date keep the shares saved in the sheet
-  let shared = sharePool({ goals, items, reserved }), sipOf = null
+  const setAside = readSetAside(settings) // ... or, once set aside on their date, exactly those units
+  const soldSince = soldSinceOf(setAside, mfTransactions, stockTransactions) // what was sold since then
+  let shared = sharePool({ goals, items, reserved, setAside, soldSince }), sipOf = null
   for (let k = 0; k < 8; k++) {
     const next = sipFrom(shared.mappings)
     const merged = sipOf ? Object.fromEntries(Object.keys(next).map((id) => [id, (next[id] + sipOf[id]) / 2])) : next
     const same = sipOf && Object.keys(merged).every((id) => Math.abs(merged[id] - sipOf[id]) < 100)
     sipOf = merged
-    shared = sharePool({ goals, items, sipOf, reserved })
+    shared = sharePool({ goals, items, sipOf, reserved, setAside, soldSince })
     if (same) break
   }
   // last pass: a goal is never left short while money is free — count only the SIP it surely gets
@@ -53,7 +56,7 @@ export function computeGoalPool(d) {
     const short = goals.some((g) => (act[g.goalId] || 0) < (sipOf[g.goalId] || 0) - 100)
     if (!short) break
     sipOf = Object.fromEntries(Object.keys(act).map((id) => [id, Math.min(act[id], sipOf[id])]))
-    shared = sharePool({ goals, items, sipOf, reserved })
+    shared = sharePool({ goals, items, sipOf, reserved, setAside, soldSince })
   }
   return { items, choice, eqOf, allocMap, ...shared }
 }
@@ -61,7 +64,7 @@ export function computeGoalPool(d) {
 export function useGoalPool() {
   const d = useData()
   const { goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, goalPortfolioMappings: savedLinks } = d
-  return useMemo(() => computeGoalPool(d), [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, savedLinks]) // eslint-disable-line react-hooks/exhaustive-deps
+  return useMemo(() => computeGoalPool(d), [goalList, mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, assetAllocations, settings, members, investmentAccounts, savedLinks, d.mfTransactions, d.stockTransactions]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /**
@@ -89,11 +92,13 @@ export function useGoalPoolSync() {
     const restores = [...new Set(mfHoldings.filter((h) => h.originalTargetPct !== null && h.originalTargetPct !== undefined).map((h) => h.portfolioId))]
     // only goals whose own links changed are written
     const goals = [...live].filter((gid) => linksChanged(current.filter((m) => m.goalId === gid), pool.mappings.filter((m) => m.goalId === gid)))
-    return { restores, changed: goals.length > 0 || closed.length > 0, goals, closed, next: pool.mappings }
+    // goals whose date has come: set their money aside (exact units), drop the set-aside of closed goals
+    const sa = nextSetAside({ current: readSetAside(settings), goals: withGoalExtras(goalList, settings), bySub: pool.bySub })
+    return { restores, changed: goals.length > 0 || closed.length > 0, goals, closed, next: pool.mappings, setAside: sa.changed ? sa.next : null }
   }, [loading, isRefreshing, freshLoad, settingsAt, pass, goalList, goalPortfolioMappings, mfHoldings, settings, pool.mappings]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!work || (!work.changed && !work.restores.length) || busy.current) return
+    if (!work || (!work.changed && !work.restores.length && !work.setAside) || busy.current) return
     try { if (sessionStorage.getItem('cf-record') === '1') return } catch { /* ignore */ }
     const once = (key) => { try { if (sessionStorage.getItem(key)) return false; sessionStorage.setItem(key, '1') } catch { /* ignore */ } return true }
     busy.current = true
@@ -121,6 +126,9 @@ export function useGoalPoolSync() {
             else for (const [gid, ms] of list) await updateGoalMappings(gid, ms)
           } catch (e) { showToast(`Could not save goal money: ${e.message}`, 'error') }
         }
+      }
+      if (work.setAside && typeof updateSettings === 'function' && once(`cf-setaside:${JSON.stringify(work.setAside).length}:${Object.keys(work.setAside).sort().join(',')}`)) {
+        try { await updateSettings({ GoalSetAside: JSON.stringify(work.setAside) }) } catch (e) { showToast(`Could not set the goal money aside: ${e.message}`, 'error') }
       }
       busy.current = false
       setPass((n) => n + 1)

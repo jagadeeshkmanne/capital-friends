@@ -66,12 +66,14 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
     const value = hs.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
     const eq = value > 0 ? hs.reduce((t, h) => t + (Number(h.currentValue) || 0) * eqOf(h), 0) / value : 0
     // each fund keeps its own mix: a hybrid fund is sold whole (its equity and debt together), so goals take funds, not mixes
-    const parts = hs.map((h) => ({ key: String(h.schemeCode || h.fundCode || h.fundName || ''), value: Number(h.currentValue) || 0, eq: eqOf(h) })).filter((x) => x.value > 0)
+    const parts = hs.map((h) => ({ key: String(h.schemeCode || h.fundCode || h.fundName || ''), value: Number(h.currentValue) || 0, units: Number(h.units) || 0, eq: eqOf(h) })).filter((x) => x.value > 0)
     items.push({ id: p.portfolioId, type: 'MF', name: String(p.portfolioName || '').replace(/^PFL-/, ''), owner: p.ownerName, value, eq, kind: 'pool', parts })
   }
   for (const p of (stockPortfolios || []).filter((x) => x.status !== 'Inactive')) {
-    const value = (stockHoldings || []).filter((h) => h.portfolioId === p.portfolioId && !(Number(h.quantity) <= 0)).reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
-    items.push({ id: p.portfolioId, type: 'Stock', name: p.portfolioName || 'Stocks', owner: p.ownerName, value, eq: 1, kind: 'pool' })
+    const hs = (stockHoldings || []).filter((h) => h.portfolioId === p.portfolioId && !(Number(h.quantity) <= 0))
+    const value = hs.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
+    const parts = hs.map((h) => ({ key: String(h.symbol || ''), value: Number(h.currentValue) || 0, units: Number(h.quantity) || 0, eq: 1 })).filter((x) => x.value > 0)
+    items.push({ id: p.portfolioId, type: 'Stock', name: p.portfolioName || 'Stocks', owner: p.ownerName, value, eq: 1, kind: 'pool', parts })
   }
   for (const i of (otherInvList || []).filter((x) => x.status === 'Active')) {
     const kind = otherKind(i)
@@ -114,14 +116,14 @@ export function goalWant(g, now = new Date(), sip = 0) {
  * @param items  poolItems(...) (only included ones are used)
  * @returns { mappings: [{ goalId, portfolioId, allocationPct, investmentType }], byGoal: { [goalId]: { want, got, eq } }, left: ₹ not used }
  */
-export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved = [] }) {
+export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved = [], setAside = {}, soldSince = {} }) {
   const live = (goals || []).filter((g) => g.isActive !== false && validDate(g.targetDate) && Number(g.targetAmount) > 0)
   // a mutual fund portfolio is shared fund by fund: near goals take the debt / liquid funds first, a hybrid fund
   // counts with its own equity and debt (it cannot be split), far goals take the equity funds
   const its = []
   for (const i of (items || []).filter((x) => x.included && x.value > 0)) {
     const parts = (i.parts || []).filter((p) => p.value > 0)
-    if (parts.length > 1) parts.forEach((p) => its.push({ ...i, id: `${i.id}::${p.key}`, parent: i.id, peq: i.eq, value: p.value, eq: p.eq, left: p.value }))
+    if (parts.length) parts.forEach((p) => its.push({ ...i, id: `${i.id}::${p.key}`, parent: i.id, peq: i.eq, value: p.value, units: p.units, eq: p.eq, left: p.value }))
     else its.push({ ...i, parent: i.id, left: i.value })
   }
   const take = {} // goalId -> itemId -> ₹
@@ -165,7 +167,33 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   // a goal whose date has passed keeps exactly the shares it already had (its money is kept for it until you
   // confirm). After you withdraw, those funds are smaller, so it simply gets less: nothing moves from other goals.
   const kept = new Set()
+  // set aside on its date (Settings → GoalSetAside): the goal keeps exactly those units / that cash. A fund is often
+  // shared, so what was sold is read from the transactions since that date (soldSince: units per fund), and a
+  // sale comes off the set-aside first, never off the other goals; market moves stay with each goal's own units.
+  const aside = {}
   for (const g of live.filter(past)) {
+    const sa = setAside?.[g.goalId]
+    if (!sa || !Array.isArray(sa.items) || !sa.items.length) continue
+    kept.add(g.goalId)
+    let was = 0, now2 = 0, gone = 0
+    for (const e of sa.items) {
+      const base = Number(e.value) || 0
+      was += base
+      const it = its.find((i) => i.id === e.id)
+      let leftShare
+      if (e.units > 0) leftShare = Math.max(0, 1 - (Number(soldSince?.[g.goalId]?.[e.id]) || 0) / e.units)
+      else leftShare = it ? Math.max(0, Math.min(1, 1 - Math.max(0, (Number(e.total) || base) - it.value) / (base || 1))) : 0
+      if (!it) leftShare = 0
+      gone += base * (1 - leftShare)
+      if (!it || leftShare <= 0) continue
+      const unitPx = it.units > 0 ? it.value / it.units : 0
+      const want = e.units > 0 && unitPx > 0 ? Math.min(e.units * leftShare, it.units) * unitPx : Math.min(base * leftShare, it.value)
+      now2 += give(g, it, Math.min(it.left, want))
+    }
+    aside[g.goalId] = { was, now: now2, goneShare: was > 0 ? gone / was : 0, date: sa.date }
+  }
+  for (const g of live.filter(past)) {
+    if (kept.has(g.goalId)) continue
     const ms = (reserved || []).filter((m) => m.goalId === g.goalId && Number(m.allocationPct) > 0)
     if (!ms.length) continue
     kept.add(g.goalId)
@@ -215,6 +243,12 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   // "extra" — shown once for the family (lower a SIP, or start a new goal). So no goal is ahead while another is
   // short; only EPF / PPF / NPS (retirement only, never moved) can leave retirement ahead.
 
+  // what each goal holds, by fund / share / deposit (used to set a goal aside on its date)
+  const bySub = {}
+  for (const g of live) bySub[g.goalId] = Object.entries(take[g.goalId]).map(([id, v]) => {
+    const it = its.find((i) => i.id === id)
+    return { id, value: Math.round(v), units: it && it.units > 0 ? Math.round((v / it.value) * it.units * 10000) / 10000 : 0, eq: it ? it.eq : 0, total: it ? Math.round(it.value) : 0 }
+  }).filter((x) => x.value > 0)
   const itemOf = Object.fromEntries((items || []).map((i) => [i.id, i]))
   const parentOf = Object.fromEntries(its.map((i) => [i.id, i.parent]))
   // back to whole investments (the goal links stay per portfolio / investment)
@@ -235,7 +269,7 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   const ex = {}
   for (const i of freeIts) { const e = ex[i.parent] || (ex[i.parent] = { id: i.parent, name: i.name, type: i.type, value: 0, eqv: 0 }); e.value += i.left; e.eqv += i.left * i.eq }
   const extraItems = Object.values(ex).map((e) => ({ id: e.id, name: e.name, type: e.type, value: e.value, eq: e.value > 0 ? e.eqv / e.value : 0 }))
-  return { mappings, take, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra, extraEq, extraItems }
+  return { mappings, take, bySub, aside, byGoal: meta, left: its.reduce((t, i) => t + i.left, 0), extra, extraEq, extraItems }
 }
 
 /** True when two sets of links differ enough to be worth saving (a new / dropped link, or a share 2+ points off). */

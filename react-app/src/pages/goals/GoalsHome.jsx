@@ -2,7 +2,7 @@
 // Numbers come from the goals pool (Money for goals), buildGoalPlan (pool mode), familyPlan and goalTodo.
 import { goalStatus, goalIcon, monthsPast, agoText } from '../../utils/goalStatus'
 import WithdrawPanel from './WithdrawPanel'
-import { useState, useRef, useLayoutEffect, useEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, createContext, useContext } from 'react'
 import { formatINR, splitFundName } from '../../data/familyData'
 import Modal from '../../components/Modal'
 import { List, Layers } from 'lucide-react'
@@ -102,6 +102,9 @@ function useApplyIncomeOnce() {
   }, [has])
 }
 
+// money set aside for goals whose date has come (utils/goalSetAside.js), per goal: { was, now, goneShare, date }
+const AsideCtx = createContext({})
+
 export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [], mfHoldings, mfPortfolios, ctx, renderBuckets, onMoney }) {
   useApplyIncomeOnce()
   const { mt, navigate, pname, closeGoal } = ctx
@@ -124,7 +127,7 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
   if (!live.length) return <EmptyGoals navigate={navigate} actions={actions} />
 
   return (
-    <div className="g2">
+    <AsideCtx.Provider value={pool?.aside || {}}><div className="g2">
       <style>{CSS}</style>
 
       {/* one row like the other pages: what waits on a goal card (left), the page's buttons (right) */}
@@ -186,7 +189,7 @@ export default function GoalsHome({ actions, plan, todo, pool, plans, closed = [
         </div>
       )}
       <p className="g2-hint" style={{ textAlign: 'center' }}>Steps come from your own funds, each goal's timeline and the app's glide path. Not investment advice.</p>
-    </div>
+    </div></AsideCtx.Provider>
   )
 }
 
@@ -478,6 +481,7 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
   const [open, setOpen] = useState(false)
   const g = s.goal, n = Math.max(1, Number(g.payYears) || 1)
   const { mfTransactions, settings } = useData()
+  const aside = useContext(AsideCtx)[g.goalId]
   // already redeemed on the platform (a CAS import brought it in) or cash / FD lowered by hand, without pressing Done here?
   let cashOuts = []; try { cashOuts = JSON.parse(settings?.GoalCashOut || '[]') || [] } catch { cashOuts = [] }
   const ids = [...new Set((s.rows || []).map((r) => (r.kind === 'other' ? r.holding?.investmentId : r.portfolioId)).filter(Boolean))]
@@ -488,7 +492,14 @@ function ReadyStep({ s, mt, pname, closeGoal, navigate }) {
     <div className="g2-rdy">
       <div><b>{n > 1 ? `This year's payment · ${L(part)}` : `Date reached${ago >= 1 ? ` ${agoText(ago)}` : ''} · ${L(s.has)} ready to use`}</b><span>{n > 1 ? `Paid over ${n} years: pay this part, the rest stays invested for the next ${n - 1}.` : ago >= 2 ? 'Already used it? Mark the goal so this money counts for your other goals again.' : 'Withdraw it when you need it, then mark the goal.'}</span></div>
       <button onClick={() => setOpen(true)} className="g2-pulse px-4 py-2.5 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">Withdraw ›</button>
-      {sold.total >= 1000 && (
+      {aside && aside.was > 0 && (
+        <div className="g2-sold">
+          <span>{aside.goneShare >= 0.02
+            ? <>Your statement shows <b>{L(aside.was * aside.goneShare)}</b> of the <b>{L(aside.was)}</b> set aside already withdrawn. When all of it is out, the goal closes by itself.</>
+            : <>Set aside on {new Date(aside.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}: <b>{L(aside.now)}</b>. It is not used for your other goals and still counts in your net worth until you withdraw it.</>}</span>
+        </div>
+      )}
+      {!aside && sold.total >= 1000 && (
         <div className="g2-sold">
           <span>We see <b>{L(sold.total)}</b> redeemed from this goal's funds since {new Date(new Date(g.targetDate).getTime() - 30 * 864e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({sold.items.length} {sold.items.every((x) => x.cash) ? `deposit${sold.items.length > 1 ? 's' : ''} lowered by you` : `redemption${sold.items.length > 1 ? 's' : ''}${sold.items.some((x) => x.cash) ? ' and deposits lowered by you' : ', from your statement'}`}). Was it for this goal?</span>
           <button onClick={() => closeGoal(g, n > 1 ? 'part' : 'used', { amount: Math.round(sold.total), actions: [], fromStatement: true })} className="px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white">Yes, it was · {n > 1 ? "mark this year's part paid" : 'close the goal'}</button>

@@ -3,7 +3,7 @@ import { Wallet, Pencil, Plus } from 'lucide-react'
 // Main Goals page (/goals, goal detail at /goals/plan/:goalId; the classic page is /goals/classic): one road for all goals, this month's steps from today's fund
 // values, and a page per goal with its own year-by-year road. The old Goals page is untouched.
 // All numbers come from utils/goalPlan.js (tested in goalPlan.test.js).
-import { useMemo, useRef, useLayoutEffect, useState, useId } from 'react'
+import { useMemo, useRef, useLayoutEffect, useState, useId, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useData } from '../../context/DataContext'
@@ -58,6 +58,21 @@ export default function GoalsPlanPage() {
   }, [mfHoldings, stockHoldings, otherInvList, banks, liabilityList, mfPortfolios, stockPortfolios])
 
   const { plan, todo } = useGoalsPlan()
+  // a goal whose set-aside money is all gone (the statement shows it sold, or the deposit lowered): close it by itself
+  const { freshLoad } = useData()
+  const closeRef = useRef(null), autoDone = useRef(new Set())
+  useEffect(() => {
+    if (!plan || !freshLoad?.at || !closeRef.current) return
+    try { if (sessionStorage.getItem('cf-record') === '1') return } catch { /* ignore */ }
+    for (const p of plan.goals) {
+      const a = pool.aside?.[p.goal.goalId]
+      if (!a || !(a.was > 0) || a.goneShare < 0.98 || autoDone.current.has(p.goal.goalId)) continue
+      autoDone.current.add(p.goal.goalId)
+      const n = Math.max(1, Number(p.goal.payYears) || 1)
+      closeRef.current(p.goal, n > 1 ? 'part' : 'used', { amount: Math.round(a.was * a.goneShare), actions: [], auto: true, fromStatement: true })
+      break
+    }
+  }, [plan, pool.aside, freshLoad?.at])
   const active = useMemo(() => (goalList || []).filter((g) => g.isActive !== false), [goalList])
   const [rebal, setRebal] = useState(null)
   // add / edit goals right here (no trip to the classic page): null | 'add' | 'list' | { edit: goal }
@@ -86,7 +101,7 @@ export default function GoalsPlanPage() {
     const acts = Array.isArray(opts.actions) ? opts.actions : []
     const actTxt = acts.length ? `\n\nThe app will record:\n${acts.map((a) => `• ${a.kind === 'mf' ? `Redeem ${Number(a.redeem.units).toLocaleString('en-IN', { maximumFractionDigits: 4 })} units of ${a.label} ≈ ${fmt(a.amount)}` : a.kind === 'stock' ? `Sell ${a.sell.quantity} ${a.label} ≈ ${fmt(a.amount)}` : `${a.label}: take ${fmt(a.amount)}, its value becomes ${fmt(a.update.currentValue)}${a.update.currentValue < 1 ? ` (${a.update.status})` : ''}`}`).join('\n')}` : ''
     const nextY = repeatYears ? plusYears(steps).getFullYear() : null
-    const ok = await confirm((how === 'part'
+    const ok = opts.auto ? true : await confirm((how === 'part'
       ? `Mark this year's payment${amount ? ` of ${fmt(amount)}` : ''} as done? "${g.goalName}" moves to ${plusYears(1).getFullYear()} with ${fmt(left)} for the remaining ${payYears - 1} year${payYears - 1 > 1 ? 's' : ''}.${acts.length ? '' : opts.fromStatement ? ' The redemption is already in your statement, so nothing more is recorded.' : ' Also record the redemption in Mutual Funds, otherwise the money you took out still counts.'}`
       : used
         ? `Close "${g.goalName}" as withdrawn${amount ? ` (${fmt(amount)} used)` : ''}?${acts.length ? '' : opts.fromStatement ? ' The redemption is already in your statement, so nothing more is recorded.' : ' Also record the redemption in Mutual Funds (or update the holding), otherwise the money you took out still counts for your other goals.'}${repeatYears ? ` The next one is added for ${nextY}.` : ''}`
@@ -141,12 +156,13 @@ export default function GoalsPlanPage() {
             expectedInflation: infl, expectedCAGR: Number(g.expectedCAGR) || 0.12, monthlyInvestment: 0, lumpsumInvested: 0, isRetirement: false,
             _extras: { repeat: repeatYears, payYears: years },
           })
-          showToast(`${g.goalName} closed. The next one is added for ${nextY}.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
+          showToast(`${opts.auto ? 'The money set aside was withdrawn: ' : ''}${g.goalName} closed. The next one is added for ${nextY}.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
         } catch (e) { showToast(`${g.goalName} is closed, but the next one could not be added (${e.message}). Add it in Edit goals.${failTxt}`, 'error', 12000) }
-      } else showToast(`${g.goalName} closed. Its money now goes to your other goals.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
+      } else showToast(`${opts.auto ? 'The money set aside was withdrawn: ' : ''}${g.goalName} closed. Its money now goes to your other goals.${failTxt}`, failed.length ? 'error' : 'success', failed.length ? 12000 : undefined)
     } catch (e) { showToast(`${e.message || 'Could not close the goal'}${failed.length ? '' : acts.length ? ' (the withdrawal was recorded: untick "Record these" if you try again)' : ''}`, 'error', 12000) }
     finally { closing.current = false }
   }
+  closeRef.current = closeGoal
   // old links to /goals/classic?add=1 / ?edit=ID now open the form on this page
   const go = (to, ...rest) => {
     if (typeof to === 'string' && to.startsWith('/goals/classic')) {
@@ -169,7 +185,7 @@ export default function GoalsPlanPage() {
     showBlockUI('Deleting...')
     try { await deleteGoal(g.goalId); setForm(null); showToast('Goal deleted') } catch (e) { showToast(e.message || 'Failed to delete goal', 'error') } finally { hideBlockUI() }
   }
-  const ctx = { mt, navigate: go, pname, netWorth, openRebalance: setRebal, closeGoal }
+  const ctx = { mt, navigate: go, pname, netWorth, openRebalance: setRebal, closeGoal, aside: pool.aside }
   const sel = goalId ? plan.goals.find((p) => p.goal.goalId === goalId) : null
 
   return (
@@ -202,7 +218,7 @@ export default function GoalsPlanPage() {
 }
 
 /** Same header as the Goals page: net worth split, then target, have, gap, progress and SIP OR lump sum. */
-function GoalsHeader({ plans, netWorth, extra = 0 }) {
+function GoalsHeader({ plans, netWorth, extra = 0, aside = 0 }) {
   const target = plans.reduce((t, p) => t + p.target, 0), has = plans.reduce((t, p) => t + p.has, 0)
   const short = plans.filter((p) => p.lumpToday > 0)
   const sipNeed = short.reduce((t, p) => t + (p.sipNeeded || 0), 0), lump = short.reduce((t, p) => t + p.lumpToday, 0)
@@ -215,7 +231,7 @@ function GoalsHeader({ plans, netWorth, extra = 0 }) {
       <div className="gp-panel gp-nw">
         <div><span className="gp-lbl">Total net worth</span><b className="gp-nwv">{L(nw)}</b></div>
         <div className="gp-nws">
-          <div><span><i style={{ background: '#8b5cf6' }} />Allocated to goals</span><b style={{ color: 'var(--accent-violet)' }}>{L(has)} <small>({pc(has)}%)</small></b></div>
+          <div><span><i style={{ background: '#8b5cf6' }} />Allocated to goals</span><b style={{ color: 'var(--accent-violet)' }}>{L(has)} <small>({pc(has)}%)</small></b>{aside > 1000 && <small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>incl. {L(aside)} set aside for goals whose date has come (until you withdraw it)</small>}</div>
           <div><span><i style={{ background: '#34d399' }} />Free money</span><b style={{ color: '#34d399' }}>{L(free)} <small>({pc(free)}%)</small></b><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>{free > 1000 ? 'Liquid money (funds, stocks, cash, FD) no goal needs yet: you could lower a SIP or add a goal' : 'Only liquid money counts: funds, stocks, cash, FD'}</small></div>
           <div><span><i style={{ background: 'var(--border)' }} />Not for goals</span><b>{L(notFor)} <small>({pc(notFor)}%)</small></b><small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>Home, physical gold, retirement-only money and anything you left out</small></div>
         </div>
@@ -244,7 +260,7 @@ function GoalList({ plans, all, ctx }) {
   if (!plans.length) return <div className="gp-panel"><p className="gp-hs">No goals yet. <a className="gp-link" onClick={() => navigate('/goals/classic?add=1')}>Add your first goal</a>.</p></div>
   return (
     <>
-      <GoalsHeader plans={plans} netWorth={ctx.netWorth} extra={all.extra} />
+      <GoalsHeader plans={plans} netWorth={ctx.netWorth} extra={all.extra} aside={Object.values(ctx.aside || {}).reduce((t, a) => t + (a.now || 0), 0)} />
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{(() => { const k = withSteps.reduce((s, p) => s + realSteps(p).length, 0); const fam = all.family?.status === 'steps' ? all.family.steps.filter((x) => ['sip-cut', 'sip-add', 'lump', 'sell', 'buy'].includes(x.t)).length : 0; const t = k + fam; return t ? `${t} step${t === 1 ? '' : 's'} this month${fam ? ' · family plan first' : ''} · based on today's fund values` : 'Nothing to do this month · based on today\'s fund values' })()}</span></div>
