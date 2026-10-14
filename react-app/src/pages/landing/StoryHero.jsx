@@ -43,7 +43,7 @@ const CHAPTERS = [
 ]
 
 function Glyph({ name, color, size = 18 }) {
-  return <svg width={size} height={size} viewBox="-16 -16 32 32" aria-hidden="true" style={{ color }}>{G[name]}</svg>
+  return <svg width={size} height={size} viewBox="-16 -16 32 32" aria-hidden="true" style={{ color }}>{name === 'play' ? <path d="M-6 -10 L11 0 L-6 10 Z" fill="currentColor" /> : G[name]}</svg>
 }
 
 /* ───────── all five scenes are drawn wide (1100 × 420) so they fill the hero from edge to edge ───────── */
@@ -452,8 +452,25 @@ const memoScene = (f) => memo(f, () => true)
 const SCENES_RAW = { drive: SceneDrive, all: SceneAll, cas: SceneCas, ath: SceneAlerts, goals: SceneGoals, family: SceneFamily }
 const SCENES = Object.fromEntries(Object.entries(SCENES_RAW).map(([k, f]) => [k, memoScene(f)]))
 
-function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
+// the demo video as the last step: a thumbnail first (nothing loads from YouTube until it is pressed), then the player
+function DemoScene({ id }) {
+  const [play, setPlay] = useState(false)
+  return (
+    <div className="st-demo">
+      {play
+        ? <iframe src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`} title="Capital Friends: full app walkthrough" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+        : <button type="button" className="st-demo-th" onClick={() => setPlay(true)} aria-label="Play the demo video" style={{ backgroundImage: `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)` }}>
+            <span className="st-demo-p"><svg width="26" height="26" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="#fff" /></svg></span>
+            <span className="st-demo-t">Full app walkthrough · 12 min</span>
+          </button>}
+    </div>
+  )
+}
+
+function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, videoLabel = 'Watch the demo' }) {
   const [i, setI] = useState(0)
+  // with a demo video, it is the last step on the path; the scenes rotate without it (it only opens when chosen)
+  const chapters = videoId ? [...CHAPTERS, { k: 'demo', ph: 'shown in 12 minutes', icon: 'play', c: '#ef4444', s: 'Demo', t: 'Watch the full app walkthrough' }] : CHAPTERS
   // the scenes play on by themselves; they only wait while the browser tab is hidden
   const [paused, setPaused] = useState(false)
   useEffect(() => {
@@ -462,11 +479,11 @@ function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
     return () => document.removeEventListener('visibilitychange', f)
   }, [])
   useEffect(() => {
-    if (paused) return
+    if (paused || i >= CHAPTERS.length) return undefined
     const t = setTimeout(() => setI((x) => (x + 1) % CHAPTERS.length), CHAPTERS[i].dur || DUR)
     return () => clearTimeout(t)
   }, [i, paused])
-  const ch = CHAPTERS[i]
+  const ch = chapters[i]
   const Scene = SCENES[ch.k]
   // the scene leans towards the mouse (3D tilt), the floating things move the other way (depth)
   const ref = useRef(null)
@@ -485,25 +502,26 @@ function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl }) {
       <div className="st-mid">
       {/* how it works, as a path: Your Drive → Track → Import → Goals → Family */}
         <ol className="st-path" role="tablist">
-          {CHAPTERS.map((c, k) => (
+          {chapters.map((c, k) => (
             <li key={c.k} className={k === i ? 'on' : k < i ? 'done' : ''} style={{ '--cc': c.c }}>
               <button type="button" role="tab" aria-selected={k === i} aria-label={c.t} onClick={() => setI(k)}>
                 <span className="st-dot"><Glyph name={c.icon} color={k <= i ? '#fff' : '#94a3b8'} size={13} /></span>
                 <span className="st-lb">{c.s}</span>
               </button>
-              {k < CHAPTERS.length - 1 && <span className="st-ln"><i style={k === i ? { animationDuration: `${c.dur || DUR}ms`, animationPlayState: paused ? 'paused' : 'running' } : undefined} /></span>}
+              {k < chapters.length - 1 && <span className="st-ln"><i style={k === i ? { animationDuration: `${c.dur || DUR}ms`, animationPlayState: paused ? 'paused' : 'running' } : undefined} /></span>}
             </li>
           ))}
         </ol>
         {/* the scene, edge to edge */}
         <div className="st-r">
-          <div key={ch.k} className="st-scene" style={{ '--pd': `${ch.dur || DUR}ms` }}><Scene /></div>
+          {ch.k === 'demo' ? <div key="demo" className="st-scene st-scene-demo"><DemoScene id={videoId} /></div> : <div key={ch.k} className="st-scene" style={{ '--pd': `${ch.dur || DUR}ms` }}><Scene /></div>}
         </div>
       </div>
       {/* one dock at the bottom: start, watch, and how many families */}
       <div className="st-dock">
         <button onClick={signIn} className="st-btn"><span className="st-g">{GoogleIcon}</span>Sign in with Google<span className="st-free">FREE</span></button>
-        {videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch the 2-minute tour"><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">Watch 2-min tour</span></a>}
+        {videoId ? <button type="button" className="st-btn2" onClick={() => setI(chapters.length - 1)} aria-label={videoLabel}><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">{videoLabel}</span></button>
+          : videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch the 2-minute tour"><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">Watch 2-min tour</span></a>}
       </div>
     </section>
   )
@@ -539,6 +557,15 @@ const CSS = `
 @keyframes stFree{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.22)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.1)}}
 .st-btn:hover{transform:translateY(-1px);background:#1e293b;box-shadow:0 14px 28px -12px rgba(11,17,32,.6)}
 .st-g{width:36px;height:36px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center}
+.st-scene-demo{display:flex;align-items:center;justify-content:center;height:100%}
+.st-demo{position:relative;width:min(900px,100%);aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#0b1120;box-shadow:0 30px 70px rgba(15,23,42,.25)}
+.st-demo iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.st-demo-th{position:absolute;inset:0;border:0;padding:0;cursor:pointer;background:#0b1120 center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.st-demo-th::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,23,.15),rgba(2,6,23,.55))}
+.st-demo-p{position:relative;width:76px;height:76px;border-radius:50%;background:#ef4444;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(239,68,68,.45);padding-left:4px;transition:transform .2s}
+.st-demo-th:hover .st-demo-p{transform:scale(1.07)}
+.st-demo-t{position:relative;color:#fff;font:700 15px Inter,system-ui,sans-serif;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+button.st-btn2{border:0;cursor:pointer;font-family:inherit}
 .st-btn2{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 18px 0 6px;border-radius:999px;color:#0b1120;font-weight:700;font-size:14.5px;text-decoration:none;background:#fff;box-shadow:inset 0 0 0 1.5px #e2e8f0;transition:box-shadow .2s}
 .st-btn2:hover{box-shadow:inset 0 0 0 1.5px var(--c)}
 .st-play{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--c);color:#fff;padding-left:2px;box-sizing:border-box;transition:background .6s,transform .18s}
