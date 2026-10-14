@@ -15,7 +15,8 @@ import PageLoading from '../../components/PageLoading'
 import { useGoalPool } from '../../hooks/useGoalPoolSync'
 import { useGoalsPlan } from '../../hooks/useGoalsPlan'
 import MoneyForGoals from './MoneyForGoals'
-import GoalsHome, { Step, GOALS_HOME_CSS, AsideCtx } from './GoalsHome'
+import GoalsHome, { Step, GOALS_HOME_CSS, AsideCtx, Buckets } from './GoalsHome'
+import { GoalActionCards } from './GoalActions'
 import Modal from '../../components/Modal'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
@@ -510,7 +511,9 @@ function FamilyBlock({ f, pname, mt }) {
 /* ───────── goal page ───────── */
 function GoalDetail({ p, ctx, todo }) {
   const { mt, navigate, pname } = ctx
-  const [stt, sc] = STATUS[p.status], gp = gapTxt(p), g = p.goal
+  const gp = gapTxt(p), g = p.goal
+  // the status dot says 'short' when the gap does (a retired goal far below its amount is not 'on plan')
+  const [stt, sc] = /short/.test(gp[0]) && p.status === 'good' ? ['Short', 'var(--accent-rose)'] : STATUS[p.status]
   let n = 0
   // the family plan's steps that belong to this goal (make it safer, money ready) — the same as on the phone
   const own = (todo?.steps || []).filter((x) => (x.t === 'protect' || x.t === 'ready') && x.goal?.goalId === g.goalId)
@@ -531,19 +534,15 @@ function GoalDetail({ p, ctx, todo }) {
       </div>
 
       <div className="gp-panel">
-        <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{p.bucketMode ? 'In the last 5 years before retirement your money follows the retirement buckets.' : `Equity ${p.eqNow ?? '—'}%, your glide path says ${p.eqTarget}% · a switch shows only when it is 5 points or more off`}</span></div>
-        {own.length > 0 && <AsideCtx.Provider value={ctx.aside || {}}><div className="g2" style={{ marginBottom: st.length ? 14 : 0 }}><style>{GOALS_HOME_CSS}</style>
-          {own.map((s, i) => <Step key={i} s={s} n={++n} mt={mt} pname={pname} closeGoal={ctx.closeGoal} navigate={navigate} />)}</div></AsideCtx.Provider>}
-        {st.length ? <>
-          <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
-          <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} onClose={ctx.closeGoal} navigate={navigate} />)}</div>
-          <p className="gp-foot">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p>
-        </> : own.length ? null : <div className="gp-ok">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
+        <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">What to do now for this goal, and why. The button shows each step.</span></div>
+        <GoalActionCards p={p} todo={todo} ctx={ctx} onMoreTime={(g0) => navigate(`/goals/classic?edit=${encodeURIComponent(g0.goalId)}`)} />
       </div>
 
       <PlanByYear p={p} />
 
-      {p.isRet && <BucketsPanel p={p} />}
+      {p.isRet && ((p.years <= 0 || p.bucketMode)
+        ? <div className="gp-panel g2"><style>{GOALS_HOME_CSS}</style><Buckets p={p} items={(p.att?.items || []).filter((it) => it.value > 0.5).sort((a, b) => b.value - a.value)} retired={p.years <= 0} mt={mt} pname={pname} /></div>
+        : <BucketsPanel p={p} />)}
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Funds in this goal</h2><span className="gp-hs">{p.att.items.length} holdings · {L(p.att.total)}{fundsEq !== null && ` · ${fundsEq}% equity, ${100 - fundsEq}% safe`}</span></div>
@@ -567,41 +566,77 @@ function GoalDetail({ p, ctx, todo }) {
 }
 
 /** Plan by year: the coming moves of this goal's glide path (one short line each), then the goal year(s). */
-export function PlanByYear({ p }) {
+/** The year-by-year plan of a goal as plain items: what happens, when, and the equity before → after. */
+export function planRows(p) {
   const g = p.goal, n = Math.max(1, Number(g.payYears) || 1)
   const stops = goalRoad(p).filter((r) => !['today', 'quiet'].includes(r.k))
   const rows = []
-  // a goal paid over several years: one row per payment, from the goal year on (also once the first year has come)
+  const yl = (x) => (x > 0 ? `${x} yr${x > 1 ? 's' : ''} left` : '')
+  const push = (r) => {
+    if (r.k === 'safer') rows.push({ y: r.y, sub: yl(r.yl), kind: 'safer', title: `Move about ${L(r.amount)} to safe funds`, line: 'As the goal comes closer, part of its equity moves to debt / liquid funds.', eq0: r.eq0, eq: r.eq })
+    else if (r.k === 'ease') rows.push({ y: r.y, sub: yl(r.yl), kind: 'ease', title: 'Equity eases slowly', line: 'About 2 points a year, from 85% towards 75% at retirement.', eq0: 85, eq: 75 })
+    else if (r.k === 'bucket') rows.push({ y: `${r.y0}–${r.y}`, sub: 'last 5 years', kind: 'bucket', title: 'Fill the 3 buckets', line: 'Each quarter, move money from Growth into Income and Stability.' })
+    else if (r.k === 'goal') {
+      if (p.isRet) rows.push({ y: r.y, sub: 'retire', kind: 'goal', title: r.bucket?.monthly ? `Income starts: ${L(r.bucket.monthly)} a month` : 'Monthly income starts', line: 'Paid from the Income bucket; refill it from Stability, and Stability from Growth.' })
+      else rows.push({ y: r.y, sub: 'goal year', kind: 'goal', title: `Withdraw ${L(p.target)}`, line: 'The Withdraw button lists each step.', eq: 0 })
+    }
+  }
   if (!p.isRet && n > 1) {
     const y0 = new Date(g.targetDate).getFullYear(), part = p.target / n
     for (const r of stops) if (r.k !== 'goal' && r.y < y0) push(r)
     for (let k = 0; k < n; k++) {
-      const rest = n - k - 1 // parts still invested after this payment
-      rows.push([y0 + k, k === 0 ? 'goal year' : `payment ${k + 1}`, rest ? `rest ${getGoalAllocation({ ...g, payYears: rest }, 1).equity}%` : 'done',
-        `Withdraw part ${k + 1} of ${n}, about ${L(part)}${rest ? `; the other ${rest} stay${rest === 1 ? 's' : ''} invested` : '; the goal is complete'}`])
+      const rest = n - k - 1
+      rows.push({ y: y0 + k, sub: k === 0 ? 'goal year' : `payment ${k + 1} of ${n}`, kind: rest ? 'pay' : 'goal', title: `Withdraw about ${L(part)}`,
+        line: rest ? `Part ${k + 1} of ${n}. The other ${rest} stay${rest === 1 ? 's' : ''} invested at about ${getGoalAllocation({ ...g, payYears: rest }, 1).equity}% equity.` : `The last part. The goal is complete.` })
     }
-    return rows.length ? panel(rows) : null
+    return rows
   }
-  if (!stops.length) return null
   for (const r of stops) push(r)
-  return panel(rows)
-  function push(r) {
-    if (r.k === 'safer') rows.push([r.y, `${r.yl} yr${r.yl > 1 ? 's' : ''} left`, `${r.eq0}% → ${r.eq}%`, `Move about ${L(r.amount)} from equity to safe funds`])
-    else if (r.k === 'ease') rows.push([r.y, `${r.yl} yrs left`, '85% → 75%', 'Equity eases about 2 points a year'])
-    else if (r.k === 'bucket') rows.push([`${r.y0}–${r.y}`, 'last 5 yrs', 'buckets', 'Each quarter, fill Income and Stability from Growth'])
-    else if (r.k === 'goal') {
-      if (p.isRet) rows.push([r.y, 'retire', '', r.bucket?.monthly ? `Start the monthly ${L(r.bucket.monthly)} from Income` : 'Start the monthly withdrawal from Income'])
-      else rows.push([r.y, 'goal year', '0%', `Withdraw ${L(p.target)} (the Withdraw button lists each step)`])
-    }
-  }
-  function panel(rows) { return (
-    <div className="gp-panel">
-      <div className="gp-ph"><h2>Plan by year</h2><span className="gp-hs">From your glide path · amounts are estimates, the exact units show in that year's steps</span></div>
-      <div className="gp-pby">
-        {rows.map(([y, yl, eq, what], i) => <div key={i}><b>{y}</b><small>{yl}</small><em>{eq}</em><span>{what}</span></div>)}
-      </div>
+  return rows
+}
+
+const PBY_COLOR = { safer: '#f59e0b', ease: '#a78bfa', bucket: '#14b8a6', pay: '#3b82f6', goal: '#22c55e' }
+/** Plan by year as a timeline (laptop and phone): Today first, then each year's move with a small equity bar. */
+export function PlanByYear({ p }) {
+  const rows = planRows(p)
+  if (!rows.length) return null
+  const now = new Date().getFullYear()
+  const Bar = ({ eq0, eq, c }) => (eq == null ? null : (
+    <div className="mt-2 flex items-center gap-2 text-[12px] tabular-nums text-[var(--text-dim)]">
+      <span>Equity</span>
+      {eq0 != null && <><span className="relative h-1.5 w-14 overflow-hidden rounded-full bg-[var(--bg-inset)]"><span className="absolute inset-y-0 left-0 rounded-full bg-[var(--text-dim)]" style={{ width: `${eq0}%` }} /></span><span>{eq0}%</span><span>→</span></>}
+      <span className="relative h-1.5 w-14 overflow-hidden rounded-full bg-[var(--bg-inset)]"><span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${eq}%`, background: c }} /></span>
+      <b className="font-semibold text-[var(--text-primary)]">{eq}%</b>
     </div>
-  ) }
+  ))
+  return (
+    <div className="gp-panel">
+      <div className="gp-ph"><h2>Plan by year</h2><span className="gp-hs">What happens to this goal's money, year by year. Amounts are estimates; the exact units show in that year's steps.</span></div>
+      <ol className="relative mt-1">
+        <li className="relative flex gap-3 pb-4">
+          <span className="relative z-[1] mt-1 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 border-[var(--text-dim)] bg-[var(--bg-card)]" />
+          <span className="absolute left-[6px] top-5 bottom-0 w-0.5 bg-[var(--border)]" />
+          <div className="min-w-0"><div className="text-[13px] font-semibold text-[var(--text-primary)]">📍 Today · {now}</div>
+            <div className="text-[13px] text-[var(--text-dim)]">{L(p.has)} in this goal{p.eqNow != null ? ` · ${p.eqNow}% equity${!p.bucketMode && p.eqTarget != null && Math.abs(p.eqNow - p.eqTarget) > 10 ? ` (plan for now: ${p.eqTarget}%)` : ''}` : ''}</div></div>
+        </li>
+        {rows.map((r, i) => {
+          const c = PBY_COLOR[r.kind] || '#a78bfa', last = i === rows.length - 1
+          return (
+            <li key={i} className="relative flex gap-3 pb-4">
+              <span className="relative z-[1] mt-1 h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: c, boxShadow: `0 0 0 4px ${c}22` }} />
+              {!last && <span className="absolute left-[6px] top-5 bottom-0 w-0.5 bg-[var(--border)]" />}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2"><b className="text-[15px] tabular-nums text-[var(--text-primary)]">{r.y}</b><span className="text-[12px] text-[var(--text-dim)]">{r.sub}</span></div>
+                <div className="mt-0.5 text-[15px] font-semibold leading-snug" style={{ color: c }}>{r.title}</div>
+                <div className="mt-0.5 text-[13px] leading-snug text-[var(--text-secondary)]">{r.line}</div>
+                <Bar eq0={r.eq0} eq={r.eq} c={c} />
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
 }
 
 export function StopCard({ r, p }) {

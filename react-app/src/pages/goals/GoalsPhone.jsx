@@ -23,7 +23,7 @@ function goalRoadNext(p) {
 }
 import { RetirementActions, useRetirementDue } from './RetirementBucketsPage'
 import Modal from '../../components/Modal'
-import WithdrawPanel from './WithdrawPanel'
+import { GoalActionCards } from './GoalActions'
 import PhoneTabs from '../../phone/PhoneTabs'
 
 const yearOf = (g) => new Date(g.targetDate).getFullYear()
@@ -242,23 +242,6 @@ function StepsScreen({ todo, ctx, back }) {
   )
 }
 
-/** One thing to do, in plain words: what (title), why (one line) and one button. The full steps (units to sell,
- *  where to buy, the withdraw list) open on their own page, so the goal page stays short. */
-function ActionCard({ icon: I, color, title, why, button, onClick, children }) {
-  return (
-    <div className="mb-3 rounded-2xl border bg-[var(--ion-item-background)] px-4 py-3.5" style={{ borderColor: `${color}55` }}>
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: `${color}22`, color }}><I size={18} /></span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[16px] font-semibold leading-snug text-[var(--ion-text-color)]">{title}</div>
-          <div className="mt-1 text-[13.5px] leading-snug text-[var(--ion-color-medium)]"><b className="font-semibold text-[var(--ion-text-color)]">Why: </b>{why}</div>
-        </div>
-      </div>
-      {children}
-      {button && <button type="button" onClick={onClick} className="mt-3 w-full rounded-xl py-2.5 text-[15px] font-semibold text-white" style={{ background: color }}>{button}</button>}
-    </div>
-  )
-}
 /** The 3 retirement jars in one glance, one line each; "How it works" opens the full explanation. */
 function BucketsGlance({ retired, onOpen, goal }) {
   const jars = [['Income', '#10b981', 'Next 2 years of spending', 'safe: liquid / short debt'], ['Stability', '#f59e0b', 'Years 3–7', 'hybrid and debt funds'], ['Growth', '#8b5cf6', 'Everything after that', 'equity: refills the other two']]
@@ -287,7 +270,6 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
   const [menu, setMenu] = useState(false)
   const [bk, setBk] = useState(false)
   const [sub, setSub] = useState(null) // 'plan' | 'funds'
-  const [detail, setDetail] = useState(null) // the step whose full steps are open
   const gp = gapTxt(p)
   const [t, c] = tone(p)
   const own = (todo?.steps || []).filter((x) => (x.t === 'protect' || x.t === 'ready') && x.goal?.goalId === g.goalId) // family-plan steps that belong to this goal
@@ -364,19 +346,7 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
 
         {/* what to do now: everything for this goal in one place */}
         <IonListHeader className="!pl-1 mt-1"><IonLabel className="cf-group">Action required{nAct > 0 ? ` · ${nAct}` : ''}</IonLabel></IonListHeader>
-        {nAct === 0 && <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-[14px]">✓ Nothing to do now.{!retired && p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
-        {refillDue && (
-          <ActionCard icon={Layers} color="#f59e0b" title="Refill your Income bucket" why="Your monthly income is paid from the Income bucket. It is running low; move money into it from Stability (and Stability from Growth) as the steps show.">
-            <div className="g2 mt-3"><style>{GOALS_HOME_CSS}</style><RetirementActions goal={g} slot="alert" /></div>
-          </ActionCard>
-        )}
-        {[...own, ...st].map((s, i) => {
-          const yl = s.years != null ? (s.years < 1 ? `${Math.max(1, Math.round(s.years * 12))} months` : `${Math.round(s.years * 2) / 2} years`) : left(p)
-          if (s.t === 'protect') return <ActionCard key={i} icon={ShieldCheck} color="#f59e0b" title={`Make it safer: move ${L(s.total)}`} why={`only ${yl} to go and ${s.eqNow}% is in equity; the plan for now is ${s.eqTarget}%. A market fall now could cut the money you need, so move this part to a safe fund.`} button="See the steps" onClick={() => setDetail(s)} />
-          if (s.t === 'ready') return <ActionCard key={i} icon={CheckCircle2} color="#3b82f6" title={n > 1 ? `Withdraw this year's part: ${L(Math.min(p.has, p.target / n))}` : `Withdraw ${L(p.has)}`} why={n > 1 ? `the first payment year has come. Take out this year's part; the other ${n - 1} stay invested.` : 'the goal date has come. Take the money out when you need it; until then it is set aside, safe, and still in your net worth.'} button="Withdraw" onClick={() => setDetail({ ...s, withdraw: true })} />
-          if (s.t === 'sip') return <ActionCard key={i} icon={TrendingUp} color="#8b5cf6" title={`Add ${L(s.amount)} a month`} why={`at today's pace the goal is ${L(s.lump)} short. A bigger SIP (or ${L(s.lump)} once) closes the gap by ${due.getFullYear()}.`} button="See the steps" onClick={() => setDetail(s)} />
-          return <ActionCard key={i} icon={ListChecks} color="#a78bfa" title={s.t === 'switch' ? 'Rebalance this goal' : 'Step to do'} why="the goal's mix is off its plan." button="See the steps" onClick={() => setDetail(s)} />
-        })}
+        <GoalActionCards p={p} todo={todo} ctx={ctx} onMoreTime={onEdit} />
 
         {p.isRet && <><IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Buckets</IonLabel></IonListHeader><BucketsGlance retired={retired} goal={g} onOpen={() => setBk(true)} /></>}
 
@@ -393,20 +363,6 @@ function GoalScreen({ p, ctx, todo, onEdit }) {
         { text: 'Not needed: close goal', role: 'destructive', handler: () => ctx.closeGoal(g, 'not-needed') },
         { text: 'Cancel', role: 'cancel' },
       ].filter(Boolean)} />
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.withdraw ? `Withdraw · ${mt(g.goalName)}` : 'How to do it'} wide>
-        {detail && (detail.withdraw
-          ? <div className="g2"><style>{GOALS_HOME_CSS}</style><WithdrawPanel s={detail} mt={mt} pname={pname} onDone={(how, opts) => { setDetail(null); ctx.closeGoal(g, how, opts) }} onMoreTime={() => { setDetail(null); onEdit(g) }} /></div>
-          : detail.t === 'protect'
-            ? <div className="g2"><style>{GOALS_HOME_CSS}</style>
-                <ol className="mb-4 space-y-1.5 rounded-2xl border border-[var(--ion-border-color)] bg-[var(--ion-item-background)] px-4 py-3 text-[14px] leading-snug">
-                  <li><b>1.</b> Open your fund app ({pname(detail.portfolioId) || 'where these funds are'}).</li>
-                  <li><b>2.</b> Use <b>Switch</b> (same fund house) or Redeem, for the units shown under SELL.</li>
-                  <li><b>3.</b> Put that money into the fund under BUY (a liquid or short-term debt fund).</li>
-                  <li><b>4.</b> Next time, import your CAS: the app updates the goal by itself.</li>
-                </ol>
-                <Step s={detail} n={1} mt={mt} pname={pname} closeGoal={ctx.closeGoal} navigate={navigate} /></div>
-            : <div className="gp"><style>{GP_CSS}</style><div className="gp-grp"><StepRow s={detail} p={p} n={1} mt={mt} pname={pname} onRebalance={ctx.openRebalance} onClose={ctx.closeGoal} navigate={navigate} /></div><p className="text-[12px] text-[var(--ion-color-medium)] mt-2">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p></div>)}
-      </Modal>
       <Modal open={bk} onClose={() => setBk(false)} title={retired ? 'Your buckets today' : 'Retirement buckets'} wide>
         {bk && <div className="gp g2"><style>{GP_CSS + GOALS_HOME_CSS}</style>{retired || p.bucketMode ? <Buckets p={p} items={items} retired={retired} mt={mt} pname={pname} /> : <BucketsPanel p={p} />}</div>}
       </Modal>
