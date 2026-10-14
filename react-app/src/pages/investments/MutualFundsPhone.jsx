@@ -301,7 +301,7 @@ function SignalRows({ ind, onBuy, onRebalance, extra = [], empty }) {
 // ── 1. all portfolios ──
 function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, stats, returns, enrichedHoldings, allFilteredTxns, setModal, open, dn, mv }) {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('holdings')
+  const [tab, setTab] = useState('portfolios')
   const [sheet, setSheet] = useState(null)
   const [add, setAdd] = useState(false)
   useEffect(() => {
@@ -312,7 +312,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
   const funds = enrichedHoldings.filter((h) => h.units > 0).sort((a, b) => b.currentValue - a.currentValue)
   return (
     <div className="pb-6">
-      <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['portfolios', 'Portfolios'], ['actions', 'Actions', nSignals(currentIndicators)], ['activity', 'History']]} />
+      <TopTabs value={tab} onChange={setTab} options={[['portfolios', 'Portfolios'], ['holdings', 'Holdings'], ['actions', 'Actions', nSignals(currentIndicators)], ['activity', 'History']]} />
       <FadeIn k={tab}>
         {tab === 'holdings' && (<>
           <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ v: 'growth' })} />
@@ -324,8 +324,9 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
           <IonListHeader className="!pl-1 mt-2"><IonLabel className="cf-group">Keep it exact</IonLabel></IonListHeader>
           <SignalRows ind={{}} extra={[importRow(navigate)]} />
         </>)}
-        {tab === 'portfolios' && (
-          <IonList lines="full" className="cf-flat -mx-4 mt-1">
+        {tab === 'portfolios' && (<>
+          <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ v: 'growth' })} />
+          <IonList lines="full" className="cf-flat -mx-4 mt-2">
             {portfolioData.map((p) => {
               const ind = portfolioIndicators[p.portfolioId] || {}
               const pl = (p.unrealizedPL || 0) + (p.realizedPL || 0)
@@ -334,7 +335,8 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
                 <IonItem key={p.portfolioId} button detail onClick={() => open({ p: p.portfolioId })}>
                   <IonLabel className="!my-3.5">
                     <h3 className="!text-[16px] !font-semibold">{dn(p.portfolioName)}</h3>
-                    <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}{ind.buyOpp > 0 && <span className="text-emerald-400"> · {ind.buyOpp} below peak</span>}</p>
+                    <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}</p>
+                    {(ind.buyOpp > 0 || ind.rebalance > 0) && <p className="!mt-1 flex gap-1.5">{ind.buyOpp > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400">{ind.buyOpp} below peak</span>}{ind.rebalance > 0 && <span className="rounded px-1.5 text-[11px] font-semibold bg-violet-500/15 text-violet-300">{ind.rebalance} to rebalance</span>}</p>}
                   </IonLabel>
                   <div slot="end" className="text-right tabular-nums">
                     <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(p.currentValue)}</div>
@@ -344,7 +346,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
               )
             })}
           </IonList>
-        )}
+        </>)}
         {tab === 'activity' && <Activity txns={allFilteredTxns} />}
       </FadeIn>
 

@@ -14,7 +14,7 @@ import Modal from '../../components/Modal'
 import PhoneTabs from '../../phone/PhoneTabs'
 
 const yearOf = (g) => new Date(g.targetDate).getFullYear()
-const left = (p) => (p.isRet && p.years <= 0 ? 'retired' : p.years <= 0 ? 'date reached' : p.years < 1 ? `${Math.max(1, Math.round(p.years * 12))} months left` : `${Math.round(p.years * 2) / 2} yrs left`)
+const left = (p) => (p.isRet && p.years <= 0 ? 'retired' : p.years <= 0 ? 'date reached' : p.years < 1 ? `${Math.max(1, Math.round(p.years * 12))} mo left` : `${Math.round(p.years * 2) / 2} yrs left`)
 const tone = (p) => (p.state === 'due' && !p.isRet ? ['Ready', '#60a5fa'] : p.state === 'short' ? [`${L(-p.gap)} short`, '#f59e0b'] : ['On track', '#34d399'])
 
 function KV({ k, v, cls = '' }) {
@@ -128,15 +128,16 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
           const [t, c] = tone(p)
           const n = realSteps(p).length
           return (
+            // same row as a Mutual Funds portfolio: name and when on the left, what it has and how it is doing on the right
             <IonItem key={p.goal.goalId} button detail onClick={() => navigate(`/goals/plan/${encodeURIComponent(p.goal.goalId)}`)}>
-              <Ring p={p} />
               <IonLabel className="!my-3.5">
-                <h3 className="!text-[16px] !font-semibold !whitespace-normal">{icon(p.goal)} {mt(p.goal.goalName)}</h3>
-                <p>{L(p.has)} of {L(p.target)} · {yearOf(p.goal)} · {left(p)}</p>
+                <h3 className="!text-[16px] !font-semibold !whitespace-normal">{mt(p.goal.goalName)}</h3>
+                <p>{L(p.target)} by {yearOf(p.goal)} · {left(p)}{n > 0 && <span className="text-amber-400"> · {n} step{n > 1 ? 's' : ''}</span>}</p>
+                <div className="mt-2 h-1.5 w-full max-w-[180px] overflow-hidden rounded-full bg-[var(--ion-color-step-150)]"><div className="h-full rounded-full" style={{ width: `${Math.min(100, pctSaved(p))}%`, background: c }} /></div>
               </IonLabel>
-              <div slot="end" className="text-right">
-                <div className="text-[13px] font-semibold" style={{ color: c }}>{t}</div>
-                {n > 0 && <div className="text-[12px] text-amber-400">{n} step{n > 1 ? 's' : ''}</div>}
+              <div slot="end" className="ml-2 shrink-0 text-right tabular-nums">
+                <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{L(p.has)}</div>
+                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: c }}>{pctSaved(p)}% · {t}</div>
               </div>
             </IonItem>
           )

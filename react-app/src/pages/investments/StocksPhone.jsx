@@ -141,7 +141,7 @@ const sumOf = (list) => {
 
 export default function StocksPhone({ portfolioData, allHoldings, allTxns, setModal, mv }) {
   const [open, setOpen] = useState(null) // portfolioId
-  const [tab, setTab] = useState('holdings')
+  const [tab, setTab] = useState('portfolios')
   const [add, setAdd] = useState(false)
   const [txn, setTxn] = useState(null)
   useEffect(() => {
@@ -185,16 +185,17 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
 
   return (
     <div className="pb-6">
-      <TopTabs value={tab} onChange={setTab} options={[['holdings', 'Holdings'], ['portfolios', 'Portfolios'], ['activity', 'History']]} />
+      <TopTabs value={tab} onChange={setTab} options={[['portfolios', 'Portfolios'], ['holdings', 'Holdings'], ['activity', 'History']]} />
       <FadeIn k={tab}>
         {tab === 'holdings' && (<>
           <SummaryCard count={allHoldings.length} s={sumOf(portfolioData)} />
           <Rows holdings={allHoldings} sub={portfolioData.length > 1 ? (h) => pname[h.portfolioId] : null} />
         </>)}
-        {tab === 'portfolios' && (
-          <IonList lines="full" className="cf-flat -mx-4 mt-1">
+        {tab === 'portfolios' && (<>
+          <SummaryCard count={allHoldings.length} s={sumOf(portfolioData)} />
+          <IonList lines="full" className="cf-flat -mx-4 mt-2">
             {portfolioData.map((x) => (
-              <IonItem key={x.portfolioId} button detail onClick={() => { setOpen(x.portfolioId); setTab('holdings') }}>
+              <IonItem key={x.portfolioId} button detail onClick={() => setOpen(x.portfolioId)}>
                 <IonLabel className="!my-3.5">
                   <h3 className="!text-[16px] !font-semibold">{x.portfolioName}</h3>
                   <p>{mv(x.ownerName, 'name')} · {x.stockCount} stock{x.stockCount === 1 ? '' : 's'}{x.platform && x.platform !== '—' ? ` · ${x.platform}` : ''}</p>
@@ -206,7 +207,7 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
               </IonItem>
             ))}
           </IonList>
-        )}
+        </>)}
         {tab === 'activity' && <Activity txns={allTxns} onOpen={setTxn} />}
       </FadeIn>
       {sheets}
