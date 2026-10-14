@@ -12,11 +12,11 @@ const L = (v) => formatINR(Math.round(v || 0))
 const GROUPS = [
   { key: 'MF', title: 'Mutual fund portfolios', has: (i) => i.type === 'MF' },
   { key: 'Stock', title: 'Stock portfolios', has: (i) => i.type === 'Stock' },
-  { key: 'Other', title: 'Other investments', has: (i) => i.type === 'Other' && i.kind !== 'retirement' && i.kind !== 'property' },
+  { key: 'Other', title: 'Other investments', has: (i) => i.type === 'Other' && i.kind !== 'retirement' && i.kind !== 'locked' },
   { key: 'Ret', title: 'For retirement only', has: (i) => i.kind === 'retirement',
     note: 'EPF, PPF, NPS and similar accounts are locked until retirement, so they count only for your Retirement goal. They are never used for other goals and never part of a sell step.' },
-  { key: 'Prop', title: 'Real estate', has: (i) => i.kind === 'property',
-    note: 'Your home or land is not used for goals. If you sell it, add the money you get as cash or FD in Other Investments: it counts for your goals from then.' },
+  { key: 'Locked', title: 'Not used for goals', has: (i) => i.kind === 'locked',
+    note: 'A goal needs money you can take out on the day. Real estate, gold, silver, unlisted shares and crypto are not easy to sell at a fair price when you need it, so they are not counted. If you sell one, add the money as cash or FD in Other Investments: it counts for your goals from then.' },
 ]
 
 export default function MoneyForGoals({ pool, onSaved }) {
@@ -27,9 +27,9 @@ export default function MoneyForGoals({ pool, onSaved }) {
   const [saving, setSaving] = useState(false)
   const dirty = JSON.stringify(choice) !== JSON.stringify(pool.choice)
 
-  const isOn = (it) => (it.kind === 'retirement' ? true : it.kind === 'property' ? false : it.kind === 'out' ? choice.on.includes(it.id) : !choice.off.includes(it.id))
+  const isOn = (it) => (it.kind === 'retirement' ? true : it.kind === 'locked' ? false : it.kind === 'out' ? choice.on.includes(it.id) : !choice.off.includes(it.id))
   const toggle = (it) => {
-    if (it.kind === 'property' || it.kind === 'retirement') return
+    if (it.kind === 'locked' || it.kind === 'retirement') return
     const on = new Set(choice.on), off = new Set(choice.off)
     if (it.kind === 'out') { on.has(it.id) ? on.delete(it.id) : on.add(it.id) } else { off.has(it.id) ? off.delete(it.id) : off.add(it.id) }
     setChoice({ ...choice, on: [...on], off: [...off] })
@@ -41,7 +41,7 @@ export default function MoneyForGoals({ pool, onSaved }) {
   }
   const total = pool.items.filter((i) => isOn(i) && i.kind !== 'retirement').reduce((t, i) => t + i.value, 0)
   const retTotal = pool.items.filter((i) => i.kind === 'retirement' && isOn(i)).reduce((t, i) => t + i.value, 0)
-  const tag = (it) => (it.kind === 'property' ? 'Not used for goals' : it.kind === 'retirement' ? 'Only for your Retirement goal · never sold' : it.kid ? "Kids' own money · left out by default" : it.kind === 'out' ? 'Left out by default' : /gold|silver|sgb|sovereign/i.test(`${it.otherType || ''} ${it.name || ''}`) ? 'Gold · growth, not safe' : it.eq >= 0.5 ? 'Equity' : 'Safe')
+  const tag = (it) => (it.kind === 'locked' ? `${it.why || 'Not liquid'} · not used for goals` : it.kind === 'retirement' ? 'Only for your Retirement goal · never sold' : it.kid ? "Kids' own money · left out by default" : it.kind === 'out' ? (/esop|rsu/i.test(it.otherType || '') ? 'Left out by default · tick it if it is vested and you can sell it' : 'Left out by default') : it.eq >= 0.5 ? 'Equity' : 'Safe')
   const goals = (goalList || []).filter((g) => g.isActive !== false)
   const hasRet = goals.some((g) => g.goalType === 'Retirement')
 
@@ -63,7 +63,7 @@ export default function MoneyForGoals({ pool, onSaved }) {
               <label key={it.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] px-3 py-2 cursor-pointer">
                 {it.kind === 'retirement'
                   ? <span title="Retirement only" className="w-4 h-4 shrink-0 flex items-center justify-center text-amber-400"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg></span>
-                  : it.kind === 'property'
+                  : it.kind === 'locked'
                     ? <span title="Not used for goals" className="w-4 h-4 shrink-0 flex items-center justify-center text-[var(--text-dim)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M6 18L18 6" /></svg></span>
                     : <input type="checkbox" checked={isOn(it)} onChange={() => toggle(it)} className="w-4 h-4 accent-violet-600" />}
                 <div className="flex-1 min-w-0">

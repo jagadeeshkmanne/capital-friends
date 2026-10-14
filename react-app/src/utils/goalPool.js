@@ -2,11 +2,13 @@
  * "Money for goals": one pool for all goals instead of linking investments to each goal by hand.
  *
  * 1. poolItems(): every investment, sorted automatically —
- *      mutual fund portfolios, stock portfolios, FDs / bonds / cash  -> in the pool (each can be switched off)
+ *    Goals need money you can take out when the date comes, so only liquid money counts:
+ *      mutual fund portfolios, stock portfolios, FD / RD / bonds / cash / savings, other listed equity
+ *                                                                    -> in the pool (each can be switched off)
  *      EPF, PPF, NPS, VPF, Sukanya                                   -> retirement only, never moved
- *      gold, silver, crypto, other                                   -> left out (can be switched on)
- *      real estate (your home, land)                                 -> never for goals (once sold, the money is added
- *                                                                       as cash / FD in Other Investments and counts then)
+ *      ESOP / RSU, 'Other', a child's own money                      -> left out (can be switched on)
+ *      real estate, gold, silver, unlisted shares, crypto            -> never for goals ('locked': not easy to sell
+ *        at a fair price on the day). Once sold, the money is added as cash / FD in Other Investments and counts then.
  * 2. sharePool(): shares the pool across goals, no input needed —
  *      A. safe money first to the nearest goals (Emergency Fund first), up to the safe part each needs
  *         (retirement takes its EPF / PPF / NPS here, counted in full)
@@ -23,19 +25,29 @@ import { needTodayN } from './goalPlan'
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
 const RET_ONLY = ['epf', 'ppf', 'nps', 'vpf', 'sukanya samriddhi', 'sukanya', 'ssy']
-const LEFT_OUT = ['physical gold', 'digital gold', 'sovereign gold bond', 'physical silver', 'digital silver', 'crypto', 'other']
-const PROPERTY = ['real estate', 'property', 'land', 'plot', 'house', 'flat', 'apartment']
+const LEFT_OUT = ['esop / rsu', 'esop', 'rsu', 'other']
+const LOCKED = ['real estate', 'property', 'land', 'plot', 'house', 'flat', 'apartment',
+  'physical gold', 'digital gold', 'sovereign gold bond', 'gold', 'physical silver', 'digital silver', 'silver', 'unlisted shares', 'crypto']
 const norm = (s) => String(s || '').trim().toLowerCase()
 
-/** How an Other Investment is treated by default: 'pool' | 'retirement' | 'out' | 'property' */
+/** How an Other Investment is treated: 'pool' | 'retirement' | 'out' (can be switched on) | 'locked' (never for goals) */
 export function otherKind(inv) {
-  const t = norm(inv?.investmentType)
+  const t = norm(inv?.investmentType), c = norm(inv?.investmentCategory)
   if (RET_ONLY.includes(t)) return 'retirement'
-  if (PROPERTY.includes(t) || norm(inv?.investmentCategory) === 'property') return 'property'   // a home is not sold for a goal
+  if (LOCKED.includes(t) || ['property', 'gold', 'silver', 'alternative'].includes(c)) return 'locked'   // not liquid: never sold for a goal
   if (LEFT_OUT.includes(t)) return 'out'
-  const c = norm(inv?.investmentCategory)
-  if (['gold', 'silver', 'alternative'].includes(c)) return 'out'
-  return 'pool' // FD, bonds, cash / savings, debt or equity entries
+  return 'pool' // FD, RD, bonds, cash / savings, other listed equity
+}
+
+/** Why a locked investment is not used for goals (shown in Money for goals). */
+export function lockedWhy(inv) {
+  const s = `${norm(inv?.investmentType)} ${norm(inv?.investmentCategory)}`
+  if (/real estate|property|land|plot|house|flat|apartment/.test(s)) return 'Real estate'
+  if (/gold/.test(s)) return 'Gold'
+  if (/silver/.test(s)) return 'Silver'
+  if (/unlisted/.test(s)) return 'Unlisted shares'
+  if (/crypto|alternative/.test(s)) return 'Crypto'
+  return ''
 }
 
 /**
@@ -61,14 +73,14 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
   for (const i of (otherInvList || []).filter((x) => x.status === 'Active')) {
     const kind = otherKind(i)
     items.push({ id: i.investmentId, type: 'Other', name: i.investmentName || i.investmentType, owner: i.familyMemberName, value: Number(i.currentValue) || 0,
-      eq: norm(i.investmentCategory) === 'equity' || /gold|silver|sgb|sovereign/i.test(`${i.investmentType} ${i.investmentCategory}`) ? 1 : 0, kind, otherType: i.investmentType, locked: kind === 'retirement',
+      eq: norm(i.investmentCategory) === 'equity' || /gold|silver|sgb|sovereign/i.test(`${i.investmentType} ${i.investmentCategory}`) ? 1 : 0, kind, otherType: i.investmentType, locked: kind === 'retirement', why: kind === 'locked' ? lockedWhy(i) : '',
       // cash that came from an EPF / PPF / NPS payout ("Received") stays retirement's money first
       fromRetirement: kind === 'pool' && /^from (epf|ppf|nps|vpf)/i.test(String(i.notes || '')) })
   }
   return items.map((it) => {
     const kid = it.kind === 'pool' && !!it.owner && kids.has(norm(it.owner))
     const kind = kid ? 'out' : it.kind
-    if (kind === 'property') return { ...it, kind, kid, eq: 0, included: false }   // a home is never sold for a goal
+    if (kind === 'locked') return { ...it, kind, kid, included: false }   // not liquid: never sold for a goal
     if (kind === 'retirement') return { ...it, kind, kid, included: true }   // EPF / PPF / NPS always count, for retirement only
     return { ...it, kind, kid, included: kind === 'out' ? on.has(it.id) : !off.has(it.id) }
   })

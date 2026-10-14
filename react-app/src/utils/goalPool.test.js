@@ -22,9 +22,9 @@ const KID = { goalId: 'KID', goalType: 'Education', targetDate: inY(3), targetAm
 const EF = { goalId: 'EF', goalType: 'Emergency Fund', targetDate: inY(0.5), targetAmount: 600000, expectedCAGR: 0.06, isActive: true }
 
 describe('money for goals', () => {
-  it('sorts investments by type: EPF retirement-only, gold left out, kids portfolio can be switched off', () => {
+  it('sorts investments by type: EPF retirement-only, gold never for goals, kids portfolio can be switched off', () => {
     expect(otherKind({ investmentType: 'EPF' })).toBe('retirement')
-    expect(otherKind({ investmentType: 'Physical Gold' })).toBe('out')
+    expect(otherKind({ investmentType: 'Physical Gold' })).toBe('locked')
     expect(otherKind({ investmentType: 'Fixed Deposit' })).toBe('pool')
     const it = poolItems({ mfPortfolios: mfP, mfHoldings: mfH, otherInvList: other, eqOf, choice: { off: ['KIDS'] } })
     expect(it.find((x) => x.id === 'KIDS').included).toBe(false)
@@ -262,12 +262,18 @@ describe('corner cases (ages, timelines, shortages)', () => {
     expect(after.byGoal.EDU.got).toBeCloseTo(before.byGoal.EDU.got, -2)
     expect(after.byGoal.CAR.got).toBeLessThan(1000)
   })
-  it('gold / SGB is never used as safe money (not for the emergency fund or a 1-year goal)', () => {
-    const gold = { investmentId: 'SGB', investmentType: 'Sovereign Gold Bond', investmentCategory: 'Gold', currentValue: 1e6, status: 'Active' }
-    const items = poolItems({ otherInvList: [gold], eqOf, choice: { on: ['SGB'] } })
-    expect(items[0].eq).toBe(1)
+  it('gold / SGB / silver / unlisted / crypto are never used for goals (not liquid), even if ticked before', () => {
+    const list = [['SGB', 'Sovereign Gold Bond', 'Gold'], ['DG', 'Digital Gold', 'Gold'], ['SIL', 'Physical Silver', 'Silver'], ['UNL', 'Unlisted Shares', 'Equity'], ['CR', 'Crypto', 'Alternative']]
+      .map(([id, t, c]) => ({ investmentId: id, investmentType: t, investmentCategory: c, currentValue: 1e6, status: 'Active' }))
+    const items = poolItems({ otherInvList: list, eqOf, choice: { on: list.map((x) => x.investmentId) } })
+    expect(items.every((i) => i.kind === 'locked' && !i.included)).toBe(true)
     const r = sharePool({ goals: [g('EF', 'Emergency Fund', 0.5, 5e5), g('RET', 'Retirement', 20, 5e7)], items, now })
-    expect(r.byGoal.RET.gotEq).toBeGreaterThan(0)
+    expect(r.mappings.length).toBe(0)
+  })
+  it('ESOP / RSU is left out by default but can be switched on', () => {
+    const rsu = { investmentId: 'RSU', investmentType: 'ESOP / RSU', investmentCategory: 'Equity', currentValue: 1e6, status: 'Active' }
+    expect(poolItems({ otherInvList: [rsu], eqOf })[0].included).toBe(false)
+    expect(poolItems({ otherInvList: [rsu], eqOf, choice: { on: ['RSU'] } })[0].included).toBe(true)
   })
 
   it('money short: higher priority first; the same priority shares the money at the same % of each need', () => {
@@ -290,7 +296,7 @@ describe('real estate: never used for goals', () => {
   const fd = { investmentId: 'FD1', investmentType: 'Fixed Deposit', investmentCategory: 'Debt', currentValue: 1200000, status: 'Active', familyMemberName: 'Jagadeesh' }
   const items = (choice) => poolItems({ otherInvList: [home, fd], eqOf, choice })
   it('is its own kind and never included, even if it was ticked before', () => {
-    expect(otherKind(home)).toBe('property')
+    expect(otherKind(home)).toBe('locked')
     expect(items({}).find((i) => i.id === 'HOME').included).toBe(false)
     expect(items({ on: ['HOME'] }).find((i) => i.id === 'HOME').included).toBe(false)
   })
