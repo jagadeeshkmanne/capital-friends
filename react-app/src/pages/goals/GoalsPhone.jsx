@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import '../../phone/ionic-setup'
 import { IonList, IonItem, IonLabel, IonButton, IonActionSheet, IonListHeader } from '@ionic/react'
-import { Plus, MoreVertical, ListChecks, AlertTriangle, CheckCircle2, Layers, Wallet } from 'lucide-react'
+import { Plus, MoreVertical, ListChecks, Layers, Wallet } from 'lucide-react'
 import { Screen, setPhoneBar } from '../../components/native'
 import { Step, GOALS_HOME_CSS, Buckets, AsideCtx } from './GoalsHome'
 import { L, icon, gapTxt, realSteps, pctSaved, StepRow, GP_CSS, BucketsPanel, PlanByYear } from './GoalsPlanPage'
 import { RetirementActions } from './RetirementBucketsPage'
 import Modal from '../../components/Modal'
+import PhoneTabs from '../../phone/PhoneTabs'
 
 const yearOf = (g) => new Date(g.targetDate).getFullYear()
 const left = (p) => (p.isRet && p.years <= 0 ? 'retired' : p.years <= 0 ? 'date reached' : p.years < 1 ? `${Math.max(1, Math.round(p.years * 12))} months left` : `${Math.round(p.years * 2) / 2} yrs left`)
@@ -64,8 +65,9 @@ export default function GoalsPhone(props) {
 
 // ── all goals ──
 function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, openView }) {
-  const { mt, navigate } = ctx
+  const { mt, navigate, pname, closeGoal } = ctx
   const [menu, setMenu] = useState(false)
+  const [tab, setTab] = useState('goals')
   useEffect(() => {
     setPhoneBar({ right: <>
       <IonButton className="cf-icon-btn" onClick={onAdd} aria-label="Add goal"><Plus size={24} /></IonButton>
@@ -92,9 +94,20 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
       </div>
     )
   }
+  const nToDo = steps.length + ready.length + (shortStep ? 1 : 0)
+  const monthSteps = todo.steps.filter((x) => x.t === 'cash' || x.t === 'switch' || x.t === 'protect' || x.t === 'short' || x.t === 'ready')
   return (
     <div className="pb-6">
-      <Card className="mt-1">
+      <PhoneTabs value={tab} onChange={setTab} options={[['goals', `Goals (${live.length})`], ['steps', 'This month', nToDo]]} />
+      {tab === 'steps' && (
+        <div className="g2 pt-2"><style>{GOALS_HOME_CSS}</style>
+          <p className="text-[13px] text-[var(--ion-color-medium)] pb-3">Do these in order. Before you start, import your latest CAS if you bought or sold since, so the units and amounts are today's.</p>
+          {monthSteps.length ? monthSteps.map((s, i) => <div key={i} className="mb-3"><Step s={s} n={i + 1} mt={mt} pname={pname} closeGoal={closeGoal} navigate={navigate} /></div>)
+            : <p className="py-10 text-center text-[var(--ion-color-medium)]">✓ Nothing to do this month. Keep your SIPs running.</p>}
+        </div>
+      )}
+      {tab === 'goals' && <>
+      <Card className="mt-3">
         <div className="text-[12px] font-semibold tracking-[0.14em] text-[var(--ion-color-medium)]">GOALS ({live.length})</div>
         <div className="mt-0.5 text-[28px] font-bold tracking-tight tabular-nums">{L(has)}</div>
         <div className="text-[13px] text-[var(--ion-color-medium)]">kept for your goals today</div>
@@ -106,9 +119,7 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
         {extra > 1000 && <KV k="Free money · liquid" v={L(extra)} cls="text-sky-400" />}
       </Card>
       <Rows rows={[
-        steps.length > 0 && [ListChecks, `${steps.length} step${steps.length > 1 ? 's' : ''} this month`, 'Rebalance and make goals safer, in order', '#f59e0b', () => openView('steps')],
-        ...ready.map((r) => [CheckCircle2, `${mt(r.goal.goalName)}: money ready`, 'Withdraw, give it more time, or close it', '#60a5fa', () => navigate(`/goals/plan/${encodeURIComponent(r.goal.goalId)}`)]),
-        shortStep && [AlertTriangle, `Goals ${L(shortStep.gap)} short`, `Add ${L(shortStep.sip)}/month, or ${L(shortStep.lump)} once`, '#fb7185', () => openView('steps')],
+        nToDo > 0 && [ListChecks, `${nToDo} thing${nToDo > 1 ? 's' : ''} to do this month`, [steps.length && 'make goals safer / rebalance', ready.length && 'money ready to withdraw', shortStep && `${L(shortStep.gap)} short`].filter(Boolean).join(' · '), '#f59e0b', () => setTab('steps')],
         [Wallet, 'Money for goals', 'Which investments count for your goals', '#a78bfa', onMoney],
       ].filter(Boolean)} />
       <IonListHeader className="!pl-1"><IonLabel className="cf-group">Your goals</IonLabel></IonListHeader>
@@ -131,6 +142,7 @@ function GoalsRoot({ plan, todo, pool, shown, ctx, onAdd, onEditList, onMoney, o
           )
         })}
       </IonList>
+      </>}
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header="Goals" buttons={[
         { text: 'Add a goal', handler: onAdd },
         { text: 'Edit goals', handler: onEditList },
@@ -162,6 +174,7 @@ function GoalScreen({ p, ctx, todo, onEdit, openView }) {
   const g = p.goal
   const [menu, setMenu] = useState(false)
   const [bk, setBk] = useState(false)
+  const [tab, setTab] = useState('overview')
   const gp = gapTxt(p)
   const own = (todo?.steps || []).filter((x) => (x.t === 'protect' || x.t === 'ready') && x.goal?.goalId === g.goalId) // family-plan steps that belong to this goal
   const st = realSteps(p).filter((x) => !own.some((o) => o.t === x.t)) // the same step is not shown twice
@@ -171,7 +184,9 @@ function GoalScreen({ p, ctx, todo, onEdit, openView }) {
   return (
     <Screen k={g.goalId} title={`${icon(g)} ${mt(g.goalName)}`} subtitle={`${new Date(g.targetDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} · ${left(p)}`} onBack={() => navigate('/goals')} right={right}>
       <div className="pb-6">
-        <Card className="mt-1">
+        <PhoneTabs value={tab} onChange={setTab} options={[['overview', 'Overview', own.length + st.length], ['plan', 'Plan by year'], ['funds', `Investments (${items.length})`]]} />
+        {tab === 'overview' && <>
+        <Card className="mt-3">
           <div className="flex items-center gap-4">
             <Ring p={p} size={58} />
             <div>
@@ -201,14 +216,18 @@ function GoalScreen({ p, ctx, todo, onEdit, openView }) {
           </div>
         ) : own.length ? null : <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-[14px]">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
 
+        </>}
+        {tab === 'plan' && <>
         <div className="gp mt-3"><style>{GP_CSS}</style><PlanByYear p={p} /></div>
+        {!p.isRet && Math.max(1, Number(g.payYears) || 1) === 1 && <p className="mt-3 px-1 text-[13px] text-[var(--ion-color-medium)]">Paid over several years (like college fees)? Edit the goal and set Withdraw to "Over 4 years": each year's part then gets its own glide path.</p>}
 
         <Rows rows={[
           p.isRet && [Layers, retired ? 'Your buckets today' : 'Retirement buckets', retired ? 'Income, Stability and Growth jars, monthly income' : 'How the money moves into 3 jars before you retire', '#34d399', () => setBk(true)],
         ].filter(Boolean)} />
         {p.isRet && <div className="mt-2"><RetirementActions goal={g} slot="pills" /></div>}
-
-        <IonListHeader className="!pl-1"><IonLabel className="cf-group">Investments in this goal · {items.length}</IonLabel></IonListHeader>
+        </>}
+        {tab === 'funds' && <>
+        <IonListHeader className="!pl-1"><IonLabel className="cf-group">{L(p.has)} · {p.eqNow ?? '—'}% equity</IonLabel></IonListHeader>
         <IonList lines="full" className="cf-flat -mx-4">
           {items.map((it) => {
             const h = it.holding
@@ -222,6 +241,7 @@ function GoalScreen({ p, ctx, todo, onEdit, openView }) {
           })}
         </IonList>
         {!items.length && <p className="py-6 text-center text-[14px] text-[var(--ion-color-medium)]">No investments counted for this goal yet. Open Money for goals.</p>}
+        </>}
       </div>
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header={mt(g.goalName)} buttons={[
         { text: 'Edit goal', handler: () => onEdit(g) },
