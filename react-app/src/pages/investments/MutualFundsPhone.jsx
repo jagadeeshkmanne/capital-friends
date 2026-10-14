@@ -11,6 +11,24 @@ import { useMask } from '../../context/MaskContext'
 import '../../phone/ionic-setup'
 import { Plus, MoreVertical, Repeat2, TrendingDown, Scale, Target, ChevronRight, ArrowDownLeft, ArrowUpRight, Lock, Trash2, X, List as ListIcon, Eye, EyeOff, LineChart } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
+import { useData } from '../../context/DataContext'
+import { buildFundsModel } from '../../utils/fundsDashboard'
+
+/** XIRR / CAGR of each holding (one fund in one portfolio), from its own transactions: { 'PFL::code': position } */
+function usePositionReturns(funds) {
+  const { mfPortfolios, mfTransactions } = useData()
+  return useMemo(() => {
+    const out = {}
+    try {
+      const m = buildFundsModel({ portfolios: mfPortfolios || [], holdings: funds || [], transactions: mfTransactions || [], withBreakdown: false })
+      for (const f of m.funds || []) for (const p of f.positions || []) out[`${p.portfolioId}::${f.schemeCode}`] = p
+    } catch { /* returns are extra: the list works without them */ }
+    return out
+  }, [funds, mfPortfolios, mfTransactions])
+}
+const posKey = (h) => `${h.portfolioId}::${String(h.schemeCode || h.fundCode || '')}`
+const rate = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`)
+import { folioOf, maskFolio } from '../../utils/folio'
 import JourneyChartLW from '../../components/JourneyChart'
 import { Screen, FadeIn, setPhoneBar } from '../../components/native'
 
@@ -88,14 +106,18 @@ function SplitSheet({ open, onClose, breakdown }) {
 
 /** Holdings list, Groww style: flat rows, fund name on the left, current value or returns on the right (tap the
  *  header to switch). Tapping a fund opens the quick-action sheet. */
+const MODES = [['returns', 'Returns (%)'], ['current', 'Current (Invested)'], ['xirr', 'XIRR (CAGR)']]
 function Holdings({ funds, sub, onOpen }) {
-  const [mode, setMode] = useState('returns')
+  // like Groww: tap the column title (or any number on the right) to switch what the right side shows
+  const [mode, setMode] = useState(() => { try { return localStorage.getItem('cf-mf-col') || 'returns' } catch { return 'returns' } })
+  const next = () => { const i = MODES.findIndex(([m]) => m === mode); const m = MODES[(i + 1) % MODES.length][0]; setMode(m); try { localStorage.setItem('cf-mf-col', m) } catch { /* ignore */ } }
+  const ret = usePositionReturns(funds)
   return (
     <>
       <div className="flex items-center justify-between px-1 pt-4 pb-1">
         <span className="text-[13px] text-[var(--ion-color-medium)]">{funds.length} fund{funds.length === 1 ? '' : 's'}</span>
-        <button type="button" onClick={() => setMode(mode === 'returns' ? 'current' : 'returns')} className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ion-text-color)]">
-          <span className="text-[var(--ion-color-medium)]">‹ ›</span><span className="border-b border-dashed border-[var(--ion-color-medium)]">{mode === 'returns' ? 'Returns (%)' : 'Current (Invested)'}</span>
+        <button type="button" onClick={next} className="flex items-center gap-1.5 rounded-full border border-[var(--ion-border-color)] px-3 py-1 text-[13px] font-semibold text-[var(--ion-text-color)]" aria-label="Switch what the numbers show">
+          <span className="text-[var(--ion-color-medium)]">‹ ›</span><span>{MODES.find(([m]) => m === mode)?.[1]}</span>
         </button>
       </div>
       <IonList lines="full" className="cf-flat">
@@ -112,10 +134,12 @@ function Holdings({ funds, sub, onOpen }) {
                   {h.ongoingSIP > 0 && <span className="px-1.5 rounded bg-sky-500/15 text-sky-400 text-[11px] font-semibold">SIP</span>}
                 </p>
               </IonLabel>
-              <div slot="end" className="text-right tabular-nums">
+              <div slot="end" className="ml-2 shrink-0 text-right tabular-nums" onClick={(e) => { e.stopPropagation(); next() }}>
                 {mode === 'returns'
-                  ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{signed(h.pl)}</div><div className={`text-[12px] font-semibold ${upCls(h.pl)}`}>({pctTxt(h.plPct)})</div></>
-                  : <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(h.currentValue)}</div><div className="text-[12px] text-[var(--ion-color-medium)]">({formatINR(h.investment)})</div></>}
+                  ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{signed(h.pl)}</div><div className={`mt-0.5 text-[12.5px] font-semibold ${upCls(h.pl)}`}>({pctTxt(h.plPct)})</div></>
+                  : mode === 'current'
+                    ? <><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(h.currentValue)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({formatINR(h.investment)})</div></>
+                    : (() => { const r = ret[posKey(h)]; return r?.xirr == null ? <div className="text-[13px] text-[var(--ion-color-medium)]">needs history</div> : <><div className={`text-[15px] font-semibold ${upCls(r.xirr)}`}>{rate(r.xirr)}</div><div className="mt-0.5 text-[12.5px] text-[var(--ion-color-medium)]">({rate(r?.cagr)})</div></> })()}
               </div>
             </IonItem>
           )
@@ -302,7 +326,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
                 <IonItem key={p.portfolioId} button detail onClick={() => open({ p: p.portfolioId })}>
                   <IonLabel className="!my-3.5">
                     <h3 className="!text-[16px] !font-semibold">{dn(p.portfolioName)}</h3>
-                    <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}{ind.buyOpp > 0 && <span className="text-emerald-400"> · {ind.buyOpp} buy</span>}</p>
+                    <p>{mv(p.ownerName, 'name')} · {n} fund{n === 1 ? '' : 's'}{ind.buyOpp > 0 && <span className="text-emerald-400"> · {ind.buyOpp} below peak</span>}</p>
                   </IonLabel>
                   <div slot="end" className="text-right tabular-nums">
                     <div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(p.currentValue)}</div>
@@ -428,6 +452,9 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
   const first = txns.map((t) => parseD(t.date)).filter(Boolean).sort((a, b) => a - b)[0]
   const held = first ? (() => { const m = Math.max(0, Math.round((Date.now() - first) / (30.44 * 864e5))); return `${Math.floor(m / 12) ? `${Math.floor(m / 12)} years ` : ''}${m % 12} months` })() : null
   const list = all ? txns : txns.slice(0, 8)
+  const pos = usePositionReturns(useMemo(() => [h], [h]))[posKey(h)]
+  const folio = folioOf(txns)
+  const { masked } = useMask()
   return (
     <Screen k={h._key} title="Investment details" onBack={back} right={right} footer={footer}>
       <div className="pb-4">
@@ -442,6 +469,8 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <Dash />
           <KV k="Total returns" v={`${signed(h.pl)} (${pctTxt(h.plPct)})`} cls={upCls(h.pl)} />
           <KV k="Invested" v={formatINR(h.investment)} />
+          <KV k="XIRR" v={pos?.xirr == null ? 'needs full history' : rate(pos.xirr)} cls={pos?.xirr == null ? 'text-[var(--ion-color-medium)] !font-normal !text-[13px]' : upCls(pos.xirr)} />
+          {pos?.cagr != null && <KV k="CAGR" v={rate(pos.cagr)} cls={upCls(pos.cagr)} />}
           {terms.ok && <><Dash /><KV k="Long term" sub="(>1Y)" v={formatINR(terms.lt)} /><KV k="Short term" sub="(<1Y)" v={formatINR(terms.st)} /></>}
         </div>
 
@@ -449,6 +478,7 @@ function FundScreen({ h, portfolio, back, openGrowth, allFilteredTxns, setModal,
           <KV k="Current NAV" v={`₹${Number(h.currentNav).toFixed(4)}`} />
           <KV k="Avg NAV" v={`₹${Number(h.avgNav || 0).toFixed(2)}`} />
           <KV k="Units" v={Number(h.units).toLocaleString('en-IN', { maximumFractionDigits: 3 })} />
+          {folio && <KV k="Folio" v={masked ? maskFolio(folio) : folio} />}
           {h.athNav > 0 && <KV k="All-time high NAV" v={`₹${Number(h.athNav).toFixed(2)}${below > 0 ? ` (↓${below.toFixed(1)}%)` : ''}`} cls={below >= 5 ? 'text-emerald-400' : ''} />}
           <Dash />
           <KV k="Monthly SIP" v={h.ongoingSIP > 0 ? formatINR(h.ongoingSIP) : '—'} />

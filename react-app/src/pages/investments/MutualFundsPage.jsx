@@ -22,6 +22,7 @@ import FundAllocationForm from '../../components/forms/FundAllocationForm'
 import PageLoading from '../../components/PageLoading'
 import { isBuyOpportunity } from '../../utils/buyOpportunities'
 import { buildFundsModel } from '../../utils/fundsDashboard'
+import { folioOf } from '../../utils/folio'
 import JourneyChartLW from '../../components/JourneyChart'
 import ImportNudge from '../../components/ImportNudge'
 import { useIsPhone } from '../../components/native'
@@ -1390,6 +1391,18 @@ export default function MutualFundsPage() {
                 <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] divide-y divide-[var(--border-light)]">
                   <DetailRow label="Invested" value={formatINR(h.investment)} />
                   <DetailRow label="Units" value={h.units.toFixed(3)} />
+                  {(() => {
+                    // this holding's own XIRR / CAGR (from its transactions) and its folio from the statement
+                    const ftx = (mfTransactions || []).filter((t) => t.portfolioId === h.portfolioId && String(t.fundCode) === String(h.schemeCode || h.fundCode))
+                    let pos = null
+                    try { pos = buildFundsModel({ portfolios: (mfPortfolios || []).filter((p) => p.portfolioId === h.portfolioId), holdings: [h], transactions: ftx, withBreakdown: false }).funds?.[0]?.positions?.[0] || null } catch { pos = null }
+                    const r = (x) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`
+                    const folio = folioOf(ftx)
+                    return <>
+                      <DetailRow label="XIRR / CAGR" value={pos?.xirr == null ? 'Needs the full history (import your CAS)' : `${r(pos.xirr)} / ${pos.cagr == null ? '—' : r(pos.cagr)}`} />
+                      {folio && <DetailRow label="Folio" value={mv(folio, 'account')} />}
+                    </>
+                  })()}
                   <DetailRow label="NAV (Current / Avg)" value={`₹${h.currentNav.toFixed(2)} / ₹${h.avgNav.toFixed(2)}${navDateBit(h) ? ` · ${navDateBit(h).text}` : ''}`} />
                   <DetailRow label="Allocation (Current / Target)" value={`${h.currentAllocationPct.toFixed(1)}% / ${h.targetAllocationPct.toFixed(1)}%`} />
                   {h.athNav > 0 && (
