@@ -560,9 +560,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
               <FormSelect value={repeat} onChange={setRepeat} options={REPEAT_OPTIONS} />
               <p className="text-[11px] text-[var(--text-dim)] mt-1">Yearly trip, school fees, insurance premium: when you close it, the next one is added for you.</p>
             </FormField>
-            <FormField label="Paid">
+            <FormField label="Withdraw">
               <FormSelect value={payYears} onChange={setPayYears} options={PAY_OPTIONS} />
-              <p className="text-[11px] text-[var(--text-dim)] mt-1">College fees over 4 years: the amount is spent in equal parts from the goal date, so it needs less today.</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-1">College fees over 4 years: the money is taken out in equal parts from the goal date. Each year's part gets its own safe / growth mix, so later years stay in growth longer and the goal needs less today.</p>
             </FormField>
           </div>
         )}
@@ -646,9 +646,9 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
                 <FormSelect value={repeat} onChange={setRepeat} options={REPEAT_OPTIONS} />
                 <p className="text-[11px] text-[var(--text-dim)] mt-1">Yearly trip, school fees, insurance premium: when you close it, the next one is added for you.</p>
               </FormField>
-              <FormField label="Paid">
+              <FormField label="Withdraw">
                 <FormSelect value={payYears} onChange={setPayYears} options={PAY_OPTIONS} />
-                <p className="text-[11px] text-[var(--text-dim)] mt-1">College fees over 4 years: the amount is spent in equal parts from the goal date, so it needs less today.</p>
+                <p className="text-[11px] text-[var(--text-dim)] mt-1">College fees over 4 years: the money is taken out in equal parts from the goal date. Each year's part gets its own safe / growth mix, so later years stay in growth longer and the goal needs less today.</p>
               </FormField>
             </div>
           )}

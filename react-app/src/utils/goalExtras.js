@@ -28,4 +28,5 @@ export const REPEAT_OPTIONS = [
 export const PAY_OPTIONS = [
   { value: '1', label: 'All at once' }, { value: '2', label: 'Over 2 years' }, { value: '3', label: 'Over 3 years' },
   { value: '4', label: 'Over 4 years' }, { value: '5', label: 'Over 5 years' }, { value: '6', label: 'Over 6 years' },
+  { value: '8', label: 'Over 8 years' }, { value: '10', label: 'Over 10 years' },
 ]
