@@ -184,7 +184,7 @@ export default function LiabilitiesTab() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y divide-[var(--border-light)]">
+            <div className="sm:hidden divide-y divide-[var(--row-divider)]">
               {filtered.map((l) => (
                 <div key={l.liabilityId} onClick={() => setModal({ edit: l })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                   <div className="flex items-center justify-between mb-1">

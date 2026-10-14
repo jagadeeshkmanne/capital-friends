@@ -253,7 +253,7 @@ export default function OtherInvestmentsTab() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y divide-[var(--border-light)]">
+            <div className="sm:hidden divide-y divide-[var(--row-divider)]">
               {filtered.map((i) => {
                 const pl = (i.currentValue || 0) - (i.investedAmount || 0)
                 const up = pl >= 0

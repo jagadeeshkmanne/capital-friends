@@ -1306,7 +1306,7 @@ export default function MutualFundsPage() {
                   </table>
                 </div>
                 {/* Mobile cards */}
-                <div className="lg:hidden divide-y divide-[var(--border-light)]">
+                <div className="lg:hidden divide-y divide-[var(--row-divider)]">
                   {portfolioData.map(p => {
                     const unrealPL = p.currentValue - p.totalInvestment
                     const unrealUp = unrealPL >= 0
@@ -1519,7 +1519,7 @@ export default function MutualFundsPage() {
                         </table>
                       </div>
                       {/* Mobile cards */}
-                      <div className="sm:hidden divide-y divide-[var(--border-light)]">
+                      <div className="sm:hidden divide-y divide-[var(--row-divider)]">
                         {fundTxns.map((t, idx) => {
                           const isBuy = t.type === 'BUY'
                           const hasRealized = !isBuy && t.gainLoss != null && t.gainLoss !== 0
@@ -1912,7 +1912,7 @@ export default function MutualFundsPage() {
                   </div>
 
                   {/* Phones: one grouped list, a row per fund (tap opens the fund) */}
-                  <div className="lg:hidden divide-y divide-[var(--border-light)]">
+                  <div className="lg:hidden divide-y divide-[var(--row-divider)]">
                     {groupHoldings.map((h) => {
                       const isPlanned = h.units === 0
                       const unrealUp = h.pl >= 0
@@ -2272,7 +2272,7 @@ export default function MutualFundsPage() {
                   </div>
 
                   {/* Mobile cards */}
-                  <div className="sm:hidden divide-y divide-[var(--border-light)]">
+                  <div className="sm:hidden divide-y divide-[var(--row-divider)]">
                     {transactions.map((t, idx) => {
                       const isBuy = t.type === 'BUY'
                       const curNav = currentNavMap[`${t.portfolioId}:${t.fundCode}`]

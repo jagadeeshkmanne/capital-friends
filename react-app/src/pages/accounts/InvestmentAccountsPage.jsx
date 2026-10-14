@@ -73,9 +73,9 @@ export default function InvestmentAccountsPage() {
 
   return (
     <div className="space-y-4">
-      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Accounts', value: filtered.length }]} onAdd={() => setModal('add')} addLabel="Add account"
+      {phone ? <SuspenseP fallback={null}><PhoneList onAdd={() => setModal('add')} addLabel="Add account"
         empty={{ icon: Briefcase, title: 'No investment accounts yet', text: 'Zerodha, Groww, Kuvera or your distributor.' }}
-        groups={[{ items: filtered.map((a) => ({ key: a.accountId, title: mv(a.accountName, 'name'), sub: `${a.platformBroker}${!member ? ` · ${mv(a.memberName, 'name')}` : ''}`, note: a.accountType, lead: { icon: Briefcase, color: '#60a5fa' }, onClick: () => setModal({ edit: a }) })) }]} /></SuspenseP> : (<>
+        groups={[{ title: `${filtered.length} account${filtered.length === 1 ? '' : 's'}`, items: filtered.map((a) => ({ key: a.accountId, title: mv(a.accountName, 'name'), sub: `${a.platformBroker}${!member ? ` · ${mv(a.memberName, 'name')}` : ''}`, note: a.accountType, lead: { icon: Briefcase, color: '#60a5fa' }, onClick: () => setModal({ edit: a }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Briefcase size={32} className="text-[var(--text-dim)]" />
@@ -143,7 +143,7 @@ export default function InvestmentAccountsPage() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y divide-[var(--border-light)]">
+            <div className="sm:hidden divide-y divide-[var(--row-divider)]">
               {filtered.map((a) => (
                 <div key={a.accountId} onClick={() => setModal({ edit: a })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                   <div className="flex items-center justify-between mb-1">

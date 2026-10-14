@@ -1,3 +1,4 @@
+import PhoneSummary from '../components/PhoneSummary'
 import { useState, useMemo } from 'react'
 import { FileText, Filter } from 'lucide-react'
 import { formatINR, splitFundName } from '../data/familyData'
@@ -55,8 +56,12 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Stat Cards (phones: one summary card) */}
+      <PhoneSummary label={`Total bought · ${txns.length} transactions`} value={formatINR(totalBuy)} rows={[
+        { k: 'Total sold', v: formatINR(totalSell) },
+        { k: 'Realised P&L', v: `${totalGL >= 0 ? '+' : '−'}${formatINR(Math.abs(totalGL))}`, cls: totalGL >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+      ]} />
+      <div className="max-lg:hidden grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Transactions" value={txns.length} />
         <StatCard label="Total Bought" value={formatINR(totalBuy)} />
         <StatCard label="Total Sold" value={formatINR(totalSell)} />
@@ -174,7 +179,7 @@ export default function ReportsPage() {
             </div>
 
             {/* Mobile */}
-            <div className="sm:hidden divide-y divide-[var(--border-light)]">
+            <div className="sm:hidden divide-y divide-[var(--row-divider)]">
               {txns.map((t) => {
                 const gl = t.gainLoss || t.realizedPL || 0
                 return (

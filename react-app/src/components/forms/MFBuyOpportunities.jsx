@@ -112,7 +112,7 @@ export default function MFBuyOpportunities() {
           </div>
 
           {/* Mobile cards */}
-          <div className="sm:hidden divide-y divide-[var(--border-light)]">
+          <div className="sm:hidden divide-y divide-[var(--row-divider)]">
             {p.opportunities.map((h) => {
               const signal = buySignal(h.belowATHPct)
               return (

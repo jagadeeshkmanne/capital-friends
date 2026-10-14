@@ -167,7 +167,7 @@ export default function InsurancePage() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y divide-[var(--border-light)]">
+            <div className="sm:hidden divide-y divide-[var(--row-divider)]">
               {filtered.map((p) => (
                 <div key={p.policyId} onClick={() => setModal({ edit: p })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                   <div className="flex items-start justify-between gap-2 mb-1">

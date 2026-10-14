@@ -1,3 +1,4 @@
+import PhoneSummary from '../../components/PhoneSummary'
 import { useMemo, useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -250,7 +251,13 @@ export default function FundsDashboardPage() {
         {filtersOpen && <div className={present ? '' : 'lg:hidden'}>{filterPanel}</div>}
 
         {/* ── Stat cards (Mutual Funds page style) ── */}
-        <div className="cf-stats grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <PhoneSummary label={`Funds (${model.funds.length})`} value={amt(t.currentValue)} rows={[
+          { k: 'Total gain', v: hideAmounts ? pct(t.totalGain != null ? t.totalGainPct : t.plPct) : `${(t.totalGain ?? t.pl) >= 0 ? '+' : ''}${formatINR(t.totalGain ?? t.pl)} (${pct(t.totalGain != null ? t.totalGainPct : t.plPct)})`, cls: (t.totalGain ?? t.pl) >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+          { k: 'Invested', v: amt(t.netInvested ?? t.invested) },
+          { k: 'XIRR', v: ratePct(t.xirr) },
+          { k: 'CAGR', v: ratePct(t.cagr) },
+        ]} />
+        <div className="cf-stats max-lg:hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <Stat sz={sz} label="Invested" value={amt(t.netInvested ?? t.invested)} title={t.netInvested != null && Math.abs(t.netInvested - t.invested) > 1 ? `Cost basis of current holdings: ${amt(t.invested)}` : undefined} />
           <Stat sz={sz} label="Current Value" value={amt(t.currentValue)} bold />
           <Stat sz={sz} label="Total Gain" positive={(t.totalGain ?? t.pl) >= 0}
@@ -355,33 +362,29 @@ export default function FundsDashboardPage() {
         </div>
 
         {/* ── Mobile cards ── */}
-        <div className="lg:hidden space-y-2 min-w-0">
+        <div className="lg:hidden min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] divide-y divide-[var(--row-divider)] overflow-hidden">
           {rows.map((f) => {
             const { main } = splitFundName(f.fundName)
             const expandable = f.positions.length > 1
             const isOpen = expandable && expanded.has(f.key)
             return (
-              <div key={f.key} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden min-w-0">
-                <button onClick={() => expandable && toggleExpand(f.key)} className="w-full text-left px-3 py-3 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
+              <div key={f.key} className="min-w-0">
+                {/* Groww-style row: name and invested on the left, value and return on the right, one line of numbers below */}
+                <button onClick={() => expandable && toggleExpand(f.key)} className="w-full text-left px-4 py-3.5 min-w-0 active:bg-[var(--bg-hover)]">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--text-primary)] leading-snug">{main}</p>
-                      {f.isBuyOpp && <div className="mt-1"><BuyTag strong={f.isStrongBuy} /></div>}
+                      <p className="text-[15px] font-semibold text-[var(--text-primary)] leading-snug">{main}</p>
+                      <p className="mt-0.5 text-[13px] text-[var(--text-dim)] tabular-nums">Invested {amt(f.invested)}{f.positions.length > 1 ? ` · ${f.positions.length} portfolios` : ''}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{amt(f.currentValue)}</p>
-                      <p className={`text-xs font-semibold tabular-nums ${plClass(f.pl)}`}>{hideAmounts ? '' : `${f.pl >= 0 ? '+' : ''}${formatINR(f.pl)} · `}{pct(f.plPct)}</p>
+                      <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">{amt(f.currentValue)}</p>
+                      <p className={`mt-0.5 text-[13px] font-medium tabular-nums ${plClass(f.pl)}`}>{hideAmounts ? '' : `${f.pl >= 0 ? '+' : ''}${formatINR(f.pl)} `}({pct(f.plPct)})</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 mt-2.5 text-center">
-                    <Mini label="XIRR" value={ratePct(f.xirr)} cls={plClass(f.xirr)} />
-                    <Mini label="CAGR" value={ratePct(f.cagr)} cls={plClass(f.cagr)} sub={f.returnsReason ? null : holdingSince(f.cagrSince || f.since)} />
-                    <Mini label="Weight" value={`${f.weight.toFixed(1)}%`} />
-                    <Mini label="Below ATH" value={f.athNav > 0 ? (f.belowATHPct <= 0 ? 'At ATH' : `−${f.belowATHPct.toFixed(1)}%`) : '—'} cls={f.athNav > 0 ? athTextClass(f.belowATHPct) : ''} />
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-xs text-[var(--text-dim)] tabular-nums">
-                    <span>Inv {amt(f.invested)}</span>
-                    {f.positions.length > 1 && <span>{f.positions.length} portfolios</span>}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-[var(--text-dim)] tabular-nums">
+                    {f.xirr != null && <span>XIRR <b className={`font-semibold ${plClass(f.xirr)}`}>{ratePct(f.xirr)}</b></span>}
+                    <span>{f.weight.toFixed(1)}% of total</span>
+                    {f.athNav > 0 && <span className={athTextClass(f.belowATHPct)}>{f.belowATHPct <= 0 ? 'At its high' : `${f.belowATHPct.toFixed(1)}% below high`}</span>}
                   </div>
                 </button>
                 {isOpen && (
@@ -529,15 +532,6 @@ function ATHBadge({ fund, cls = 'text-xs' }) {
   )
 }
 
-function Mini({ label, value, cls = 'text-[var(--text-primary)]', sub }) {
-  return (
-    <div>
-      <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">{label}</p>
-      <p className={`text-xs font-semibold tabular-nums ${cls}`}>{value}</p>
-      {sub && <p className="text-[10px] text-[var(--text-dim)]">{sub}</p>}
-    </div>
-  )
-}
 
 function SortIcon({ active, dir }) {
   if (!active) return <ArrowUpDown size={11} className="opacity-40" />
@@ -595,7 +589,7 @@ function BreakdownCard({ mode, rows, amt, hideAmounts, sz, quiet }) {
       </div>
 
       {/* Mobile rows */}
-      <div className="sm:hidden divide-y divide-[var(--border-light)]">
+      <div className="sm:hidden divide-y divide-[var(--row-divider)]">
         {rows.map((r) => (
           <div key={r.id} className="px-4 py-3">
             <div className="flex items-center justify-between gap-2">

@@ -79,9 +79,9 @@ export default function Family() {
 
   return (
     <div className="space-y-4">
-      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'People', value: activeMembers.length }]} onAdd={() => setModal('add')} addLabel="Add member"
+      {phone ? <SuspenseP fallback={null}><PhoneList onAdd={() => setModal('add')} addLabel="Add member"
         empty={{ icon: Users, title: 'No family members yet', text: 'Add yourself first, then the family.' }}
-        groups={[{ items: activeMembers.map((m) => ({ key: m.memberId, title: mv(m.memberName, 'name'), sub: [m.relationship, mv(m.email, 'email')].filter(Boolean).join(' · '), lead: { text: m.memberName }, onClick: () => setModal({ edit: m }) })) }]} /></SuspenseP> : (<>
+        groups={[{ title: `${activeMembers.length} ${activeMembers.length === 1 ? 'person' : 'people'}`, items: activeMembers.map((m) => ({ key: m.memberId, title: mv(m.memberName, 'name'), sub: [m.relationship, mv(m.email, 'email')].filter(Boolean).join(' · '), lead: { text: m.memberName }, onClick: () => setModal({ edit: m }) })) }]} /></SuspenseP> : (<>
       {/* Header with Add */}
       <div className="flex items-center justify-end px-1">
         <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors">
@@ -161,7 +161,7 @@ export default function Family() {
           </div>
 
           {/* Mobile card list */}
-          <div className="sm:hidden divide-y divide-[var(--border-light)]">
+          <div className="sm:hidden divide-y divide-[var(--row-divider)]">
             {activeMembers.map((m, idx) => {
               const df = m.dynamicFields || {}
               const dfEntries = Object.entries(df)

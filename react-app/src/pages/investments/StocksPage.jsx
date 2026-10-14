@@ -1,3 +1,4 @@
+import PhoneSummary from '../../components/PhoneSummary'
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -351,8 +352,14 @@ export default function StocksPage() {
             </div>
           )}
 
-          {/* ── Stat Cards ── */}
-          <div className="cf-stats grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {/* ── Stat Cards (phones: one summary card) ── */}
+          <PhoneSummary label={`Stocks (${holdings.length})`} value={formatINR(stats.current)} rows={[
+            { k: 'Total returns', v: `${stats.totalPL >= 0 ? '+' : ''}${formatINR(stats.totalPL)} (${stats.totalPLPct >= 0 ? '+' : ''}${stats.totalPLPct.toFixed(1)}%)`, cls: stats.totalPL >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+            { k: 'Invested', v: formatINR(stats.invested) },
+            { k: 'Unrealised P&L', v: `${stats.unrealizedPL >= 0 ? '+' : ''}${formatINR(stats.unrealizedPL)} (${stats.unrealizedPLPct >= 0 ? '+' : ''}${stats.unrealizedPLPct.toFixed(1)}%)`, cls: stats.unrealizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+            { k: 'Realised P&L', v: `${stats.realizedPL >= 0 ? '+' : ''}${formatINR(stats.realizedPL)}`, cls: stats.realizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+          ]} />
+          <div className="cf-stats max-lg:hidden grid grid-cols-2 sm:grid-cols-5 gap-3">
             <StatCard label="Invested" value={formatINR(stats.invested)} />
             <StatCard label="Current Value" value={formatINR(stats.current)} bold />
             <StatCard
@@ -489,39 +496,24 @@ export default function StocksPage() {
                   </div>
 
                   {/* Mobile cards */}
-                  <div className="sm:hidden divide-y divide-[var(--border-light)]">
+                  <div className="sm:hidden divide-y divide-[var(--row-divider)]">
                     {holdings.map((h) => {
                       const up = h.unrealizedPL >= 0
                       const portfolio = selectedPortfolioId === 'all' ? portfolioData.find((p) => p.portfolioId === h.portfolioId) : null
                       return (
-                        <div key={`${h.portfolioId}-${h.symbol}`} className="px-4 py-3">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div>
-                              <p className="text-xs font-medium text-[var(--text-primary)]">{h.companyName}</p>
-                              <p className="text-xs font-mono text-[var(--text-dim)]">
-                                {h.symbol}
-                                {portfolio && <span className="ml-1 font-sans">· {portfolio.portfolioName}</span>}
-                              </p>
+                        <div key={`${h.portfolioId}-${h.symbol}`} className="px-4 py-3.5">
+                          {/* Groww-style row: company and shares on the left, value and return on the right */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[15px] font-semibold leading-snug text-[var(--text-primary)]">{h.companyName}</p>
+                              <p className="mt-0.5 text-[13px] text-[var(--text-dim)] tabular-nums">{h.quantity} shares · Avg {formatINR(h.avgBuyPrice)}</p>
                             </div>
-                            <div className="text-right">
-                              <p className={`text-xs font-bold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                {up ? '+' : ''}{h.unrealizedPLPct.toFixed(1)}%
-                              </p>
-                              <p className={`text-xs font-semibold tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                {up ? '+' : ''}{formatINR(h.unrealizedPL)}
-                              </p>
+                            <div className="shrink-0 text-right">
+                              <p className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">{formatINR(h.currentValue)}</p>
+                              <p className={`mt-0.5 text-[13px] font-medium tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{up ? '+' : ''}{formatINR(h.unrealizedPL)} ({up ? '+' : ''}{h.unrealizedPLPct.toFixed(1)}%)</p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between text-xs gap-2">
-                            <div className="text-[var(--text-dim)] min-w-0 truncate">
-                              <span>{h.quantity} shares</span>
-                              <span className="mx-1">·</span>
-                              <span>Avg {formatINR(h.avgBuyPrice)}</span>
-                              <span className="mx-1">·</span>
-                              <span>CMP {formatINR(h.currentPrice)}</span>
-                            </div>
-                            <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums shrink-0">{formatINR(h.currentValue)}</p>
-                          </div>
+                          <p className="mt-1.5 text-[12.5px] text-[var(--text-dim)] tabular-nums"><span className="font-mono">{h.symbol}</span> · CMP {formatINR(h.currentPrice)}{portfolio ? ` · ${portfolio.portfolioName}` : ''}</p>
                         </div>
                       )
                     })}
@@ -625,7 +617,7 @@ export default function StocksPage() {
                   </div>
 
                   {/* Mobile cards */}
-                  <div className="sm:hidden divide-y divide-[var(--border-light)]">
+                  <div className="sm:hidden divide-y divide-[var(--row-divider)]">
                     {transactions.map((t) => {
                       const isBuy = t.type === 'BUY'
                       const curPrice = currentPriceMap[`${t.portfolioId}:${t.symbol}`]

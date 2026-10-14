@@ -79,9 +79,9 @@ export default function BankAccountsPage() {
 
   return (
     <div className="space-y-4">
-      {phone ? <SuspenseP fallback={null}><PhoneList summary={[{ label: 'Accounts', value: filtered.length }, { label: 'Banks', value: uniqueBanks }]} onAdd={() => setModal('add')} addLabel="Add bank account"
+      {phone ? <SuspenseP fallback={null}><PhoneList onAdd={() => setModal('add')} addLabel="Add bank account"
         empty={{ icon: Landmark, title: 'No bank accounts yet', text: 'Add the family\'s accounts so everyone knows which bank to call.' }}
-        groups={[{ items: filtered.map((a) => ({ key: a.accountId, title: mv(a.accountName, 'name'), sub: `${a.bankName}${!member ? ` · ${mv(a.memberName, 'name')}` : ''}`, value: mv(a.accountNumber, 'account'), note: a.accountType, lead: { icon: Landmark, color: '#38bdf8' }, onClick: () => setModal({ edit: a }) })) }]} /></SuspenseP> : (<>
+        groups={[{ title: `${filtered.length} account${filtered.length === 1 ? '' : 's'} · ${uniqueBanks} bank${uniqueBanks === 1 ? '' : 's'}`, items: filtered.map((a) => ({ key: a.accountId, title: mv(a.accountName, 'name'), sub: `${a.bankName}${!member ? ` · ${mv(a.memberName, 'name')}` : ''}`, value: a.accountNumber ? `•• ${String(a.accountNumber).replace(/\s/g, '').slice(-4)}` : null, note: a.accountType, lead: { icon: Landmark, color: '#38bdf8' }, onClick: () => setModal({ edit: a }) })) }]} /></SuspenseP> : (<>
       {filtered.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
           <Landmark size={32} className="text-[var(--text-dim)]" />
@@ -150,7 +150,7 @@ export default function BankAccountsPage() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y divide-[var(--border-light)]">
+            <div className="sm:hidden divide-y divide-[var(--row-divider)]">
               {filtered.map((a) => (
                 <div key={a.accountId} onClick={() => setModal({ edit: a })} className="px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                   <div className="flex items-center justify-between mb-1">

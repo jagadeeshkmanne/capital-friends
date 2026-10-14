@@ -34,13 +34,13 @@ function Shot({ src, alt }) {
 
 // Small animated "how to get it" strip: the 4 steps light up one after another.
 const STEPS = [
-  { icon: ExternalLink, title: 'Open CAMS', text: 'Statements → CAS', shot: 'cams-cas-1.jpg',
+  { icon: ExternalLink, short: 'Open CAMS', title: 'Open CAMS', text: 'Statements → CAS', shot: 'cams-cas-1.jpg',
     picks: ['Open the CAMS website (button below)', 'CAS - CAMS+KFintech is selected (box 1)'] },
-  { icon: FileText, title: 'Choose options', text: 'Detailed · 2000 · zero balance', shot: 'cams-cas-1.jpg',
+  { icon: FileText, short: 'Options', title: 'Choose options', text: 'Detailed · 2000 · zero balance', shot: 'cams-cas-1.jpg',
     picks: ['2  Detailed', '3  Specific Period', '4  From date 01-Jan-2000', '5  With zero balance folios'] },
-  { icon: Mail, title: 'Email & password', text: 'then Submit', shot: 'cams-cas-2.jpg',
+  { icon: Mail, short: 'Email', title: 'Email & password', text: 'then Submit', shot: 'cams-cas-2.jpg',
     picks: ['6  Your email (used in your funds)', '7  Make a password – remember it', '8  Submit'] },
-  { icon: Upload, title: 'Import here', text: 'PDF from your email', shot: null,
+  { icon: Upload, short: 'Import', title: 'Import here', text: 'PDF from your email', shot: null,
     picks: ['CAMS emails the PDF in a few minutes', 'Press Choose PDF below', 'Type the password you made'] },
 ]
 export function HowToStrip({ onOpenGuide }) {
@@ -64,7 +64,7 @@ export function HowToStrip({ onOpenGuide }) {
               <div className={`mx-auto w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-500 ${on ? 'bg-violet-600 text-white' : done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-card)] text-[var(--text-dim)]'}`}>
                 <Icon size={15} />
               </div>
-              <p className={`mt-1 text-[11px] font-semibold ${on ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>{k + 1}. {x.title}</p>
+              <p className={`mt-1 text-[11px] font-semibold leading-tight ${on ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}><span className="max-sm:hidden">{k + 1}. {x.title}</span><span className="sm:hidden whitespace-nowrap">{x.short}</span></p>
               <p className="text-[10px] text-[var(--text-dim)] leading-tight hidden sm:block">{x.text}</p>
             </button>
           )
