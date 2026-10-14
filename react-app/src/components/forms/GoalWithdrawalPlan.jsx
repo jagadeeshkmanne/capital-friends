@@ -3,10 +3,11 @@ import { ArrowDownCircle, AlertTriangle } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { buildGoalWithdrawalPlan } from '../../utils/goalWithdrawal'
+import { withGoalExtras } from '../../utils/goalExtras'
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
 
 export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal }) {
-  const { goalPortfolioMappings, mfPortfolios, mfHoldings, stockHoldings, otherInvList, goalList, assetAllocations } = useData()
+  const { goalPortfolioMappings, mfPortfolios, mfHoldings, stockHoldings, otherInvList, goalList, assetAllocations, settings } = useData()
   const today = new Date().toISOString().split('T')[0]
   const [redeemDate, setRedeemDate] = useState(today)
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -17,9 +18,9 @@ export default function GoalWithdrawalPlan({ goal, onClose, onConfirmWithdrawal 
   const attribution = useMemo(() => {
     const allocMap = {}
     for (const a of (assetAllocations || [])) if (a.assetAllocation) allocMap[a.fundCode] = a.assetAllocation
-    return attributeFamilyGoals({ goals: (goalList || []).filter(g => g.isActive !== false), mappings: goalPortfolioMappings,
+    return attributeFamilyGoals({ goals: (withGoalExtras(goalList, settings) || []).filter(g => g.isActive !== false), mappings: goalPortfolioMappings,
       mfHoldings, stockHoldings, otherInvList, allocMap })[goal.goalId]
-  }, [goal.goalId, goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations])
+  }, [goal.goalId, settings, goalList, goalPortfolioMappings, mfHoldings, stockHoldings, otherInvList, assetAllocations])
 
   const basePlan = useMemo(() => buildGoalWithdrawalPlan({
     goal,

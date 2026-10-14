@@ -10,9 +10,10 @@ import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { useMaskText } from '../../hooks/useMaskText'
 import { formatINR, splitFundName } from '../../data/familyData'
-import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
+import { getGoalAllocation, followsBucketPlan } from '../../data/glidePath'
 import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { useGoalsPlan } from '../../hooks/useGoalsPlan'
+import { withGoalExtras } from '../../utils/goalExtras'
 import { useBucketActions } from '../goals/useBucketActions'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
@@ -114,11 +115,13 @@ export default function Dashboard() {
     stockPortfolios, stockHoldings,
     otherInvList, liabilityList,
     banks, investmentAccounts, insurancePolicies,
-    reminderList, goalList, goalPortfolioMappings,
+    reminderList, goalList: rawGoalList, goalPortfolioMappings, settings,
     assetAllocations,
     activeMembers, activeBanks, activeInvestmentAccounts,
     healthCheckCompleted, healthCheckAnswers
   } = useData()
+  // goals with their paid-over-years / repeat settings (the glide path of a goal paid over years follows each year's part)
+  const goalList = useMemo(() => withGoalExtras(rawGoalList, settings), [rawGoalList, settings])
 
   // goals: the same plan and steps as the Goals page (Money for goals pool)
   const { plan: goalsPlan, todo: goalsTodo } = useGoalsPlan()
@@ -456,7 +459,7 @@ export default function Dashboard() {
       if (yearsLeft <= 0) return
       const rec = g.goalType === 'Emergency Fund'
         ? { equity: 0, debt: 100, label: 'Safety' }
-        : getRecommendedAllocation(g.goalType, yearsLeft)
+        : getGoalAllocation(g, yearsLeft)
       const maps = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
       const att = goalAttribution[g.goalId] || { total: 0, equity: 0 }
       const totalVal = att.total, eqVal = att.equity

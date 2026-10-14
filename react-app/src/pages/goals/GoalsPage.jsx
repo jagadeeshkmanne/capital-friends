@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Pencil, Target, Link2, ArrowDownCircle, Trophy, ShieldAlert, Trash2, AlertTriangle, Wallet, TrendingUp } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
-import { getRecommendedAllocation, followsBucketPlan } from '../../data/glidePath'
+import { getRecommendedAllocation, getGoalAllocation, followsBucketPlan } from '../../data/glidePath'
+import { withGoalExtras } from '../../utils/goalExtras'
 import { useFamily } from '../../context/FamilyContext'
 import { useData } from '../../context/DataContext'
 import { useToast } from '../../context/ToastContext'
@@ -46,7 +47,7 @@ export default function GoalsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { selectedMember, member } = useFamily()
-  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, updateGoalMappings, switchMF, executeMFPlan, mfHoldings, stockHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList, liabilityList, banks, assetAllocations } = useData()
+  const { goalList, addGoal, updateGoal, deleteGoal, goalPortfolioMappings, updateGoalMappings, switchMF, executeMFPlan, mfHoldings, stockHoldings, activeMembers, mfPortfolios, stockPortfolios, otherInvList, liabilityList, banks, assetAllocations, settings } = useData()
   const { showToast, showBlockUI, hideBlockUI } = useToast()
   const confirm = useConfirm()
 
@@ -69,7 +70,7 @@ export default function GoalsPage() {
 
   // Inline allocation state (replaces separate Allocation Manager)
 
-  const allActiveGoals = useMemo(() => (goalList || []).filter(g => g.isActive !== false), [goalList])
+  const allActiveGoals = useMemo(() => (withGoalExtras(goalList, settings) || []).filter(g => g.isActive !== false), [goalList, settings])
 
   const filtered = useMemo(() => {
     return selectedMember === 'all' ? allActiveGoals : allActiveGoals.filter((g) => g.familyMemberId === selectedMember)
@@ -160,7 +161,7 @@ export default function GoalsPage() {
       // needed soon must move out of equity even more than money that is still being built.
       const yearsLeft = (new Date(g.targetDate) - now) / (365.25 * 24 * 60 * 60 * 1000)
       if (yearsLeft <= 0) continue
-      const recommended = getRecommendedAllocation(g.goalType, yearsLeft)
+      const recommended = getGoalAllocation(g, yearsLeft)
       const mappings = (goalPortfolioMappings || []).filter(m => m.goalId === g.goalId)
       const att = goalAttribution[g.goalId] || { total: 0, equity: 0 }
       const totalValue = att.total, equityValue = att.equity

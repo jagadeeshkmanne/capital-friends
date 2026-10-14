@@ -16,7 +16,7 @@
  *    The result is written as ordinary goal links (goalId, portfolioId, allocationPct), so the buckets page,
  *    dashboard, email report and everything else keep working unchanged.
  */
-import { getRecommendedAllocation } from '../data/glidePath'
+import { getGoalAllocation, spendsOverYears } from '../data/glidePath'
 import { needTodayN } from './goalPlan'
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
@@ -83,7 +83,7 @@ export function goalWant(g, now = new Date(), sip = 0) {
   // what it should hold today so that this + its running SIP reaches the amount (the same "Need today" the goal shows)
   const want = (years > 0 || Number(g.payYears) > 1) && !isEF(g) ? needTodayN({ target, years, annualReturn: r, sip: Number(sip) || 0, payYears: g.payYears }) : target
   // a retirement goal keeps its mix after the date (the money must last for decades); other goals are spent then
-  const eq = isEF(g) || (years <= 0 && !isRet(g)) ? 0 : getRecommendedAllocation(g.goalType, years).equity / 100
+  const eq = isEF(g) || (years <= 0 && !isRet(g) && !spendsOverYears(g)) ? 0 : getGoalAllocation(g, years).equity / 100
   return { want, eq, years, target }
 }
 

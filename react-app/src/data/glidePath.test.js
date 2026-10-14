@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getRecommendedAllocation, followsBucketPlan } from './glidePath.js'
+import { getRecommendedAllocation, followsBucketPlan, getGoalAllocation } from './glidePath.js'
 
 test('one-time goals continue to de-risk near their deadline', () => {
   assert.deepEqual(getRecommendedAllocation('Child Education', 0.5), {
@@ -46,4 +46,26 @@ test('retirement goals follow the bucket plan in the last 5 years', () => {
   assert.equal(followsBucketPlan('Retirement', 4.9), true)
   assert.equal(followsBucketPlan('Retirement', 6), false)
   assert.equal(followsBucketPlan('Education', 2), false)
+})
+
+test('goal paid over years: one-time goal is the plain glide path', () => {
+  assert.deepEqual(getGoalAllocation({ goalType: 'Education' }, 2), getRecommendedAllocation('Education', 2))
+})
+
+test('college fees over 4 years: each year has its own mix, later years keep more equity', () => {
+  const four = getGoalAllocation({ goalType: 'Education', payYears: 4, expectedCAGR: 0.12 }, 2)
+  assert.deepEqual(four.parts.map((p) => p.equity), [30, 30, 50, 50])
+  assert.ok(four.equity > getRecommendedAllocation('Education', 2).equity && four.equity < 50)
+  assert.equal(four.equity + four.debt, 100)
+})
+
+test('first payment year: that part is safe, the later parts still hold equity', () => {
+  const r = getGoalAllocation({ goalType: 'Education', payYears: 4 }, 0)
+  assert.equal(r.parts[0].equity, 0)
+  assert.ok(r.equity > 0)
+})
+
+test('retirement and emergency fund ignore payYears', () => {
+  assert.deepEqual(getGoalAllocation({ goalType: 'Retirement', payYears: 4 }, 8), getRecommendedAllocation('Retirement', 8))
+  assert.equal(getGoalAllocation({ goalType: 'Emergency Fund', payYears: 3 }, 1).equity, 0)
 })

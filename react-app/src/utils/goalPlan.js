@@ -14,7 +14,7 @@ import { itemsMonthly } from './portfolioSip'
  *   switch      = only when the goal's equity is BAND points or more away from its glide path
  *                 sell units (known, the user holds them) -> buy a ₹ amount (units depend on that day's NAV)
  */
-import { getRecommendedAllocation, followsBucketPlan } from '../data/glidePath'
+import { getGoalAllocation, followsBucketPlan, spendsOverYears } from '../data/glidePath'
 import { getRetirementExpenseBasis } from './retirementBuckets'
 
 export const BAND = 5                     // percentage points of equity before a switch is shown
@@ -175,7 +175,7 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     // pool mode: a goal has only what the pool gives it (the old saved currentValue would count money twice)
     const has = att.total > 0 || pool ? att.total : (Number(g.currentValue) || 0)
     const isRet = g.goalType === 'Retirement'
-    const rec = { ...(years > 0 || isRet ? getRecommendedAllocation(g.goalType, years) : { equity: 0 }) }
+    const rec = { ...(years > 0 || isRet || spendsOverYears(g) ? getGoalAllocation(g, years) : { equity: 0 }) }
     const bucketMode = isRet && followsBucketPlan(g.goalType, years)
     const eqNow = att.total > 0 ? Math.round(att.equity / att.total * 100) : null
     // the emergency fund is needed in full today (pool mode); other goals can grow towards their date
@@ -278,4 +278,4 @@ export function goalRoad(p, nowYear = new Date().getFullYear()) {
   if (p.isRet) stops.push({ k: 'spend', y: endYear + 1, bucket })
   return stops
 }
-const years2eq = (g, yl) => getRecommendedAllocation(g.goalType, Math.max(0.01, yl)).equity
+const years2eq = (g, yl) => getGoalAllocation(g, Math.max(0.01, yl)).equity

@@ -4,7 +4,7 @@ import { ChevronRight, ChevronLeft, Target, DollarSign, CheckCircle2, TrendingUp
 import { FormField, FormInput, FormDateInput, FormSelect, FormTextarea, FormActions, DeleteButton } from '../Modal'
 import { useData } from '../../context/DataContext'
 import { formatINR } from '../../data/familyData'
-import { getRecommendedAllocation } from '../../data/glidePath'
+import { getGoalAllocation } from '../../data/glidePath'
 import { useMask } from '../../context/MaskContext'
 import { calculateGoalFundingProjection } from '../../utils/goalProjection'
 
@@ -544,7 +544,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
           <MissingFieldsHint form={form} isRetirement={isRetirement} isEmergency={isEmergency} calc={calc} />
         )}
         {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
-          <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
+          <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} payYears={Number(payYears) || 1} cagr={(Number(form.cagr) || 12) / 100} />
         )}
 
         {/* Linking section (passed from GoalsPage) */}
@@ -748,7 +748,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
           {/* Glide Path Recommendation */}
           {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
-            <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
+            <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} payYears={Number(payYears) || 1} cagr={(Number(form.cagr) || 12) / 100} />
           )}
 
           <FormField label="Notes">
@@ -810,7 +810,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
 
           {/* Glide Path on review */}
           {calc.hasTarget && calc.yearsToGo > 0 && form.goalType && (
-            <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} />
+            <GlidePathRecommendation goalType={form.goalType} yearsLeft={calc.yearsToGo} payYears={Number(payYears) || 1} cagr={(Number(form.cagr) || 12) / 100} />
           )}
         </div>
       )}
@@ -1184,8 +1184,8 @@ function SWRPanel({ swr, postRetYears }) {
   )
 }
 
-function GlidePathRecommendation({ goalType, yearsLeft }) {
-  const rec = getRecommendedAllocation(goalType, yearsLeft)
+function GlidePathRecommendation({ goalType, yearsLeft, payYears = 1, cagr }) {
+  const rec = getGoalAllocation({ goalType, payYears, expectedCAGR: cagr }, yearsLeft)
   const labelColor = rec.label === 'Short-term' ? '#60a5fa'
     : rec.label === 'Medium-term' ? '#fbbf24'
     : rec.label === 'Long-term' ? '#34d399' : '#94a3b8'
@@ -1226,6 +1226,7 @@ function GlidePathRecommendation({ goalType, yearsLeft }) {
          rec.label === 'Short-term' ? 'Focus on debt/hybrid funds to preserve capital.' :
          rec.label === 'Medium-term' ? 'Balanced mix — gradually shift to debt as deadline nears.' :
          'Growth-oriented — can take higher equity exposure.'}
+        {rec.parts && ` Paid over ${rec.parts.length} years: each year's part has its own mix (${rec.parts.map((p) => `year ${p.part} ${p.equity}%`).join(', ')} equity).`}
       </p>
     </div>
   )

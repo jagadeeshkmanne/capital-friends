@@ -13,7 +13,7 @@
  * to move money when the investment as a whole really lacks it.
  */
 
-import { getRecommendedAllocation } from '../data/glidePath'
+import { getGoalAllocation, spendsOverYears } from '../data/glidePath'
 
 const EQUITY_CATS = new Set(['Equity', 'ELSS', 'Index'])
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
@@ -22,8 +22,8 @@ const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
 export function goalTargetEquity(goal, now = new Date()) {
   if (!goal?.targetDate) return null
   const yearsLeft = (new Date(goal.targetDate) - now) / YEAR_MS
-  if (!(yearsLeft > 0) || goal.goalType === 'Emergency Fund') return 0
-  return (getRecommendedAllocation(goal.goalType, yearsLeft).equity || 0) / 100
+  if (goal.goalType === 'Emergency Fund' || !(yearsLeft > 0 || (spendsOverYears(goal) && yearsLeft > -1))) return 0
+  return (getGoalAllocation(goal, yearsLeft).equity || 0) / 100
 }
 
 /** attributeGoals for a family's active goals with the app's glide path targets. */
