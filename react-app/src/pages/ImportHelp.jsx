@@ -166,7 +166,7 @@ export default function ImportHelp() {
           ['Switches and STPs', 'Saved as switches: units move between your funds, but they are not counted as new money invested.'],
           ['Sold funds', 'Their history is added so your total profit and XIRR are right. They don\'t show as holdings.'],
           ['Can I undo?', 'Yes. Every import keeps a backup. Press Undo under "Past imports" and everything goes back to how it was.'],
-          ['Stocks / demat (NSDL, CDSL)', 'Not yet – this imports mutual funds from the CAMS statement.'],
+          ['Stocks / demat (CDSL, NSDL)', 'This page imports mutual funds. For shares, go to Stocks → Import → CDSL / NSDL statement (PDF): it brings in the shares you hold today. Tested with CDSL statements; NSDL is new — if anything looks wrong, tell us.'],
         ].map(([q, a]) => (
           <details key={q} className="group px-3 py-2">
             <summary className="cursor-pointer font-medium list-none flex items-center justify-between">

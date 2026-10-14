@@ -181,7 +181,7 @@ export default function ImportDematForm({ onCancel }) {
           </button>
           {file && <span className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]"><FileText size={14} /> {file.name}</span>}
         </div>
-        <p className="text-xs text-[var(--text-dim)] mt-2">The monthly <strong>CAS from CDSL or NSDL</strong> (emailed to you, or downloaded from their website). One statement has every demat account of that PAN. The file is read on this device.</p>
+        <p className="text-xs text-[var(--text-dim)] mt-2">The monthly <strong>CAS from CDSL or NSDL</strong> (emailed to you, or downloaded from their website). One statement has every demat account of that PAN. The file is read on this device. Tested with CDSL statements; NSDL is new — if anything looks wrong, tell us.</p>
         <input ref={fileRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setCas(null); setPw(''); read(f) } if (fileRef.current) fileRef.current.value = '' }} />
       </div>
 
