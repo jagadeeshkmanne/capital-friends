@@ -7,17 +7,26 @@ import { useMaskText } from '../../hooks/useMaskText'
 import { formatINR } from '../../data/familyData'
 
 const L = (v) => formatINR(Math.round(v || 0))
-// retirement-only money (EPF, PPF, NPS, VPF, Sukanya) and real estate get their own groups, so it is clear
-// they are not shared with the other goals
+// Groups by how the money is used, so it is clear what counts for goals:
+//   counted (liquid: funds, stocks, cash / FD, listed equity) · you decide (left out until ticked) ·
+//   retirement only (EPF / PPF / NPS) · not used (not liquid: real estate, gold, silver, unlisted, crypto)
+const POOL = (i) => i.kind === 'pool'
 const GROUPS = [
-  { key: 'MF', title: 'Mutual fund portfolios', has: (i) => i.type === 'MF' },
-  { key: 'Stock', title: 'Stock portfolios', has: (i) => i.type === 'Stock' },
-  { key: 'Other', title: 'Other investments', has: (i) => i.type === 'Other' && i.kind !== 'retirement' && i.kind !== 'locked' },
-  { key: 'Ret', title: 'For retirement only', has: (i) => i.kind === 'retirement',
+  { key: 'MF', title: 'Mutual funds', badge: 'Counted', has: (i) => POOL(i) && i.type === 'MF' },
+  { key: 'Stock', title: 'Stocks', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Stock' },
+  { key: 'Cash', title: 'Cash, FDs and bonds', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Other' && i.eq < 0.5 },
+  { key: 'Eq', title: 'Other equity', badge: 'Counted', has: (i) => POOL(i) && i.type === 'Other' && i.eq >= 0.5 },
+  { key: 'Out', title: 'You decide', badge: 'Left out', has: (i) => i.kind === 'out',
+    note: "Not counted unless you tick them: your kids' own money, ESOP / RSU (tick only if it is vested and you can sell it) and anything marked Other." },
+  { key: 'Ret', title: 'For retirement only', badge: 'Retirement', has: (i) => i.kind === 'retirement',
     note: 'EPF, PPF, NPS and similar accounts are locked until retirement, so they count only for your Retirement goal. They are never used for other goals and never part of a sell step.' },
-  { key: 'Locked', title: 'Not used for goals', has: (i) => i.kind === 'locked',
+  { key: 'Locked', title: 'Not used for goals', badge: 'Not liquid', has: (i) => i.kind === 'locked',
     note: 'A goal needs money you can take out on the day. Real estate, gold, silver, unlisted shares and crypto are not easy to sell at a fair price when you need it, so they are not counted. If you sell one, add the money as cash or FD in Other Investments: it counts for your goals from then.' },
 ]
+const BADGE = {
+  Counted: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', 'Left out': 'bg-slate-500/10 text-[var(--text-muted)] border-[var(--border-light)]',
+  Retirement: 'bg-amber-500/10 text-amber-400 border-amber-500/30', 'Not liquid': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+}
 
 export default function MoneyForGoals({ pool, onSaved }) {
   const mt = useMaskText()
@@ -48,16 +57,20 @@ export default function MoneyForGoals({ pool, onSaved }) {
   return (
     <div className="space-y-4 text-sm">
       <p className="text-xs text-[var(--text-muted)]">
-        Pick which investments are for your goals. You don't link them to each goal: the app shares this money across all goals —
-        the emergency fund and near goals get the safe money, retirement is protected, far goals get the equity.
-        Switch off anything that is not for these goals (for example your kids' own portfolio).
+        Only money you can take out when a goal comes is counted: mutual funds, stocks, cash and FDs. You don't link them to each
+        goal: the app shares this money across all goals — the emergency fund and near goals get the safe money, retirement is
+        protected, far goals get the equity. Untick anything that is not for these goals.
       </p>
       {GROUPS.map((gr) => {
         const list = pool.items.filter(gr.has)
         if (!list.length) return null
         return (
           <div key={gr.key} className="space-y-1.5">
-            <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{gr.title}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{gr.title}</p>
+              <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${BADGE[gr.badge]}`}>{gr.badge}</span>
+              <span className="ml-auto text-xs tabular-nums text-[var(--text-dim)]">{L(list.reduce((t, i) => t + i.value, 0))}</span>
+            </div>
             {gr.note && <p className="text-[11px] text-[var(--text-dim)] -mt-0.5">{gr.note}{gr.key === 'Ret' && !hasRet ? ' You have no Retirement goal yet, so they are not used.' : ''}</p>}
             {list.map((it) => (
               <label key={it.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-inset)] px-3 py-2 cursor-pointer">
@@ -70,7 +83,6 @@ export default function MoneyForGoals({ pool, onSaved }) {
                   <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{mt(it.name)}{it.owner ? <span className="font-normal text-[var(--text-dim)]"> · {mt(it.owner)}</span> : null}</p>
                   <p className="text-xs text-[var(--text-dim)]">{tag(it)}{it.kind === 'pool' && it.type !== 'Stock' ? ` · ${Math.round(it.eq * 100)}% equity` : ''}</p>
                 </div>
-                {it.kind === 'retirement' && <span className="shrink-0 px-2 py-0.5 text-[11px] font-semibold rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30">Retirement</span>}
                 <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">{L(it.value)}</span>
               </label>
             ))}
