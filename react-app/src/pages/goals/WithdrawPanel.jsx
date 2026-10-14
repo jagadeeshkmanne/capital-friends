@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Landmark, Wallet, BarChart3 } from 'lucide-react'
 import { formatINR, splitFundName } from '../../data/familyData'
+import { useData } from '../../context/DataContext'
 
 // The withdraw window of a goal whose date has come. Every investment the goal holds is listed with an editable
 // "taking" amount, filled with what the goal holds there. People change it to what they really took (part of the FD,
@@ -65,8 +66,32 @@ export function withdrawActions(rows, taken, today = localDay()) {
   return out
 }
 
+/** Where a row is sold and where the money goes: the app cannot sell for you, so it says which platform / bank. */
+export function whereOf(r, { mfPortfolios, stockPortfolios, investmentAccounts, banks }) {
+  if (r.kind === 'other') {
+    const inv = r.holding || {}
+    return { key: `other:${inv.familyMemberName || ''}`, title: `Deposits & cash${inv.familyMemberName ? ` · ${inv.familyMemberName}` : ''}`, to: 'Close / withdraw at the bank, into your savings account' }
+  }
+  const p = (r.kind === 'mf' ? mfPortfolios : stockPortfolios || []).find((x) => x.portfolioId === r.portfolioId) || {}
+  const a = (investmentAccounts || []).find((x) => x.accountId === p.investmentAccountId) || {}
+  const b = (banks || []).find((x) => x.accountId === a.bankAccountId) || {}
+  const platform = a.platformBroker || a.accountName || (r.kind === 'mf' ? 'your fund platform' : 'your broker')
+  const owner = p.ownerName || a.memberName || ''
+  const bank = b.bankName || a.bankAccountName || ''
+  return { key: `${r.kind}:${platform}:${owner}`, title: `On ${platform}${owner ? ` · ${owner}` : ''}`, to: bank ? `Money goes to ${bank}${b.accountType ? ` (${b.accountType})` : ''}` : 'Money goes to the bank account linked to this account' }
+}
+/** Gain on the part being sold (for the tax note): units × (today's price − average buy price). */
+export function gainOf(r, amount) {
+  const h = r.holding || {}
+  if (r.kind === 'mf') { const nav = navOf(h), avg = Number(h.avgNav) || 0; return nav > 0 && avg > 0 ? (amount / nav) * (nav - avg) : 0 }
+  if (r.kind === 'stock') { const px = priceOf(h), avg = Number(h.avgBuyPrice) || 0; return px > 0 && avg > 0 ? (amount / px) * (px - avg) : 0 }
+  return 0
+}
+
 export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
   const g = s.goal
+  const data = useData()
+  const [done, setDone] = useState({})
   const n = Math.max(1, Number(g.payYears) || 1)
   const rows = s.rows
   // multi-year goal: this year's part is taken from the safest money first (cash, then debt funds)
@@ -83,7 +108,17 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
   const [record, setRecord] = useState(true)
   const total = rows.reduce((t, r) => t + Math.min(num(taken[rowKey(r)]), r.value), 0)
   const leftover = Math.max(0, s.has - total)
-  const groups = ['other', 'mf', 'stock'].map((k) => ({ k, items: rows.map((r, i) => ({ r, i })).filter((x) => x.r.kind === k) })).filter((x) => x.items.length)
+  // one step per platform / account (where you sell), deposits first, then funds, then shares
+  const groups = []
+  for (const k of ['other', 'mf', 'stock']) rows.forEach((r, i) => {
+    if (r.kind !== k || num(taken[rowKey(r)]) < 1) return
+    const w = whereOf(r, data)
+    let gr = groups.find((x) => x.key === w.key); if (!gr) { gr = { ...w, k, items: [] }; groups.push(gr) }
+    gr.items.push({ r, i })
+  })
+  const steps = groups.flatMap((x) => x.items)
+  const nDone = steps.filter(({ r }) => done[rowKey(r)]).length
+  const gain = steps.reduce((t, { r }) => t + gainOf(r, Math.min(num(taken[rowKey(r)]), r.value)), 0)
   const finish = (how) => onDone(how, { amount: Math.round(total), actions: record ? withdrawActions(rows, taken) : [] })
 
   return (
@@ -93,16 +128,17 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
         <div><span>{n > 1 ? "This year's payment" : 'You withdraw'}</span><b className="v">{L(total)}</b></div>
         {n > 1 ? <div><span>Stays for next year</span><b>{L(leftover)}</b></div> : <div><span>From</span><b>{rows.length} investment{rows.length > 1 ? 's' : ''}</b></div>}
       </div>
-      <p className="wdp-help">{n > 1 ? "This year's part, taken from the safest money first. Redeem these, then press Done." : 'The goal is complete: redeem everything below (this goal’s share of each), then press Done.'}</p>
+      <p className="wdp-help">{n > 1 ? "This year's part, taken from the safest money first." : 'The goal is complete: this is everything it holds (its share of each investment).'} The app cannot sell for you: do each step on that platform or bank, tick it, then press Done.</p>
 
-      {groups.filter(({ items }) => items.some(({ r }) => num(taken[rowKey(r)]) >= 1)).map(({ k, items }) => { const K = KIND[k]; return (
-        <div key={k} className="wdp-grp">
-          <p className="wdp-gt"><K.icon size={13} style={{ color: K.c }} /> {K.t}</p>
-          {items.map(({ r, i }) => {
-            const v = num(taken[rowKey(r)]), all = v >= r.value - 1, none = v < 1
+      {groups.map((gr, gi) => { const K = KIND[gr.k]; return (
+        <div key={gr.key} className="wdp-grp">
+          <p className="wdp-gt"><span className="wdp-no">{gi + 1}</span><K.icon size={13} style={{ color: K.c }} /> {mt(gr.title)}<em>{gr.to}</em></p>
+          {gr.items.map(({ r, i }) => {
+            const v = num(taken[rowKey(r)]), all = v >= r.value - 1, none = v < 1, k = r.kind, ok = !!done[rowKey(r)]
             if (none) return null
             return (
-              <div key={i} className={`wdp-row ${none ? 'off' : ''}`}>
+              <div key={i} className={`wdp-row ${ok ? 'off' : ''}`}>
+                <input type="checkbox" className="wdp-ck" checked={ok} onChange={(e) => setDone({ ...done, [rowKey(r)]: e.target.checked })} aria-label="Done" />
                 <div className="wdp-n">
                   <b>{k === 'other' ? mt(r.name) : k === 'mf' ? splitFundName(r.name).main : r.name}</b>
                   <small>{k === 'other' ? `${r.holding?.investmentType || 'Investment'} · ${all ? 'close it / take it all' : 'take this much'}` : `${pname(r.portfolioId)} · redeem ${all && r.all ? 'all ' : ''}${Number(all ? r.units : v / (Number(r.holding?.currentNav) || Number(r.holding?.currentPrice) || 1)).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${k === 'stock' ? 'shares' : 'units'}`}</small>
@@ -113,9 +149,12 @@ export default function WithdrawPanel({ s, mt, pname, onDone, onMoreTime }) {
           })}
         </div>) })}
 
+      {gain > 1000 && <p className="wdp-help">Gain on what you sell: about <b>{L(gain)}</b>. Tax may apply (equity funds and shares held over a year: 12.5% above ₹1.25 L of gains a year per person; within a year: 20%; debt funds: your slab), and some funds charge an exit load within a year. So the money you receive can be a little less.</p>}
+
       <label className="wdp-rec"><input type="checkbox" checked={record} onChange={(e) => setRecord(e.target.checked)} />
-        <span><b>Record these in the app</b><small>Lowers the FD / savings value, redeems the fund units at today's NAV and sells the shares at today's price. Untick if you'll import a CAS or record them yourself.</small></span>
+        <span><b>Record these in the app</b><small>Lowers the FD / savings value, redeems the fund units at today's NAV and sells the shares at today's price. The real price is usually the next day's: when the money arrives, import your CAS statement and the app replaces these with the exact amounts.</small></span>
       </label>
+      {steps.length > 0 && <p className="wdp-help">{nDone === steps.length ? 'All steps done.' : `${nDone} of ${steps.length} done. You can still press Done if you did them already.`}</p>}
 
       <div className="wdp-acts">
         {n > 1
@@ -137,7 +176,7 @@ const CSS = `
 .wdp-top span{display:block;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}.wdp-top b{display:block;font-size:18px;color:var(--text-primary);margin-top:3px;font-variant-numeric:tabular-nums}.wdp-top b.v{color:#a78bfa}
 .wdp-help{font-size:12.5px;color:var(--text-muted);margin:0}
 .wdp-grp{border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.wdp-gt{display:flex;align-items:center;gap:6px;margin:0;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);background:var(--bg-inset);border-bottom:1px solid var(--border-light)}
+.wdp-gt{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0;padding:8px 14px;font-size:12px;font-weight:700;color:var(--text-secondary);background:var(--bg-inset);border-bottom:1px solid var(--border-light)}.wdp-gt em{flex-basis:100%;font-style:normal;font-weight:500;font-size:11.5px;color:var(--text-dim);padding-left:26px}.wdp-no{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#8b5cf6;color:#fff;font-size:11px}.wdp-ck{width:18px;height:18px;accent-color:#059669;flex-shrink:0}
 .wdp-row{display:flex;align-items:center;gap:14px;padding:11px 14px;transition:opacity .15s}.wdp-row+.wdp-row{border-top:1px solid var(--border-light)}.wdp-row.off .wdp-n{opacity:.5}
 .wdp-n{flex:1;min-width:0}.wdp-n b{display:block;font-size:14px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wdp-n small{display:block;font-size:12px;color:var(--text-dim);margin-top:2px}
 .wdp-amt{text-align:right;flex-shrink:0}.wdp-amt b{display:block;font-size:15px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums}.wdp-amt small{font-size:11.5px;color:var(--text-dim)}
@@ -153,6 +192,6 @@ const CSS = `
 .wdp-acts button{padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--border-light);color:var(--text-primary)}
 .wdp-acts button.p{background:#059669;border-color:#059669;color:#fff}.wdp-acts button.p:hover{background:#10b981}.wdp-acts button.q{color:var(--text-muted)}
 @media(max-width:640px){.wdp-top{grid-template-columns:1fr 1fr}.wdp-top>div:last-child{grid-column:span 2;border-left:0;border-top:1px solid var(--border)}
- .wdp-row{flex-direction:column;align-items:stretch;gap:8px}.wdp-in{flex-direction:row;align-items:center;justify-content:space-between}.wdp-in label{width:150px}
+ .wdp-in{flex-direction:row;align-items:center;justify-content:space-between}.wdp-in label{width:150px}
  .wdp-acts button{flex:1 1 100%}}
 `
