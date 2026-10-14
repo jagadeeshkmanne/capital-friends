@@ -186,7 +186,7 @@ export function buildGoalPlan({ goals, attribution, mfHoldings, mappings, eqOf, 
     // follows its timeline (glide path): a goal 10 years away keeps growing in equity, one 1 year away is safe.
     const achieved = pool && years > 0 && target > 0 && has >= target * 0.98
     const state = years <= 0 ? 'due' : achieved ? 'achieved' : gap < -tol ? 'short' : gap > tol ? 'extra' : 'onplan'
-    if (years <= 0 && !isRet) rec.equity = 0 // a retired person's money keeps its bucket mix
+    if (years <= 0 && !isRet && !spendsOverYears(g)) rec.equity = 0 // a retired person's money keeps its bucket mix; a goal paid over years keeps the later parts invested
     const steps = []
     if (pool) {
       // one family plan does the equity / safe moves; a goal only shows what is its own

@@ -62,3 +62,19 @@ describe('soldSinceOf', () => {
     expect(soldSinceOf(sa, tx, [])).toEqual({ CAR: { 'PF::LIQ': 5 } })
   })
 })
+
+describe('a goal paid over 4 years, first year due', () => {
+  const edu = { goalId: 'EDU', goalName: 'College', goalType: 'Education', targetDate: inY(-0.02), targetAmount: 2000000, payYears: 4, isActive: true }
+  const items0 = poolItems({ mfPortfolios: P, mfHoldings: H(20000), eqOf })
+  const r0 = sharePool({ goals: [edu, ret], items: items0, now })
+  const sa = nextSetAside({ current: {}, goals: [edu, ret], bySub: r0.bySub, now }).next
+  it("sets aside only this year's part", () => {
+    const was = sa.EDU.items.reduce((t, x) => t + (Number(x.value) || 0), 0)
+    expect(was).toBeGreaterThan(400000); expect(was).toBeLessThan(600000)
+  })
+  it('the later 3 parts keep taking money from the pool (not left short)', () => {
+    const r = sharePool({ goals: [edu, ret], items: items0, now, setAside: sa })
+    expect(r.byGoal.EDU.got).toBeGreaterThan(r.aside.EDU.was + 1000000)
+    expect(r.byGoal.EDU.got).toBeLessThanOrEqual(r.byGoal.EDU.want + 1)
+  })
+})

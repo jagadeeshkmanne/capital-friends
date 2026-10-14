@@ -174,7 +174,10 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
   for (const g of live.filter(past)) {
     const sa = setAside?.[g.goalId]
     if (!sa || !Array.isArray(sa.items) || !sa.items.length) continue
-    kept.add(g.goalId)
+    // a goal paid over several years: only this year's part is set aside; the later parts stay open and keep
+    // taking from the pool like any goal (with their own glide path), so they are not left short
+    const multi = spendsOverYears(g)
+    if (!multi) kept.add(g.goalId)
     let was = 0, now2 = 0, gone = 0
     for (const e of sa.items) {
       const base = Number(e.value) || 0
@@ -191,6 +194,7 @@ export function sharePool({ goals, items, now = new Date(), sipOf = {}, reserved
       now2 += give(g, it, Math.min(it.left, want))
     }
     aside[g.goalId] = { was, now: now2, goneShare: was > 0 ? gone / was : 0, date: sa.date }
+    if (multi) meta[g.goalId].want = Math.max(0, meta[g.goalId].want - gone) // what was already paid out is not refilled
   }
   for (const g of live.filter(past)) {
     if (kept.has(g.goalId)) continue

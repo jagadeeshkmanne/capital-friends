@@ -15,7 +15,7 @@ import PageLoading from '../../components/PageLoading'
 import { useGoalPool } from '../../hooks/useGoalPoolSync'
 import { useGoalsPlan } from '../../hooks/useGoalsPlan'
 import MoneyForGoals from './MoneyForGoals'
-import GoalsHome from './GoalsHome'
+import GoalsHome, { Step, GOALS_HOME_CSS, AsideCtx } from './GoalsHome'
 import Modal from '../../components/Modal'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
@@ -224,7 +224,7 @@ export default function GoalsPlanPage() {
       <style>{GP_CSS}</style>
       {modals}
       {sel && <div className="gp-bar"><div><h1><a className="gp-back" onClick={() => navigate('/goals')}>← All goals</a></h1></div></div>}
-      {sel ? <GoalDetail p={sel} ctx={ctx} /> : <GoalsHome actions={<><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
+      {sel ? <GoalDetail p={sel} ctx={ctx} todo={todo} /> : <GoalsHome actions={<><button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setMoneyOpen(true)}><Wallet size={14} /> Money for goals</button>
           <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('list')}><Pencil size={14} /> Edit goals</button>
           <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg transition-colors" onClick={() => setForm('add')}><Plus size={14} /> Add Goal</button></>} plan={plan} todo={todo} pool={pool} closed={(goalList || []).filter((g) => g.isActive === false)} plans={shown} mfHoldings={mfHoldings} mfPortfolios={mfPortfolios} ctx={ctx} onMoney={() => setMoneyOpen(true)} />}
       {sel && <p className="gp-note">Steps are calculated from your own funds, your goal's expected return and the app's glide path. No fund recommendations.</p>}
@@ -520,11 +520,13 @@ function FamilyBlock({ f, pname, mt }) {
 }
 
 /* ───────── goal page ───────── */
-function GoalDetail({ p, ctx }) {
+function GoalDetail({ p, ctx, todo }) {
   const { mt, navigate, pname } = ctx
   const [stt, sc] = STATUS[p.status], gp = gapTxt(p), g = p.goal
   let n = 0
-  const st = realSteps(p)
+  // the family plan's steps that belong to this goal (make it safer, money ready) — the same as on the phone
+  const own = (todo?.steps || []).filter((x) => (x.t === 'protect' || x.t === 'ready') && x.goal?.goalId === g.goalId)
+  const st = realSteps(p).filter((x) => !own.some((o) => o.t === x.t))
   const after = {}
   st.filter((s) => s.t === 'switch').forEach((s) => {
     const kf = `${s.portfolioId}::${s.from.schemeCode || s.from.fundCode}`; after[kf] = (after[kf] || 0) - s.sellValue
@@ -542,11 +544,13 @@ function GoalDetail({ p, ctx }) {
 
       <div className="gp-panel">
         <div className="gp-ph"><h2>Action required</h2><span className="gp-hs">{p.bucketMode ? 'In the last 5 years before retirement your money follows the retirement buckets.' : `Equity ${p.eqNow ?? '—'}%, your glide path says ${p.eqTarget}% · a switch shows only when it is 5 points or more off`}</span></div>
+        {own.length > 0 && <AsideCtx.Provider value={ctx.aside || {}}><div className="g2" style={{ marginBottom: st.length ? 14 : 0 }}><style>{GOALS_HOME_CSS}</style>
+          {own.map((s, i) => <Step key={i} s={s} n={++n} mt={mt} pname={pname} closeGoal={ctx.closeGoal} navigate={navigate} />)}</div></AsideCtx.Provider>}
         {st.length ? <>
           <div className="gp-thd"><span /><span>Action</span><span>From</span><span /><span>To</span><span style={{ textAlign: 'right' }}>Amount</span></div>
           <div className="gp-grp">{st.map((s, i) => <StepRow key={i} s={s} p={p} n={++n} mt={mt} pname={pname} onRebalance={ctx.openRebalance} onClose={ctx.closeGoal} navigate={navigate} />)}</div>
           <p className="gp-foot">Sell in units you hold. Buy in ₹, because the units depend on that day's NAV.</p>
-        </> : <div className="gp-ok">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
+        </> : own.length ? null : <div className="gp-ok">✓ Nothing to do now.{p.sip > 0 ? ` Keep your SIP ${L(p.sip)}/month.` : ''}</div>}
       </div>
 
       <PlanByYear p={p} />
@@ -578,26 +582,38 @@ function GoalDetail({ p, ctx }) {
 export function PlanByYear({ p }) {
   const g = p.goal, n = Math.max(1, Number(g.payYears) || 1)
   const stops = goalRoad(p).filter((r) => !['today', 'quiet'].includes(r.k))
-  if (!stops.length) return null
   const rows = []
-  for (const r of stops) {
+  // a goal paid over several years: one row per payment, from the goal year on (also once the first year has come)
+  if (!p.isRet && n > 1) {
+    const y0 = new Date(g.targetDate).getFullYear(), part = p.target / n
+    for (const r of stops) if (r.k !== 'goal' && r.y < y0) push(r)
+    for (let k = 0; k < n; k++) {
+      const rest = n - k - 1 // parts still invested after this payment
+      rows.push([y0 + k, k === 0 ? 'goal year' : `payment ${k + 1}`, rest ? `rest ${getGoalAllocation({ ...g, payYears: rest }, 1).equity}%` : 'done',
+        `Withdraw part ${k + 1} of ${n}, about ${L(part)}${rest ? `; the other ${rest} stay${rest === 1 ? 's' : ''} invested` : '; the goal is complete'}`])
+    }
+    return rows.length ? panel(rows) : null
+  }
+  if (!stops.length) return null
+  for (const r of stops) push(r)
+  return panel(rows)
+  function push(r) {
     if (r.k === 'safer') rows.push([r.y, `${r.yl} yr${r.yl > 1 ? 's' : ''} left`, `${r.eq0}% → ${r.eq}%`, `Move about ${L(r.amount)} from equity to safe funds`])
     else if (r.k === 'ease') rows.push([r.y, `${r.yl} yrs left`, '85% → 75%', 'Equity eases about 2 points a year'])
     else if (r.k === 'bucket') rows.push([`${r.y0}–${r.y}`, 'last 5 yrs', 'buckets', 'Each quarter, fill Income and Stability from Growth'])
     else if (r.k === 'goal') {
       if (p.isRet) rows.push([r.y, 'retire', '', r.bucket?.monthly ? `Start the monthly ${L(r.bucket.monthly)} from Income` : 'Start the monthly withdrawal from Income'])
-      else if (n > 1) for (let k = 0; k < n; k++) rows.push([r.y + k, k === 0 ? 'goal year' : `payment ${k + 1}`, `${getGoalAllocation({ ...g, payYears: n - k }, 0).equity}%`, `Withdraw this year's part (${k + 1} of ${n}), about ${L(p.target / n)}`])
       else rows.push([r.y, 'goal year', '0%', `Withdraw ${L(p.target)} (the Withdraw button lists each step)`])
     }
   }
-  return (
+  function panel(rows) { return (
     <div className="gp-panel">
       <div className="gp-ph"><h2>Plan by year</h2><span className="gp-hs">From your glide path · amounts are estimates, the exact units show in that year's steps</span></div>
       <div className="gp-pby">
         {rows.map(([y, yl, eq, what], i) => <div key={i}><b>{y}</b><small>{yl}</small><em>{eq}</em><span>{what}</span></div>)}
       </div>
     </div>
-  )
+  ) }
 }
 
 export function StopCard({ r, p }) {
