@@ -205,8 +205,16 @@ function heldFundCodes_() {
 }
 var HELD_ONLY_TABS_ = { MutualFundData: 8, MF_ATH_Data: 7 };
 
-/** Master rows (shared cached copy) for the given codes only. */
+/**
+ * Master rows for the given codes only. Asks the master DB for just those rows (a query that returns in a
+ * second or two); only if that fails is the full shared copy downloaded and filtered, as before.
+ * The full copies took 2-3 minutes each in the background jobs, which hit the 6-minute limit (15 Oct 2026).
+ */
 function masterRowsForCodes_(userTab, codes) {
+  var m = USER_MASTER_TABS_[userTab];
+  if (m && Object.keys(codes).length && Object.keys(codes).length <= 300) {
+    try { return masterRowsByCodes_(m[0], m[1], codes); } catch (e) { log('masterRowsForCodes_ ' + userTab + ': ' + e.message + ' - using the full copy'); }
+  }
   var rows = userMasterTabSource_(userTab) || [];
   return rows.filter(function (r) { return codes[String(parseInt(String(r[0]).trim(), 10))]; });
 }
@@ -232,15 +240,19 @@ function userTabsCodes_(tabs) {
 function replaceHeldTabFromMaster_(sheet, userTab, masterTab, numCols, label) {
   var codes;
   try { codes = heldFundCodes_(); } catch (e) { log('held funds unreadable (' + e.message + '): full ' + label + ' copy'); return replaceTabFromMaster_(sheet, masterTab, numCols, label); }
+  var tq = Date.now();
   var data = masterRowsForCodes_(userTab, codes);
-  var all = userMasterTabSource_(userTab);
-  if (!all || !all.length) { log('Master ' + masterTab + ' empty or unreadable: kept existing ' + label); return 0; }
-  var cols = numCols;
+  log(label + ': ' + data.length + ' held rows fetched in ' + (Date.now() - tq) + 'ms');
+  var total = +masterRowCount_(masterTab, CacheService.getScriptCache()) || 0;   // cheap count query (cached 10 min)
+  if (Object.keys(codes).length && !data.length) { log('Master ' + masterTab + ' returned no rows for the held funds: kept existing ' + label); return 0; }
+  var cols = numCols, t0 = Date.now();
   data = data.map(function (r) { var x = r.slice(0, cols); while (x.length < cols) x.push(''); return x; });
   if (data.length) { ensureRows_(sheet, data.length + 1); sheet.getRange(2, 1, data.length, cols).setValues(data); }
   var extra = sheet.getMaxRows() - (data.length + 1);
   if (extra > 0) sheet.getRange(data.length + 2, 1, extra, Math.min(cols, sheet.getMaxColumns())).clearContent();
-  log('Refreshed ' + data.length + ' held ' + label + ' rows (of ' + all.length + ' in master)');
+  // A tab that once held the full list (~15,000 rows) is shrunk once, so every later clear is tiny
+  if (extra > 1500) { try { sheet.deleteRows(data.length + 2 + 500, extra - 500); log(label + ' tab shrunk by ' + (extra - 500) + ' empty rows'); } catch (e) { log(label + ' tab shrink skipped: ' + e.message); } }
+  log('Refreshed ' + data.length + ' held ' + label + ' rows (of ' + (total || '?') + ' in master) in ' + (Date.now() - t0) + 'ms write');
   return data.length;
 }
 
@@ -362,7 +374,9 @@ function refreshAllMasterData() {
   }
 
   try {
-    results.stocks = refreshStockData();
+    // The stock list (~5,000 rows) is the slow part; a background run must finish well inside Apps Script's 6 minutes
+    if (Date.now() - startTime > 150000) { log('Stock refresh skipped: ' + Math.round((Date.now() - startTime) / 1000) + 's used already'); results.stocks = { success: false, skipped: true }; }
+    else results.stocks = refreshStockData();
   } catch (e) {
     log('Error refreshing stock data: ' + e.message);
     results.stocks = { success: false, error: e.message };

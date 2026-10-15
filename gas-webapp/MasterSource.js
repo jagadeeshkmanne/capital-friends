@@ -18,13 +18,15 @@
  * ============================================================================
  */
 
-function masterRows_(tabName, numCols) {
+function masterRows_(tabName, numCols, tq) {
   // Note: cells formatted as date-only come back as whole days (time of day dropped).
   // In the master DB that is only MF_ATH "Last Checked", which the app never reads.
+  // tq: optional query (default 'select *'); with a 'where' only the matching rows are downloaded.
   var json;
   try {
-    json = gvizFetch_(tabName, 'select *');
+    json = gvizFetch_(tabName, tq || 'select *');
   } catch (e) {
+    if (tq) throw e; // a filtered query has no SpreadsheetApp fallback: the caller falls back to the full copy
     // Until Google approves script.external_request the app has no UrlFetch permission:
     // read the master DB the old way (needs the spreadsheets scope, still present then).
     if (/permission|Required permissions|not sufficient/i.test(String(e && e.message))) return masterRowsViaSpreadsheetApp_(tabName, numCols);
@@ -166,6 +168,26 @@ function userMasterTabSource_(userTab) {
     cache.putAll(put, 3600);
   } catch (e) { Logger.log('master tab cache put failed: ' + e); }
   return rows;
+}
+
+/**
+ * Master rows whose column A (scheme code) is one of `codes` - one small query instead of the
+ * ~15,000-row download. Codes are tried as numbers first, then as text (the master column may be either).
+ */
+function masterRowsByCodes_(tabName, numCols, codes) {
+  var list = Object.keys(codes).filter(function (c) { return /^\d+$/.test(c); });
+  if (!list.length) return [];
+  var out = [], errs = [];
+  for (var g = 0; g < list.length; g += 60) {   // keep each URL short
+    var part = list.slice(g, g + 60), rows = null;
+    var tries = [part.map(function (c) { return 'A = ' + c; }).join(' or '), part.map(function (c) { return "A = '" + c + "'"; }).join(' or ')];
+    for (var k = 0; k < tries.length && rows === null; k++) {
+      try { rows = masterRows_(tabName, numCols, 'select * where ' + tries[k]); } catch (e) { errs.push(e.message); }
+    }
+    if (rows === null) throw new Error('held rows query failed: ' + errs.join(' | ').slice(0, 300));
+    out = out.concat(rows);
+  }
+  return out;
 }
 
 /** Master tab row count, cached 10 minutes ('' when it can't be read: then the plain 1-hour cache is used). */
