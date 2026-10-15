@@ -43,6 +43,22 @@ function _plSign(v) { return v >= 0 ? '+' : ''; }
 function _maskPan(p) { p = String(p || '').trim(); return p.length >= 6 ? p.slice(0, 2) + 'XXXXX' + p.slice(-3) : (p ? 'XXXX' : '-'); }
 function _maskMobile(m) { m = String(m || '').replace(/\D/g, ''); return m.length >= 4 ? 'XXXXXX' + m.slice(-4) : '-'; }
 
+// email: first letter + dots + last letter before @ (j•••••h@gmail.com); ids: last 4 only (XXXX-7731)
+function _maskEmail(e) { e = String(e || '').trim(); var at = e.indexOf('@'); if (at < 1) return e ? '•••' : '-'; var u = e.slice(0, at); return (u.length <= 2 ? u.charAt(0) + '•' : u.charAt(0) + '•••••' + u.charAt(u.length - 1)) + e.slice(at); }
+function _maskId(v) { v = String(v || '').trim(); if (!v) return '-'; return v.length > 4 ? 'XXXX-' + v.slice(-4) : 'XXXX'; }
+var _APP_LINK = 'https://capitalfriends.in/?from=email';
+function _maskedNote(what) {
+  return '<div style="font-size:12px;color:#64748b;margin:-8px 0 18px 2px">&#128274; ' + what + ' are masked in this email. <a href="' + _APP_LINK + '" style="color:#059669;font-weight:700;text-decoration:none">Open Capital Friends</a> to see the full details.</div>';
+}
+function _appCard() {
+  var h = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;margin-top:6px"><tbody>';
+  h += '<tr><td style="padding:16px 18px 0 18px;text-align:center"><img src="https://capitalfriends.in/email/directory.png" width="420" alt="" style="display:block;width:100%;max-width:420px;height:auto;margin:0 auto;border:0"></td></tr>';
+  h += '<tr><td style="padding:6px 18px 0 18px;text-align:center"><div style="font-size:15px;font-weight:700;color:#0f172a">The complete record is in the app</div><div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-top:4px">Full account numbers, client IDs, PAN and contact details, for every member, kept in your own Google Drive. Sign in with the family Google account.</div></td></tr>';
+  h += '<tr><td style="padding:14px 18px 18px 18px;text-align:center"><table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center"><tbody><tr><td style="background:#10b981;border-radius:8px"><a href="' + _APP_LINK + '" style="display:inline-block;padding:11px 24px;font-size:13.5px;font-weight:700;color:#06281b;text-decoration:none">Open Capital Friends &rarr;</a></td></tr></tbody></table></td></tr>';
+  h += '</tbody></table>';
+  return h;
+}
+
 function _maskAadhar(a) {
   if (!a) return '-';
   var s = String(a).replace(/\D/g, '');
@@ -540,13 +556,14 @@ function buildDashboardPDFHTML(data) {
     h += '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:12px">Personal Details</div>';
     h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>';
     h += '<td style="width:50%;vertical-align:top;padding-right:8px">';
-    h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Email</div><div style="font-size:13px;color:#1e293b;font-weight:600;word-break:break-all">' + _escHtml(mem.email || '-') + '</div></div>';
+    h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Email</div><div style="font-size:13px;color:#1e293b;font-weight:600;word-break:break-all">' + _escHtml(_maskEmail(mem.email)) + '</div></div>';
     h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">PAN</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _escHtml(_maskPan(mem.pan)) + '</div></div>';
     h += '</td><td style="width:50%;vertical-align:top;padding-left:8px">';
     h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Mobile</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _escHtml(_maskMobile(mem.mobile)) + '</div></div>';
     h += '<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:10px"><div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Aadhar</div><div style="font-size:13px;color:#1e293b;font-weight:600;font-family:monospace">' + _maskAadhar(mem.aadhar) + '</div></div>';
     h += '</td></tr></tbody></table></td>';
     h += '</tr></tbody></table></td></tr></tbody></table></div>';
+    h += _maskedNote('Email, mobile, PAN and Aadhaar');
 
     // ── Mutual Funds ──
     if (md2.mfPortfolios.length > 0) {
@@ -555,7 +572,7 @@ function buildDashboardPDFHTML(data) {
         var mp2 = md2.mfPortfolios[mpi2];
         var mpF = mp2.funds || [];
         var mpia = mp2.investmentAccountId ? iaLookup[mp2.investmentAccountId] : null;
-        var mpcid = mpia ? (mpia.clientId || '') : '';
+        var mpcid = mpia && mpia.clientId ? _maskId(mpia.clientId) : '';
         var psI = parseFloat(mp2.totalInvestment) || 0, psC = parseFloat(mp2.currentValue) || 0;
         var psUPL = parseFloat(mp2.unrealizedPL) || 0;
         var psRPL = parseFloat(mp2.realizedPL) || 0;
@@ -653,7 +670,7 @@ function buildDashboardPDFHTML(data) {
         var msp = md2.stockPortfolios[msi2];
         var msH = msp.holdings || [];
         var msia = msp.investmentAccountId ? iaLookup[msp.investmentAccountId] : null;
-        var mscid = msia ? (msia.clientId || '') : '';
+        var mscid = msia && msia.clientId ? _maskId(msia.clientId) : '';
         var ssI = parseFloat(msp.totalInvestment) || 0, ssC = parseFloat(msp.currentValue) || 0;
         var ssPL = ssC - ssI, ssPP = ssI > 0 ? (ssPL / ssI * 100) : 0;
 
@@ -974,7 +991,7 @@ function buildDashboardPDFHTML(data) {
   h += '<td style="width:3px"><div style="width:3px;height:14px;background:#059669;border-radius:2px"></div></td>';
   h += '<td style="padding-left:10px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1.5px">Account Directory</td>';
   h += '</tr></tbody></table>';
-  h += '<div style="font-size:13px;color:#64748b;margin-bottom:16px">Complete list of all accounts across institutions &mdash; keep this for your records</div>';
+  h += '<div style="font-size:13px;color:#64748b;margin-bottom:16px">Who holds what, and where to call. Confidential numbers are masked here and shown in full only inside the app.</div>';
 
   // Bank Accounts
   if (bankAccounts.length > 0) {
@@ -993,6 +1010,7 @@ function buildDashboardPDFHTML(data) {
       h += '<td style="padding:6px 8px;font-size:13px;color:#64748b">' + _escHtml(bk.branch || '-') + '</td></tr>';
     }
     h += '</tbody></table>';
+    h += _maskedNote('Account numbers');
   }
 
   // Investment Accounts
@@ -1006,11 +1024,12 @@ function buildDashboardPDFHTML(data) {
       h += '<tr' + (iak < investmentAccounts.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
       h += '<td style="' + _td + '">' + _escHtml(iaMN) + '</td>';
       h += '<td style="padding:6px 8px;font-size:13px;color:#1e293b;font-weight:600">' + _escHtml(ia.platform) + '</td>';
-      h += '<td style="' + _tdMono + '">' + _escHtml(ia.clientId || '-') + '</td>';
+      h += '<td style="' + _tdMono + '">' + _escHtml(_maskId(ia.clientId)) + '</td>';
       h += '<td style="' + _td + '">' + _escHtml(ia.accountType || '-') + '</td>';
-      h += '<td style="padding:6px 8px;font-size:13px;color:#64748b">' + _escHtml(ia.email || '-') + '</td></tr>';
+      h += '<td style="padding:6px 8px;font-size:13px;color:#64748b">' + _escHtml(_maskEmail(ia.email)) + '</td></tr>';
     }
     h += '</tbody></table>';
+    h += _maskedNote('Client IDs and registered emails');
   }
 
   // Insurance Policies
@@ -1044,8 +1063,10 @@ function buildDashboardPDFHTML(data) {
       h += '<td style="padding:6px 8px;font-size:13px;font-weight:600;color:#b45309">' + _escHtml(nominee) + '</td></tr>';
     }
     h += '</tbody></table>';
+    h += '<div style="font-size:12px;color:#64748b;margin:8px 0 18px 2px">Policy numbers and nominees are shown in full on purpose: at claim time these are the first things asked for.</div>';
   }
 
+  h += _appCard();
   h += '</td></tr></tbody></table>'; // close Account Directory
 
   // ══════════════════════════════════════════════════════════════════

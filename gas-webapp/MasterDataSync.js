@@ -589,7 +589,8 @@ function getMyDailyJobsStatus() {
       sync: names.indexOf('dailyUserSync') !== -1,
       email: names.indexOf('sendScheduledDailyEmail') !== -1,
       emailConfigured: emailOn,
-      reminders: names.indexOf('checkAndSendReminders') !== -1
+      reminders: names.indexOf('checkAndSendReminders') !== -1,
+      lastEmail: (function () { try { var v = getSetting('EmailLastRun'); return v ? JSON.parse(v) : null; } catch (e) { return null; } })()
     };
   } catch (e) {
     log('getMyDailyJobsStatus: ' + e.message);

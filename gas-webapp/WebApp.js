@@ -159,40 +159,9 @@ function freshAfterWrite_(action) {
  * Handle GET requests (health check and trigger installation popup)
  */
 function doGet(e) {
-  // Trigger Installation Popup Handler
+  // Trigger Installation Popup Handler (the only place triggers can be created: the Apps Script API cannot create them)
   if (e && e.parameter && e.parameter.action === 'installTriggers') {
-    try {
-      var email = Session.getActiveUser().getEmail();
-      if (!email) {
-        return HtmlService.createHtmlOutput('<h2>Error</h2><p>You must be signed into a Google Account.</p>');
-      }
-      
-      // Look up user (ensure they are registered)
-      var userRecord = findUserByEmail(email);
-      if (!userRecord || !userRecord.spreadsheetId) {
-        return HtmlService.createHtmlOutput('<h2>Error</h2><p>Account not fully set up yet. Please complete setup in the main app.</p>');
-      }
-      
-      // Set context so trigger functions can read settings
-      _currentUserSpreadsheetId = userRecord.spreadsheetId;
-      
-      // Install triggers natively on the user's account
-      installDailyTriggerForUser();
-      installTriggers(false); // Installs onEdit, email schedules, and reminders
-      
-      var html = '<!DOCTYPE html><html><head><title>Setup Complete</title></head>' +
-                 '<body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding-top: 50px; background-color: #0c1222; color: white;">' +
-                 '<h2 style="color: #4ade80;">Setup Complete! ✅</h2>' +
-                 '<p style="color: #94a3b8;">Background sync triggers have been successfully installed.</p>' +
-                 '<p style="color: #94a3b8; font-size: 14px;">This window will close automatically...</p>' +
-                 '<script>setTimeout(function(){ try { window.top.close(); } catch(e){} window.close(); }, 2500);</script>' +
-                 '</body></html>';
-                 
-      return HtmlService.createHtmlOutput(html);
-    } catch (err) {
-      log('Trigger popup error: ' + err.toString());
-      return HtmlService.createHtmlOutput('<h2>Error Installing Triggers</h2><p>' + err.message + '</p>');
-    }
+    return installTriggersPage_(e.parameter.expected || '');
   }
 
   var result = {
@@ -1148,3 +1117,72 @@ function requireOwner(userRecord) {
 // ============================================================================
 // END OF WEBAPP.JS
 // ============================================================================
+
+
+// ============================================================================
+// TRIGGER INSTALL PAGE
+// ============================================================================
+// Opened from the app in a new window/tab while signed in. Runs as the accessing user, so the triggers land in
+// that user's account. It checks the account matches the one signed into the app, installs the daily sync, the
+// email schedule and the reminders, and then shows what is actually installed (never "Setup complete" blindly).
+function installTriggersPage_(expected) {
+  var P = 'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#0c1222;color:#e2e8f0;margin:0;padding:28px 22px;text-align:center';
+  var box = function (title, color, body) {
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Capital Friends</title></head><body style="' + P + '">' +
+      '<div style="font-size:13px;letter-spacing:2px;color:#64748b;margin-bottom:10px">CAPITAL FRIENDS</div><h2 style="color:' + color + ';margin:0 0 12px;font-size:20px">' + title + '</h2>' + body + '</body></html>';
+  };
+  var esc = function (t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email) return HtmlService.createHtmlOutput(box('Please sign in', '#f59e0b', '<p>This window must be signed into a Google account. Sign in and try again from the app.</p>'));
+    var self = ScriptApp.getService().getUrl() + '?action=installTriggers&expected=' + encodeURIComponent(expected || '');
+    if (expected && expected.toLowerCase() !== email.toLowerCase()) {
+      var chooser = 'https://accounts.google.com/AccountChooser?Email=' + encodeURIComponent(expected) + '&continue=' + encodeURIComponent(self);
+      return HtmlService.createHtmlOutput(box('Wrong Google account', '#f59e0b',
+        '<p style="color:#94a3b8">This window opened as <b style="color:#fff">' + esc(email) + '</b>, but the app is signed in as <b style="color:#fff">' + esc(expected) + '</b>. The daily updates must be installed on the same account.</p>' +
+        '<p><a href="' + chooser + '" style="display:inline-block;background:#10b981;color:#06281b;font-weight:700;padding:10px 18px;border-radius:8px;text-decoration:none">Switch to ' + esc(expected) + '</a></p>'));
+    }
+    var userRecord = findUserByEmail(email);
+    if (!userRecord || !userRecord.spreadsheetId) {
+      return HtmlService.createHtmlOutput(box('Account not set up yet', '#f59e0b', '<p style="color:#94a3b8">Open the app once with <b style="color:#fff">' + esc(email) + '</b> so your sheet is created, then press Turn on again.</p>'));
+    }
+    _currentUserSpreadsheetId = userRecord.spreadsheetId;
+
+    // permissions: if the user unticked a scope on Google's consent screen, triggers would fail silently later
+    var auth = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    if (auth.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED) {
+      return HtmlService.createHtmlOutput(box('One more permission needed', '#f59e0b',
+        '<p style="color:#94a3b8">Google needs your OK for the app to run in the background and send the family email.</p>' +
+        '<p><a href="' + auth.getAuthorizationUrl() + '" target="_blank" style="display:inline-block;background:#10b981;color:#06281b;font-weight:700;padding:10px 18px;border-radius:8px;text-decoration:none">Allow and continue</a></p>' +
+        '<p style="color:#64748b;font-size:13px">Tick every box on the Google screen, then come back here and <a href="' + self + '" style="color:#34d399">check again</a>.</p>'));
+    }
+
+    // email schedule needs the EmailConfigured setting; older sheets never had it -> default to daily 9 AM
+    var cfg = getSetting('EmailConfigured');
+    if (cfg === null || cfg === '') { updateSetting('EmailConfigured', 'TRUE'); if (!getSetting('EmailFrequency')) updateSetting('EmailFrequency', 'Daily'); }
+
+    var problems = [];
+    try { installDailyTriggerForUser(); } catch (e1) { problems.push('Price updates: ' + e1.message); }
+    try { installTriggers(false); } catch (e2) { problems.push('Email / reminders: ' + e2.message); }
+
+    var st = checkUserTriggers();
+    var row = function (ok, label, sub) {
+      return '<tr><td style="padding:8px 10px;text-align:left"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:' + (ok ? '#34d399' : '#f59e0b') + ';margin-right:10px"></span><b>' + label + '</b><div style="color:#94a3b8;font-size:12px;margin-left:20px">' + sub + '</div></td><td style="padding:8px 10px;color:' + (ok ? '#34d399' : '#f59e0b') + ';font-weight:700">' + (ok ? 'ON' : 'OFF') + '</td></tr>';
+    };
+    var emailOff = (String(getSetting('EmailConfigured')).toUpperCase() !== 'TRUE');
+    var html = '<p style="color:#94a3b8;margin:0 0 14px">Installed for <b style="color:#fff">' + esc(email) + '</b></p>' +
+      '<table style="margin:0 auto;border-collapse:collapse;background:#111c33;border-radius:10px;min-width:300px">' +
+      row(st.hasDailySync, 'Daily price updates', 'fund NAVs, highs and the gold rate, 3 times a day') +
+      row(st.hasEmailTrigger, 'Family email', emailOff ? 'switched off in Settings > Email reports' : 'at the time you chose in Settings') +
+      row(st.hasReminderTrigger, 'Reminders', 'SIP dates, premiums, FD maturities') + '</table>';
+    if (problems.length) html += '<p style="color:#fca5a5;font-size:13px;margin-top:14px">' + problems.map(esc).join('<br>') + '</p>';
+    var allOk = st.hasDailySync && st.hasReminderTrigger && (st.hasEmailTrigger || emailOff) && !problems.length;
+    html += allOk
+      ? '<p style="color:#94a3b8;font-size:13px;margin-top:16px">All set. This window closes by itself.</p><script>setTimeout(function(){ try { window.close(); } catch(e){} }, 3500);</script>'
+      : '<p style="color:#94a3b8;font-size:13px;margin-top:16px">Something is still off. <a href="' + self + '" style="color:#34d399">Try again</a> or write to capital.friends.dev@gmail.com with this screen.</p>';
+    return HtmlService.createHtmlOutput(box(allOk ? 'Daily updates are on' : 'Partly installed', allOk ? '#4ade80' : '#f59e0b', html));
+  } catch (err) {
+    log('Trigger popup error: ' + err.toString());
+    return HtmlService.createHtmlOutput(box('Could not install', '#f87171', '<p style="color:#94a3b8">' + esc(err.message) + '</p><p style="color:#64748b;font-size:13px">Try again from Settings. If it keeps failing, write to capital.friends.dev@gmail.com.</p>'));
+  }
+}

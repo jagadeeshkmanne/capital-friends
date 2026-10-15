@@ -168,17 +168,24 @@ export async function callAPI(action, params = {}, retry = true, pickerTried = f
 
 // ── Convenience Methods ──
 
+// The daily jobs (price sync, family email, reminders) can only be installed by Google's own web-app page, opened
+// in a new window as the signed-in user (the Apps Script API cannot create triggers). Call this directly from a
+// click handler, or browsers block the window. Returns the URL so the caller can show a fallback link.
+export function triggerInstallUrl() {
+  if (!DEPLOYMENT_ID) return null
+  let email = ''
+  try { email = JSON.parse(localStorage.getItem('cf_user_profile') || '{}').email || '' } catch {}
+  const q = email ? `&expected=${encodeURIComponent(email)}&authuser=${encodeURIComponent(email)}` : ''
+  return `https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=installTriggers${q}`
+}
 export function installUserTriggers() {
-  if (!DEPLOYMENT_ID) {
-    console.error('No GAS Deployment ID found for triggers');
-    return;
-  }
-  const url = `https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=installTriggers`;
-  const width = 450;
-  const height = 350;
-  const left = window.screen.width / 2 - width / 2;
-  const top = window.screen.height / 2 - height / 2;
-  window.open(url, 'install_triggers', `width=${width},height=${height},top=${top},left=${left}`);
+  const url = triggerInstallUrl()
+  if (!url) { console.error('No GAS Deployment ID found for triggers'); return null }
+  const width = 460, height = 520
+  const left = window.screen.width / 2 - width / 2, top = window.screen.height / 2 - height / 2
+  let w = null
+  try { w = window.open(url, 'install_triggers', `width=${width},height=${height},top=${top},left=${left}`) } catch {}
+  return w // null when the browser blocked it: show the link instead
 }
 
 // Auth

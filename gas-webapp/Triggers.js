@@ -204,13 +204,23 @@ function sendScheduledDailyEmail() {
 
     if (result && result.success) {
       Logger.log('Scheduled email sent successfully to ' + (result.sentCount || 0) + ' recipients');
+      recordEmailRun_(true, result.sentCount || 0, '');
     } else {
       Logger.log('Scheduled email failed: ' + (result ? result.error : 'Unknown error'));
+      recordEmailRun_(false, 0, result ? result.error : 'Unknown error');
     }
 
   } catch (error) {
     Logger.log('Error in scheduled email: ' + error.toString());
+    try { recordEmailRun_(false, 0, String(error.message || error)); } catch (e2) {}
   }
+}
+
+/** Settings['EmailLastRun'] = {at, ok, sent, error}: shown in the app's Settings so "I get no email" has an answer. */
+function recordEmailRun_(ok, sent, error) {
+  var msg = String(error || '');
+  if (/gmail|mail service|permission|authoriz/i.test(msg)) msg = 'Gmail permission missing. Sign out, sign in again and allow all four permissions.';
+  updateSetting('EmailLastRun', JSON.stringify({ at: new Date().toISOString(), ok: !!ok, sent: sent || 0, error: msg.slice(0, 200) }));
 }
 
 /**

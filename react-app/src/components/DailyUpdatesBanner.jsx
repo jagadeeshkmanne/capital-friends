@@ -34,8 +34,10 @@ export default function DailyUpdatesBanner() {
     return () => { alive = false; clearTimeout(t); clearInterval(pollRef.current) }
   }, [])
 
+  const [blockedUrl, setBlockedUrl] = useState(null)
   function turnOn() {
-    api.installUserTriggers() // opens Google's small one-time window (needs this click, or browsers block it)
+    const w = api.installUserTriggers() // opens Google's small one-time window (needs this click, or browsers block it)
+    setBlockedUrl(w ? null : api.triggerInstallUrl())
     setState('waiting')
     let tries = 0
     clearInterval(pollRef.current)
@@ -84,7 +86,9 @@ export default function DailyUpdatesBanner() {
           <p className="text-sm font-semibold text-[var(--text-primary)]">Keep your fund values up to date</p>
           <p className="text-xs text-[var(--text-dim)] mt-0.5">
             {state === 'waiting'
-              ? 'A small Google window has opened. Allow it there — this takes a few seconds.'
+              ? (blockedUrl
+                  ? <>Your browser blocked the window. <a href={blockedUrl} target="_blank" rel="noopener" className="underline font-semibold text-violet-400">Open it here</a>, sign in with the same Google account, then come back.</>
+                  : 'A small Google window has opened. Sign in there with the same account and keep it open until it says the updates are on.')
               : 'Let Capital Friends update your mutual fund prices every day and send your daily summary email, even when the app is closed. You only need to do this once.'}
           </p>
           {state === 'ask' && (

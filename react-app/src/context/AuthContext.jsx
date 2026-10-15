@@ -121,12 +121,7 @@ export function AuthProvider({ children }) {
       // Call our backend to register/login
       const me = await api.getMe()
       
-      // If this is a newly registered account, prompt Google to install background triggers
-      if (me.isNew) {
-        setTimeout(() => {
-          try { api.installUserTriggers() } catch(e) { console.warn('Popup blocked?', e) }
-        }, 1500)
-      }
+      // New accounts: the DailyUpdatesBanner asks to switch on the daily jobs with a click (a timed popup is blocked)
 
       setUserAndCache({
         email: me.email || profile.email,

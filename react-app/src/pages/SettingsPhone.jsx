@@ -112,7 +112,7 @@ export default function SettingsPhone() {
           <Ico I={RefreshCw} c="#34d399" /><IonLabel><h3 className="!text-[15px] !font-semibold">Refresh market data</h3><p>Fund NAVs, all-time highs, stock prices · last {ago(s.masterDataLastSync)}{s._navDataDate ? ` · NAV ${s._navDataDate}` : ''}</p></IonLabel>
           {refreshing ? <IonSpinner slot="end" name="crescent" /> : s._stale ? <IonBadge slot="end" color="warning">Old</IonBadge> : null}
         </IonItem>
-        <IonItem button detail onClick={() => api.installUserTriggers()}>
+        <IonItem button detail onClick={() => { const w = api.installUserTriggers(); if (!w) window.location.href = api.triggerInstallUrl() }}>
           <Ico I={Clock} c="#a78bfa" /><IonLabel><h3 className="!text-[15px] !font-semibold">Daily updates</h3><p>Prices and the family email every day, even with the app closed</p></IonLabel>
           {daily != null && <IonBadge slot="end" color={daily ? 'success' : 'warning'}>{daily ? 'ON' : 'OFF'}</IonBadge>}
         </IonItem>

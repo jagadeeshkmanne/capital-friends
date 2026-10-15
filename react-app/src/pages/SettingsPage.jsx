@@ -27,9 +27,11 @@ function SettingsDesktop() {
   const { members, settings, updateSettings, updateMember, healthCheckCompleted, refreshData, isRefreshing, refreshSettings } = useData()
   // Daily updates: show whether they are on (the Turn on window installs them; check again when you come back)
   const [daily, setDaily] = useState(null) // null = checking, true / false
+  const [jobs, setJobs] = useState(null)   // {sync, email, emailConfigured, reminders, lastEmail}
+  const [installLink, setInstallLink] = useState(null) // shown when the browser blocked the install window
   useEffect(() => {
     let alive = true
-    const check = () => api.getDailyJobsStatus().then((r) => { if (alive) setDaily(r && !r.unknown ? !!r.sync : null) }).catch(() => { if (alive) setDaily(null) })
+    const check = () => api.getDailyJobsStatus().then((r) => { if (alive) { setDaily(r && !r.unknown ? !!r.sync : null); setJobs(r && !r.unknown ? r : null) } }).catch(() => { if (alive) setDaily(null) })
     check()
     window.addEventListener('focus', check)
     return () => { alive = false; window.removeEventListener('focus', check) }
@@ -244,7 +246,7 @@ function SettingsDesktop() {
 
           <div className="h-px bg-[var(--border-light)] w-full my-4"></div>
 
-          {/* Background Triggers */}
+          {/* Background jobs: price sync, family email, reminders (installed by Google's one-time window) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div>
@@ -255,12 +257,36 @@ function SettingsDesktop() {
                 <p className="text-xs text-[var(--text-dim)] mt-0.5">Updates your fund prices and sends your summary email every day, even when the app is closed</p>
               </div>
               <button
-                onClick={() => api.installUserTriggers()}
+                onClick={() => { const w = api.installUserTriggers(); setInstallLink(w ? null : api.triggerInstallUrl()) }}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0 whitespace-nowrap"
               >
                 {daily ? 'Turn on again' : 'Turn on'}
               </button>
             </div>
+            {installLink && (
+              <p className="text-xs text-amber-400">Your browser blocked the window. <a href={installLink} target="_blank" rel="noopener" className="underline font-semibold">Open it here</a>, sign in as {user?.email}, then come back.</p>
+            )}
+            {jobs && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                {[['Price updates', jobs.sync, '3 times a day'],
+                  ['Family email', jobs.email, jobs.emailConfigured ? 'at the time below' : 'off in Email reports'],
+                  ['Reminders', jobs.reminders, 'SIPs, premiums, FDs']].map(([l, on, sub]) => (
+                  <div key={l} className="flex items-center gap-2 rounded-lg border border-[var(--border-light)] px-2.5 py-1.5">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${on ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                    <div className="min-w-0"><p className="text-xs font-semibold text-[var(--text-primary)]">{l} <span className={on ? 'text-emerald-400' : 'text-amber-400'}>{on ? 'on' : 'off'}</span></p><p className="text-[11px] text-[var(--text-dim)] truncate">{sub}</p></div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {jobs?.lastEmail && (
+              <p className={`text-xs ${jobs.lastEmail.ok ? 'text-[var(--text-dim)]' : 'text-amber-400'}`}>
+                Last scheduled email: {new Date(jobs.lastEmail.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                {jobs.lastEmail.ok ? ` · sent to ${jobs.lastEmail.sent} ${jobs.lastEmail.sent === 1 ? 'person' : 'people'}` : ` · failed: ${jobs.lastEmail.error || 'unknown error'}`}
+              </p>
+            )}
+            {jobs && jobs.sync && jobs.emailConfigured && !jobs.email && (
+              <p className="text-xs text-amber-400">The email schedule is not installed. Press Turn on again and keep the window open until it says all three are on.</p>
+            )}
           </div>
 
           {importBeta && (
