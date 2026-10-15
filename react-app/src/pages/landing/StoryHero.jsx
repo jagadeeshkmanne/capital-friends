@@ -461,7 +461,7 @@ function DemoScene({ id }) {
         ? <iframe src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`} title="Capital Friends: full app walkthrough" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
         : <button type="button" className="st-demo-th" onClick={() => setPlay(true)} aria-label="Play the demo video" style={{ backgroundImage: `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)` }}>
             <span className="st-demo-p"><svg width="26" height="26" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="#fff" /></svg></span>
-            <span className="st-demo-t">Full app walkthrough · 12 min</span>
+            <span className="st-demo-t">Full app demo · 30 min</span>
           </button>}
     </div>
   )
@@ -470,7 +470,7 @@ function DemoScene({ id }) {
 function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, videoLabel = 'Watch the demo' }) {
   const [i, setI] = useState(0)
   // with a demo video, it is the last step on the path; the scenes rotate without it (it only opens when chosen)
-  const chapters = videoId ? [...CHAPTERS, { k: 'demo', ph: 'shown in 12 minutes', icon: 'play', c: '#ef4444', s: 'Demo', t: 'Watch the full app walkthrough' }] : CHAPTERS
+  const chapters = videoId ? [...CHAPTERS, { k: 'demo', ph: 'the whole app in 30 minutes', icon: 'play', c: '#ef4444', s: 'Demo', t: 'Watch the full app walkthrough' }] : CHAPTERS
   // the scenes play on by themselves; they only wait while the browser tab is hidden
   const [paused, setPaused] = useState(false)
   useEffect(() => {
