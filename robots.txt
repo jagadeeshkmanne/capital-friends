@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /import
+Disallow: /investments
+Disallow: /goals
+Disallow: /family
+Disallow: /accounts
+Disallow: /insurance
+Disallow: /liabilities
+Disallow: /reports
+Disallow: /reminders
+Disallow: /health-check
+Disallow: /more
+
+Sitemap: https://capitalfriends.in/sitemap.xml
