@@ -13,18 +13,28 @@
     if (!isFinite(n)) return '—';
     var a = Math.abs(n), s = n < 0 ? '-' : '';
     if (a >= 1e12) return s + '₹' + Math.round(a / 1e7).toLocaleString('en-IN') + ' Cr';   // never scientific notation
-    if (a >= 1e7) return s + '₹' + (a / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
-    if (a >= 1e5) return s + '₹' + (a / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' L';
+    if (a >= 1e7 - 5e4) return s + '₹' + (a / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' Cr';   // 99.995 L rounds up to 1 Cr, not "100 L"
+    if (a >= 1e5 - 50) return s + '₹' + (a / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' L';
     return fmt(n);
   };
   var pct = function (x) { return (x * 100).toFixed(2).replace(/\.?0+$/, '') + '%'; };
   // Read a field, kept inside its min/max (typed values ignore the attributes). The box is corrected too, so the user sees it.
-  var num = function (id) {
+  var num = function (id, force) {
     var el = $(id) || {}, v = parseFloat(el.value); if (!isFinite(v)) return 0;
     var lo = parseFloat(el.min), hi = parseFloat(el.max), c = v;
     if (isFinite(lo) && c < lo) c = lo; if (isFinite(hi) && c > hi) c = hi;
-    if (c !== v && document.activeElement !== el) el.value = c;
+    if (c !== v && (force || document.activeElement !== el)) el.value = c;
     return c;
+  };
+  // true when any of these boxes is empty: the calculator then shows a prompt instead of a result built on zeros
+  var blank = function (ids) { for (var i = 0; i < ids.length; i++) { var el = $(ids[i]); if (el && !isFinite(parseFloat(el.value))) return true; } return false; };
+  var yrs = function (n) { return n + (n === 1 ? ' year' : ' years'); };
+  var times = function (x) { return !isFinite(x) ? '' : ' (' + (x >= 1000 ? Math.round(x).toLocaleString('en-IN') : x.toFixed(1)) + 'x)'; };
+  // cross-field rule (e.g. retirement age after today's age): correct the box too, unless the user is still typing in it
+  var atLeast = function (id, v, min) { if (v > min) return v; var el = $(id); if (el && document.activeElement !== el) el.value = min + 1; return min + 1; };
+  var prompt = function (msg) {
+    setText('r-value', '—'); setText('r-invested', '—'); setText('r-gain', '—'); setText('r-note', msg);
+    var b = $('r-bar'); if (b) b.innerHTML = ''; var t = $('r-table'); if (t) t.innerHTML = '';
   };
   var fmt0 = fmt; fmt = function (n) { return Math.abs(n) >= 1e12 ? short(n) : fmt0(n); };   // huge rupee amounts also stay readable
   var setText = function (id, t) { var e = $(id); if (e) e.textContent = t; };
@@ -78,32 +88,35 @@
   // ---------- calculators ----------
   var C = {
     sip: function () {
+      if (blank(['f-amount', 'f-rate', 'f-years'])) return prompt('Enter the monthly SIP, the expected return and the number of years.');
       var p = num('f-amount'), r = num('f-rate'), y = num('f-years'), s = num('f-stepup'), l = num('f-lump');
       var o = sipFV(p, r, y, s, l);
       setText('r-value', short(o.fv)); setText('r-invested', short(o.invested)); setText('r-gain', short(o.fv - o.invested));
-      setText('r-note', (l ? fmt(l) + ' today, plus ' : 'Invest ') + fmt(p) + ' a month' + (s ? ', increasing ' + s + '% every year,' : '') + ' for ' + y + ' years at ' + r + '% a year gives about ' + fmt(o.fv) + '.');
+      setText('r-note', (l ? fmt(l) + ' today, plus ' : 'Invest ') + fmt(p) + ' a month' + (s ? ', increasing ' + s + '% every year,' : '') + ' for ' + yrs(y) + ' at ' + r + '% a year gives about ' + fmt(o.fv) + '.');
       bar('r-bar', o.invested, o.fv - o.invested, 'Invested', 'Returns');
       table('r-table', ['Year', 'Monthly SIP', 'Total invested', 'Value'], o.rows.map(function (x) { return [x.year, fmt(x.sip), short(x.invested), short(x.value)]; }));
     },
     lumpsum: function () {
+      if (blank(['f-amount', 'f-rate', 'f-years'])) return prompt('Enter the amount, the expected return and the number of years.');
       var p = num('f-amount'), r = num('f-rate'), y = num('f-years'); var o = lumpFV(p, r, y);
       setText('r-value', short(o.fv)); setText('r-invested', short(p)); setText('r-gain', short(o.fv - p));
-      setText('r-note', fmt(p) + ' invested once, growing at ' + r + '% a year for ' + y + ' years, becomes about ' + fmt(o.fv) + ' (' + (o.fv / p).toFixed(1) + 'x).');
+      setText('r-note', fmt(p) + ' invested once, growing at ' + r + '% a year for ' + yrs(y) + ', becomes about ' + fmt(o.fv) + (p > 0 ? times(o.fv / p) : '') + '.');
       bar('r-bar', p, o.fv - p, 'Invested', 'Returns');
       table('r-table', ['Year', 'Value'], o.rows.map(function (x) { return [x.year, short(x.value)]; }));
     },
     swp: function () {
+      if (blank(['f-corpus', 'f-withdraw', 'f-rate', 'f-years'])) return prompt('Enter the starting corpus, the monthly withdrawal, the expected return and the number of years.');
       var c = num('f-corpus'), w = num('f-withdraw'), r = num('f-rate'), y = num('f-years'), inf = num('f-inflation'); var o = swp(c, w, r, y, inf);
       setText('r-value', short(o.final)); setText('r-invested', short(o.withdrawn)); setText('r-gain', o.exhausted ? (Math.floor(o.lasted / 12) + ' yrs ' + (o.lasted % 12) + ' mo') : y + ' years');
       setText('r-note', o.exhausted ? 'At ' + fmt(w) + ' a month the corpus runs out after ' + Math.floor(o.lasted / 12) + ' years and ' + (o.lasted % 12) + ' months. Lower the withdrawal or the inflation step-up.' :
-        'Withdraw ' + fmt(w) + ' a month' + (inf ? ' (rising ' + inf + '% a year)' : '') + ' for ' + y + ' years and about ' + fmt(o.final) + ' is still left, because the corpus keeps earning ' + r + '%.');
+        'Withdraw ' + fmt(w) + ' a month' + (inf ? ' (rising ' + inf + '% a year)' : '') + ' for ' + yrs(y) + ' and about ' + fmt(o.final) + ' is still left, because the corpus keeps earning ' + r + '%.');
       bar('r-bar', o.withdrawn, Math.max(0, o.final), 'Withdrawn', 'Left');
       table('r-table', ['Year', 'Monthly withdrawal', 'Total withdrawn', 'Corpus left'], o.rows.map(function (x) { return [x.year, fmt(x.w), short(x.withdrawn), short(x.value)]; }));
     },
     cagr: function () {
       var pv = num('f-start'), fv = num('f-end'), y = num('f-years'); var g = cagr(pv, fv, y);
       setText('r-value', isFinite(g) ? pct(g) : '—'); setText('r-invested', short(fv - pv)); setText('r-gain', pv > 0 ? ((fv / pv - 1) * 100).toFixed(1) + '%' : '—');
-      setText('r-note', isFinite(g) ? fmt(pv) + ' growing to ' + fmt(fv) + ' in ' + y + ' years is a CAGR of ' + pct(g) + ' a year. Absolute return ' + ((fv / pv - 1) * 100).toFixed(1) + '%.' : 'Enter a start value, an end value and the number of years.');
+      setText('r-note', isFinite(g) ? fmt(pv) + ' growing to ' + fmt(fv) + ' in ' + yrs(y) + ' is a CAGR of ' + pct(g) + ' a year. Absolute return ' + ((fv / pv - 1) * 100).toFixed(1) + '%.' : 'Enter a start value, an end value and the number of years.');
       bar('r-bar', pv, Math.max(0, fv - pv), 'Start', 'Growth');
       var rows = []; for (var k = 1; k <= Math.min(30, Math.ceil(y)); k++) rows.push([k, short(pv * Math.pow(1 + g, k))]); table('r-table', ['Year', 'Value at this CAGR'], rows);
     },
@@ -119,42 +132,46 @@
       bar('r-bar', inv, Math.max(0, vv - inv), 'Invested', 'Gain');
     },
     retirement: function () {
+      if (blank(['f-age', 'f-retire', 'f-life', 'f-expense'])) return prompt('Enter your age today, the retirement age, the age the money must last till and your monthly expenses.');
       var exp = num('f-expense'), age = num('f-age'), rage = num('f-retire'), life = num('f-life'), inf = num('f-inflation'), ret = num('f-rate'), pre = num('f-prerate'), have = num('f-have');
-      if (rage <= age) { rage = age + 1; } if (life <= rage) { life = rage + 1; }   // retire after today, money lasts past retirement
-      var yrs = Math.max(0, rage - age), fexp = exp * Math.pow(1 + inf / 100, yrs), years = Math.max(1, life - rage);
+      rage = atLeast('f-retire', rage, age); life = atLeast('f-life', life, rage);   // retire after today, money lasts past retirement
+      var yrs0 = Math.max(0, rage - age), fexp = exp * Math.pow(1 + inf / 100, yrs0), years = Math.max(1, life - rage);
       // Same rule as the Capital Friends app: a safe withdrawal rate by how long the money must last (post-retirement years)
       // 40+ yrs 3.0% (33x) · 35+ 3.3% (30x) · 25+ 4.0% (25x) · 18+ 5.0% (20x) · else 6.0% (17x) of the first year's expenses
       var swr = years >= 40 ? 0.030 : years >= 35 ? 0.033 : years >= 25 ? 0.040 : years >= 18 ? 0.050 : 0.060;
       var corpus = fexp * 12 / swr;
-      var haveFV = have * Math.pow(1 + pre / 100, yrs), gap = Math.max(0, corpus - haveFV);
-      var r = pre / 100 / 12, n = yrs * 12, sip = n > 0 && r > 0 ? gap * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) : (n > 0 ? gap / n : gap);
+      var haveFV = have * Math.pow(1 + pre / 100, yrs0), gap = Math.max(0, corpus - haveFV);
+      var r = pre / 100 / 12, n = yrs0 * 12, sip = n > 0 && r > 0 ? gap * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) : (n > 0 ? gap / n : gap);
       setText('r-value', short(corpus)); setText('r-invested', short(fexp)); setText('r-gain', short(sip));
-      setText('r-note', 'Today\'s ' + fmt(exp) + ' a month becomes ' + fmt(fexp) + ' a month at ' + inf + '% inflation when you retire at ' + rage + '. For ' + years + ' years of retirement the app plans a ' + (swr * 100).toFixed(1) + '% safe withdrawal rate, so you need about ' + fmt(corpus) + ' at retirement (' + Math.round(1 / swr) + 'x the first year\'s expenses)' + (have ? ', of which your current ' + fmt(have) + ' grows to ' + short(haveFV) : '') + '. The gap needs a SIP of about ' + fmt(sip) + ' a month for ' + yrs + ' years.');
+      setText('r-note', 'Today\'s ' + fmt(exp) + ' a month becomes ' + fmt(fexp) + ' a month at ' + inf + '% inflation when you retire at ' + rage + '. For ' + yrs(years) + ' of retirement the app plans a ' + (swr * 100).toFixed(1) + '% safe withdrawal rate, so you need about ' + fmt(corpus) + ' at retirement (' + Math.round(1 / swr) + 'x the first year\'s expenses)' + (have ? ', of which your current ' + fmt(have) + ' grows to ' + short(haveFV) : '') + '. The gap needs a SIP of about ' + fmt(sip) + ' a month for ' + yrs(yrs0) + '.');
       bar('r-bar', haveFV, gap, 'From what you have', 'Still to build');
       var rows = [], bal = corpus, w = fexp * 12; for (var k = 1; k <= Math.min(years, 40); k++) { bal = bal * (1 + ret / 100) - w; rows.push([rage + k, short(w), short(Math.max(0, bal))]); w *= 1 + inf / 100; }
       table('r-table', ['Age', 'Yearly expenses', 'Corpus left'], rows);
     },
     emergency: function () {
+      if (blank(['f-expense', 'f-months'])) return prompt('Enter your monthly expenses and how many months to cover.');
       var exp = num('f-expense'), m = num('f-months'), emi = num('f-emi'), have = num('f-have'); var need = (exp + emi) * m, gap = Math.max(0, need - have);
       setText('r-value', short(need)); setText('r-invested', short(have)); setText('r-gain', short(gap));
       setText('r-note', 'With ' + fmt(exp + emi) + ' of monthly expenses and EMIs, a ' + m + '-month emergency fund is ' + fmt(need) + '.' + (gap > 0 ? ' You still need ' + fmt(gap) + '. Keep it in a savings account, sweep-in FD or liquid fund, not in equity.' : ' You already have it. Keep it separate from your investments.'));
       bar('r-bar', Math.min(have, need), gap, 'You have', 'To add');
     },
     fire: function () {
+      if (blank(['f-age', 'f-expense', 'f-rate', 'f-inflation', 'f-swr'])) return prompt('Enter your age, monthly expenses, expected return, inflation and a safe withdrawal rate.');
       var exp = num('f-expense'), age = num('f-age'), have = num('f-have'), save = num('f-save'), ret = num('f-rate'), inf = num('f-inflation'), swr = num('f-swr');
-      var real = (1 + ret / 100) / (1 + inf / 100) - 1, target = exp * 12 / (swr / 100), bal = have, yrs = 0, rows = [];
-      while (bal < target && yrs < 60) { bal = bal * (1 + real) + save * 12; yrs++; rows.push([age + yrs, short(bal), short(target)]); }
-      setText('r-value', short(target)); setText('r-invested', (bal >= target ? yrs : '60+') + ' years'); setText('r-gain', bal >= target ? 'age ' + (age + yrs) : '—');
-      setText('r-note', 'Your FIRE number at a ' + swr + '% withdrawal rate is ' + fmt(target) + ' in today\'s money (' + (100 / swr).toFixed(0) + 'x yearly expenses). Saving ' + fmt(save) + ' a month at a real return of ' + pct(real) + ' (' + ret + '% minus ' + inf + '% inflation), you reach it in ' + (bal >= target ? yrs + ' years, at age ' + (age + yrs) : 'more than 60 years') + '.');
+      var real = (1 + ret / 100) / (1 + inf / 100) - 1, target = exp * 12 / (swr / 100), bal = have, yrs1 = 0, rows = [];
+      while (bal < target && yrs1 < 60) { bal = bal * (1 + real) + save * 12; yrs1++; rows.push([age + yrs1, short(bal), short(target)]); }
+      setText('r-value', short(target)); setText('r-invested', bal >= target ? yrs(yrs1) : '60+ years'); setText('r-gain', bal >= target ? 'age ' + (age + yrs1) : '—');
+      setText('r-note', 'Your FIRE number at a ' + swr + '% withdrawal rate is ' + fmt(target) + ' in today\'s money (' + (100 / swr).toFixed(0) + 'x yearly expenses). Saving ' + fmt(save) + ' a month at a real return of ' + pct(real) + ' (' + ret + '% minus ' + inf + '% inflation), you reach it in ' + (bal >= target ? yrs(yrs1) + ', at age ' + (age + yrs) : 'more than 60 years') + '.');
       bar('r-bar', Math.min(have, target), Math.max(0, target - have), 'Have today', 'To build');
       table('r-table', ['Age', 'Corpus (today\'s money)', 'Target'], rows);
     },
     goal: function () {
+      if (blank(['f-cost', 'f-years'])) return prompt('Enter what the goal costs today and in how many years you need it.');
       var cost = num('f-cost'), y = num('f-years'), inf = num('f-inflation'), ret = num('f-rate'), have = num('f-have');
       var fcost = cost * Math.pow(1 + inf / 100, y), haveFV = have * Math.pow(1 + ret / 100, y), gap = Math.max(0, fcost - haveFV);
       var r = ret / 100 / 12, n = y * 12, sip = n > 0 && r > 0 ? gap * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) : (n > 0 ? gap / n : gap), lump = gap / Math.pow(1 + ret / 100, y);
       setText('r-value', short(fcost)); setText('r-invested', short(sip)); setText('r-gain', short(lump));
-      setText('r-note', 'Something that costs ' + fmt(cost) + ' today will cost about ' + fmt(fcost) + ' in ' + y + ' years at ' + inf + '% inflation. ' + (have ? 'Your ' + fmt(have) + ' grows to ' + short(haveFV) + ', so the gap is ' + short(gap) + '. ' : '') + 'Cover it with a SIP of ' + fmt(sip) + ' a month, or ' + fmt(lump) + ' invested today, at ' + ret + '% a year.');
+      setText('r-note', 'Something that costs ' + fmt(cost) + ' today will cost about ' + fmt(fcost) + ' in ' + yrs(y) + ' at ' + inf + '% inflation. ' + (have ? 'Your ' + fmt(have) + ' grows to ' + short(haveFV) + ', so the gap is ' + short(gap) + '. ' : '') + 'Cover it with a SIP of ' + fmt(sip) + ' a month, or ' + fmt(lump) + ' invested today, at ' + ret + '% a year.');
       bar('r-bar', haveFV, gap, 'From what you have', 'Still to build');
       var rows = []; for (var k = 1; k <= y; k++) rows.push([k, short(cost * Math.pow(1 + inf / 100, k))]); table('r-table', ['Year', 'Cost of the goal'], rows);
     },
@@ -169,7 +186,7 @@
 
   function run() { var el = document.querySelector('[data-calc]'); if (!el) return; var fn = C[el.getAttribute('data-calc')]; if (fn) { try { fn(); } catch (e) { } } }
   document.addEventListener('input', function (e) { if (e.target && e.target.matches('.calc input, .calc select')) run(); });
-  document.addEventListener('focusout', function (e) { if (e.target && e.target.matches('.calc input[type=number]')) { num(e.target.id); run(); } }, true);
+  document.addEventListener('focusout', function (e) { if (e.target && e.target.matches('.calc input[type=number]')) { num(e.target.id, true); run(); } }, true);
   document.addEventListener('click', function (e) {
     if (e.target && e.target.id === 'add-flow') { var t = document.querySelector('#flows .flow'); var c = t.cloneNode(true); c.querySelector('.fa').value = ''; $('flows').appendChild(c); }
     if (e.target && e.target.classList.contains('rm-flow')) { var rows = document.querySelectorAll('#flows .flow'); if (rows.length > 1) e.target.closest('.flow').remove(); run(); }
