@@ -25,3 +25,17 @@ describe('groupHolders (CAS names not in Family)', () => {
     expect(groupHolders([{ holder: 'MANNE SANJITH', folios: 1 }], [])[0].name).toBe('Manne Sanjith')
   })
 })
+
+import { defaultRows } from './AddMissingMembers'
+describe('defaultRows (auto-add with defaults, nothing to pick)', () => {
+  const people = groupHolders([{ holder: 'Jagadeesh Manne', folios: 10 }, { holder: 'Visali Manne', folios: 4 }, { holder: 'Sanjith Manne', folios: 2 }], [])
+  it('no Self yet: the person with most folios is Self, the rest Other, email is mine, daily email on for Self only', () => {
+    const r = defaultRows(people, { hasSelf: false, me: 'me@gmail.com', statementEmail: 'me@gmail.com' })
+    expect(r.map((x) => x.rel)).toEqual(['Self', 'Other', 'Other'])
+    expect(r.every((x) => x.email === 'me@gmail.com')).toBe(true)
+    expect(r.map((x) => x.report)).toEqual([true, false, false])
+  })
+  it('Self already exists: everyone is Other', () => {
+    expect(defaultRows(people, { hasSelf: true, me: 'me@gmail.com' }).every((x) => x.rel === 'Other')).toBe(true)
+  })
+})

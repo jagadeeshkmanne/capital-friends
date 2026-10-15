@@ -2,7 +2,7 @@ import { useMemo, useState, lazy, Suspense } from 'react'
 import { useIsPhone } from '../../components/native'
 import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
 const DashboardPhone = lazy(() => import('./DashboardPhone'))
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Trophy, Star, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useData } from '../../context/DataContext'
@@ -809,6 +809,22 @@ export default function Dashboard() {
                     <span className="text-red-400 font-semibold tabular-nums">&minus;{formatINR(data.totalLiabilities)}</span>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ EMPTY APP: the fastest start is one CAMS statement (family, accounts and portfolios come from it) ═══ */}
+        {selectedMember === 'all' && data.totalAssets === 0 && !(mfPortfolios || []).length && (
+          <div className="md:col-span-2 rounded-xl border border-emerald-500/30 bg-[var(--bg-card)] p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-base font-bold text-[var(--text-primary)]">Fastest way to start: import your CAMS statement</p>
+                <p className="text-sm text-[var(--text-muted)] mt-1">One PDF brings in every mutual fund and transaction. The app adds the people on the statement to Family and creates their accounts and portfolios by itself. Nothing to set up first.</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Link to="/import" className="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold">Import statement</Link>
+                <Link to="/family" className="px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">Add family by hand</Link>
               </div>
             </div>
           </div>

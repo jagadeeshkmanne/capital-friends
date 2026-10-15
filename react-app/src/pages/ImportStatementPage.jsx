@@ -314,6 +314,7 @@ export default function ImportStatementPage() {
               The <b>Detailed</b> CAMS + KFintech statement (CAS) PDF, from <b>01-Jan-2000</b>, <b>with zero balance folios</b>. Don&apos;t have it yet? It&apos;s free and takes 2 minutes:
             </p>
             <HowToStrip onOpenGuide={() => setShowHelp(true)} />
+            <p className="text-xs text-[var(--text-dim)]">Nothing to set up first: the people on the statement are added to Family, and their investment accounts and portfolios are created by the import. You can edit them later.</p>
           </>
         )}
         {parsed ? (
@@ -354,11 +355,10 @@ export default function ImportStatementPage() {
             <>
               <p className="text-xs text-[var(--text-dim)]">Your statement has these accounts. We picked the best match; change it if needed.</p>
 
-              {mustFix && (
-                <Note tone={preview.needsBank ? 'bad' : 'info'}>
-                  <p className="font-semibold">{preview.needsBank ? 'Before you can import:' : `${preview.missingMembers.length === 1 ? 'One person' : 'Some people'} on this statement ${preview.missingMembers.length === 1 ? 'is' : 'are'} new to the app`}</p>
-                  {preview.missingMembers.length > 0 && <p>{preview.needsBank ? '• ' : ''}Check the names below, pick how each one is related to you and press Add: the app adds them to Family, makes their accounts and portfolios, and the import goes on. (You can also add them in <Link to="/family" className="underline">Family</Link>.)</p>}
-                  {preview.needsBank && <p>• Add a bank account in <Link to="/accounts/bank" className="underline">Bank Accounts</Link> first – a new investment account needs one. Or pick one of your existing portfolios below.</p>}
+              {preview.needsBank && (
+                <Note tone="bad">
+                  <p className="font-semibold">Before you can import:</p>
+                  <p>• Add a bank account in <Link to="/accounts/bank" className="underline">Bank Accounts</Link> first – a new investment account needs one. Or pick one of your existing portfolios below.</p>
                 </Note>
               )}
               {preview.missingMembers.length > 0 && (

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Loader2, UserPlus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Loader2, CheckCircle2 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { useMask } from '../context/MaskContext'
@@ -8,12 +8,9 @@ import { useMask } from '../context/MaskContext'
 // The same person often appears twice ("Jagadeesh Kumar Manne" and "MANNE JAGADEESH KUMAR"): grouped by
 // name words (order and case don't matter) and, if the PAN is the same, by one name being part of the other.
 
-const RELS = ['Self', 'Spouse', 'Son', 'Daughter', 'Father', 'Mother', 'Brother', 'Sister', 'Other']
 const tokens = (s) => String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter((t) => t.length > 1)
 const uniq = (a) => [...new Set(a)]
 const title = (s) => String(s || '').toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\s+/g, ' ').trim()
-const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || '').trim())
-const KIDS = ['Son', 'Daughter']
 
 /** Group the statement's missing holder names into people. Exported for tests. */
 export function groupHolders(missing, folios) {
@@ -45,6 +42,22 @@ export function groupHolders(missing, folios) {
   return people
 }
 
+/**
+ * Defaults for people found on the statement who are not in Family yet (exported for tests).
+ * Nothing to pick: the person whose statement email is the signed-in account (else the one with most folios)
+ * becomes Self when there is no Self yet; everyone else is "Other" (change it in Family later). Email is yours
+ * for everyone (a spouse's own email from the statement when it differs), daily email on for Self only.
+ */
+export function defaultRows(people, { hasSelf, me, statementEmail }) {
+  const stmt = String(statementEmail || '').trim().toLowerCase()
+  const most = people.reduce((b, p) => (!b || p.folios > b.folios ? p : b), null)
+  return people.map((p) => {
+    const rel = !hasSelf && p === most ? 'Self' : 'Other'
+    return { key: p.key, name: p.name, names: p.names, rel, email: rel === 'Self' ? (me || stmt) : (me || stmt), report: rel === 'Self' }
+  })
+}
+
+// Adds them by itself (no form): a live list of what is being created, then the import check runs again.
 export default function AddMissingMembers({ missing, folios, statementEmail, onDone }) {
   const { addMember, members } = useData()
   const { user } = useAuth()
@@ -53,78 +66,42 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
   const me = String(user?.email || '').trim().toLowerCase()
   const people = useMemo(() => groupHolders(missing, folios), [missing, folios])
   const hasSelf = (members || []).some((m) => m.relationship === 'Self' && m.status !== 'Inactive')
-  const mostFolios = people.reduce((b, p) => (!b || p.folios > b.folios ? p : b), null)
-  const stmt = String(statementEmail || '').trim().toLowerCase()
-  const emailFor = (rel) => (rel === 'Spouse' ? (stmt && stmt !== me ? stmt : '') : me)
-  const [rows, setRows] = useState(() => people.map((p) => {
-    const rel = !hasSelf && p === mostFolios ? 'Self' : ''
-    return { key: p.key, name: p.name, names: p.names, rel, email: rel ? emailFor(rel) : me, emailEdited: false, report: rel === 'Self', reportEdited: false }
-  }))
-  const [saving, setSaving] = useState(false)
+  const rows = useMemo(() => defaultRows(people, { hasSelf, me, statementEmail }), [people, hasSelf, me, statementEmail])
+  const [done, setDone] = useState([])      // keys added so far
   const [err, setErr] = useState('')
+  const started = useRef(false)
 
-  const set = (i, patch) => setRows((rs) => rs.map((r, j) => {
-    if (j !== i) return r
-    const n = { ...r, ...patch }
-    if (patch.rel && !r.emailEdited) n.email = emailFor(patch.rel)
-    if (patch.rel && !r.reportEdited) n.report = ['Self', 'Spouse'].includes(patch.rel)
-    return n
-  }))
-  const selfCount = rows.filter((r) => r.rel === 'Self').length + (hasSelf ? 1 : 0)
-  const problem = rows.some((r) => !r.name.trim()) ? 'Each person needs a name.'
-    : rows.some((r) => !r.rel) ? 'Pick how each person is related to you.'
-      : rows.some((r) => !isEmail(r.email)) ? 'Each person needs an email (kids can use yours).'
-        : selfCount > 1 ? 'Only one person can be "Self".' : ''
+  useEffect(() => {
+    if (started.current || !rows.length) return
+    started.current = true
+    ;(async () => {
+      try {
+        for (const r of rows) {
+          await addMember({ memberName: r.name.trim(), relationship: r.rel, email: r.email, includeInEmailReports: !!r.report, pan: '', aadhar: '', mobile: '', dynamicFields: {} })
+          setDone((d) => [...d, r.key])
+        }
+        onDone?.()
+      } catch (e) { setErr(e.message || 'Could not add the family members') }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function addAll() {
-    if (problem) { setErr(problem); return }
-    setSaving(true); setErr('')
-    try {
-      for (const r of rows) {
-        const email = r.email.trim()
-        // the daily email: your choice per person (on for you and your spouse, off for kids by default)
-        await addMember({ memberName: r.name.trim(), relationship: r.rel, email, includeInEmailReports: !!r.report, pan: '', aadhar: '', mobile: '', dynamicFields: {} })
-      }
-      onDone?.()
-    } catch (e) { setErr(e.message || 'Could not add the family members') }
-    finally { setSaving(false) }
-  }
-
-  const inp = 'w-full px-2.5 py-2 text-sm rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)]'
   return (
-    <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3 space-y-3">
-      <div>
-        <p className="text-sm font-semibold text-[var(--text-primary)]">Add {rows.length === 1 ? 'this person' : `these ${rows.length} people`} to your family</p>
-        <p className="text-xs text-[var(--text-dim)]">From your statement. Check the name, pick the relationship, and we add them for you.</p>
-      </div>
-      {rows.map((r, i) => (
-        <div key={r.key} className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr_1.4fr] gap-2 pb-3 border-b border-[var(--border-light)] last:border-0 last:pb-0">
-          <div>
-            <input className={inp + blur} value={r.name} onChange={(e) => set(i, { name: e.target.value })} aria-label="Name" />
-            {r.names.length > 1 && <p className={`text-[11px] text-[var(--text-dim)] mt-1${blur}`}>Same person on the statement as: {r.names.join(' · ')}</p>}
-          </div>
-          <select className={inp} value={r.rel} onChange={(e) => set(i, { rel: e.target.value })} aria-label="Relationship">
-            <option value="">Relationship…</option>
-            {RELS.map((x) => <option key={x} value={x}>{x}</option>)}
-          </select>
-          <div>
-            <input className={inp + blur} type="email" value={r.email} onChange={(e) => set(i, { email: e.target.value, emailEdited: true })} placeholder="Email" aria-label="Email" />
-            {KIDS.includes(r.rel) && <p className="text-[11px] text-[var(--text-dim)] mt-1">Young kids can use your email. A grown-up child can use their own.</p>}
-            {r.rel === 'Spouse' && <p className="text-[11px] text-[var(--text-dim)] mt-1">Their own email: they can also sign in and see the family.</p>}
-            <label className="flex items-center gap-2 mt-1.5 text-xs text-[var(--text-primary)]">
-              <input type="checkbox" checked={r.report} onChange={(e) => set(i, { report: e.target.checked, reportEdited: true })} />
-              Send them the daily email
-            </label>
-          </div>
-        </div>
-      ))}
-      {(err || problem) && <p className="text-xs text-[var(--accent-rose,#f43f5e)]">{err || problem}</p>}
-      <button onClick={addAll} disabled={saving || !!problem}
-        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold">
-        {saving ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-        {saving ? 'Adding…' : `Add to family and check again`}
-      </button>
-      <p className="text-[11px] text-[var(--text-dim)]">PAN, Aadhaar and mobile are not saved. You can add them later in Family if you want.</p>
+    <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3 space-y-2">
+      <p className="text-sm font-semibold text-[var(--text-primary)]">Adding {rows.length === 1 ? 'one person' : `${rows.length} people`} from your statement to Family</p>
+      <ul className="space-y-1">
+        {rows.map((r) => {
+          const ok = done.includes(r.key)
+          return (
+            <li key={r.key} className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+              {ok ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" /> : <Loader2 size={16} className="animate-spin text-[var(--text-dim)] shrink-0" />}
+              <span className={blur}>{r.name}</span>
+              <span className="text-xs text-[var(--text-dim)]">· {r.rel === 'Self' ? 'you' : 'family member'}{r.report ? ' · daily email on' : ''}</span>
+            </li>
+          )
+        })}
+      </ul>
+      {err && <p className="text-xs text-[var(--accent-rose,#f43f5e)]">{err}</p>}
+      <p className="text-[11px] text-[var(--text-dim)]">Relationship, email, PAN and the daily email can be changed any time in Family. Investment accounts and portfolios are created with the import.</p>
     </div>
   )
 }
