@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import * as api from '../services/api'
 import * as idb from '../services/idb'
 import { clearStocksCache } from '../components/forms/StockSearchInput'
@@ -813,6 +813,20 @@ export function DataProvider({ children }) {
 
   // ── Filtered helpers ──
   const activeMembers = (members || []).filter((m) => m.status === 'Active')
+  // MF portfolios carry no owner of their own (the backend sends ownerId: ''): the owner is the investment account's
+  // member. Resolved once here so "Viewing as <person>" works everywhere (dashboard, header pill, alerts, forms, reports).
+  const mfPortfoliosOwned = useMemo(() => {
+    if (!mfPortfolios) return mfPortfolios
+    const accounts = investmentAccounts || [], people = members || []
+    return mfPortfolios.map((p) => {
+      if (p.ownerId) return p
+      let a = accounts.find((x) => x.accountId === p.investmentAccountId)
+      if (!a && p.investmentAccountId) a = accounts.find((x) => `${x.accountName} - ${x.platformBroker}` === p.investmentAccountId)
+      if (!a) return p
+      const m = people.find((x) => x.memberId === a.memberId)
+      return { ...p, ownerId: a.memberId || '', ownerName: p.ownerName || m?.memberName || '' }
+    })
+  }, [mfPortfolios, investmentAccounts, members])
   const activeBanks = (banks || []).filter((b) => b.status === 'Active')
   const activeInvestmentAccounts = (investmentAccounts || []).filter((a) => a.status === 'Active')
 
@@ -849,7 +863,7 @@ export function DataProvider({ children }) {
       addStockPortfolio, updateStockPortfolio, deleteStockPortfolio,
       buyStock, importStocks, sellStock, editStockTransaction, deleteStockTransaction, refreshStocks,
       // MF data
-      mfPortfolios, mfHoldings, mfTransactions,
+      mfPortfolios: mfPortfoliosOwned, mfHoldings, mfTransactions,
       // MF CRUD
       addMFPortfolio, updateMFPortfolio, deleteMFPortfolio,
       investMF, redeemMF, redeemMFBulk, switchMF, updateHoldingAllocations, restoreOriginalTargets, toggleLumpsumRestricted, toggleSipRestricted, deleteMFTransaction, editMFTransaction, deleteFundFromPortfolio,
