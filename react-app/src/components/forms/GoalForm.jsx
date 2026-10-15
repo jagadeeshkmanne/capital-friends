@@ -109,7 +109,7 @@ function retirementAgeAtDate(dob, targetDate) {
   return age > 0 ? String(age) : ''
 }
 
-export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent, defaultType, live }) {
+export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingContent, defaultType, live, submitLabel }) {
   const { mv } = useMask()
   const isEdit = !!initial
   const { activeMembers, settings } = useData()
@@ -850,7 +850,7 @@ export default function GoalForm({ initial, onSave, onDelete, onCancel, linkingC
             </button>
           ) : (
             <button onClick={handleSubmit} disabled={saving} className="px-5 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {saving ? 'Saving...' : 'Create Goal'}
+              {saving ? 'Saving...' : (submitLabel || 'Create Goal')}
             </button>
           )}
         </div>

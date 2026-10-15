@@ -68,6 +68,10 @@ export default function GoalsPlanPage() {
   const [rebal, setRebal] = useState(null)
   // add / edit goals right here (no trip to the classic page): null | 'add' | 'list' | { edit: goal }
   const [form, setForm] = useState(null)
+  // a goal planned on the public /goal-planner/ page before signing in: open it prefilled, once
+  useEffect(() => {
+    try { const d = localStorage.getItem('cf-goal-draft'); if (d) { localStorage.removeItem('cf-goal-draft'); setForm({ draft: JSON.parse(d) }) } } catch {}
+  }, [])
   const phone = useIsPhone()
 
   if (!plan) return <PageLoading title="Loading goals" />
@@ -184,7 +188,7 @@ export default function GoalsPlanPage() {
       <Modal open={!!rebal} onClose={() => setRebal(null)} title="Rebalance" wide>{rebal && <MFRebalanceDialog filterPortfolioId={rebal} />}</Modal>
       <Modal open={moneyOpen} onClose={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} title="Money for goals" wide>{moneyOpen && <MoneyForGoals pool={pool} onSaved={() => { setMoneyOpen(false); if (sp.get('money')) { sp.delete('money'); setSp(sp, { replace: true }) } }} />}</Modal>
       <Modal open={!!form && form !== 'list'} onClose={() => setForm(null)} title={form?.edit ? 'Edit Goal' : 'Add Goal'} wide>
-        {form && form !== 'list' && <GoalForm key={form?.edit?.goalId || 'new-' + (form?.type || '')} initial={form?.edit || undefined} live={(() => { const p = form?.edit && plan?.goals?.find((x) => x.goal.goalId === form.edit.goalId); return p ? { has: p.has, sip: p.sip } : undefined })()} defaultType={form?.type} onSave={saveGoal} onDelete={form?.edit ? removeGoal : undefined} onCancel={() => setForm(null)} />}
+        {form && form !== 'list' && <GoalForm key={form?.edit?.goalId || 'new-' + (form?.type || '')} initial={form?.edit || form?.draft || undefined} live={(() => { const p = form?.edit && plan?.goals?.find((x) => x.goal.goalId === form.edit.goalId); return p ? { has: p.has, sip: p.sip } : undefined })()} defaultType={form?.type} onSave={saveGoal} onDelete={form?.edit ? removeGoal : undefined} onCancel={() => setForm(null)} />}
       </Modal>
       <Modal open={form === 'list'} onClose={() => setForm(null)} title="Edit goals">
         <div className="space-y-2">

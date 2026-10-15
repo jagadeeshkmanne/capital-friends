@@ -18,6 +18,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
+      input: { main: 'index.html', goalPlanner: 'goal-planner/index.html' },   // second page: public goal planner
       output: {
         manualChunks: {
           'ag-grid': ['ag-grid-community', 'ag-grid-react'],

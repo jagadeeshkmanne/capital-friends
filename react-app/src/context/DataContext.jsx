@@ -866,3 +866,11 @@ export function DataProvider({ children }) {
 export function useData() {
   return useContext(DataContext)
 }
+
+// Public pages (the goal planner) mount app forms without a signed-in user: empty lists, no settings, no-op actions.
+export function GuestDataProvider({ children }) {
+  const noop = async () => ({ success: true })
+  const value = { loading: false, activeMembers: [], members: [], settings: null, goalList: [], mfHoldings: [], mfPortfolios: [], stockPortfolios: [], otherInvList: [], liabilityList: [], banks: [],
+    addGoal: noop, updateGoal: noop, deleteGoal: noop, updateGoalMappings: noop }
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+}

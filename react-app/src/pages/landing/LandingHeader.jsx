@@ -37,13 +37,14 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
 }
 
 // Free calculators + feature pages (static HTML under /public): a dropdown on desktop, one "Tools" link on phones
-const TOOLS = [['/sip-calculator/', 'SIP calculator'], ['/step-up-sip-calculator/', 'Step-up SIP'], ['/lumpsum-calculator/', 'Lumpsum'], ['/swp-calculator/', 'SWP'], ['/xirr-calculator/', 'XIRR'], ['/cagr-calculator/', 'CAGR'],
-  ['/retirement-corpus-calculator/', 'Retirement corpus'], ['/fire-calculator/', 'FIRE'], ['/goal-sip-calculator/', 'Goal SIP'], ['/emergency-fund-calculator/', 'Emergency fund'], ['/net-worth-calculator/', 'Net worth']]
+const TOOLS = [['/sip-calculator/', 'SIP (+ step-up, + lumpsum)'], ['/lumpsum-calculator/', 'Lumpsum'], ['/swp-calculator/', 'SWP'], ['/xirr-calculator/', 'XIRR'], ['/cagr-calculator/', 'CAGR'],
+  ['/retirement-corpus-calculator/', 'Retirement corpus'], ['/fire-calculator/', 'FIRE'], ['/emergency-fund-calculator/', 'Emergency fund'], ['/net-worth-calculator/', 'Net worth']]
 const GUIDES = [['/mutual-fund-portfolio-tracker/', 'Mutual fund tracker'], ['/family-net-worth-tracker/', 'Family net worth'], ['/cams-cas-import/', 'CAMS CAS import'], ['/stock-portfolio-tracker/', 'Stock tracker'], ['/retirement-bucket-strategy/', 'Retirement buckets'], ['/goal-based-investing/', 'Goal planning']]
 function ToolsMenu({ isMobile }) {
   const [open, setOpen] = useState(false)
-  if (isMobile) return <a className="lh-tools" href="/tools/">Calculators</a>
-  return (
+  if (isMobile) return <span className="lh-mob"><a className="lh-tools" href="/goal-planner/">Goal planner</a><a className="lh-tools" href="/tools/">Calculators</a></span>
+  return (<>
+    <a className="lh-tools lh-gp" href="/goal-planner/">Goal planner</a>
     <div className={`lh-menu ${open ? 'open' : ''}`} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <a className="lh-tools" href="/tools/" aria-haspopup="true" aria-expanded={open} onFocus={() => setOpen(true)}>Free calculators <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg></a>
       <div className="lh-dd" role="menu">
@@ -51,13 +52,14 @@ function ToolsMenu({ isMobile }) {
         <div className="lh-col"><b>Guides</b>{GUIDES.map(([h, t]) => <a key={h} href={h} role="menuitem">{t}</a>)}<a href="/tools/" className="all">All free tools →</a></div>
       </div>
     </div>
-  )
+  </>)
 }
 
 const CSS = `
+.lh-gp{margin-left:14px;color:#a7f3d0}.lh-mob{display:inline-flex;margin-right:auto}.lh-mob .lh-tools{margin:0}
 .lh-tools{display:inline-flex;align-items:center;gap:6px;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;font-size:13.5px;font-weight:600;text-decoration:none;padding:8px 10px;border-radius:8px;white-space:nowrap}
 .lh-tools:hover{background:rgba(255,255,255,.08);color:#fff}
-.lh-menu{position:relative;margin-right:auto;margin-left:10px}
+.lh-menu{position:relative;margin-right:auto;margin-left:0}
 .lh-dd{position:absolute;left:0;top:100%;padding-top:8px;display:none;z-index:110}
 .lh-menu.open .lh-dd{display:block}
 .lh-dd>div{display:none}.lh-menu.open .lh-dd{display:flex;gap:0}

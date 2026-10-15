@@ -87,7 +87,7 @@ def head(p, url):
 def header():
     return """<header class="top"><div class="in">
 <a class="brand" href="/"><img src="/logo-new.png" alt="Capital Friends logo" /><span><b>Capital</b> <em>Friends</em></span></a>
-<nav class="nav"><a href="/tools/">Calculators</a><a href="/mutual-fund-portfolio-tracker/">Portfolio tracker</a><a href="/family-net-worth-tracker/">Family net worth</a><a href="/retirement-bucket-strategy/">Retirement</a><a class="go" href="/">Open the free app</a></nav>
+<nav class="nav"><a href="/goal-planner/">Goal planner</a><a href="/tools/">Calculators</a><a href="/mutual-fund-portfolio-tracker/">Portfolio tracker</a><a href="/family-net-worth-tracker/">Family net worth</a><a href="/retirement-bucket-strategy/">Retirement</a><a class="go" href="/">Open the free app</a></nav>
 </div></header>"""
 
 def footer(tools, feats):
@@ -95,7 +95,7 @@ def footer(tools, feats):
     f = ''.join(f'<a href="/{s}/">{PAGES[s]["nav"]}</a>' for s in feats)
     return f"""<footer class="bot"><div class="in">
 <div><b>Free calculators</b>{t}</div>
-<div><b>Capital Friends</b>{f}<a href="/">Open the app</a><a href="/donate">Support the project</a></div>
+<div><b>Capital Friends</b><a href="/goal-planner/">Goal planner (free)</a>{f}<a href="/">Open the app</a><a href="/donate">Support the project</a></div>
 <div><b>Trust</b><a href="/privacy/">Privacy policy</a><a href="/terms/">Terms</a><a href="https://github.com/jagadeeshkmanne/capital-friends" rel="noopener">Open source on GitHub</a><a href="https://www.youtube.com/@capitalfriendsin" rel="noopener">YouTube channel</a></div>
 <div class="legal">Capital Friends is a free, open-source family portfolio tracker. Your data stays in your own Google Drive. Calculators and content are for information only and are not investment advice. Mutual fund investments are subject to market risks; read all scheme related documents carefully. © {datetime.date.today().year} Jagadeesh Manne.</div>
 </div></footer>"""
@@ -162,12 +162,12 @@ def add(slug, **kw): PAGES[slug] = kw
 
 # ---- calculators ----
 add('sip-calculator', nav='SIP calculator', blurb='Monthly SIP → value after N years, with optional yearly step-up.',
- title='SIP Calculator – Monthly SIP Returns with Step-up (Free, India)',
- desc='Free SIP calculator for Indian mutual funds. See what a monthly SIP grows to in 5, 10 or 20 years, add a yearly step-up, and view the year-by-year table. No sign-up.',
- h1='SIP Calculator', lead='Find out what your monthly SIP can grow to. Enter the amount, the expected return and the number of years. Add a yearly step-up to see how raising your SIP with your salary changes the result.',
+ title='SIP Calculator – SIP, Step-up SIP and SIP + Lumpsum Returns (Free)',
+ desc='Free SIP calculator for Indian mutual funds: monthly SIP value after 5–30 years, with optional yearly step-up and a starting lumpsum (SIP + lumpsum), and a year-by-year table. No sign-up.',
+ h1='SIP Calculator', lead='Find out what your monthly SIP can grow to. Enter the amount, the expected return and the number of years. Add a yearly step-up to see how raising your SIP with your salary changes the result, or a starting lumpsum to combine both.',
  calc=dict(id='sip', out=['Estimated value', 'Total invested', 'Estimated returns'], fields=[
    field('f-amount', 'Monthly SIP (₹)', 10000, 500), field('f-rate', 'Expected return (% per year)', 12, 0.5, 'Equity funds have given 10–14% over long periods; use 7–8% for debt funds.'),
-   field('f-years', 'Investment period (years)', 15, 1), field('f-stepup', 'Yearly step-up (%)', 0, 1, 'Optional: increase the SIP every year, e.g. 10% when your income rises.')]),
+   field('f-years', 'Investment period (years)', 15, 1), '<div class="row">' + field('f-stepup', 'Yearly step-up (%)', 0, 1, 'Optional: raise the SIP every year, e.g. 10% with your salary.') + field('f-lump', 'Starting lumpsum (₹)', 0, 10000, 'Optional: money you invest today along with the SIP.') + '</div>']),
  body="""<h2>How the SIP calculator works</h2>
 <p>A SIP (Systematic Investment Plan) invests a fixed amount every month. Each instalment then compounds for the months left in your period, so early instalments grow the most. The calculator uses the standard SIP formula with monthly compounding:</p>
 <p><strong>Value = P × [((1 + r)<sup>n</sup> − 1) ÷ r] × (1 + r)</strong>, where P is the monthly SIP, r is the monthly rate (yearly return ÷ 12) and n is the number of months. With a step-up, the SIP amount is raised once a year and the same formula runs month by month.</p>
@@ -184,28 +184,7 @@ add('sip-calculator', nav='SIP calculator', blurb='Monthly SIP → value after N
       ('Is SIP better than lump sum?', 'A SIP spreads purchases over time, so you buy more units when prices are low. A lump sum works better when markets rise steadily. Most salaried investors use a SIP because income arrives monthly. Compare both with the <a href="/lumpsum-calculator/">lumpsum calculator</a>.'),
       ('How is SIP return calculated for an existing portfolio?', 'For money already invested, use XIRR, which accounts for the date of every instalment. The <a href="/xirr-calculator/">XIRR calculator</a> does this, and Capital Friends does it automatically from your CAMS statement.'),
       ('Does the calculator include tax?', 'No. Equity fund gains above ₹1.25 lakh a year are taxed at 12.5% (long term), so your take-home value will be a little lower.')],
- related=['step-up-sip-calculator', 'lumpsum-calculator', 'xirr-calculator', 'goal-sip-calculator', 'retirement-corpus-calculator', 'cagr-calculator'])
-
-add('step-up-sip-calculator', nav='Step-up SIP calculator', blurb='SIP that increases every year, compared with a flat SIP.',
- title='Step-up SIP Calculator – Yearly Increasing SIP Returns (Free)',
- desc='Free step-up SIP calculator: see how a SIP that rises 5–15% every year grows versus a flat SIP, with the year-by-year amounts. Built for Indian mutual fund investors.',
- h1='Step-up SIP Calculator', lead='A step-up (top-up) SIP raises your monthly instalment once a year, usually in line with your salary hike. Small yearly increases make a surprisingly large difference over 15–25 years.',
- calc=dict(id='sip', out=['Estimated value', 'Total invested', 'Estimated returns'], fields=[
-   field('f-amount', 'Starting monthly SIP (₹)', 10000, 500), field('f-stepup', 'Yearly step-up (%)', 10, 1, 'Set this to 0 to see the flat-SIP result.'),
-   field('f-rate', 'Expected return (% per year)', 12, 0.5), field('f-years', 'Investment period (years)', 20, 1)]),
- body="""<h2>How a step-up SIP is calculated</h2>
-<p>The calculator runs month by month. Every 12 months the SIP amount is multiplied by (1 + step-up %), and each instalment compounds at the monthly rate until the end of the period. The table shows the SIP amount in force each year, the total you have put in, and the value.</p>
-<h2>Flat SIP vs step-up SIP</h2>
-<p>₹10,000 a month at 12% for 20 years gives about ₹1 crore. The same SIP stepped up 10% a year gives about ₹1.9 crore, because the later, larger instalments still get 10–15 years of compounding. Your total outlay also rises, so check the table and make sure the year-15 SIP is something your future income can carry.</p>
-<h2>How to set up a step-up SIP in practice</h2>
-<ol class="steps"><li>Decide the step-up as a percentage of your expected yearly raise, not the whole raise. 5–10% is realistic.</li>
-<li>Most AMCs and platforms (Zerodha Coin, Groww, Kuvera, MF Central) let you set a top-up SIP once, so it rises automatically.</li>
-<li>Track the actual instalments, not the plan. Capital Friends reads every SIP from your CAMS statement and shows the real money-in and XIRR.</li></ol>""",
- faq=[('What is a good step-up percentage?', 'Match it to your expected salary growth: 5–10% a year for most salaried investors. A 15% step-up is aggressive and hard to sustain for 20 years.'),
-      ('Is a step-up SIP better than starting with a bigger SIP?', 'If you can afford the bigger SIP today, start bigger. The step-up is for people whose income will grow; it lets today\'s SIP stay affordable while the plan still reaches the goal.'),
-      ('Can I step up an existing SIP?', 'Yes. Either register a new SIP for the extra amount, or use the top-up option your platform offers. Both show up as separate SIP transactions in your CAMS statement.'),
-      ('Does the calculator use annual or monthly compounding?', 'Monthly. Each instalment compounds at the yearly return divided by 12, which is how SIP calculators on AMFI and AMC sites work.')],
- related=['sip-calculator', 'lumpsum-calculator', 'goal-sip-calculator', 'retirement-corpus-calculator', 'xirr-calculator', 'fire-calculator'])
+ related=['lumpsum-calculator', 'xirr-calculator', 'retirement-corpus-calculator', 'cagr-calculator'])
 
 add('lumpsum-calculator', nav='Lumpsum calculator', blurb='One-time investment → future value at a given return.',
  title='Lumpsum Calculator – Mutual Fund One-time Investment Returns (Free)',
@@ -223,7 +202,7 @@ add('lumpsum-calculator', nav='Lumpsum calculator', blurb='One-time investment �
       ('What return should I use?', 'Use 10–12% for equity funds, 7–8% for debt, 9–10% for hybrid, and a lower number if you want a conservative plan.'),
       ('Does the calculator include exit load or tax?', 'No. Equity funds held over a year attract 12.5% long-term capital gains tax on gains above ₹1.25 lakh a year; exit loads usually apply only in the first year.'),
       ('Can some funds refuse a lumpsum?', 'Yes. Several international funds and some funds with very large AUM stop fresh lumpsum investments from time to time. Capital Friends lets you mark such funds so rebalancing suggestions skip them.')],
- related=['sip-calculator', 'cagr-calculator', 'swp-calculator', 'goal-sip-calculator', 'xirr-calculator', 'fire-calculator'])
+ related=['sip-calculator', 'cagr-calculator', 'swp-calculator', 'xirr-calculator', 'fire-calculator'])
 
 add('swp-calculator', nav='SWP calculator', blurb='How long a corpus lasts with monthly withdrawals.',
  title='SWP Calculator – Systematic Withdrawal Plan, Monthly Income from a Corpus',
@@ -313,7 +292,7 @@ add('retirement-corpus-calculator', nav='Retirement corpus calculator', blurb='C
       ('What withdrawal rate is safe in India?', 'Around 3.5–4% of the corpus in the first year, rising with inflation. Higher inflation in India argues for the lower end, or for keeping part of the corpus in equity after retiring.'),
       ('Should I count EPF and NPS?', 'Yes, they are retirement money. Capital Friends counts EPF, PPF and NPS for the retirement goal only and never includes them in a sell step, since they pay out on their own rules.'),
       ('What if I cannot invest the SIP the calculator shows?', 'Start with what you can and step it up every year, push the retirement age a little, or lower planned expenses. Re-run the calculation yearly; small corrections early are far cheaper than big ones late.')],
- related=['swp-calculator', 'fire-calculator', 'sip-calculator', 'step-up-sip-calculator', 'retirement-bucket-strategy', 'emergency-fund-calculator'])
+ related=['swp-calculator', 'fire-calculator', 'sip-calculator', 'retirement-bucket-strategy', 'emergency-fund-calculator'])
 
 add('emergency-fund-calculator', nav='Emergency fund calculator', blurb='Months of expenses you should keep aside, and where.',
  title='Emergency Fund Calculator – How Much to Keep Aside (India)',
@@ -333,7 +312,7 @@ add('emergency-fund-calculator', nav='Emergency fund calculator', blurb='Months 
       ('Should the emergency fund be in a liquid fund or FD?', 'Both work. A liquid fund has no penalty for early withdrawal and is taxed only on gains; an FD is simpler and insured up to ₹5 lakh per bank. Many people split it.'),
       ('Should I build the emergency fund before starting SIPs?', 'Build at least 2–3 months first, then run both in parallel. A SIP you have to stop in an emergency costs more than a delayed start.'),
       ('Does the emergency fund count towards my goals?', 'Keep it separate. In Capital Friends it is its own goal, funded first from the safest assets, and excluded from rebalancing.')],
- related=['retirement-corpus-calculator', 'goal-sip-calculator', 'sip-calculator', 'net-worth-calculator', 'fire-calculator', 'swp-calculator'])
+ related=['retirement-corpus-calculator', 'sip-calculator', 'net-worth-calculator', 'fire-calculator', 'swp-calculator'])
 
 add('fire-calculator', nav='FIRE calculator', blurb='Your FIRE number and the age you can stop working.',
  title='FIRE Calculator India – Your FIRE Number and Retire-early Age',
@@ -354,28 +333,7 @@ add('fire-calculator', nav='FIRE calculator', blurb='Your FIRE number and the ag
       ('Is the 4% rule valid in India?', 'It is a starting point. Because of higher inflation and the long horizon of early retirement, 3–3.5% is safer. Each 0.5% lower adds roughly 4 years of expenses to the target.'),
       ('Should I include my house in FIRE?', 'No, unless you plan to sell it. A home you live in does not generate the cash you will spend.'),
       ('How do I draw down after FIRE?', 'Use a bucket strategy: 2 years of expenses in safe funds, 5 years in hybrid/debt, the rest in equity, refilled in good years. Capital Friends runs this on your actual portfolio.')],
- related=['retirement-corpus-calculator', 'swp-calculator', 'step-up-sip-calculator', 'cagr-calculator', 'retirement-bucket-strategy', 'net-worth-calculator'])
-
-add('goal-sip-calculator', nav='Goal SIP calculator', blurb='SIP needed for a child\'s education, a house or any goal.',
- title='Goal SIP Calculator – SIP Needed for Child Education, House or Any Goal',
- desc='Free goal planning calculator: enter today\'s cost, years to the goal and inflation to see the future cost and the monthly SIP or lumpsum needed. Child education, house down payment, car, wedding.',
- h1='Goal SIP Calculator', lead='Turn a goal into a monthly number. Enter what it costs today and how far away it is; the calculator inflates the cost, credits what you have already saved, and gives the SIP that closes the gap.',
- calc=dict(id='goal', out=['Cost of the goal when it comes', 'SIP needed per month', 'Or invest today (lumpsum)'], fields=[
-   field('f-cost', 'Cost today (₹)', 2500000, 50000, 'e.g. a 4-year engineering course, a house down payment, a car.'), '<div class="row">' + field('f-years', 'Years to the goal', 10, 1) + field('f-inflation', 'Inflation for this goal (%)', 8, 0.5, 'Education inflates faster (8–10%) than general prices (6%).') + '</div>',
-   '<div class="row">' + field('f-rate', 'Expected return (%)', 11, 0.5) + field('f-have', 'Already saved for it (₹)', 300000, 10000) + '</div>']), cta='goal',
- body="""<h2>How the goal calculation works</h2>
-<ol class="steps"><li>Today's cost is inflated to the goal year: ₹25 lakh at 8% for 10 years is about ₹54 lakh.</li>
-<li>Money already saved is grown at the expected return and subtracted.</li>
-<li>The gap is converted into a monthly SIP (or a one-time investment today) at the expected return.</li></ol>
-<h2>Which return to use for which goal</h2>
-<ul><li><strong>Under 3 years</strong>: debt or arbitrage funds, 6–7%. Equity is too risky this close.</li><li><strong>3–7 years</strong>: hybrid or balanced advantage, 9–10%.</li><li><strong>7+ years</strong>: mostly equity, 11–12%, moving to safer funds as the date comes near.</li></ul>
-<h2>The glide path: moving money as the goal comes near</h2>
-<p>A goal that is 100% equity three months before college is a gamble. Capital Friends gives each goal a road: far goals get the equity, near goals get the safe money, and the app shows how much to shift each year so the money is safe by the time you need it. For a child's education it even sets the date from the child's age and the course.</p>""",
- faq=[('What inflation rate should I use for education?', 'Private college fees in India have risen 8–10% a year; use 10% for professional courses and foreign education, 8% for general degrees.'),
-      ('Can one SIP serve several goals?', 'You can invest in one place and let a tracker split it. Capital Friends shares your investments across all goals automatically: the emergency fund and near goals get the safe money, far goals get the equity.'),
-      ('Is a lumpsum better than a SIP for a goal?', 'If you have the money now, investing it today needs much less than a SIP spread over the years, because it compounds longer. The calculator shows both numbers.'),
-      ('When should I move a goal from equity to debt?', 'Start about 5 years before the date and shift a little each year, preferably in good market years, so you are never forced to sell in a crash.')],
- related=['sip-calculator', 'step-up-sip-calculator', 'lumpsum-calculator', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'goal-based-investing'])
+ related=['retirement-corpus-calculator', 'swp-calculator', 'cagr-calculator', 'retirement-bucket-strategy', 'net-worth-calculator'])
 
 add('net-worth-calculator', nav='Net worth calculator', blurb='Assets minus loans, the number that shows real progress.',
  title='Net Worth Calculator India – Assets Minus Loans (Free)',
@@ -524,15 +482,15 @@ add('goal-based-investing', nav='Goal-based investing', blurb='Goals on a road, 
 <li><strong>Follow the road.</strong> Each goal shows have-today versus need-today, on track or not, the funds counted for it, and the year-by-year plan to shift from equity to safe.</li></ol>
 <h2>Why a glide path matters</h2>
 <p>A ₹47 lakh college fee due in 2033 should not be 100% in equity in 2032. The app starts shifting five years out, a little each year and only in good markets, so a bad year right before the date does not cut the corpus by a third.</p>
-<h2>Start with a calculator</h2>
-<p>Try the <a href="/goal-sip-calculator/">goal SIP calculator</a> for a single goal, the <a href="/retirement-corpus-calculator/">retirement corpus calculator</a>, or the <a href="/emergency-fund-calculator/">emergency fund calculator</a>. Then open the app to run the same numbers on your real funds.</p>""", cta='goal',
+<h2>Start with the planner</h2>
+<p>Try the <a href="/goal-planner/">goal planner</a> (the app's own planner, no sign-in to plan), the <a href="/retirement-corpus-calculator/">retirement corpus calculator</a>, or the <a href="/emergency-fund-calculator/">emergency fund calculator</a>. Then sign in to run the same numbers on your real funds.</p>""", cta='goal',
  faq=[('Can I have many goals at once?', 'Yes. Retirement, two children\'s education and an emergency fund on one road is the normal setup. The app prioritises the emergency fund first, then goals by date and priority.'),
       ('Do I have to assign each fund to a goal?', 'No. Tick which investments are for goals in general; the app divides them by what each goal needs and how far away it is.'),
       ('What if I am not on track?', 'The goal shows the gap and the extra SIP that would close it. You can also move the date, change the priority or lower the target.'),
       ('Does it include EPF and PPF?', 'For the retirement goal only. They are never part of a sell or switch step.')],
- related=['goal-sip-calculator', 'retirement-bucket-strategy', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'mutual-fund-portfolio-tracker', 'family-net-worth-tracker'])
+ related=['retirement-bucket-strategy', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'mutual-fund-portfolio-tracker', 'family-net-worth-tracker'])
 
-TOOLS = ['sip-calculator', 'step-up-sip-calculator', 'lumpsum-calculator', 'swp-calculator', 'cagr-calculator', 'xirr-calculator', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'fire-calculator', 'goal-sip-calculator', 'net-worth-calculator']
+TOOLS = ['sip-calculator', 'lumpsum-calculator', 'swp-calculator', 'cagr-calculator', 'xirr-calculator', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'fire-calculator', 'net-worth-calculator']
 FEATS = ['mutual-fund-portfolio-tracker', 'family-net-worth-tracker', 'cams-cas-import', 'stock-portfolio-tracker', 'retirement-bucket-strategy', 'goal-based-investing']
 
 # tools index
@@ -541,7 +499,7 @@ add('tools', nav='All calculators', blurb='',
  desc='Free, no-login financial calculators for Indian investors: SIP and step-up SIP, lumpsum, SWP, CAGR, XIRR, retirement corpus, emergency fund, FIRE, goal SIP and net worth. By Capital Friends, the free family portfolio tracker.',
  h1='Free Financial Calculators', lead='Plain calculators with the formula explained, no sign-up and no ads. When you want the same numbers on your real portfolio, open the free Capital Friends app.',
  body='<div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in TOOLS) + '</div>'
-      '<h2>Then track the real thing</h2><div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in FEATS) + '</div>',
+      '<h2>Plan a goal with the real planner</h2><div class="cards"><div class="card"><a href="/goal-planner/">Goal planner</a><p>Retirement, child education, a house or any goal: the app\'s own planner, free, no sign-in to plan.</p></div></div><h2>Then track the real thing</h2><div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in FEATS) + '</div>',
  faq=[('Are these calculators free?', 'Yes, free with no login and no ads. They run in your browser; nothing you type is sent anywhere.'),
       ('How accurate are they?', 'They use standard formulas (monthly-compounded SIP, compound growth, XIRR by bisection). Results depend on the return and inflation you assume.'),
       ('Can I use the numbers for my own portfolio?', 'Yes: Capital Friends, the free app behind these pages, applies the same maths to your real mutual funds, stocks, EPF and FDs for the whole family.')],
@@ -558,7 +516,7 @@ def main():
         d = os.path.join(ROOT, slug); os.makedirs(d, exist_ok=True)
         open(os.path.join(d, 'index.html'), 'w').write(page(slug, p, TOOLS, FEATS))
         urls.append((slug + '/', TODAY, '0.8' if slug in TOOLS or slug == 'tools' else '0.9'))
-    urls += [('privacy/', TODAY, '0.3'), ('terms/', TODAY, '0.3'), ('donate', TODAY, '0.4')]
+    urls += [('goal-planner/', TODAY, '0.9'), ('privacy/', TODAY, '0.3'), ('terms/', TODAY, '0.3'), ('donate', TODAY, '0.4')]
     sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(
         f'  <url><loc>{SITE}/{u}</loc><lastmod>{m}</lastmod><priority>{pr}</priority></url>\n' for u, m, pr in urls) + '</urlset>\n'
     open(os.path.join(ROOT, 'sitemap.xml'), 'w').write(sm)

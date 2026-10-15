@@ -21,8 +21,8 @@
   var setText = function (id, t) { var e = $(id); if (e) e.textContent = t; };
 
   // ---------- maths ----------
-  function sipFV(p, annualPct, years, stepUpPct) {
-    var r = annualPct / 100 / 12, n = Math.round(years * 12), fv = 0, inv = 0, rows = [], m = p;
+  function sipFV(p, annualPct, years, stepUpPct, lump) {
+    var r = annualPct / 100 / 12, n = Math.round(years * 12), fv = lump || 0, inv = lump || 0, rows = [], m = p;
     for (var i = 1; i <= n; i++) {
       if (stepUpPct && i > 1 && (i - 1) % 12 === 0) m = m * (1 + stepUpPct / 100);
       fv = (fv + m) * (1 + r); inv += m;
@@ -69,10 +69,10 @@
   // ---------- calculators ----------
   var C = {
     sip: function () {
-      var p = num('f-amount'), r = num('f-rate'), y = num('f-years'), s = num('f-stepup');
-      var o = sipFV(p, r, y, s);
+      var p = num('f-amount'), r = num('f-rate'), y = num('f-years'), s = num('f-stepup'), l = num('f-lump');
+      var o = sipFV(p, r, y, s, l);
       setText('r-value', short(o.fv)); setText('r-invested', short(o.invested)); setText('r-gain', short(o.fv - o.invested));
-      setText('r-note', 'Invest ' + fmt(p) + ' a month' + (s ? ', increasing ' + s + '% every year,' : '') + ' for ' + y + ' years at ' + r + '% a year and you could have about ' + fmt(o.fv) + '.');
+      setText('r-note', (l ? fmt(l) + ' today, plus ' : 'Invest ') + fmt(p) + ' a month' + (s ? ', increasing ' + s + '% every year,' : '') + ' for ' + y + ' years at ' + r + '% a year gives about ' + fmt(o.fv) + '.');
       bar('r-bar', o.invested, o.fv - o.invested, 'Invested', 'Returns');
       table('r-table', ['Year', 'Monthly SIP', 'Total invested', 'Value'], o.rows.map(function (x) { return [x.year, fmt(x.sip), short(x.invested), short(x.value)]; }));
     },

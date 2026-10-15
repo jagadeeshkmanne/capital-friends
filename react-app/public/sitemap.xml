@@ -2,7 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://capitalfriends.in/</loc><lastmod>2026-10-15</lastmod><priority>1.0</priority></url>
   <url><loc>https://capitalfriends.in/sip-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
-  <url><loc>https://capitalfriends.in/step-up-sip-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/lumpsum-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/swp-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/cagr-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
@@ -10,7 +9,6 @@
   <url><loc>https://capitalfriends.in/retirement-corpus-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/emergency-fund-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/fire-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
-  <url><loc>https://capitalfriends.in/goal-sip-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/net-worth-calculator/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://capitalfriends.in/mutual-fund-portfolio-tracker/</loc><lastmod>2026-10-15</lastmod><priority>0.9</priority></url>
   <url><loc>https://capitalfriends.in/family-net-worth-tracker/</loc><lastmod>2026-10-15</lastmod><priority>0.9</priority></url>
@@ -19,6 +17,7 @@
   <url><loc>https://capitalfriends.in/retirement-bucket-strategy/</loc><lastmod>2026-10-15</lastmod><priority>0.9</priority></url>
   <url><loc>https://capitalfriends.in/goal-based-investing/</loc><lastmod>2026-10-15</lastmod><priority>0.9</priority></url>
   <url><loc>https://capitalfriends.in/tools/</loc><lastmod>2026-10-15</lastmod><priority>0.8</priority></url>
+  <url><loc>https://capitalfriends.in/goal-planner/</loc><lastmod>2026-10-15</lastmod><priority>0.9</priority></url>
   <url><loc>https://capitalfriends.in/privacy/</loc><lastmod>2026-10-15</lastmod><priority>0.3</priority></url>
   <url><loc>https://capitalfriends.in/terms/</loc><lastmod>2026-10-15</lastmod><priority>0.3</priority></url>
   <url><loc>https://capitalfriends.in/donate</loc><lastmod>2026-10-15</lastmod><priority>0.4</priority></url>
