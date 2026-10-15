@@ -20,9 +20,26 @@ header.top{position:sticky;top:0;z-index:50;background:rgba(10,15,31,.98);border
 header.top .in{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:56px}
 .brand{display:flex;align-items:center;gap:8px;font-family:'Poppins',sans-serif;font-size:17px;letter-spacing:-.3px}
 .brand img{height:40px}.brand b{color:#fff;font-weight:700}.brand em{color:#34d399;font-weight:800;font-style:normal}
-.nav a{color:#cbd5e1;font-size:13px;margin-left:16px}.nav a.go{background:#10b981;color:#06281b;font-weight:700;padding:7px 14px;border-radius:8px}
-.nav a.go:hover{background:#34d399;text-decoration:none}
-@media(max-width:640px){.nav a:not(.go){display:none}}
+.nav{display:flex;align-items:center;gap:2px}
+.nav>a,.menu>a{display:inline-flex;align-items:center;gap:6px;color:#e2e8f0;font-size:13.5px;font-weight:600;padding:8px 10px;border-radius:8px;white-space:nowrap}
+.nav>a:hover,.menu>a:hover,.menu:hover>a,.menu:focus-within>a{background:rgba(255,255,255,.08);color:#fff;text-decoration:none}
+.nav a.gp{color:#a7f3d0}.nav a.on,.menu>a.on{color:#fff;box-shadow:inset 0 -2px 0 #34d399;border-radius:8px 8px 0 0}
+.nav a.go{background:#10b981;color:#06281b;font-weight:700;padding:7px 14px;border-radius:8px;margin-left:8px}.nav a.go:hover{background:#34d399}
+.menu{position:relative}.menu svg{width:10px;height:10px}
+.dd{position:absolute;left:0;top:100%;padding-top:8px;display:none;z-index:110}.menu:hover .dd,.menu:focus-within .dd{display:block}
+.dd .col{display:flex;flex-direction:column;min-width:210px;padding:12px 8px;background:#fff;border-radius:12px;box-shadow:0 18px 40px -12px rgba(15,23,42,.35),0 0 0 1px #e2e8f0}
+.dd a{font-size:13.5px;color:#0f172a;padding:6px 10px;border-radius:7px;white-space:nowrap}.dd a:hover{background:#f1f5f9;text-decoration:none}.dd a.cur{background:#ecfdf5;color:#047857;font-weight:700}
+.dd a.all{color:#059669;font-weight:700;margin-top:6px}
+.burger{display:none}
+@media(max-width:760px){
+ .nav{display:none}
+ .burger{display:block;position:relative}.burger summary{list-style:none;cursor:pointer;width:40px;height:40px;display:grid;place-items:center;border-radius:8px;color:#e2e8f0}.burger summary::-webkit-details-marker{display:none}
+ .burger[open] summary{background:rgba(255,255,255,.1)}
+ .burger .sheet{position:absolute;right:0;top:48px;width:min(92vw,340px);max-height:calc(100vh - 70px);overflow:auto;background:#fff;border-radius:14px;box-shadow:0 18px 40px -12px rgba(15,23,42,.45),0 0 0 1px #e2e8f0;padding:10px}
+ .burger .sheet b{display:block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;padding:10px 10px 4px}
+ .burger .sheet a{display:block;font-size:14px;color:#0f172a;padding:8px 10px;border-radius:8px}.burger .sheet a:hover{background:#f1f5f9;text-decoration:none}.burger .sheet a.cur{background:#ecfdf5;color:#047857;font-weight:700}
+ .burger .sheet a.go{background:#10b981;color:#06281b;font-weight:700;text-align:center;margin:8px 0 2px}
+}
 main{max-width:1100px;margin:0 auto;padding:28px 16px 56px}
 .crumbs{font-size:12.5px;color:#64748b;margin-bottom:14px}.crumbs a{color:#64748b}
 h1{font-family:'Poppins',sans-serif;font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.5px;margin-bottom:10px}
@@ -105,14 +122,44 @@ CSS += r"""
 .note-box{background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;color:#78350f;font-size:14px}
 .defs dt{font-weight:700;margin-top:10px}.defs dd{margin:2px 0 0 0;color:#334155}
 .upd{font-size:12.5px;color:#64748b;margin-top:26px}
+.gwrap{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:32px;align-items:start}.gwrap article{min-width:0}
+.gside{position:sticky;top:72px;max-height:calc(100vh - 84px);overflow:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin}
+.gside .box{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 12px}.gside b{display:block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;padding:0 8px 8px}
+.gside .box a{display:flex;align-items:center;gap:9px;font-size:13.5px;color:#0f172a;padding:6px 8px;border-radius:8px;line-height:1.3}.gside .box a:hover{background:#f1f5f9;text-decoration:none}
+.gside .box a i{flex:none;width:22px;height:22px;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:11px;font-weight:700;font-style:normal;display:grid;place-items:center}
+.gside .box a.cur{background:#ecfdf5;color:#047857;font-weight:700}.gside .box a.cur i{background:#10b981;color:#06281b}
+.gside .dark{background:#0b1220;border-color:#0b1220}.gside .dark b{color:#94a3b8}.gside .dark p{color:#cbd5e1;font-size:13px;padding:0 8px;margin-bottom:10px}
+.gside .dark a.go{display:block;background:#10b981;color:#06281b;font-weight:700;text-align:center;padding:10px;border-radius:10px}.gside .dark a.go:hover{background:#34d399}
+.pn{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}.pn a{display:block;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;font-weight:700;color:#0f172a}
+.pn a:hover{border-color:#10b981;text-decoration:none}.pn a small{display:block;font-size:11.5px;font-weight:600;color:#64748b;margin-bottom:2px}.pn a.next{text-align:right}
+@media(max-width:1000px){.gwrap{grid-template-columns:1fr}.gside{position:static}.gside .box{columns:2;column-gap:8px}.gside .box b,.gside .dark{column-span:all}.gside .box a{break-inside:avoid}}
+@media(max-width:560px){.gside .box{columns:1}.pn{grid-template-columns:1fr}.pn a.next{text-align:left}}
 .art-h{margin-top:34px}.art-h+.art{margin-top:12px}
 h2[id]{scroll-margin-top:72px}
 """ + ART_CSS
 
-def header():
-    return """<header class="top"><div class="in">
+# The menus come from the app's own landing header (src/pages/landing/LandingHeader.jsx), so the static pages and the app never drift apart.
+def _menu_lists():
+    src = open(os.path.join(os.path.dirname(__file__), '..', 'src', 'pages', 'landing', 'LandingHeader.jsx')).read()
+    def arr(name):
+        m = re.search(name + r' = \[(.*?)\]\s*\n', src, re.S)
+        return re.findall(r"\['(/[^']+/)', '([^']+)'\]", m.group(1))
+    return arr('const TOOLS'), arr('const GUIDES')
+MENU_TOOLS, MENU_GUIDES = _menu_lists()
+CHEV = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>'
+def header(cur=''):
+    here = f'/{cur}/' if cur else ''
+    def items(lst, allh, allt):
+        return ''.join(f'<a href="{h}"{" class=cur" if h == here else ""}>{t}</a>' for h, t in lst) + f'<a href="{allh}" class="all">{allt} →</a>'
+    def drop(href, label, lst, allt):
+        on = ' on' if here == href or any(h == here for h, _ in lst) else ''
+        return f'<div class="menu"><a href="{href}" class="{on.strip()}" aria-haspopup="true">{label} {CHEV}</a><div class="dd"><div class="col">{items(lst, href, allt)}</div></div></div>'
+    sheet = ('<b>Plan</b><a href="/goal-planner/">Goal planner (free)</a><b>Free calculators</b>' + ''.join(f'<a href="{h}"{" class=cur" if h == here else ""}>{t}</a>' for h, t in MENU_TOOLS) + '<a href="/tools/">All calculators →</a>'
+             '<b>Guides</b>' + ''.join(f'<a href="{h}"{" class=cur" if h == here else ""}>{t}</a>' for h, t in MENU_GUIDES) + '<a href="/guides/">All guides →</a><a class="go" href="/">Open the free app</a>')
+    return f"""<header class="top"><div class="in">
 <a class="brand" href="/"><img src="/logo-new.png" alt="Capital Friends logo" /><span><b>Capital</b> <em>Friends</em></span></a>
-<nav class="nav"><a href="/goal-planner/">Goal planner</a><a href="/tools/">Calculators</a><a href="/guides/">Guides</a><a class="go" href="/">Open the free app</a></nav>
+<nav class="nav" aria-label="Site"><a href="/goal-planner/" class="gp{' on' if here == '/goal-planner/' else ''}">Goal planner</a>{drop('/tools/', 'Free calculators', MENU_TOOLS, 'All calculators')}{drop('/guides/', 'Guides', MENU_GUIDES, 'All guides')}<a class="go" href="/">Open the free app</a></nav>
+<details class="burger"><summary aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></summary><div class="sheet">{sheet}</div></details>
 </div></header>"""
 
 def footer(tools, feats):
@@ -208,19 +255,26 @@ def page(slug, p, tools, feats):
     t, d, b = CTA[p.get('cta', 'default')]
     pvk = p.get('preview')
     body = p['body'] + (preview(*pvk) if pvk else '')
+    side = ''
     if p.get('guide'):
         heads = re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', body)
         toc = '<nav class="toc" aria-label="In this guide"><b>In this guide</b>' + ''.join(f'<a href="#{i}">{re.sub("<[^>]+>", "", t)}</a>' for i, t in heads) + '</nav>'
+        k = feats.index(slug) if slug in feats else -1
+        prev_ = feats[k - 1] if k > 0 else None; next_ = feats[k + 1] if 0 <= k < len(feats) - 1 else None
+        pn = '<nav class="pn" aria-label="Guides">' + (f'<a class="prev" href="/{prev_}/"><small>← Previous guide</small>{PAGES[prev_]["nav"]}</a>' if prev_ else '<span></span>') + \
+             (f'<a class="next" href="/{next_}/"><small>Next guide →</small>{PAGES[next_]["nav"]}</a>' if next_ else '<span></span>') + '</nav>'
         body = _art(slug) + toc + body
-        body += f'<p class="upd">Last updated {datetime.date.today().strftime("%d %b %Y")} · by Jagadeesh Manne, who built Capital Friends for his own family.</p>'
-    html = head(p, url) + '<body>' + header() + '<main>' + \
+        body += f'<p class="upd">Last updated {datetime.date.today().strftime("%d %b %Y")} · by Jagadeesh Manne, who built Capital Friends for his own family.</p>' + pn
+        side = '<aside class="gside"><div class="box"><b>All guides</b>' + ''.join(f'<a href="/{g}/"{" class=cur" if g == slug else ""}><i>{n + 1}</i>{PAGES[g]["nav"]}</a>' for n, g in enumerate(feats)) + '</div>' + \
+               '<div class="box dark"><b>Free app</b><p>Everything in these guides is in Capital Friends. Your data stays in your Google Drive.</p><a class="go" href="/">Open the free app →</a></div></aside>'
+    html = head(p, url) + '<body>' + header(slug) + '<main>' + \
         f'<div class="crumbs"><a href="/">Capital Friends</a> › {"<a href=/tools/>Calculators</a> › " if p.get("calc") else ("<a href=/guides/>Guides</a> › " if slug in FEATS else "")}{p["h1"]}</div>' + \
-        f'<h1>{p["h1"]}</h1><p class="lead">{p["lead"]}</p>' + \
+        f'<h1>{p["h1"]}</h1><p class="lead">{p["lead"]}</p>' + ('<div class="gwrap"><article>' if side else '') + \
         (calc_html(p) + '<h2 class="art-h">How it works, in one picture</h2>' + _art(slug) if p.get('calc') else ('' if p.get('guide') else _art(slug))) + body + \
         f'<div class="cta"><div><h2>{t}</h2><p>{d}</p></div><a href="{APP_CTA}">{b} →</a></div>' + \
         faq_html(p['faq']) + related(p['related'], 'Read next' if p.get('guide') else 'More free tools') + \
         '<p class="disc">Calculators use the inputs you enter and standard formulas; results are estimates, not guarantees. Returns from mutual funds, stocks and other investments are not fixed and can be lower than assumed. Capital Friends is a tracking tool and is not a SEBI-registered investment adviser; nothing here is a recommendation to buy or sell any security.</p>' + \
-        '</main>' + footer(tools, feats) + ('<script src="/seo/calc.js" defer></script>' if p.get('calc') else '') + '</body></html>'
+        ('</article>' + side + '</div>' if side else '') + '</main>' + footer(tools, feats) + ('<script src="/seo/calc.js" defer></script>' if p.get('calc') else '') + '</body></html>'
     return html
 
 # ─────────────────────────── pages ───────────────────────────
