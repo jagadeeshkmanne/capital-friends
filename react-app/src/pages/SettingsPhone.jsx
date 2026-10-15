@@ -38,6 +38,7 @@ export default function SettingsPhone() {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [daily, setDaily] = useState(null)
+  const [jobs, setJobs] = useState(null)
   const [importBeta, setImportBeta] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [sending, setSending] = useState(false)
@@ -51,7 +52,7 @@ export default function SettingsPhone() {
 
   useEffect(() => {
     let alive = true
-    const check = () => api.getDailyJobsStatus().then((r) => alive && setDaily(r && !r.unknown ? !!r.sync : null)).catch(() => alive && setDaily(null))
+    const check = () => api.getDailyJobsStatus().then((r) => { if (alive) { setDaily(r && !r.unknown ? !!r.sync : null); setJobs(r && !r.unknown ? r : null) } }).catch(() => alive && setDaily(null))
     check(); window.addEventListener('focus', check)
     api.importEnabled().then((r) => alive && setImportBeta(!!r?.enabled)).catch(() => {})
     return () => { alive = false; window.removeEventListener('focus', check) }
@@ -116,6 +117,20 @@ export default function SettingsPhone() {
           <Ico I={Clock} c="#a78bfa" /><IonLabel><h3 className="!text-[15px] !font-semibold">Daily updates</h3><p>Prices and the family email every day, even with the app closed</p></IonLabel>
           {daily != null && <IonBadge slot="end" color={daily ? 'success' : 'warning'}>{daily ? 'ON' : 'OFF'}</IonBadge>}
         </IonItem>
+        {jobs && (
+          <IonItem lines="full">
+            <IonLabel className="ion-text-wrap">
+              <p className="!text-[12px]">
+                <span style={{ color: jobs.sync ? '#34d399' : '#fbbf24' }}>● Price updates {jobs.sync ? 'on' : 'off'}</span>{'  '}
+                <span style={{ color: jobs.email ? '#34d399' : '#fbbf24' }}>● Family email {jobs.email ? 'on' : (jobs.emailConfigured ? 'off' : 'off in Email reports')}</span>{'  '}
+                <span style={{ color: jobs.reminders ? '#34d399' : '#fbbf24' }}>● Reminders {jobs.reminders ? 'on' : 'off'}</span>
+              </p>
+              {jobs.authorized === false && <p className="!text-[12px]" style={{ color: '#fbbf24' }}>Google permission missing (a box was unticked at sign-in). <a href={jobs.authUrl || '#'} target="_blank" rel="noopener" style={{ color: '#fbbf24', textDecoration: 'underline' }}>Allow on Google</a>, then tap Daily updates again.</p>}
+              {!jobs.sync && jobs.authorized !== false && <p className="!text-[12px]">Not turned on yet{jobs.account ? ` for ${jobs.account}` : ''}. Tap Daily updates: a Google page opens; sign in with the same account and keep it open until it says all three are on.</p>}
+              {jobs.lastEmail && <p className="!text-[12px]" style={{ color: jobs.lastEmail.ok ? undefined : '#fbbf24' }}>Last email: {new Date(jobs.lastEmail.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{jobs.lastEmail.ok ? ` · sent to ${jobs.lastEmail.sent}` : ` · failed: ${jobs.lastEmail.error || 'unknown error'}`}</p>}
+            </IonLabel>
+          </IonItem>
+        )}
         {importBeta && <IonItem button detail onClick={() => navigate('/import')}><Ico I={FileUp} /><IonLabel><h3 className="!text-[15px] !font-semibold">Import statement</h3><p>All mutual fund transactions from a CAMS PDF</p></IonLabel></IonItem>}
       </IonList>
 

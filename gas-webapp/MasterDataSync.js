@@ -590,7 +590,11 @@ function getMyDailyJobsStatus() {
       email: names.indexOf('sendScheduledDailyEmail') !== -1,
       emailConfigured: emailOn,
       reminders: names.indexOf('checkAndSendReminders') !== -1,
-      lastEmail: (function () { try { var v = getSetting('EmailLastRun'); return v ? JSON.parse(v) : null; } catch (e) { return null; } })()
+      lastEmail: (function () { try { var v = getSetting('EmailLastRun'); return v ? JSON.parse(v) : null; } catch (e) { return null; } })(),
+      // has this user granted every permission the background jobs need? (a scope unticked at sign-in makes sends fail)
+      authorized: (function () { try { return ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL).getAuthorizationStatus() !== ScriptApp.AuthorizationStatus.REQUIRED; } catch (e) { return null; } })(),
+      authUrl: (function () { try { var a = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL); return a.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED ? a.getAuthorizationUrl() : null; } catch (e) { return null; } })(),
+      account: (function () { try { return Session.getActiveUser().getEmail() || ''; } catch (e) { return ''; } })()
     };
   } catch (e) {
     log('getMyDailyJobsStatus: ' + e.message);

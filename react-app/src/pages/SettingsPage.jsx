@@ -278,11 +278,21 @@ function SettingsDesktop() {
                 ))}
               </div>
             )}
+            {jobs && (
+              <button onClick={() => { setJobs(null); api.getDailyJobsStatus().then((r) => { setDaily(r && !r.unknown ? !!r.sync : null); setJobs(r && !r.unknown ? r : null) }).catch(() => setDaily(null)) }}
+                className="text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] underline">Check again</button>
+            )}
             {jobs?.lastEmail && (
               <p className={`text-xs ${jobs.lastEmail.ok ? 'text-[var(--text-dim)]' : 'text-amber-400'}`}>
                 Last scheduled email: {new Date(jobs.lastEmail.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                 {jobs.lastEmail.ok ? ` · sent to ${jobs.lastEmail.sent} ${jobs.lastEmail.sent === 1 ? 'person' : 'people'}` : ` · failed: ${jobs.lastEmail.error || 'unknown error'}`}
               </p>
+            )}
+            {jobs && jobs.authorized === false && (
+              <p className="text-xs text-amber-400">Google permission missing for the background jobs (one box was unticked at sign-in). <a href={jobs.authUrl || '#'} target="_blank" rel="noopener" className="underline font-semibold">Allow on Google</a>, tick every box, then press Turn on again.</p>
+            )}
+            {jobs && !jobs.sync && jobs.authorized !== false && (
+              <p className="text-xs text-[var(--text-dim)]">Not turned on yet{jobs.account ? ` for ${jobs.account}` : ''}. Press Turn on: a small Google window opens; sign in there with the same account and keep it open until it says all three are on.</p>
             )}
             {jobs && jobs.sync && jobs.emailConfigured && !jobs.email && (
               <p className="text-xs text-amber-400">The email schedule is not installed. Press Turn on again and keep the window open until it says all three are on.</p>
