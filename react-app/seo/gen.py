@@ -2,7 +2,9 @@
 """Generates the public SEO pages (calculators + feature pages) into react-app/public/<slug>/index.html,
 plus public/sitemap.xml and public/seo/{site.css,calc.js}. Run: python3 seo/gen.py  (from react-app/).
 Content lives in PAGES below; edit and re-run. The pages are plain HTML so Google indexes them fully."""
-import os, json, re, datetime
+import os, sys, json, re, datetime
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from illus import art as _art, CSS as ART_CSS
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'public')
 SITE = 'https://capitalfriends.in'
 TODAY = datetime.date.today().isoformat()
@@ -96,6 +98,16 @@ def head(p, url):
 {GA}
 </head>"""
 
+CSS += r"""
+.toc{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.toc b{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#64748b;margin-right:6px}.toc a{font-size:13.5px;font-weight:600;color:#0f172a}.toc a:hover{color:#059669}
+.tip{background:#ecfdf5;border-left:4px solid #10b981;border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;color:#065f46;font-size:14.5px}
+.note-box{background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;color:#78350f;font-size:14px}
+.defs dt{font-weight:700;margin-top:10px}.defs dd{margin:2px 0 0 0;color:#334155}
+.upd{font-size:12.5px;color:#64748b;margin-top:26px}
+h2[id]{scroll-margin-top:72px}
+""" + ART_CSS
+
 def header():
     return """<header class="top"><div class="in">
 <a class="brand" href="/"><img src="/logo-new.png" alt="Capital Friends logo" /><span><b>Capital</b> <em>Friends</em></span></a>
@@ -124,8 +136,12 @@ def crumbs_ld(name, url):
         {"@type": "ListItem", "position": 1, "name": "Capital Friends", "item": SITE + "/"},
         {"@type": "ListItem", "position": 2, "name": name, "item": url}]}
 
-def related(slugs):
-    return '<h2>More free tools</h2><div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in slugs) + '</div>'
+EXTRA = {'goal-planner': ('Goal planner', 'Plan retirement, education or any goal with the app\'s own planner, no sign-in.')}
+def related(slugs, title='More free tools'):
+    def c(s):
+        n, b = (PAGES[s]['nav'], PAGES[s]['blurb']) if s in PAGES else EXTRA[s]
+        return f'<div class="card"><a href="/{s}/">{n}</a><p>{b}</p></div>'
+    return f'<h2>{title}</h2><div class="cards">' + ''.join(c(s) for s in slugs) + '</div>'
 
 CTA = {
  'default': ("Track the real thing, not just the estimate", "Capital Friends is a free, open-source portfolio tracker for Indian families. Import your CAMS statement, see XIRR and CAGR for every fund, plan goals and retirement, and let your family get one summary email. Your data stays in your own Google Drive.", "Open the free app"),
@@ -180,6 +196,10 @@ def page(slug, p, tools, feats):
     ld = [crumbs_ld(p['h1'], url)]
     if p.get('calc'):
         ld.append({"@context": "https://schema.org", "@type": "SoftwareApplication", "name": p['h1'], "applicationCategory": "FinanceApplication", "operatingSystem": "Web", "url": url, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "INR"}, "description": p['desc'], "publisher": {"@type": "Organization", "name": "Capital Friends", "url": SITE}})
+    elif p.get('guide'):
+        ld.append({"@context": "https://schema.org", "@type": "Article", "headline": p['h1'], "description": p['desc'], "url": url, "datePublished": "2026-10-15", "dateModified": TODAY,
+                   "author": {"@type": "Person", "name": "Jagadeesh Manne"}, "publisher": {"@type": "Organization", "name": "Capital Friends", "url": SITE, "logo": {"@type": "ImageObject", "url": SITE + "/logo-new.png"}},
+                   "image": SITE + "/og-image.png", "mainEntityOfPage": url, "isPartOf": {"@type": "WebSite", "name": "Capital Friends", "url": SITE}})
     else:
         ld.append({"@context": "https://schema.org", "@type": "WebPage", "name": p['h1'], "url": url, "description": p['desc'], "isPartOf": {"@type": "WebSite", "name": "Capital Friends", "url": SITE}})
     ld.append(faq_ld(p['faq']))
@@ -187,12 +207,17 @@ def page(slug, p, tools, feats):
     t, d, b = CTA[p.get('cta', 'default')]
     pvk = p.get('preview')
     body = p['body'] + (preview(*pvk) if pvk else '')
+    if p.get('guide'):
+        heads = re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', body)
+        toc = '<nav class="toc" aria-label="In this guide"><b>In this guide</b>' + ''.join(f'<a href="#{i}">{re.sub("<[^>]+>", "", t)}</a>' for i, t in heads) + '</nav>'
+        body = _art(slug) + toc + body
+        body += f'<p class="upd">Last updated {datetime.date.today().strftime("%d %b %Y")} · by Jagadeesh Manne, who built Capital Friends for his own family.</p>'
     html = head(p, url) + '<body>' + header() + '<main>' + \
         f'<div class="crumbs"><a href="/">Capital Friends</a> › {"<a href=/tools/>Calculators</a> › " if p.get("calc") else ("<a href=/guides/>Guides</a> › " if slug in FEATS else "")}{p["h1"]}</div>' + \
         f'<h1>{p["h1"]}</h1><p class="lead">{p["lead"]}</p>' + \
         (calc_html(p) if p.get('calc') else '') + body + \
         f'<div class="cta"><div><h2>{t}</h2><p>{d}</p></div><a href="{APP_CTA}">{b} →</a></div>' + \
-        faq_html(p['faq']) + related(p['related']) + \
+        faq_html(p['faq']) + related(p['related'], 'Read next' if p.get('guide') else 'More free tools') + \
         '<p class="disc">Calculators use the inputs you enter and standard formulas; results are estimates, not guarantees. Returns from mutual funds, stocks and other investments are not fixed and can be lower than assumed. Capital Friends is a tracking tool and is not a SEBI-registered investment adviser; nothing here is a recommendation to buy or sell any security.</p>' + \
         '</main>' + footer(tools, feats) + ('<script src="/seo/calc.js" defer></script>' if p.get('calc') else '') + '</body></html>'
     return html
@@ -416,138 +441,11 @@ STEPS_IMPORT = """<ol class="steps"><li>On the CAMS website choose a <strong>Det
 <li>Open Capital Friends, go to Mutual Funds, click <strong>Import from CAMS statement</strong>, choose the PDF and type the password.</li>
 <li>The app reads every fund and every transaction, creates one portfolio per account (including minor accounts for your kids), and asks you to confirm before importing. You can undo an import any time.</li></ol>"""
 
-add('mutual-fund-portfolio-tracker', nav='Mutual fund portfolio tracker', blurb='All family funds from one CAS import, with XIRR and CAGR.',
- title='Mutual Fund Portfolio Tracker for Indian Families – Free, CAS Import',
- desc='Free mutual fund portfolio tracker: import your CAMS CAS statement, see real money-in, XIRR and CAGR for every fund and every family member, rebalancing and funds below their high. Data in your own Google Drive.',
- h1='Mutual Fund Portfolio Tracker', lead='Track every mutual fund of every family member in one place, from one CAMS statement. Real money-in, XIRR and CAGR, allocation targets, rebalancing suggestions and funds below their high, with the data kept in a Google Sheet in your own Drive.',
- body="""<h2>What makes it different from Groww, Kuvera or a spreadsheet</h2>""" + feat([
-  ('Real money-in, not holdings cost', 'When you switch funds, most apps count the switch as new investment and inflate "invested". Capital Friends shows the money that actually left your bank, the holdings cost, and the profit, realised and unrealised, separately.'),
-  ('The whole family', 'Your funds, your spouse\'s, your parents\' and the kids\' minor accounts, each as its own portfolio and together as one number. Import each person\'s CAS statement the same way.'),
-  ('XIRR and CAGR for everything', 'For every fund, every portfolio and the family total, from the exact date of every purchase, SIP, switch and redemption.'),
-  ('Below its high', 'Every fund is compared with its own all-time-high NAV every day. You see which of your funds is 5% or 10% below its peak, instead of reacting to a Nifty headline. Information, not advice.'),
-  ('Rebalancing you can act on', 'Set a target allocation per fund. The app shows the drift and three ways to fix it: adjust SIP amounts, add a lump sum to what is short, or buy and sell. Funds that no longer accept fresh money can be marked and skipped.'),
-  ('Your data, your Drive', 'No bank login, no server database. One Google Sheet in your Drive holds everything; delete it and the app has nothing.')]) + """
-<h2>How to import your mutual funds</h2>""" + STEPS_IMPORT + """
-<h2>What you see after the import</h2>
-<p>A Mutual Funds page with money-in, current value, unrealised and realised profit, XIRR, CAGR and monthly SIP; the asset-class split; the investment journey since your first purchase; and every portfolio with its own return. Open a portfolio for the holdings table with units, NAV, average NAV, distance from the high, and current versus target allocation. Open a fund for its journey and every transaction with its own profit.</p>
-<h2>Fund breakdown: large, mid, small, global</h2>
-<p>Classify each fund once (asset class, market cap, geography, copied from Morningstar) and the app shows how much of the family's money is large cap, mid cap, small cap, debt, gold and outside India. Goals use this split to decide which funds are safe money and which are growth money.</p>""", cta='xirr',
- preview=(['funds','goal'], 'What you see after the import', 'Real money-in, XIRR and CAGR, funds below their high, and goals funded from the same money.'),
- faq=[('Is the mutual fund tracker free?', 'Yes, free with no ads and open source. You can support the project with a voluntary donation.'),
-      ('Which statements can I import?', 'The detailed CAMS + KFintech consolidated account statement (CAS) PDF, which covers all AMCs. One statement per PAN; import one for each family member.'),
-      ('Does it track SIPs automatically?', 'Yes. Every SIP instalment is a transaction in the CAS, so the app knows your running SIPs, their amounts and dates, and sends reminders before the next date.'),
-      ('How are NAVs updated?', 'Daily from AMFI data through a scheduled script that runs in your own Google account, so values and the below-high alerts are current even when you do not open the app.'),
-      ('Can I use it as an Excel or Google Sheets portfolio tracker?', 'Your data already lives in a Google Sheet in your Drive. Open it any time, or download it as Excel.')],
- related=['cams-cas-import', 'xirr-calculator', 'family-net-worth-tracker', 'stock-portfolio-tracker', 'goal-based-investing', 'sip-calculator'])
-
-add('family-net-worth-tracker', nav='Family net worth tracker', blurb='Every member, every asset and loan, one daily email.',
- title='Family Net Worth Tracker – Every Member, Every Asset, One Daily Email',
- desc='Track your whole family\'s net worth for free: mutual funds, stocks, FDs, EPF, gold by weight, property and loans for every member, in a Google Sheet in your own Drive, with a daily summary email your family can rely on.',
- h1='Family Net Worth Tracker', lead='One dashboard for the whole family: every bank account, investment account, mutual fund, stock, FD, EPF, gold, property, loan and insurance policy, tied to the person it belongs to. If something happens to you, your family knows where everything is.',
- body="""<h2>Why families need this, not just investors</h2>
-<p>In most homes all of the money lives in one person's head. Families that lose that person spend months searching for documents: where are the investments, which bank, who is the nominee. Some of it can be traced with a PAN; much of it cannot. Capital Friends was built so that one email, sent every morning, answers those questions.</p>
-<h2>What it tracks</h2>""" + feat([
-  ('Family members', 'Self, spouse, parents, kids. Everything else belongs to one of them. PAN and Aadhaar are optional, saved only in your sheet and masked on screen.'),
-  ('Bank and investment accounts', 'A list of which accounts exist and which platform (Zerodha, Groww, a distributor) is linked to which bank. No bank login, ever.'),
-  ('Mutual funds and stocks', 'Funds from a CAMS statement, stocks from your broker\'s Excel or a CDSL/NSDL statement, with XIRR and CAGR.'),
-  ('Other investments', 'FDs, PPF, EPF, NPS, bonds, gold and silver by weight at today\'s rate, property with its loan linked.'),
-  ('Insurance', 'Term and health policies with insured member, nominee and sum assured; the app checks whether the cover is enough.'),
-  ('Loans', 'Home, car and personal loans with EMI, interest and months left; net worth is assets minus loans.')]) + """
-<h2>The family email</h2>
-<p>Every day (or every month) at a time you choose, each member you select gets the Family Financial Blueprint: net worth, every account, every fund and its value, policies and nominees, loans, goals, and which bank account is linked to what. It goes from your own Gmail, to the addresses you enter. There is no Capital Friends server in between.</p>
-<h2>Privacy by design</h2>
-<p>Sign in with Google and the app creates one Google Sheet in your Drive; that is the entire database. The developer cannot see it. The mask button hides names and numbers on screen for screen-sharing. The code is open source.</p>""", cta='default',
- preview=(['networth','mail'], 'The dashboard and the email', 'One number for the family, and one email every morning that says where everything is.'),
- faq=[('Is the family net worth tracker free?', 'Yes, completely free and open source, with no ads.'),
-      ('Does it connect to my bank?', 'No. Bank accounts are a list you type, so the family knows which account is linked to what. There is no login, OTP or account aggregator.'),
-      ('Who can see my family\'s data?', 'Only your Google account. The data is a Google Sheet in your own Drive; share it only if you choose to.'),
-      ('Can each family member see only their own money?', 'The app has a "viewing as" switch to look at one member or everyone. The daily email can go to any members you select.'),
-      ('How is gold valued?', 'By weight and purity at the day\'s rate, so you never need to update it.')],
- related=['net-worth-calculator', 'mutual-fund-portfolio-tracker', 'retirement-bucket-strategy', 'goal-based-investing', 'emergency-fund-calculator', 'cams-cas-import'])
-
-add('cams-cas-import', nav='CAMS CAS import', blurb='Get your consolidated statement and import every transaction.',
- title='How to Import a CAMS CAS Statement into a Portfolio Tracker (Free)',
- desc='Step-by-step: download your detailed CAMS + KFintech consolidated account statement (CAS) and import it into Capital Friends to get every fund, SIP, switch and redemption with real money-in, XIRR and CAGR.',
- h1='Import Your CAMS CAS Statement', lead='The consolidated account statement from CAMS lists every mutual fund transaction you have ever made, across all AMCs. Import it once and your whole mutual fund history is in the tracker, with no typing.',
- body="""<h2>Step 1: get the detailed CAS from CAMS</h2>
-<ol class="steps"><li>Go to the CAMS statements page and choose the consolidated account statement, <strong>Detailed</strong> type (the summary version has no transactions).</li>
-<li>Choose the period. Pick a start date before your first investment; many people simply choose the earliest year offered so nothing is missed.</li>
-<li>Enter the email registered with your folios and set a password for the PDF. The statement arrives by email in a few minutes. It is free.</li></ol>
-<h2>Step 2: import it</h2>""" + STEPS_IMPORT + """
-<h2>What the import gives you</h2>
-<ul><li>Every purchase, SIP, switch in/out, STP and redemption with its real date and NAV.</li><li>Real money-in (cash from your bank) separate from holdings cost, so switches do not inflate the invested amount.</li><li>XIRR and CAGR for each fund, each portfolio and the family.</li><li>Separate portfolios for each account in the statement, including kids' minor accounts; fully-sold accounts are skipped.</li><li>Past imports listed with an undo button.</li></ul>
-<h2>Importing the whole family</h2>
-<p>A CAS is per PAN. Request one for your spouse, your parents and anyone else you track, and import each the same way. Minor accounts come inside the guardian's statement and get their own portfolios.</p>""", cta='xirr',
- preview=(['funds','mail'], 'After the import', 'Every fund and transaction, with the real money-in, in the app and in the family email.'),
- faq=[('CAMS or KFintech: which statement do I need?', 'The CAMS "CAS" covers both CAMS- and KFintech-serviced AMCs, so one statement is enough. Choose the detailed version with transactions.'),
-      ('What is the password for the CAS PDF?', 'The one you set while requesting it on the CAMS site. The tracker needs it to open the PDF; it is used only on your device and never stored.'),
-      ('Will importing twice duplicate transactions?', 'No. Import the same statement again or a newer one and existing transactions are matched, not doubled. You can also undo any import.'),
-      ('Does it work with NSDL or CDSL CAS?', 'Depository statements are for demat holdings. For stocks, Capital Friends imports the broker\'s holdings Excel or a CDSL/NSDL statement; for mutual funds use the CAMS CAS.')],
- related=['mutual-fund-portfolio-tracker', 'xirr-calculator', 'stock-portfolio-tracker', 'family-net-worth-tracker', 'sip-calculator', 'cagr-calculator'])
-
-add('stock-portfolio-tracker', nav='Stock portfolio tracker', blurb='Family stock holdings from a broker Excel or CDSL statement.',
- title='Stock Portfolio Tracker India – Free, Family Holdings from Broker Excel',
- desc='Free stock portfolio tracker for Indian families: import holdings from Zerodha, Groww or any broker Excel, or a CDSL/NSDL statement, see every member\'s stocks with daily prices, profit and allocation, beside mutual funds and FDs.',
- h1='Stock Portfolio Tracker', lead='Keep every family member\'s stocks beside their mutual funds, FDs and gold, so the dashboard shows the real total. Import holdings from your broker\'s Excel file or a CDSL/NSDL statement; prices update daily.',
- body="""<h2>How stocks come in</h2>
-<ol class="steps"><li>Download the holdings file from your broker (Zerodha Console, Groww, Upstox, ICICI Direct and others export an Excel or CSV), or your CDSL/NSDL consolidated statement.</li>
-<li>Create a stock portfolio for the family member and import the file. Each holding gets its quantity and average price.</li>
-<li>Prices refresh daily. You see current value, profit, allocation across the family, and the stocks in your top and bottom performers.</li></ol>
-<h2>Stocks and funds together</h2>
-<p>Most trackers do one or the other. Capital Friends shows stocks and mutual funds in the same net worth, the same family email and the same goals, so a family with a Zerodha account, an SIP portfolio, an EPF and a house sees one honest number.</p>""",
- preview=(['networth','mail'], 'Stocks beside everything else', 'Stocks, funds, FDs, gold and the house in one net worth, for every family member.'),
- faq=[('Which brokers are supported?', 'Any broker that exports holdings as Excel or CSV with symbol, quantity and average price. CDSL and NSDL statements also work.'),
-      ('Are stock prices live?', 'They update daily through a public price sheet; this is a tracker for long-term holdings, not a trading terminal.'),
-      ('Can I track my spouse\'s and parents\' demat accounts?', 'Yes. Add each person as a family member, create their stock portfolio and import their holdings file.'),
-      ('Is there buy/sell advice?', 'No. The app shows facts: value, profit, allocation and distance from the high. Decisions are yours.')],
- related=['mutual-fund-portfolio-tracker', 'family-net-worth-tracker', 'cagr-calculator', 'net-worth-calculator', 'xirr-calculator', 'goal-based-investing'])
-
-add('retirement-bucket-strategy', nav='Retirement bucket strategy', blurb='Three buckets, refilled in good years, so you never sell in a crash.',
- title='Three-Bucket Retirement Strategy in India – Income, Stability, Growth',
- desc='How the three-bucket retirement withdrawal strategy works (income, stability and growth buckets), how the buckets are refilled in good, bad and recovery years, and how Capital Friends runs it on your own portfolio for free.',
- h1='The Three-Bucket Retirement Strategy', lead='A retirement corpus is only useful if you can draw from it for 30 years without selling equity at the bottom of a crash. The bucket strategy splits the corpus into three jars by when the money is needed, and refills them with rules instead of nerves.',
- body="""<h2>The three buckets</h2>""" + feat([
-  ('Income bucket: next 2 years', 'Two years of expenses in the safest place: liquid fund, short-duration debt, sweep-in FD. Your monthly expenses come only from here.'),
-  ('Stability bucket: years 3 to 7', 'Five years of expenses in hybrid and debt funds, plus EPF, PPF and NPS which are never sold but count here. Refills income when the market is down.'),
-  ('Growth bucket: everything else', 'Equity funds. Left alone to grow; refills the other two only in good years, when the market is near its high.')]) + """
-<h2>How the refills work</h2>
-<ul><li><strong>Five years before retirement</strong>: every quarter a small amount moves from growth to stability, and in the last two years to income too, but only in a good market, so nothing is sold in one go or at a low.</li>
-<li><strong>Every month after retiring</strong>: expenses are paid from the income bucket. The other two are not touched. Bucket sizes use this year's expenses, so they grow with inflation.</li>
-<li><strong>Good year</strong> (market near its high): growth refills income and tops up stability.</li>
-<li><strong>Bad year</strong> (growth funds more than 10% below their high): growth is left alone; stability refills income.</li>
-<li><strong>Recovery year</strong>: once the market is back near its high, growth refills both.</li>
-<li><strong>Long fall</strong>: stability never goes below two years of expenses; the app warns you to spend a little less for a while.</li></ul>
-<h2>Running it on your real money</h2>
-<p>In Capital Friends, add a retirement goal with your expenses, inflation and retirement age. Tick which investments are for goals. The app fills the three buckets from your actual funds, EPF and FDs, shows what each bucket holds today, and from five years before retirement shows the quarterly moves. Start with the <a href="/retirement-corpus-calculator/">retirement corpus calculator</a> or the <a href="/swp-calculator/">SWP calculator</a>.</p>""", cta='retire',
- preview=(['buckets','mail'], 'The buckets on your own portfolio', 'Your funds, EPF and FDs fill the jars; each quarterly move is a step you record with one tap.'),
- faq=[('Why not just an SWP from a balanced fund?', 'An SWP sells units every month regardless of the market. Buckets make sure the units sold in a crash come from the safe jar, so equity gets time to recover.'),
-      ('How big should the income bucket be?', 'Two years of expenses is the common choice; it covers most bear markets. Some retirees keep three.'),
-      ('Where do EPF, PPF and NPS fit?', 'They count in the stability bucket but are never switched or sold by the app; they pay out on their own rules. When one matures, you press Received and the money joins the plan.'),
-      ('Is this advice?', 'No. It is a rule-based way to organise withdrawals that you can read and change. Capital Friends is a tracker, not a SEBI-registered adviser.')],
- related=['retirement-corpus-calculator', 'swp-calculator', 'fire-calculator', 'goal-based-investing', 'family-net-worth-tracker', 'emergency-fund-calculator'])
-
-add('goal-based-investing', nav='Goal-based investing', blurb='Goals on a road, funded from the money you already have.',
- title='Goal-based Investing Tracker – Child Education, Retirement, House (Free)',
- desc='Plan child education, retirement, a house or any goal with a free goal tracker: future cost with inflation, SIP needed, which of your existing funds count for each goal, and the yearly shift from equity to safe as the date nears.',
- h1='Goal-based Investing, With Your Real Portfolio', lead='Most goal calculators stop at a number. Capital Friends puts your goals on a timeline, counts the money you already have against them, shows the gap, and tells you each year how much to move from equity to safe so the money is there on the date.',
- body="""<h2>How goals work in the app</h2>
-<ol class="steps"><li><strong>Add a goal.</strong> Retirement, child education, emergency fund, house, car, travel, wedding or custom. For child education the date is set from the child's age and the course; for retirement from your age and retirement age.</li>
-<li><strong>See the number.</strong> Today's cost inflated to the goal year, the SIP required or the lumpsum today, and a suggested equity/debt split for that horizon.</li>
-<li><strong>Money for goals.</strong> Tick which investments are for goals. You do not link funds to goals one by one: the app shares the pool, giving the emergency fund and near goals the safe money and far goals the equity. Kids' own portfolios and the house can be left out.</li>
-<li><strong>Follow the road.</strong> Each goal shows have-today versus need-today, on track or not, the funds counted for it, and the year-by-year plan to shift from equity to safe.</li></ol>
-<h2>Why a glide path matters</h2>
-<p>A ₹47 lakh college fee due in 2033 should not be 100% in equity in 2032. The app starts shifting five years out, a little each year and only in good markets, so a bad year right before the date does not cut the corpus by a third.</p>
-<h2>Start with the planner</h2>
-<p>Try the <a href="/goal-planner/">goal planner</a> (the app's own planner, no sign-in to plan), the <a href="/retirement-corpus-calculator/">retirement corpus calculator</a>, or the <a href="/emergency-fund-calculator/">emergency fund calculator</a>. Then sign in to run the same numbers on your real funds.</p>""", cta='goal',
- preview=(['goal','buckets'], 'A goal in the app', 'The investments counted for it, the glide path step, and the retirement buckets.'),
- faq=[('Can I have many goals at once?', 'Yes. Retirement, two children\'s education and an emergency fund on one road is the normal setup. The app prioritises the emergency fund first, then goals by date and priority.'),
-      ('Do I have to assign each fund to a goal?', 'No. Tick which investments are for goals in general; the app divides them by what each goal needs and how far away it is.'),
-      ('What if I am not on track?', 'The goal shows the gap and the extra SIP that would close it. You can also move the date, change the priority or lower the target.'),
-      ('Does it include EPF and PPF?', 'For the retirement goal only. They are never part of a sell or switch step.')],
- related=['retirement-bucket-strategy', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'mutual-fund-portfolio-tracker', 'family-net-worth-tracker'])
+from guides import register as _register_guides, ORDER as GUIDE_ORDER
+_register_guides(add, feat)
 
 TOOLS = ['sip-calculator', 'lumpsum-calculator', 'swp-calculator', 'cagr-calculator', 'xirr-calculator', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'fire-calculator', 'net-worth-calculator']
-FEATS = ['mutual-fund-portfolio-tracker', 'family-net-worth-tracker', 'cams-cas-import', 'stock-portfolio-tracker', 'retirement-bucket-strategy', 'goal-based-investing']
+FEATS = GUIDE_ORDER
 
 # tools index (calculators only) and guides index
 add('tools', nav='All calculators', blurb='',

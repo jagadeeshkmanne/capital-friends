@@ -39,7 +39,9 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
 // Free calculators and guides (static HTML under /public): two dropdowns on desktop, plain links on phones
 const TOOLS = [['/sip-calculator/', 'SIP (+ step-up, + lumpsum)'], ['/lumpsum-calculator/', 'Lumpsum'], ['/swp-calculator/', 'SWP'], ['/xirr-calculator/', 'XIRR'], ['/cagr-calculator/', 'CAGR'],
   ['/retirement-corpus-calculator/', 'Retirement corpus'], ['/fire-calculator/', 'FIRE'], ['/emergency-fund-calculator/', 'Emergency fund'], ['/net-worth-calculator/', 'Net worth']]
-const GUIDES = [['/mutual-fund-portfolio-tracker/', 'Mutual fund tracker'], ['/family-net-worth-tracker/', 'Family net worth'], ['/cams-cas-import/', 'CAMS CAS import'], ['/stock-portfolio-tracker/', 'Stock tracker'], ['/retirement-bucket-strategy/', 'Retirement buckets'], ['/goal-based-investing/', 'Goal planning']]
+const GUIDES = [['/your-data-in-your-google-drive/', 'Your data, your Drive'], ['/family-members-and-accounts/', 'Family & accounts'], ['/financial-health-check/', 'Health check'], ['/cams-cas-import/', 'CAMS CAS import'],
+  ['/mutual-fund-portfolio-tracker/', 'Mutual fund tracker'], ['/portfolio-rebalancing/', 'Rebalancing'], ['/stock-portfolio-tracker/', 'Stock tracker'], ['/track-fd-ppf-epf-gold-property/', 'FD, EPF, gold, property'],
+  ['/insurance-tracker/', 'Insurance'], ['/goal-based-investing/', 'Goals & glide path'], ['/retirement-bucket-strategy/', 'Retirement buckets'], ['/family-net-worth-tracker/', 'Family net worth'], ['/family-financial-blueprint-email/', 'The family email']]
 function Drop({ href, label, items, all }) {
   const [open, setOpen] = useState(false)
   return (
