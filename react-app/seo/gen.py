@@ -105,6 +105,7 @@ CSS += r"""
 .note-box{background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;color:#78350f;font-size:14px}
 .defs dt{font-weight:700;margin-top:10px}.defs dd{margin:2px 0 0 0;color:#334155}
 .upd{font-size:12.5px;color:#64748b;margin-top:26px}
+.art-h{margin-top:34px}.art-h+.art{margin-top:12px}
 h2[id]{scroll-margin-top:72px}
 """ + ART_CSS
 
@@ -215,7 +216,7 @@ def page(slug, p, tools, feats):
     html = head(p, url) + '<body>' + header() + '<main>' + \
         f'<div class="crumbs"><a href="/">Capital Friends</a> › {"<a href=/tools/>Calculators</a> › " if p.get("calc") else ("<a href=/guides/>Guides</a> › " if slug in FEATS else "")}{p["h1"]}</div>' + \
         f'<h1>{p["h1"]}</h1><p class="lead">{p["lead"]}</p>' + \
-        (calc_html(p) if p.get('calc') else '') + body + \
+        (calc_html(p) + '<h2 class="art-h">How it works, in one picture</h2>' + _art(slug) if p.get('calc') else ('' if p.get('guide') else _art(slug))) + body + \
         f'<div class="cta"><div><h2>{t}</h2><p>{d}</p></div><a href="{APP_CTA}">{b} →</a></div>' + \
         faq_html(p['faq']) + related(p['related'], 'Read next' if p.get('guide') else 'More free tools') + \
         '<p class="disc">Calculators use the inputs you enter and standard formulas; results are estimates, not guarantees. Returns from mutual funds, stocks and other investments are not fixed and can be lower than assumed. Capital Friends is a tracking tool and is not a SEBI-registered investment adviser; nothing here is a recommendation to buy or sell any security.</p>' + \
@@ -277,7 +278,7 @@ add('swp-calculator', nav='SWP calculator', blurb='How long a corpus lasts with 
  desc='Free SWP calculator: enter your corpus, monthly withdrawal, expected return and inflation to see how long the money lasts and what is left. For retirees and FIRE planners in India.',
  h1='SWP Calculator (Systematic Withdrawal Plan)', lead='A Systematic Withdrawal Plan pays you a fixed amount every month from a mutual fund while the rest stays invested. This calculator shows whether your corpus survives the period, and what remains.',
  calc=dict(id='swp', out=['Corpus left at the end', 'Total withdrawn', 'Money lasts for'], fields=[
-   field('f-corpus', 'Starting corpus (₹)', 10000000, 100000), field('f-withdraw', 'Monthly withdrawal (₹)', 50000, 1000),
+   field('f-corpus', 'Starting corpus (₹)', 15000000, 100000), field('f-withdraw', 'Monthly withdrawal (₹)', 50000, 1000),
    field('f-rate', 'Expected return on the corpus (% per year)', 8, 0.5, 'Use 6–8% for debt/hybrid, 10% if a part stays in equity.'), field('f-inflation', 'Raise the withdrawal every year by (%)', 6, 0.5, 'Set 0 for a fixed withdrawal.'),
    field('f-years', 'Withdrawal period (years)', 30, 1)]),
  body="""<h2>How the SWP calculator works</h2>

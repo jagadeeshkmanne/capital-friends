@@ -246,3 +246,117 @@ ART = {'your-data-in-your-google-drive': drive, 'family-members-and-accounts': m
 def art(slug):
     f = ART.get(slug)
     return f() if f else ''
+
+# ────────────────────────── calculator and index heroes (compact) ──────────────────────────
+def _bars(x0, y0, vals, colors, w=26, gap=14, hmax=130, cls='a-grow-y'):
+    out = ''; m = max(vals)
+    for i, v in enumerate(vals):
+        h = hmax * v / m; x = x0 + i * (w + gap)
+        out += f'<rect x="{x}" y="{y0-h:.0f}" width="{w}" height="{h:.0f}" rx="6" fill="{colors[i % len(colors)]}" class="{cls}" style="animation-delay:{.15+i*.08:.2f}s"/>'
+    return out
+
+def sip_art():
+    vals = [1, 1.4, 1.9, 2.6, 3.4, 4.4, 5.6, 7.1, 8.9, 11]
+    b = text(90, 48, 'Every month', 12, SLATE, 700) + text(90, 70, '₹10,000', 20, NAVY, 800)
+    for i in range(3): b += f'<g class="a-coin c{i+1 if i else ""}"><circle cx="{118+i*7}" cy="92" r="9" fill="{AMBER}"/><circle cx="{118+i*7}" cy="92" r="5" fill="none" stroke="#fff" stroke-opacity=".6"/></g>'
+    b += f'<rect x="80" y="170" width="90" height="46" rx="10" fill="{MIST}"/>' + text(125, 198, 'SIP', 13, SLATE, 700, 'middle')
+    b += line(170, 193, 240, 193)
+    b += _bars(250, 220, vals, [LILAC] * 7 + [EMERALD] * 3) + f'<path d="M250 220h400" stroke="{LINE}"/>'
+    b += text(250, 240, 'year 1', 11, SLATE, 600) + text(640, 240, 'year 10', 11, SLATE, 600, 'end')
+    b += card(700, 60, 240, 150, 'a-rise a-d3') + text(720, 90, 'After 15 years at 12%', 12, SLATE, 700) + text(720, 122, '₹50.5 L', 26, NAVY, 800) + text(720, 146, 'invested ₹18 L', 12, '#6d28d9', 700) + text(720, 166, 'returns ₹32.5 L', 12, EMERALD, 700) + text(720, 192, 'step-up 10%/yr → ₹70 L+', 11, SLATE, 600)
+    return svg(b, 260)
+
+def lumpsum_art():
+    b = f'<g class="a-rise"><circle cx="150" cy="140" r="56" fill="{AMBER}"/><circle cx="150" cy="140" r="40" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="3"/>' + text(150, 148, '₹5 L', 22, '#fff', 800, 'middle') + '</g>' + text(150, 222, 'invested once', 12, SLATE, 700, 'middle')
+    b += line(210, 140, 280, 140)
+    b += f'<path d="M290 220h420" stroke="{LINE}"/><path d="M290 215 C 400 212, 500 195, 580 150 S 680 70, 710 40" fill="none" stroke="{EMERALD}" stroke-width="3.5" class="a-draw"/>'
+    for i, (x, y, l) in enumerate([(290, 215, '₹5 L'), (500, 185, '₹10 L · yr 6'), (640, 95, '₹20 L · yr 12')]):
+        b += f'<circle cx="{x}" cy="{y}" r="6" fill="{EMERALD}" class="a-tick" style="animation-delay:{.6+i*.6:.1f}s"/>' + text(x + 10, y - 10, l, 12, NAVY, 700)
+    b += card(740, 60, 200, 140, 'a-rise a-d3') + text(760, 90, 'Rule of 72', 12, SLATE, 700) + text(760, 120, '72 ÷ 12% = 6', 18, NAVY, 800) + text(760, 144, 'money doubles', 12, INK, 600) + text(760, 162, 'every 6 years', 12, INK, 600)
+    return svg(b, 260)
+
+def swp_art():
+    b = f'<g class="a-rise"><rect x="90" y="60" width="150" height="160" rx="18" fill="#fff" stroke="{LINE}" stroke-width="2"/><clipPath id="swpj"><rect x="92" y="62" width="146" height="156" rx="16"/></clipPath><g clip-path="url(#swpj)"><rect x="90" y="100" width="150" height="120" fill="{SKY}" opacity=".85" class="a-fill"/></g>' + text(165, 160, '₹1.5 Cr', 18, '#fff', 800, 'middle') + text(165, 182, 'earns 8%', 12, '#fff', 600, 'middle') + '</g>' + text(165, 244, 'the corpus', 12, SLATE, 700, 'middle')
+    b += line(240, 140, 330, 140)
+    for i in range(3): b += f'<g class="a-coin c{i+1 if i else ""}"><circle cx="{600+i*18}" cy="60" r="8" fill="{AMBER}"/></g>' + card(330, 100, 200, 80, 'a-rise a-d2') + text(430, 130, '₹50,000 a month', 14, NAVY, 700, 'middle') + text(430, 152, 'rising 6% a year', 12, SLATE, 600, 'middle')
+    b += line(530, 140, 600, 140) + bust(640, 140, 'father', 32, 'a-rise a-d3') + text(640, 192, 'paid for 30 years', 12, SLATE, 700, 'middle')
+    b += card(720, 60, 220, 160, 'a-rise a-d4') + text(740, 90, 'Corpus over time', 12, SLATE, 700) + f'<path d="M740 190h180" stroke="{LINE}"/><path d="M740 120 C 800 118, 850 140, 920 125" fill="none" stroke="{EMERALD}" stroke-width="3" class="a-draw"/>' + text(740, 212, 'still ₹1.7 Cr left at year 30', 11, EMERALD, 700)
+    return svg(b, 260)
+
+def cagr_art():
+    b = _bars(120, 220, [1, 2.2], [LILAC, EMERALD], 70, 60, 150) + text(155, 240, 'start ₹5 L', 12, SLATE, 700, 'middle') + text(285, 240, 'end ₹11 L', 12, SLATE, 700, 'middle')
+    b += f'<path d="M190 150 C 230 140, 240 90, 285 70" fill="none" stroke="{AMBER}" stroke-width="2.5" class="a-dash"/>' + text(240, 60, '6 years', 12, AMBER, 700, 'middle')
+    b += card(400, 70, 260, 130, 'a-rise a-d2') + text(420, 100, 'CAGR', 12, SLATE, 700) + text(420, 136, '14.0% a year', 24, NAVY, 800) + text(420, 166, 'absolute return 120%', 12, INK, 600) + text(420, 184, '(11 ÷ 5)^(1/6) − 1', 11, SLATE, 500)
+    b += card(690, 70, 250, 130, 'a-rise a-d3') + text(710, 100, 'Same growth, one number', 12, SLATE, 700) + rows(710, 130, [('FD', '7%', SKY), ('This fund', '14%', EMERALD), ('Nifty 50 (10 yr)', '12%', LILAC)], 210, 26)
+    return svg(b, 260)
+
+def xirr_art():
+    b = f'<path d="M80 150h600" stroke="{INK}" stroke-width="3"/>'
+    for i, (x, l, a) in enumerate([(100, 'Jan 2020', '−₹2 L'), (240, 'Jul 2021', '−₹1 L'), (380, 'Mar 2023', '−₹3 L'), (520, 'Sep 2024', '−₹1 L')]):
+        b += f'<g class="a-tick" style="animation-delay:{.2+i*.2:.1f}s"><circle cx="{x}" cy="150" r="10" fill="{LILAC}"/><path d="M{x} 141v18" stroke="#fff" stroke-width="2"/></g>' + text(x, 185, l, 11, SLATE, 600, 'middle') + text(x, 125, a, 12, '#6d28d9', 700, 'middle')
+    b += f'<g class="a-tick" style="animation-delay:1.1s"><circle cx="660" cy="150" r="14" fill="{EMERALD}"/><path d="M654 150l4 4 8-8" fill="none" stroke="#fff" stroke-width="2.5"/></g>' + text(660, 185, 'today', 11, SLATE, 600, 'middle') + text(660, 120, '+₹9.4 L', 13, EMERALD, 800, 'middle')
+    b += card(720, 70, 220, 160, 'a-rise a-d4') + text(740, 100, 'XIRR', 12, SLATE, 700) + text(740, 136, '10.6%', 28, NAVY, 800) + text(740, 164, 'every rupee weighed by', 11, INK, 600) + text(740, 180, 'how long it was invested', 11, INK, 600) + text(740, 208, 'the number to compare with an FD', 11, SLATE, 500)
+    return svg(b, 260)
+
+def retire_art():
+    b = bust(110, 110, 'you', 34, 'a-rise') + text(110, 160, 'age 42 · ₹50k/month', 12, NAVY, 700, 'middle') + text(110, 178, 'today', 11, SLATE, 600, 'middle')
+    b += f'<path d="M160 110 C 260 60, 360 60, 460 110" fill="none" stroke="{AMBER}" stroke-width="2.5" class="a-dash"/>' + text(310, 70, '7% inflation · 10 years', 12, AMBER, 700, 'middle')
+    b += bust(510, 110, 'father', 34, 'a-rise a-d2') + text(510, 160, 'age 52 · ₹93k/month', 12, NAVY, 700, 'middle') + text(510, 178, 'at retirement', 11, SLATE, 600, 'middle')
+    b += line(560, 110, 640, 110)
+    b += f'<g class="a-rise a-d3"><rect x="650" y="40" width="120" height="150" rx="18" fill="#fff" stroke="{LINE}" stroke-width="2"/><clipPath id="rj"><rect x="652" y="42" width="116" height="146" rx="16"/></clipPath><g clip-path="url(#rj)"><rect x="650" y="75" width="120" height="115" fill="{VIOLET}" opacity=".85" class="a-fill"/></g>' + text(710, 130, '₹2.8 Cr', 18, '#fff', 800, 'middle') + text(710, 150, 'corpus', 11, '#fff', 600, 'middle') + '</g>' + text(710, 214, '25× yearly expenses (4% SWR)', 11, SLATE, 600, 'middle')
+    b += card(790, 60, 160, 110, 'a-rise a-d4') + text(810, 88, 'SIP needed', 12, SLATE, 700) + text(810, 120, '₹1.43 L', 22, NAVY, 800) + text(810, 146, 'a month, or ₹98 L today', 11, INK, 600)
+    return svg(b, 250)
+
+def emergency_art():
+    b = f'<g class="a-rise"><path d="M60 150 Q150 40 240 150 Z" fill="{SKY}" opacity=".9"/><path d="M60 150 Q105 110 150 150 Q195 110 240 150" fill="none" stroke="#fff" stroke-width="2"/><rect x="148" y="150" width="4" height="60" fill="{NAVY}"/></g>'
+    b += bust(130, 200, 'you', 22) + bust(175, 200, 'spouse', 22) + text(150, 246, 'safe from a job loss or a hospital bill', 11, SLATE, 700, 'middle')
+    b += text(320, 60, 'Monthly expenses ₹75,000', 13, NAVY, 700)
+    for i in range(12):
+        x = 320 + i * 44; c = EMERALD if i < 6 else (AMBER if i < 9 else MIST)
+        b += f'<rect x="{x}" y="80" width="36" height="46" rx="8" fill="{c}" class="a-rise" style="animation-delay:{.1+i*.07:.2f}s"/>' + text(x + 18, 108, str(i + 1), 12, '#fff' if i < 9 else SLATE, 800, 'middle')
+    b += text(320, 150, '6 months · ₹4.5 L minimum', 12, EMERALD, 700) + text(584, 150, '9 months', 12, AMBER, 700) + text(716, 150, '12 months · ₹9 L (single earner)', 12, SLATE, 700)
+    b += card(320, 175, 600, 60, 'a-rise a-d4') + disc(350, 205, 'bank', SKY, 16) + text(376, 200, 'Where: savings + liquid fund + short FDs, never equity', 12, INK, 600) + text(376, 220, 'Capital Friends counts it as a goal with 0% equity', 11, SLATE, 500)
+    return svg(b, 260)
+
+def fire_art():
+    road = 'M60 200 C 250 200, 350 120, 520 140 S 800 180, 940 90'
+    b = f'<path d="{road}" fill="none" stroke="{INK}" stroke-width="22" stroke-linecap="round"/><path d="{road}" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="12 12"/>'
+    b += bust(70, 150, 'you', 26, 'a-rise') + text(70, 118, 'age 32', 12, NAVY, 700, 'middle')
+    for i, (x, y, l, s) in enumerate([(380, 140, '₹1.2 Cr', 'age 40'), (660, 160, '₹2 Cr', 'age 46')]):
+        b += card(x - 55, y - 70, 110, 44, f'a-rise a-d{i+2}') + text(x, y - 50, l, 13, NAVY, 800, 'middle') + text(x, y - 34, s, 11, SLATE, 600, 'middle')
+    b += f'<g class="a-rise a-d4"><rect x="938" y="30" width="4" height="58" fill="{EMERALD}"/><path d="M942 30h-40l10 10-10 10h40z" fill="{EMERALD}"/></g>' + card(790, 40, 120, 44, 'a-rise a-d4') + text(850, 58, 'FIRE ₹2.57 Cr', 12, '#065f46', 800, 'middle') + text(850, 75, 'age 49', 11, SLATE, 600, 'middle')
+    b += f'<g class="a-car"><rect x="-16" y="-9" width="32" height="18" rx="5" fill="{AMBER}"/><rect x="-8" y="-15" width="16" height="8" rx="3" fill="{AMBER}"/><circle cx="-9" cy="9" r="4" fill="{NAVY}"/><circle cx="9" cy="9" r="4" fill="{NAVY}"/></g>'.replace("M60 250", "M60 200")
+    b += text(500, 245, '25–33× yearly expenses, in today\'s money · then the three buckets pay you', 12, SLATE, 600, 'middle')
+    return svg(b, 260).replace("offset-path:path('M60 250 C 220 250, 300 120, 470 150 S 760 230, 940 120')", f"offset-path:path('{road}')") if False else svg(b.replace('class="a-car"', f'class="a-car" style="offset-path:path(\'{road}\')"'), 260)
+
+def networth_calc_art():
+    assets = [('Mutual funds', 40, LILAC), ('House', 36, SKY), ('EPF, FD', 12, EMERALD), ('Gold', 8, AMBER)]
+    b = text(80, 50, 'Assets ₹4.41 Cr', 13, NAVY, 700); x = 80
+    for i, (l, w, c) in enumerate(assets):
+        b += f'<rect x="{x}" y="62" width="{w*6}" height="30" rx="6" fill="{c}" class="a-rise" style="animation-delay:{.1+i*.1:.1f}s"/>' + text(x + 6, 82, l if w > 10 else '', 11, '#fff', 700); x += w * 6 + 4
+    b += text(80, 130, 'Loans ₹90 L', 13, NAVY, 700) + f'<rect x="80" y="142" width="120" height="30" rx="6" fill="{ROSE}" class="a-rise a-d3"/>' + text(86, 162, 'home loan', 11, '#fff', 700)
+    b += f'<path d="M80 195h580" stroke="{LINE}"/>' + text(80, 228, 'Net worth', 14, SLATE, 700) + text(660, 228, '₹3.51 Cr', 22, NAVY, 800, 'end')
+    b += card(700, 50, 240, 180, 'a-rise a-d4') + text(720, 80, 'Why it matters', 12, SLATE, 700) + text(720, 106, 'Income is what you earn.', 12, INK, 600) + text(720, 124, 'Net worth is what you keep.', 12, INK, 600) + text(720, 150, 'Track it for the whole family,', 12, INK, 600) + text(720, 168, 'revalued every day, in the app.', 12, INK, 600) + text(720, 206, 'free · no bank login', 11, EMERALD, 700)
+    return svg(b, 250)
+
+def tools_art():
+    items = [('rupee', 'SIP', EMERALD), ('chart', 'Lumpsum', SKY), ('jar', 'SWP', AMBER), ('chart', 'CAGR', LILAC), ('flag', 'XIRR', VIOLET), ('users', 'Retirement', ROSE), ('shield', 'Emergency', TEAL), ('flag', 'FIRE', AMBER), ('bank', 'Net worth', SKY)]
+    b = ''
+    for i, (ic, l, c) in enumerate(items):
+        x = 100 + i * 100
+        b += disc(x, 90, ic, c, 28, f'a-rise a-d{min(6, i+1)}') + text(x, 140, l, 12, NAVY, 700, 'middle')
+    b += text(500, 200, 'no sign-up · no ads · the formula explained under every one', 13, SLATE, 600, 'middle')
+    return svg(b, 230)
+
+def guides_art():
+    b = bust(150, 110, 'you', 30, 'a-rise') + bust(215, 110, 'spouse', 30, 'a-rise a-d1') + bust(180, 170, 'son', 22, 'a-rise a-d2') + text(185, 215, 'one family', 12, SLATE, 700, 'middle')
+    b += line(260, 140, 330, 140)
+    for i, (ic, l, c) in enumerate([('lock', 'Your Drive', TEAL), ('sheet', 'CAS import', SKY), ('chart', 'Funds & stocks', LILAC), ('shield', 'Insurance', EMERALD), ('flag', 'Goals', VIOLET), ('jar', 'Retirement', AMBER), ('mail', 'Family email', ROSE)]):
+        x = 360 + (i % 4) * 150; y = 70 + (i // 4) * 90
+        b += card(x, y, 135, 64, f'a-rise a-d{i+1 if i < 6 else 6}') + disc(x + 28, y + 32, ic, c, 18) + text(x + 54, y + 37, l, 12, NAVY, 700)
+    return svg(b, 250)
+
+ART.update({'sip-calculator': sip_art, 'lumpsum-calculator': lumpsum_art, 'swp-calculator': swp_art, 'cagr-calculator': cagr_art, 'xirr-calculator': xirr_art,
+            'retirement-corpus-calculator': retire_art, 'emergency-fund-calculator': emergency_art, 'fire-calculator': fire_art, 'net-worth-calculator': networth_calc_art,
+            'tools': tools_art, 'guides': guides_art})
+CSS += ".a-grow-y{transform-box:fill-box;transform-origin:bottom;animation:aGrowY 1s cubic-bezier(.2,.8,.2,1) both}@keyframes aGrowY{from{transform:scaleY(0)}to{transform:scaleY(1)}}\n"

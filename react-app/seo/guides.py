@@ -71,7 +71,7 @@ def register(add, feat):
             'PAN, Aadhaar and mobile are optional. If something happens to you, these are the first things a bank or AMC asks your family for, so adding them saves a search; they are stored only in your sheet and masked on screen.',
             'Tick <strong>Include in email reports</strong> for the members who should receive the daily family email.',
             'Repeat for everyone. Kids are added as members too; their minor mutual fund accounts become their own portfolios when you import your CAMS statement.']) + """
-<p>Names on screen are hidden the moment you switch on the mask (the eye icon in the header), which is what you will see in our demo videos.</p>
+<p>Names on screen are hidden the moment you switch on the mask (the eye icon in the header), which is what you will see in our demo videos. Each member form also takes <strong>custom fields</strong> (occupation, blood group, employer, anything the family should know), and the <strong>Viewing as</strong> switch under your profile picture filters every page to one member or shows everyone together.</p>
 <h2 id="bank">Bank accounts</h2>
 <p>This is a list, not a connection. For each account you record the member, the bank and the type (savings, current, FD, NRE/NRO). Account number, IFSC and branch are optional; even the last four digits are enough for the family to identify it. No login, no balance fetching: the point is that the family knows the account exists and whose it is.</p>
 <h2 id="invest">Investment accounts</h2>
