@@ -25,14 +25,18 @@ export function getStoredToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
 
-export function storeToken(accessToken, expiresInSeconds = 3500) {
+export function storeToken(accessToken, expiresInSeconds = 3500, grantedScopes) {
   localStorage.setItem(TOKEN_KEY, accessToken)
   localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + expiresInSeconds * 1000))
+  // which permissions this token carries (Google lets people skip some): read back when a call fails for one
+  if (typeof grantedScopes === 'string') localStorage.setItem(TOKEN_KEY + '_scopes', grantedScopes)
 }
+export function getGrantedScopes() { return (localStorage.getItem(TOKEN_KEY + '_scopes') || '').split(/\s+/).filter(Boolean) }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(TOKEN_EXPIRY_KEY)
+  localStorage.removeItem(TOKEN_KEY + '_scopes')
   localStorage.removeItem(USER_NAME_KEY)
 }
 
@@ -82,7 +86,13 @@ export function setFilePickerHandler(fn) {
 let _freshHandler = null
 export function setFreshHandler(fn) { _freshHandler = fn }
 
-export async function callAPI(action, params = {}, retry = true, pickerTried = false) {
+// Apps Script refuses a call when the signed-in token lacks a permission the code needs (a box left unticked on
+// Google's consent screen): "You do not have permission to call UrlFetchApp.fetch. Required permissions: https://..."
+function missingScopeIn(msg) {
+  const m = /Required permissions?:\s*(https:\/\/www\.googleapis\.com\/auth\/[\w.]+)/i.exec(String(msg || ''))
+  return m ? m[1] : (/do not have permission to call/i.test(String(msg || '')) ? 'https://www.googleapis.com/auth/script.external_request' : null)
+}
+export async function callAPI(action, params = {}, retry = true, pickerTried = false, consentTried = false) {
   const token = getStoredToken()
   if (!token) {
     throw new Error('Not authenticated. Please sign in.')
@@ -136,6 +146,12 @@ export async function callAPI(action, params = {}, retry = true, pickerTried = f
     // Script execution error (runtime error in GAS code)
     if (data.error.details && data.error.details.length > 0) {
       const detail = data.error.details[0]
+      const sc = missingScopeIn(detail.errorMessage)
+      if (sc && !consentTried && _reauthHandler) {
+        // a permission was unticked at sign-in: ask for it (button → Google consent) and retry once
+        try { await _reauthHandler(sc); return callAPI(action, params, false, pickerTried, true) } catch { /* user said Later */ }
+        throw new Error('Capital Friends needs the Google permission "Connect to an external service" for this. Sign out, sign in again and tick every permission box.')
+      }
       throw new Error(detail.errorMessage || 'Script execution error')
     }
 
@@ -150,6 +166,11 @@ export async function callAPI(action, params = {}, retry = true, pickerTried = f
       if (picked) return callAPI(action, params, retry, true)
     }
     if (result && !result.success) {
+      const sc = missingScopeIn(result.error)
+      if (sc && !consentTried && _reauthHandler) {
+        try { await _reauthHandler(sc); return callAPI(action, params, false, pickerTried, true) } catch { /* user said Later */ }
+        throw new Error('Capital Friends needs the Google permission "Connect to an external service" for this. Sign out, sign in again and tick every permission box.')
+      }
       const err = new Error(result.needsFilePicker ? 'Please open your family sheet to continue.' : (result.error || 'Unknown error'))
       err.code = result.code
       throw err
