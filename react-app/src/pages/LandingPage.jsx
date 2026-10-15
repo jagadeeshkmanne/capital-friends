@@ -497,7 +497,7 @@ export const LANDING_FAQ = [
 ]
 export const YOUTUBE_URL = 'https://www.youtube.com/@capitalfriendsin'
 // Demo video: the full app walkthrough on YouTube (the id is the part after watch?v=). Shown as the last step of the hero story.
-export const DEMO_VIDEO_ID = '9M205N5lUlo'
+export const DEMO_VIDEO_ID = '9M205N5lUIo'
 export const DEMO_VIDEO_LABEL = 'Watch the demo · 30 min'
 export const INSTAGRAM_URL = 'https://www.instagram.com/jags.manne/'
 
