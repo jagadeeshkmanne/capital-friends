@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react'
 import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Download } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
 import { useFamily } from '../../context/FamilyContext'
 import { useMask } from '../../context/MaskContext'
 import { formatINR } from '../../data/familyData'
@@ -24,6 +25,56 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
     const active = (stockPortfolios || []).filter((p) => p.status === 'Active')
     return selectedMember === 'all' ? active : active.filter((p) => p.ownerId === selectedMember)
   }, [stockPortfolios, selectedMember])
+
+  const { activeMembers, activeInvestmentAccounts, addMember, addInvestmentAccount, addStockPortfolio } = useData()
+  const { user } = useAuth()
+  // No stock portfolio yet: nothing to set up first. Pick who it is for (defaults to you) and the import
+  // creates the demat account (broker from the file name) and the portfolio by itself, like the CAS import.
+  const noPortfolio = activePortfolios.length === 0
+  const selfMember = (activeMembers || []).find((m) => m.relationship === 'Self')
+  const [forMember, setForMember] = useState(() => (selectedMember !== 'all' ? selectedMember : selfMember?.memberId || (activeMembers || [])[0]?.memberId || 'me'))
+  const [setupSteps, setSetupSteps] = useState([])   // [{ label, done }] shown while creating member / account / portfolio
+  const memberOptions = useMemo(() => {
+    const opts = (activeMembers || []).map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
+    if (!opts.some((o) => o.value === 'me') && !selfMember) opts.unshift({ value: 'me', label: `${user?.name || 'Me'} (you, added to Family)` })
+    return opts
+  }, [activeMembers, selfMember, user, mv])
+  const brokerFromFile = (name) => {
+    const n = String(name || '').toLowerCase()
+    for (const [k, v] of [['zerodha', 'Zerodha'], ['kite', 'Zerodha'], ['console', 'Zerodha'], ['groww', 'Groww'], ['upstox', 'Upstox'], ['angel', 'Angel One'], ['icici', 'ICICI Direct'], ['hdfc', 'HDFC Securities'], ['kotak', 'Kotak Securities'], ['dhan', 'Dhan'], ['5paisa', '5paisa'], ['paytm', 'Paytm Money'], ['sharekhan', 'Sharekhan'], ['motilal', 'Motilal Oswal'], ['fyers', 'Fyers'], ['ibkr', 'Interactive Brokers'], ['interactive', 'Interactive Brokers'], ['vested', 'Vested'], ['indmoney', 'INDmoney']]) if (n.includes(k)) return v
+    return 'Broker'
+  }
+  const step = (label) => setSetupSteps((st) => [...st, { label, done: false }])
+  const tick = () => setSetupSteps((st) => st.map((x, i) => (i === st.length - 1 ? { ...x, done: true } : x)))
+  // Make sure a portfolio exists for the chosen person; returns its id. Creates member / demat account / portfolio as needed.
+  async function ensurePortfolio() {
+    let memberId = forMember, member = (activeMembers || []).find((m) => m.memberId === memberId)
+    if (memberId === 'me' || !member) {
+      step(`Adding ${user?.name || 'you'} to Family`)
+      const r = await addMember({ memberName: user?.name || 'Me', relationship: selfMember ? 'Other' : 'Self', email: user?.email || '', includeInEmailReports: true, pan: '', aadhar: '', mobile: '', dynamicFields: {} })
+      memberId = r?.memberId || r?.data?.memberId || r?.id
+      if (!memberId) throw new Error('Could not add you to Family')
+      member = { memberId, memberName: user?.name || 'Me' }
+      tick()
+    }
+    const broker = brokerFromFile(fileName)
+    let acct = (activeInvestmentAccounts || []).find((a) => a.memberId === memberId && (a.accountType === 'Demat + Trading' || a.accountType === 'Trading') && String(a.platformBroker || '').toLowerCase() === broker.toLowerCase())
+      || (activeInvestmentAccounts || []).find((a) => a.memberId === memberId && (a.accountType === 'Demat + Trading' || a.accountType === 'Trading'))
+    if (!acct) {
+      step(`Creating demat account ${broker} · ${member.memberName}`)
+      const r = await addInvestmentAccount({ accountName: `${broker} - ${member.memberName}`, memberId, bankAccountId: '', accountType: 'Demat + Trading', platformBroker: broker, accountClientId: '', registeredEmail: user?.email || '', registeredPhone: '' })
+      const id = r?.accountId || r?.data?.accountId
+      if (!id) throw new Error('Could not create the demat account')
+      acct = { accountId: id, accountName: `${broker} - ${member.memberName}`, platformBroker: broker }
+      tick()
+    }
+    step(`Creating portfolio ${broker} · ${member.memberName}`)
+    const pr = await addStockPortfolio({ portfolioName: `${broker} - ${member.memberName}`, ownerId: memberId, investmentAccountId: acct.accountId })
+    const newId = pr?.portfolioId || pr?.data?.portfolioId
+    if (!newId) throw new Error('Could not create the portfolio')
+    tick()
+    return newId
+  }
 
   const [pid, setPid] = useState(portfolioId || '')
   const [date, setDate] = useState(today())
@@ -72,12 +123,14 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
   }, [rows, held]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleImport() {
-    if (!pid) { setError('Choose a portfolio first'); return }
+    if (!pid && !noPortfolio) { setError('Choose a portfolio first'); return }
     if (!toImport.length) return
     setSaving(true); setError('')
     try {
+      let target = pid
+      if (!target) { setSetupSteps([]); target = await ensurePortfolio(); setPid(target) }
       const res = await onImport({
-        portfolioId: pid, date,
+        portfolioId: target, date,
         rows: toImport.map((r) => ({ symbol: r.stock.symbol, quantity: r.quantity, avgPrice: Math.round(r.avgPrice * 10000) / 10000, sourceSymbol: r.sourceSymbol, isin: r.isin || undefined, currency: r.currency || undefined, date: r.date || undefined })),
       })
       const notTaken = (rows || []).filter((r) => !toImport.includes(r)).map((r) => ({ symbol: r.sourceSymbol, reason: !r.stock ? 'Not found in the stock list' : status(r) === 'held' ? 'Already in this portfolio' : 'Left out by you' }))
@@ -123,9 +176,16 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Import into portfolio" required>
-          <FormSelect value={pid} onChange={setPid} options={portfolioOptions} placeholder="Select portfolio..." />
-        </FormField>
+        {noPortfolio ? (
+          <FormField label="Import for" required>
+            <FormSelect value={forMember} onChange={setForMember} options={memberOptions} placeholder="Who are these stocks for?" />
+            <p className="text-[11px] text-[var(--text-dim)] mt-1">No stock portfolio yet. The import creates the demat account and portfolio for this person. Nothing to set up first.</p>
+          </FormField>
+        ) : (
+          <FormField label="Import into portfolio" required>
+            <FormSelect value={pid} onChange={setPid} options={portfolioOptions} placeholder="Select portfolio..." />
+          </FormField>
+        )}
         <FormField label="Bought on (rows without a Buy date)">
           <FormDateInput value={date} onChange={setDate} />
         </FormField>
@@ -146,6 +206,11 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
       </div>
 
       {error && <p className="text-xs text-rose-500">{error}</p>}
+      {setupSteps.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {setupSteps.map((x, i) => <li key={i} className="flex items-center gap-2 text-[var(--text-primary)]">{x.done ? <CheckCircle2 size={14} className="text-emerald-500" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--text-dim)] border-t-transparent animate-spin" />}{x.label}</li>)}
+        </ul>
+      )}
 
       {/* preview */}
       {rows && (
