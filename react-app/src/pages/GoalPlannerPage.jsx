@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { Target, GraduationCap, Umbrella, Home, ShieldCheck, Route, BellRing, LogIn, RotateCcw } from 'lucide-react'
+import { Target, GraduationCap, Umbrella, Home, ShieldCheck, Route, BellRing, LogIn, RotateCcw, Mail, PieChart } from 'lucide-react'
 import GoalForm from '../components/forms/GoalForm'
 import { LogoMark } from './landing/Brand'
+import { buildGoalPlan } from '../utils/goalPlan'
+import { PlanByYear, GP_CSS, L } from './goals/GoalsPlanPage'
 
 // Public goal planner (/goal-planner/): the real Add Goal dialog, without a family member and without saving.
-// "Create" stores the plan on this device and sends the visitor to sign in; the Goals page then opens it prefilled.
+// The last step shows the goal's year-by-year plan (the app's own glide path) computed as if no money is in it yet,
+// then what the app adds once signed in. Nothing is stored; nothing touches a signed-in user's data.
 const TYPES = [
   ['Retirement', 'Retirement', Umbrella, 'Corpus from today\'s expenses, inflation and a safe withdrawal rate'],
   ['Child Education', 'Child education', GraduationCap, 'Date set from the child\'s age and the course'],
@@ -13,10 +16,17 @@ const TYPES = [
   ['Custom', 'Any goal', Target, 'Car, travel, wedding, a business'],
 ]
 const AFTER = [
-  [Route, 'Your real money on the goal', 'Tick which funds, FDs and EPF are for your goals; the app shares them across goals and shows have-today vs need-today.'],
-  [Target, 'The glide path', 'From five years out it tells you how much to move from equity to safe each year, only in good markets, so the money is there on the date.'],
-  [BellRing, 'Alerts with action items', 'When a goal drifts off its path or a fund it depends on falls below its high, you get a daily email with what to do.'],
+  [PieChart, 'Your real money on the goal', 'Import your CAMS statement once, tick which funds, FDs and EPF are for goals, and this plan shows have-today vs need-today with the actual funds counted for it.'],
+  [Route, 'Each step with the exact units', 'Every "move to safe" year above becomes a step with the fund names and amounts, shown only in good markets, so nothing is sold at a low.'],
+  [BellRing, 'Alerts with action items', 'When the goal drifts off its path, or a fund it depends on falls below its high, the daily family email says what to do.'],
+  [Mail, 'Your family knows', 'The goal, the funds behind it and the plan are in the daily email your family receives. If something happens to you, they know.'],
 ]
+// the plan the app would show for this goal if it held no money yet: the required SIP goes in from today
+function guestPlan(data) {
+  const goal = { ...data, goalId: 'guest', goalName: data.goalName || data.goalType, isActive: true, status: 'Active' }
+  const plan = buildGoalPlan({ goals: [goal], attribution: {}, mfHoldings: [], mappings: [], eqOf: () => 0 })
+  return plan.goals[0] || null
+}
 
 export default function GoalPlannerPage() {
   const [type, setType] = useState('Retirement')
@@ -24,11 +34,11 @@ export default function GoalPlannerPage() {
   const [done, setDone] = useState(null)
 
   const onSave = async (data) => {
-    try { localStorage.setItem('cf-goal-draft', JSON.stringify({ ...data, goalName: data.goalName || type })) } catch { /* private mode */ }
-    setDone(data)
-    try { window.gtag && window.gtag('event', 'goal_planner_complete', { goal_type: data.goalType }) } catch { /* no analytics */ }
+    setDone({ data, p: guestPlan(data) })
+    try { window.gtag && window.gtag('event', 'goal_planner_plan', { goal_type: data.goalType }) } catch { /* no analytics */ }
+    setTimeout(() => document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
-  const signIn = () => { window.location.href = '/?from=goal-planner' }
+  const signIn = () => { window.location.href = '/' }
 
   return (
     <div className="cf-app min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -62,33 +72,46 @@ export default function GoalPlannerPage() {
         {/* the real Add Goal dialog, inline */}
         <section className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-3 sm:p-5" id="planner">
           {done ? (
-            <div className="py-6 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300"><Target size={28} /></div>
-              <h2 className="mt-4 text-[22px] font-extrabold text-white">Your plan is ready</h2>
-              <p className="mx-auto mt-2 max-w-xl text-[14px] text-[var(--text-muted)]">It is saved on this device. Sign in with Google and the same goal opens inside the app, where the plan runs on your real investments: the glide path, the funds counted for it, and the alerts.</p>
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <button onClick={signIn} className="flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-[14px] font-bold text-emerald-950 hover:bg-emerald-400"><LogIn size={16} /> Sign in with Google, free</button>
-                <button onClick={() => { setDone(null); setN(n + 1) }} className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-4 py-2.5 text-[14px] font-semibold text-[var(--text-muted)] hover:text-white"><RotateCcw size={15} /> Plan another goal</button>
+            <div id="plan">
+              <style>{GP_CSS}</style>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-[22px] font-extrabold text-white">{done.data.goalName || done.data.goalType} · {new Date(done.data.targetDate).getFullYear()}</h2>
+                  <p className="mt-1 text-[13px] text-[var(--text-muted)]">This is the plan the app would run for this goal from today, with the SIP it needs going in every month.</p>
+                </div>
+                <button onClick={() => { setDone(null); setN(n + 1) }} className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-semibold text-[var(--text-muted)] hover:text-white"><RotateCcw size={14} /> Plan another goal</button>
               </div>
-              <p className="mt-4 text-[12px] text-[var(--text-dim)]">Your data stays in a Google Sheet in your own Drive. No bank login. Open source.</p>
+              {done.p ? (
+                <>
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[['Goal amount', L(done.p.target)], ['SIP needed', `${L(done.p.sipNeeded)} / mo`], ['Years to go', `${done.p.yearsLeft}`], ['Equity now', done.p.bucketMode ? 'Buckets' : `${done.p.eqTarget}%`]].map(([k, v]) => (
+                      <div key={k} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5"><div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">{k}</div><div className="mt-0.5 text-[17px] font-bold text-white">{v}</div></div>
+                    ))}
+                  </div>
+                  <div className="mt-4"><PlanByYear p={done.p} /></div>
+                </>
+              ) : <p className="mt-4 text-[14px] text-[var(--text-muted)]">Set a target date to see the year-by-year plan.</p>}
+              <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+                <h3 className="text-[18px] font-extrabold text-white">This plan, on your real money</h3>
+                <p className="mt-1 text-[14px] text-[var(--text-muted)]">Sign in with Google (free, your data stays in your own Google Drive) and the app runs this same plan on the funds, FDs and EPF you already have.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {AFTER.map(([Icon, t, d]) => (
+                    <div key={t} className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300"><Icon size={18} /></div>
+                      <div><div className="text-[14px] font-bold text-white">{t}</div><p className="mt-0.5 text-[13px] leading-relaxed text-[var(--text-muted)]">{d}</p></div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button onClick={signIn} className="flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-[14px] font-bold text-emerald-950 hover:bg-emerald-400"><LogIn size={16} /> Open the app, free</button>
+                  <a href="https://www.youtube.com/@capitalfriendsin" target="_blank" rel="noopener noreferrer" className="text-[13px] font-semibold text-emerald-300 hover:underline">Watch the walkthrough on YouTube →</a>
+                </div>
+              </div>
             </div>
           ) : (
-            <GoalForm key={`${type}-${n}`} defaultType={type} onSave={onSave} onCancel={() => setN(n + 1)} submitLabel="Create this goal →" />
+            <GoalForm key={`${type}-${n}`} defaultType={type} onSave={onSave} onCancel={() => setN(n + 1)} submitLabel="See the year-by-year plan →" />
           )}
         </section>
-
-        {/* what happens after sign in */}
-        <h2 className="mt-12 text-[22px] font-extrabold text-white" style={{ fontFamily: "'Poppins', sans-serif" }}>What the sign-in adds</h2>
-        <p className="mt-1 max-w-3xl text-[14px] text-[var(--text-muted)]">A calculator stops at a number. In the app the goal becomes a plan that watches your money.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {AFTER.map(([Icon, t, d]) => (
-            <div key={t} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300"><Icon size={18} /></div>
-              <div className="mt-3 text-[14px] font-bold text-white">{t}</div>
-              <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-muted)]">{d}</p>
-            </div>
-          ))}
-        </div>
 
         <h2 className="mt-12 text-[22px] font-extrabold text-white" style={{ fontFamily: "'Poppins', sans-serif" }}>How the planner calculates</h2>
         <div className="prose-cf mt-2 max-w-3xl space-y-3 text-[14px] leading-relaxed text-[var(--text-muted)]">

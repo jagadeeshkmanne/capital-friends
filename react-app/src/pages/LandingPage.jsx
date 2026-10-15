@@ -534,7 +534,7 @@ export default function LandingPage() {
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated) { let d = null; try { d = localStorage.getItem('cf-goal-draft') } catch {}; navigate(d ? '/goals' : '/dashboard', { replace: true }) }
+    if (isAuthenticated) navigate('/dashboard', { replace: true })
   }, [isAuthenticated, navigate])
 
   return (
