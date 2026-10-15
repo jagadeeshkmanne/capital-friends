@@ -54,6 +54,18 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:#f1f5f9
 .feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:14px 0}.feat div{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}.feat b{display:block;margin-bottom:4px}.feat p{font-size:13.5px;margin:0}
 .steps{counter-reset:s}.steps li{list-style:none;margin:10px 0;padding-left:40px;position:relative}.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:#0b1220;color:#34d399;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
 .disc{font-size:12.5px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:14px;margin-top:30px}
+.pv{margin-top:34px}.pv h2{margin-top:0}.pv .sub{color:#475569;font-size:14px;margin:-6px 0 14px}
+.pv .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;background:#0b1220;border-radius:16px;padding:14px}
+.pv .pc{background:#111c33;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;color:#e2e8f0;font-size:13px}
+.pv .pc .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.pv .pc .hd b{color:#fff;font-size:13.5px}.pv .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+.pv .ok{background:rgba(52,211,153,.15);color:#6ee7b7}.pv .due{background:rgba(245,158,11,.15);color:#fcd34d}.pv .smp{font-size:10.5px;color:#64748b;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:1px 7px}
+.pv .tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}.pv .tiles div{background:#0b1220;border-radius:8px;padding:7px 10px}.pv .tiles small{display:block;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#64748b}.pv .tiles b{color:#fff;font-size:14px}
+.pv ul{list-style:none;margin:10px 0 0;padding:0}.pv li{display:flex;justify-content:space-between;gap:8px;margin:5px 0;color:#cbd5e1}.pv li i{display:inline-block;width:20px;height:20px;border-radius:5px;margin-right:8px;vertical-align:middle}.pv li b{color:#fff}
+.pv .chip{font-size:10.5px;padding:1px 7px;border-radius:999px;background:rgba(148,163,184,.15);color:#cbd5e1;white-space:nowrap}.pv .eq{background:rgba(167,139,250,.2)}.pv .sf{background:rgba(52,211,153,.2)}
+.pv .bar{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:8px;background:rgba(255,255,255,.08)}.pv .bar span{display:block}
+.pv .note{font-size:11px;color:#64748b;margin:10px 0 0}.pv .step{background:#0b1220;border-radius:8px;padding:9px 10px;margin-top:10px}.pv .step b{color:#fff}.pv .amber{color:#fcd34d;font-weight:600;font-size:14px;margin-top:6px}
+.pv .btn{display:inline-block;background:#7c3aed;color:#fff;font-weight:600;font-size:12px;padding:6px 12px;border-radius:8px;margin-top:10px}.pv .jar{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}.pv .jar div{background:#0b1220;border-radius:8px;padding:8px}.pv .jar small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#64748b}.pv .jar b{display:block;color:#fff;font-size:14px;margin-top:2px}.pv .jar em{display:block;font-style:normal;font-size:10.5px;color:#94a3b8;margin-top:2px}
+.pv .mail li{justify-content:flex-start}.pv .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px}
 footer.bot{background:#080d1a;color:#64748b;font-size:12.5px}footer.bot .in{max-width:1100px;margin:0 auto;padding:26px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
 footer.bot b{color:#94a3b8;display:block;margin-bottom:8px;font-size:12px;letter-spacing:1px;text-transform:uppercase}footer.bot a{color:#94a3b8;display:block;margin:4px 0}footer.bot .legal{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;color:#475569}
 """
@@ -121,6 +133,33 @@ CTA = {
  'xirr': ("Get XIRR for every fund, automatically", "Stop typing cashflows. Import your CAMS statement into Capital Friends and get XIRR, CAGR, real money-in and profit for every fund, every portfolio and the whole family. Free and open source.", "Import my CAS statement"),
 }
 
+PV = {
+ 'funds': """<div class="pc"><div class="hd"><b>Mutual funds · the whole family</b><span class="smp">Sample numbers</span></div>
+<div class="tiles"><div><small>Your money in</small><b>₹1.58 Cr</b></div><div><small>Current value</small><b>₹2.04 Cr</b></div><div><small>XIRR</small><b>11.5%</b></div><div><small>CAGR</small><b>16.4%</b></div></div>
+<ul><li><span><i style="background:rgba(167,139,250,.25)"></i>Flexi cap fund <span class="chip">7% below high</span></span><b>₹28.4 L</b></li><li><span><i style="background:rgba(167,139,250,.25)"></i>Multi asset fund</span><b>₹13.3 L</b></li><li><span><i style="background:rgba(56,189,248,.25)"></i>Global index fund <span class="chip">SIP only</span></span><b>₹11.4 L</b></li><li><span><i style="background:rgba(52,211,153,.25)"></i>Bank FD · safe</span><b>₹12 L</b></li></ul>
+<p class="note">Every fund, SIP, switch and sale from one CAMS statement. Money-in is real cash, not switched profit. Each fund is compared with its own high every day.</p></div>""",
+ 'buckets': """<div class="pc"><div class="hd"><b>Retirement · 3 buckets</b><span class="tag ok">On track</span></div>
+<div class="jar"><div><small>Income</small><b>₹0</b><em>2 yrs of expenses · fills from 2031</em></div><div><small>Stability</small><b>₹30 L</b><em>next 5 yrs · EPF, hybrid, debt</em></div><div><small>Growth</small><b>₹68.5 L</b><em>the rest · equity</em></div></div>
+<div class="step"><small style="font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#64748b">2034 · a quarterly step</small><div class="amber">Move ₹2.1 L from Growth to Income</div><div style="color:#94a3b8;font-size:11.5px;margin-top:3px">Only while the market is near its high. In a bad year Stability pays instead, so nothing is sold at a low.</div><span class="btn">Record the move</span></div>
+<p class="note">Your actual funds, EPF and FDs fill the jars. Every year of the plan becomes a step like this.</p></div>""",
+ 'goal': """<div class="pc"><div class="hd"><b>Child education · 2033</b><span class="tag ok">On track</span></div>
+<div class="tiles"><div><small>Have today</small><b>₹22.2 L</b></div><div><small>Should have</small><b>₹22.1 L</b></div></div>
+<div class="bar"><span style="width:42%;background:#a78bfa"></span><span style="width:58%;background:#34d399"></span></div><div style="display:flex;justify-content:space-between;font-size:10.5px;color:#64748b;margin-top:3px"><span>42% growth</span><span>58% safe</span></div>
+<ul><li><span><i style="background:rgba(52,211,153,.25)"></i>Bank FD <span class="chip sf">65% of it</span></span><b>₹7.8 L</b></li><li><span><i style="background:rgba(167,139,250,.25)"></i>Multi asset fund <span class="chip eq">31% of it</span></span><b>₹6 L</b></li><li><span><i style="background:rgba(167,139,250,.25)"></i>Multi factor fund</span><b>₹5.9 L</b></li></ul>
+<div class="step"><div class="amber">2029 · move ₹4.2 L to safe funds</div><div style="color:#94a3b8;font-size:11.5px;margin-top:3px">The glide path: equity 65% → 50% as the date comes near, only in good markets.</div></div>
+<p class="note">You tick which investments are for goals; the app shares them: near goals get the safe money, far goals the equity.</p></div>""",
+ 'networth': """<div class="pc"><div class="hd"><b>Family net worth</b><span class="smp">Sample numbers</span></div>
+<div class="tiles"><div><small>Net worth</small><b>₹3.51 Cr</b></div><div><small>Total assets</small><b>₹4.41 Cr</b></div><div><small>Loans</small><b>₹90 L</b></div><div><small>Money in</small><b>₹2.35 Cr</b></div></div>
+<div class="bar"><span style="width:46%;background:#a78bfa"></span><span style="width:36%;background:#38bdf8"></span><span style="width:8%;background:#fbbf24"></span><span style="width:10%;background:#34d399"></span></div>
+<ul><li><span><i style="background:rgba(167,139,250,.25)"></i>Mutual funds · 4 members</span><b>₹2.04 Cr</b></li><li><span><i style="background:rgba(56,189,248,.25)"></i>House · loan linked</span><b>₹1.6 Cr</b></li><li><span><i style="background:rgba(251,191,36,.25)"></i>Gold · 250 g, today's rate</span><b>₹35 L</b></li><li><span><i style="background:rgba(52,211,153,.25)"></i>EPF, FD</span><b>₹42 L</b></li></ul>
+<p class="note">Every member, every account, revalued daily. Gold by weight, the house with its loan, insurance with nominees.</p></div>""",
+ 'mail': """<div class="pc mail"><div class="hd"><b>Family Financial Blueprint</b><span class="smp">Daily email</span></div>
+<ul><li><span class="dot" style="background:#fbbf24"></span><span><b>Retirement</b> is 4% off its path · 1 step due</span></li><li><span class="dot" style="background:#38bdf8"></span><span><b>Flexi cap fund</b> is 7% below its high · information, not advice</span></li><li><span class="dot" style="background:#34d399"></span><span><b>SIP</b> ₹40,000 due on the 5th · term policy renews in 12 days</span></li><li><span class="dot" style="background:#a78bfa"></span><span><b>Net worth</b>, every account, every fund, nominees, loans: where everything is</span></li></ul>
+<p class="note">Sent every morning from your own Gmail to the family members you choose. If something happens to you, they know where everything is.</p></div>""",
+}
+def preview(kinds, title, sub):
+    return f'<section class="pv"><h2>{title}</h2><p class="sub">{sub}</p><div class="wrap">' + ''.join(PV[k] for k in kinds) + '</div></section>'
+
 def field(id, label, val, step=None, hint=None, typ='number', attrs=''):
     st = f' step="{step}"' if step else ''
     h = f'<div class="hint">{hint}</div>' if hint else ''
@@ -145,7 +184,8 @@ def page(slug, p, tools, feats):
     ld.append(faq_ld(p['faq']))
     p = dict(p, ld=ld)
     t, d, b = CTA[p.get('cta', 'default')]
-    body = p['body']
+    pvk = p.get('preview')
+    body = p['body'] + (preview(*pvk) if pvk else '')
     html = head(p, url) + '<body>' + header() + '<main>' + \
         f'<div class="crumbs"><a href="/">Capital Friends</a> › {"<a href=/tools/>Calculators</a> › " if p.get("calc") else ""}{p["h1"]}</div>' + \
         f'<h1>{p["h1"]}</h1><p class="lead">{p["lead"]}</p>' + \
@@ -179,6 +219,7 @@ add('sip-calculator', nav='SIP calculator', blurb='Monthly SIP → value after N
 <p>Most people start a SIP they can afford today and never raise it. A 10% yearly step-up on a ₹10,000 SIP at 12% for 20 years adds roughly ₹70 lakh to the final value compared with a flat SIP. Try it above: switch the step-up between 0 and 10 and watch the difference.</p>
 <h2>SIP calculator vs your real portfolio</h2>
 <p>A calculator assumes one steady return. Real funds rise and fall, SIPs get paused, and money is switched between funds. That is why the invested amount in most apps drifts away from what you actually put in. Capital Friends reads your CAMS statement and shows your real SIPs, real money-in and the XIRR you are actually earning, for every family member.</p>""",
+ preview=(['funds','mail'], 'What this looks like with your real funds', 'A calculator assumes one steady return. In Capital Friends the same numbers come from your actual SIPs, with the real money-in, XIRR and CAGR for every fund and every family member.'),
  faq=[('Is a SIP calculator accurate?', 'It is accurate for the assumptions you enter. Real mutual fund returns vary year to year, so treat the result as a planning estimate, and review it against your actual XIRR once a year.'),
       ('What return should I assume for a SIP?', 'For diversified equity funds, 10–12% a year is a common long-term planning assumption. For hybrid funds 9–10%, and for debt funds 6–8%. Lower assumptions keep you safe.'),
       ('Is SIP better than lump sum?', 'A SIP spreads purchases over time, so you buy more units when prices are low. A lump sum works better when markets rise steadily. Most salaried investors use a SIP because income arrives monthly. Compare both with the <a href="/lumpsum-calculator/">lumpsum calculator</a>.'),
@@ -198,6 +239,7 @@ add('lumpsum-calculator', nav='Lumpsum calculator', blurb='One-time investment �
 <p>A lump sum puts all the money to work on day one, which wins when the market goes up steadily. A SIP spreads the risk of a bad entry point. A common middle path is a lumpsum into a liquid or arbitrage fund with an STP (systematic transfer) into equity over 6–12 months. Compare the two with the <a href="/sip-calculator/">SIP calculator</a>.</p>
 <h2>Is it a good time to invest a lump sum?</h2>
 <p>Headlines talk about Nifty. Your funds are not Nifty. A large-cap fund may be 15% below its high while your small-cap fund is only 3% below. Capital Friends shows each of your funds against its own all-time high, so you look at your own money, not the news, before adding a lump sum. That is information, not advice.</p>""",
+ preview=(['funds','mail'], 'Before you add a lump sum, see your own funds', 'Which of your funds is below its own high, which no longer accepts fresh money, and what the family holds in total.'),
  faq=[('Which is better, lumpsum or SIP?', 'Historically a lump sum in a rising market beats a SIP, but a SIP protects you from a bad entry. If the amount is large relative to your portfolio, spreading it over 6–12 months is a reasonable compromise.'),
       ('What return should I use?', 'Use 10–12% for equity funds, 7–8% for debt, 9–10% for hybrid, and a lower number if you want a conservative plan.'),
       ('Does the calculator include exit load or tax?', 'No. Equity funds held over a year attract 12.5% long-term capital gains tax on gains above ₹1.25 lakh a year; exit loads usually apply only in the first year.'),
@@ -220,6 +262,7 @@ add('swp-calculator', nav='SWP calculator', blurb='How long a corpus lasts with 
 <ul><li>An SWP lets you decide the amount; a dividend (IDCW) payout is decided by the fund and is fully taxable.</li>
 <li>Only the gain inside each withdrawal is taxed, which usually makes an SWP more tax-efficient than FD interest.</li>
 <li>Withdrawing from equity in a crash locks in losses. A bucket approach, where 2–3 years of expenses sit in safe funds, avoids that. See the <a href="/retirement-bucket-strategy/">three-bucket retirement strategy</a>.</li></ul>""", cta='retire',
+ preview=(['buckets','mail'], 'Withdrawals that never sell equity in a crash', 'The app runs the three-bucket plan on your real retirement money and tells you each quarter what to move.'),
  faq=[('What is a safe SWP rate?', 'Around 3.5–4% of the corpus a year, rising with inflation, has historically lasted 30 years in most cases. Higher rates work only if returns stay high, which you cannot count on.'),
       ('Is SWP taxable?', 'Each withdrawal is part capital and part gain; only the gain portion is taxed, at the capital-gains rate for that fund type. That is why SWPs are usually better than taking dividends or FD interest in a high tax bracket.'),
       ('Which fund is good for SWP?', 'A low-volatility fund such as a conservative hybrid, balanced advantage or short-duration debt fund for the income part, with equity kept separate for growth. Capital Friends models this as three buckets.'),
@@ -238,6 +281,7 @@ add('cagr-calculator', nav='CAGR calculator', blurb='Annualised growth from a st
 <p>CAGR assumes one investment at the start and one value at the end. It is the right number for a one-time investment, an FD, gold or a house. If you invested in instalments (SIPs, top-ups, redemptions), the money went in on different dates and CAGR becomes misleading; use <a href="/xirr-calculator/">XIRR</a> instead. Capital Friends shows both, side by side, for every fund and portfolio, so you can see the difference on your own money.</p>
 <h2>Typical CAGRs in India (for context, not a forecast)</h2>
 <ul><li>Nifty 50 total return, long run: roughly 11–13% a year.</li><li>Bank FDs: 6–7.5%. PPF: 7.1%. EPF: 8.25%.</li><li>Gold over 20 years: about 11%. Inflation: 5–6%.</li></ul>""",
+ preview=(['funds','mail'], 'CAGR and XIRR side by side, for your own funds', 'The difference between a fund\'s return and your return, for every fund, every portfolio and the family.'),
  faq=[('What is a good CAGR for mutual funds?', 'For equity funds, 12% or more over 10+ years is good; 15%+ is excellent. Compare a fund with its benchmark index over the same period, not with a fixed number.'),
       ('Why is my CAGR different from the fund\'s CAGR?', 'The fund\'s CAGR is for a lump sum held for the whole period. Your money went in on different dates, so your personal return is an XIRR, which can be higher or lower.'),
       ('How do I calculate CAGR for a house or gold?', 'Use the purchase price as the start value, today\'s market value as the end value, and the years since purchase. Remember to subtract stamp duty, brokerage and maintenance for a true figure.'),
@@ -263,6 +307,7 @@ add('xirr-calculator', nav='XIRR calculator', blurb='Your real annual return fro
 <ol class="steps"><li>Download your detailed CAMS + KFintech consolidated statement (CAS) PDF. It lists every transaction since you started.</li>
 <li>Import it into Capital Friends. The app reads every purchase, SIP, switch and redemption with its date.</li>
 <li>You get XIRR and CAGR for every fund, every portfolio and the family as a whole, and the money-in figure is the real cash that left your bank, not the cost of switched units.</li></ol>""",
+ preview=(['funds','mail'], 'XIRR for every fund, without typing a single cashflow', 'One CAMS statement gives every purchase, SIP, switch and redemption with its date.'),
  faq=[('Why is my XIRR lower than the fund\'s 5-year return?', 'The fund\'s return is for a lump sum invested 5 years ago. Your SIP instalments were invested later, many of them at higher NAVs, so your XIRR is usually lower in a rising market and higher in a falling one.'),
       ('Does a switch count as a new investment in XIRR?', 'For your overall return, no: money switched between your own funds is not new cash. Many apps count it anyway and inflate the invested amount. Capital Friends tracks the real money-in separately.'),
       ('How much data do I need?', 'At least one purchase with a date, and the current value with its date. More purchases make it more accurate. Redemptions can be entered as negative amounts if you edit the code; the app handles them automatically.'),
@@ -288,6 +333,7 @@ add('retirement-corpus-calculator', nav='Retirement corpus calculator', blurb='C
 <li><strong>One return for 50 years.</strong> Use a higher return while accumulating and a lower one after retiring, when most money should be in safer funds.</li></ul>
 <h2>After the number: how to actually withdraw</h2>
 <p>A corpus is only half the plan. The other half is how you draw it without selling equity in a crash. Capital Friends uses three buckets: income (2 years of expenses, safe), stability (next 5 years, hybrid/debt) and growth (the rest, equity). It refills the income bucket from growth in good years and from stability in bad years. Read how it works on the <a href="/retirement-bucket-strategy/">retirement bucket strategy</a> page, or try the <a href="/swp-calculator/">SWP calculator</a>.</p>""",
+ preview=(['buckets','mail'], 'From a number to a plan on your real money', 'Your EPF, funds and FDs fill the three buckets; the glide path and the alerts do the rest.'),
  faq=[('How much corpus do I need to retire in India?', 'A common rule is 25–30 times your yearly expenses at retirement (after inflation). For ₹1 lakh a month at retirement that is ₹3–3.6 crore. The calculator above gives a more exact number for your ages and returns.'),
       ('What withdrawal rate is safe in India?', 'Around 3.5–4% of the corpus in the first year, rising with inflation. Higher inflation in India argues for the lower end, or for keeping part of the corpus in equity after retiring.'),
       ('Should I count EPF and NPS?', 'Yes, they are retirement money. Capital Friends counts EPF, PPF and NPS for the retirement goal only and never includes them in a sell step, since they pay out on their own rules.'),
@@ -308,6 +354,7 @@ add('emergency-fund-calculator', nav='Emergency fund calculator', blurb='Months 
 <ul><li><strong>Savings account with sweep-in FD</strong> for the first month of expenses: instant access.</li><li><strong>Liquid or overnight mutual fund</strong> for the rest: better than savings interest, redeemable in a day, and some offer instant redemption up to ₹50,000.</li><li>Never in equity, and not locked in a 5-year FD with a penalty.</li></ul>
 <h2>Track it with the rest of your money</h2>
 <p>Capital Friends has an emergency fund goal that always gets the safest money first, before any other goal is funded. When you tick which FDs and liquid funds are for your goals, the emergency fund is protected and never part of a rebalance.</p>""", cta='goal',
+ preview=(['goal','mail'], 'Your emergency fund as a goal the app protects', 'It gets the safest money first, is never part of a rebalance, and the family email shows where it is.'),
  faq=[('Is 6 months of expenses enough?', 'For a two-income household, usually yes. For a single earner or an uncertain job market, 9–12 months is safer. Health insurance reduces the medical part of the risk.'),
       ('Should the emergency fund be in a liquid fund or FD?', 'Both work. A liquid fund has no penalty for early withdrawal and is taxed only on gains; an FD is simpler and insured up to ₹5 lakh per bank. Many people split it.'),
       ('Should I build the emergency fund before starting SIPs?', 'Build at least 2–3 months first, then run both in parallel. A SIP you have to stop in an emergency costs more than a delayed start.'),
@@ -329,6 +376,7 @@ add('fire-calculator', nav='FIRE calculator', blurb='Your FIRE number and the ag
 <ul><li><strong>Lean FIRE</strong>: expenses cut to the bone, smaller number, less margin.</li><li><strong>Regular FIRE</strong>: today's lifestyle continues.</li><li><strong>Coast FIRE</strong>: you have enough invested that it will grow to the number by normal retirement age without adding more, so you can take a lower-paying job you like.</li></ul>
 <h2>Why India needs a lower withdrawal rate</h2>
 <p>The 4% rule comes from US data with 3% inflation and 60+ years of market history. Indian inflation runs 5–6% and equity is more volatile, so most planners suggest 3–3.5% for an early retiree who may need the money for 40–50 years, plus a bucket structure so equity is never sold in a crash.</p>""",
+ preview=(['buckets','goal'], 'After the FIRE number: the withdrawal plan', 'Three buckets for retirement and a glide path for every other goal, on the money you actually hold.'),
  faq=[('What is a realistic FIRE number in India?', 'For ₹75,000 a month of expenses, 29× yearly expenses is about ₹2.6 crore in today\'s money. Add health insurance and a paid-off home, and keep the number updated for inflation every year.'),
       ('Is the 4% rule valid in India?', 'It is a starting point. Because of higher inflation and the long horizon of early retirement, 3–3.5% is safer. Each 0.5% lower adds roughly 4 years of expenses to the target.'),
       ('Should I include my house in FIRE?', 'No, unless you plan to sell it. A home you live in does not generate the cash you will spend.'),
@@ -354,6 +402,7 @@ add('net-worth-calculator', nav='Net worth calculator', blurb='Assets minus loan
 <li><strong>Leave out:</strong> the car's resale value (optional), insurance cover (it is protection, not wealth), and money owed to you that you may not get back.</li></ul>
 <h2>Net worth for the whole family, updated every day</h2>
 <p>A calculator gives a snapshot. Capital Friends keeps it live: every family member's funds, stocks, FDs, EPF, gold (revalued daily by weight), property and loans in one dashboard, stored in a Google Sheet in your own Drive. The family gets a daily email with the net worth and where everything is. See the <a href="/family-net-worth-tracker/">family net worth tracker</a>.</p>""",
+ preview=(['networth','mail'], 'The same number, live, for the whole family', 'Every member\'s funds, stocks, FDs, EPF, gold and property with its loan, updated every day and emailed to the family.'),
  faq=[('Should I include my house in net worth?', 'Yes, at a conservative value, but look at liquid net worth separately. Many people are house-rich and cash-poor.'),
       ('How often should I calculate net worth?', 'Once a quarter is enough if you do it by hand. A tracker that updates fund prices daily makes it effortless and lets you see the trend.'),
       ('What is a good net worth by age in India?', 'A rough guide is 1× yearly income by 30, 3× by 40, 6× by 50 and 10× by 60, excluding the home you live in. Your own trend matters more than the benchmark.'),
@@ -382,6 +431,7 @@ add('mutual-fund-portfolio-tracker', nav='Mutual fund portfolio tracker', blurb=
 <p>A Mutual Funds page with money-in, current value, unrealised and realised profit, XIRR, CAGR and monthly SIP; the asset-class split; the investment journey since your first purchase; and every portfolio with its own return. Open a portfolio for the holdings table with units, NAV, average NAV, distance from the high, and current versus target allocation. Open a fund for its journey and every transaction with its own profit.</p>
 <h2>Fund breakdown: large, mid, small, global</h2>
 <p>Classify each fund once (asset class, market cap, geography, copied from Morningstar) and the app shows how much of the family's money is large cap, mid cap, small cap, debt, gold and outside India. Goals use this split to decide which funds are safe money and which are growth money.</p>""", cta='xirr',
+ preview=(['funds','goal'], 'What you see after the import', 'Real money-in, XIRR and CAGR, funds below their high, and goals funded from the same money.'),
  faq=[('Is the mutual fund tracker free?', 'Yes, free with no ads and open source. You can support the project with a voluntary donation.'),
       ('Which statements can I import?', 'The detailed CAMS + KFintech consolidated account statement (CAS) PDF, which covers all AMCs. One statement per PAN; import one for each family member.'),
       ('Does it track SIPs automatically?', 'Yes. Every SIP instalment is a transaction in the CAS, so the app knows your running SIPs, their amounts and dates, and sends reminders before the next date.'),
@@ -406,6 +456,7 @@ add('family-net-worth-tracker', nav='Family net worth tracker', blurb='Every mem
 <p>Every day (or every month) at a time you choose, each member you select gets the Family Financial Blueprint: net worth, every account, every fund and its value, policies and nominees, loans, goals, and which bank account is linked to what. It goes from your own Gmail, to the addresses you enter. There is no Capital Friends server in between.</p>
 <h2>Privacy by design</h2>
 <p>Sign in with Google and the app creates one Google Sheet in your Drive; that is the entire database. The developer cannot see it. The mask button hides names and numbers on screen for screen-sharing. The code is open source.</p>""", cta='default',
+ preview=(['networth','mail'], 'The dashboard and the email', 'One number for the family, and one email every morning that says where everything is.'),
  faq=[('Is the family net worth tracker free?', 'Yes, completely free and open source, with no ads.'),
       ('Does it connect to my bank?', 'No. Bank accounts are a list you type, so the family knows which account is linked to what. There is no login, OTP or account aggregator.'),
       ('Who can see my family\'s data?', 'Only your Google account. The data is a Google Sheet in your own Drive; share it only if you choose to.'),
@@ -426,6 +477,7 @@ add('cams-cas-import', nav='CAMS CAS import', blurb='Get your consolidated state
 <ul><li>Every purchase, SIP, switch in/out, STP and redemption with its real date and NAV.</li><li>Real money-in (cash from your bank) separate from holdings cost, so switches do not inflate the invested amount.</li><li>XIRR and CAGR for each fund, each portfolio and the family.</li><li>Separate portfolios for each account in the statement, including kids' minor accounts; fully-sold accounts are skipped.</li><li>Past imports listed with an undo button.</li></ul>
 <h2>Importing the whole family</h2>
 <p>A CAS is per PAN. Request one for your spouse, your parents and anyone else you track, and import each the same way. Minor accounts come inside the guardian's statement and get their own portfolios.</p>""", cta='xirr',
+ preview=(['funds','mail'], 'After the import', 'Every fund and transaction, with the real money-in, in the app and in the family email.'),
  faq=[('CAMS or KFintech: which statement do I need?', 'The CAMS "CAS" covers both CAMS- and KFintech-serviced AMCs, so one statement is enough. Choose the detailed version with transactions.'),
       ('What is the password for the CAS PDF?', 'The one you set while requesting it on the CAMS site. The tracker needs it to open the PDF; it is used only on your device and never stored.'),
       ('Will importing twice duplicate transactions?', 'No. Import the same statement again or a newer one and existing transactions are matched, not doubled. You can also undo any import.'),
@@ -442,6 +494,7 @@ add('stock-portfolio-tracker', nav='Stock portfolio tracker', blurb='Family stoc
 <li>Prices refresh daily. You see current value, profit, allocation across the family, and the stocks in your top and bottom performers.</li></ol>
 <h2>Stocks and funds together</h2>
 <p>Most trackers do one or the other. Capital Friends shows stocks and mutual funds in the same net worth, the same family email and the same goals, so a family with a Zerodha account, an SIP portfolio, an EPF and a house sees one honest number.</p>""",
+ preview=(['networth','mail'], 'Stocks beside everything else', 'Stocks, funds, FDs, gold and the house in one net worth, for every family member.'),
  faq=[('Which brokers are supported?', 'Any broker that exports holdings as Excel or CSV with symbol, quantity and average price. CDSL and NSDL statements also work.'),
       ('Are stock prices live?', 'They update daily through a public price sheet; this is a tracker for long-term holdings, not a trading terminal.'),
       ('Can I track my spouse\'s and parents\' demat accounts?', 'Yes. Add each person as a family member, create their stock portfolio and import their holdings file.'),
@@ -465,6 +518,7 @@ add('retirement-bucket-strategy', nav='Retirement bucket strategy', blurb='Three
 <li><strong>Long fall</strong>: stability never goes below two years of expenses; the app warns you to spend a little less for a while.</li></ul>
 <h2>Running it on your real money</h2>
 <p>In Capital Friends, add a retirement goal with your expenses, inflation and retirement age. Tick which investments are for goals. The app fills the three buckets from your actual funds, EPF and FDs, shows what each bucket holds today, and from five years before retirement shows the quarterly moves. Start with the <a href="/retirement-corpus-calculator/">retirement corpus calculator</a> or the <a href="/swp-calculator/">SWP calculator</a>.</p>""", cta='retire',
+ preview=(['buckets','mail'], 'The buckets on your own portfolio', 'Your funds, EPF and FDs fill the jars; each quarterly move is a step you record with one tap.'),
  faq=[('Why not just an SWP from a balanced fund?', 'An SWP sells units every month regardless of the market. Buckets make sure the units sold in a crash come from the safe jar, so equity gets time to recover.'),
       ('How big should the income bucket be?', 'Two years of expenses is the common choice; it covers most bear markets. Some retirees keep three.'),
       ('Where do EPF, PPF and NPS fit?', 'They count in the stability bucket but are never switched or sold by the app; they pay out on their own rules. When one matures, you press Received and the money joins the plan.'),
@@ -484,6 +538,7 @@ add('goal-based-investing', nav='Goal-based investing', blurb='Goals on a road, 
 <p>A ₹47 lakh college fee due in 2033 should not be 100% in equity in 2032. The app starts shifting five years out, a little each year and only in good markets, so a bad year right before the date does not cut the corpus by a third.</p>
 <h2>Start with the planner</h2>
 <p>Try the <a href="/goal-planner/">goal planner</a> (the app's own planner, no sign-in to plan), the <a href="/retirement-corpus-calculator/">retirement corpus calculator</a>, or the <a href="/emergency-fund-calculator/">emergency fund calculator</a>. Then sign in to run the same numbers on your real funds.</p>""", cta='goal',
+ preview=(['goal','buckets'], 'A goal in the app', 'The investments counted for it, the glide path step, and the retirement buckets.'),
  faq=[('Can I have many goals at once?', 'Yes. Retirement, two children\'s education and an emergency fund on one road is the normal setup. The app prioritises the emergency fund first, then goals by date and priority.'),
       ('Do I have to assign each fund to a goal?', 'No. Tick which investments are for goals in general; the app divides them by what each goal needs and how far away it is.'),
       ('What if I am not on track?', 'The goal shows the gap and the extra SIP that would close it. You can also move the date, change the priority or lower the target.'),
