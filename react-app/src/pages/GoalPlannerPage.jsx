@@ -105,7 +105,7 @@ export default function GoalPlannerPage() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <a href="/" className="flex items-center gap-2 no-underline"><LogoMark size={32} /><span className="text-[17px] font-bold text-white" style={{ fontFamily: "'Poppins', sans-serif" }}>Capital <em className="not-italic text-emerald-400">Friends</em></span></a>
           <nav className="flex items-center gap-2 text-[13px]">
-            <a href="/tools/" className="hidden px-2 text-slate-300 hover:text-white sm:inline">Calculators</a>
+            <a href="/tools/" className="hidden px-2 text-slate-300 hover:text-white sm:inline">Calculators</a><a href="/guides/" className="hidden px-2 text-slate-300 hover:text-white sm:inline">Guides</a>
             <a href="/goal-based-investing/" className="hidden px-2 text-slate-300 hover:text-white sm:inline">How goals work</a>
             <button onClick={signIn} className="rounded-lg bg-emerald-500 px-3.5 py-1.5 font-semibold text-emerald-950 hover:bg-emerald-400">Sign in, it's free</button>
           </nav>
@@ -182,7 +182,7 @@ export default function GoalPlannerPage() {
         </div>
 
         <div className="mt-10 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--text-dim)]">
-          <a href="/goal-sip-calculator/" className="hover:text-white">Goal SIP calculator</a><a href="/retirement-corpus-calculator/" className="hover:text-white">Retirement corpus calculator</a><a href="/retirement-bucket-strategy/" className="hover:text-white">Three-bucket strategy</a><a href="/goal-based-investing/" className="hover:text-white">Goal-based investing</a><a href="/tools/" className="hover:text-white">All calculators</a><a href="/privacy/" className="hover:text-white">Privacy</a>
+          <a href="/sip-calculator/" className="hover:text-white">SIP calculator</a><a href="/retirement-corpus-calculator/" className="hover:text-white">Retirement corpus calculator</a><a href="/retirement-bucket-strategy/" className="hover:text-white">Three-bucket strategy</a><a href="/goal-based-investing/" className="hover:text-white">Goal-based investing</a><a href="/tools/" className="hover:text-white">All calculators</a><a href="/guides/" className="hover:text-white">Guides</a><a href="/privacy/" className="hover:text-white">Privacy</a>
         </div>
       </main>
     </div>

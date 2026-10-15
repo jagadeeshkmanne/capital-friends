@@ -36,20 +36,23 @@ git stash --quiet 2>/dev/null || true
 git checkout gh-pages
 git pull origin gh-pages --quiet
 
-echo "🗑️  Replacing assets..."
-rm -rf assets privacy terms help
-cp "$DIST_TMP/index.html" .
-cp "$DIST_TMP/404.html" .
-cp -r "$DIST_TMP/assets" .
-cp -r "$DIST_TMP/privacy" .
-cp -r "$DIST_TMP/terms" .
-cp -r "$DIST_TMP/help" .
+echo "🗑️  Replacing the published site with the new build..."
+# Everything in dist/ is the site: index.html, 404.html, assets/, the static calculator and guide pages, goal-planner/,
+# seo/, sitemap.xml, robots.txt, ga.js, logos. Only the files tracked on gh-pages are removed (ignored files from main,
+# such as react-app/node_modules and .env, stay untouched); .nojekyll and the runtime UPI QR are kept.
+OLD_FILES="$(git ls-tree --name-only HEAD)"
+for f in $OLD_FILES; do
+  case "$f" in .nojekyll|upi-qr-code.png) ;; *) rm -rf "$f" ;; esac
+done
+cp -r "$DIST_TMP"/. .
+touch .nojekyll
 
 echo "📄 Ensuring CNAME is present..."
 cp "$REPO_DIR/CNAME" . 2>/dev/null || true
 
 echo "🚀 Committing and pushing..."
-git add -A index.html 404.html assets/ privacy/ terms/ help/ CNAME
+# stage only the site files (old names too, so removed pages are deleted from the branch)
+git add -A -- .nojekyll CNAME $OLD_FILES $(ls "$DIST_TMP")
 git commit -m "Deploy: $(date '+%Y-%m-%d %H:%M')" --allow-empty
 git push origin gh-pages
 

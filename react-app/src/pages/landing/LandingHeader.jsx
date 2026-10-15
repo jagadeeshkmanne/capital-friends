@@ -36,35 +36,36 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
   )
 }
 
-// Free calculators + feature pages (static HTML under /public): a dropdown on desktop, one "Tools" link on phones
+// Free calculators and guides (static HTML under /public): two dropdowns on desktop, plain links on phones
 const TOOLS = [['/sip-calculator/', 'SIP (+ step-up, + lumpsum)'], ['/lumpsum-calculator/', 'Lumpsum'], ['/swp-calculator/', 'SWP'], ['/xirr-calculator/', 'XIRR'], ['/cagr-calculator/', 'CAGR'],
   ['/retirement-corpus-calculator/', 'Retirement corpus'], ['/fire-calculator/', 'FIRE'], ['/emergency-fund-calculator/', 'Emergency fund'], ['/net-worth-calculator/', 'Net worth']]
 const GUIDES = [['/mutual-fund-portfolio-tracker/', 'Mutual fund tracker'], ['/family-net-worth-tracker/', 'Family net worth'], ['/cams-cas-import/', 'CAMS CAS import'], ['/stock-portfolio-tracker/', 'Stock tracker'], ['/retirement-bucket-strategy/', 'Retirement buckets'], ['/goal-based-investing/', 'Goal planning']]
-function ToolsMenu({ isMobile }) {
+function Drop({ href, label, items, all }) {
   const [open, setOpen] = useState(false)
-  if (isMobile) return <span className="lh-mob"><a className="lh-tools" href="/goal-planner/">Goal planner</a><a className="lh-tools" href="/tools/">Calculators</a></span>
-  return (<>
-    <a className="lh-tools lh-gp" href="/goal-planner/">Goal planner</a>
+  return (
     <div className={`lh-menu ${open ? 'open' : ''}`} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <a className="lh-tools" href="/tools/" aria-haspopup="true" aria-expanded={open} onFocus={() => setOpen(true)}>Free calculators <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg></a>
-      <div className="lh-dd" role="menu">
-        <div className="lh-col"><b>Calculators</b>{TOOLS.map(([h, t]) => <a key={h} href={h} role="menuitem">{t}</a>)}</div>
-        <div className="lh-col"><b>Guides</b>{GUIDES.map(([h, t]) => <a key={h} href={h} role="menuitem">{t}</a>)}<a href="/tools/" className="all">All free tools →</a></div>
-      </div>
-    </div>
-  </>)
+      <a className="lh-tools" href={href} aria-haspopup="true" aria-expanded={open} onFocus={() => setOpen(true)}>{label} <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg></a>
+      <div className="lh-dd" role="menu"><div className="lh-col">{items.map(([h, t]) => <a key={h} href={h} role="menuitem">{t}</a>)}<a href={href} className="all">{all} →</a></div></div>
+    </div>)
+}
+function ToolsMenu({ isMobile }) {
+  if (isMobile) return <span className="lh-mob"><a className="lh-tools" href="/goal-planner/">Planner</a><a className="lh-tools" href="/tools/">Calculators</a><a className="lh-tools" href="/guides/">Guides</a></span>
+  return (<nav className="lh-nav" aria-label="Free tools">
+    <a className="lh-tools lh-gp" href="/goal-planner/">Goal planner</a>
+    <Drop href="/tools/" label="Free calculators" items={TOOLS} all="All calculators" />
+    <Drop href="/guides/" label="Guides" items={GUIDES} all="All guides" />
+  </nav>)
 }
 
 const CSS = `
-.lh-gp{margin-left:14px;color:#a7f3d0}.lh-mob{display:inline-flex;margin-right:auto}.lh-mob .lh-tools{margin:0}
+.lh-gp{margin-left:10px;color:#a7f3d0}.lh-mob{display:inline-flex;margin-right:auto}.lh-mob .lh-tools{margin:0}
 .lh-tools{display:inline-flex;align-items:center;gap:6px;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;font-size:13.5px;font-weight:600;text-decoration:none;padding:8px 10px;border-radius:8px;white-space:nowrap}
 .lh-tools:hover{background:rgba(255,255,255,.08);color:#fff}
-.lh-menu{position:relative;margin-right:auto;margin-left:0}
+.lh-nav{display:inline-flex;align-items:center;gap:2px;margin-right:auto}.lh-menu{position:relative}
 .lh-dd{position:absolute;left:0;top:100%;padding-top:8px;display:none;z-index:110}
 .lh-menu.open .lh-dd{display:block}
-.lh-dd>div{display:none}.lh-menu.open .lh-dd{display:flex;gap:0}
 .lh-dd .lh-col{display:flex;flex-direction:column;min-width:190px;padding:12px 8px;background:#fff;box-shadow:0 18px 40px -12px rgba(15,23,42,.35),0 0 0 1px #e2e8f0}
-.lh-dd .lh-col:first-child{border-radius:12px 0 0 12px}.lh-dd .lh-col:last-child{border-radius:0 12px 12px 0;border-left:1px solid #f1f5f9}
+.lh-dd .lh-col{border-radius:12px}
 .lh-dd b{font-family:Inter,system-ui,sans-serif;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;padding:4px 10px 6px}
 .lh-dd a{font-family:Inter,system-ui,sans-serif;font-size:13.5px;color:#0f172a;text-decoration:none;padding:6px 10px;border-radius:7px}.lh-dd a:hover{background:#f1f5f9}.lh-dd a.all{color:#059669;font-weight:700;margin-top:6px}
 .lh.m .lh-tools{font-size:12.5px;padding:6px 8px;margin-left:4px;margin-right:auto}

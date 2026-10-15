@@ -99,7 +99,7 @@ def head(p, url):
 def header():
     return """<header class="top"><div class="in">
 <a class="brand" href="/"><img src="/logo-new.png" alt="Capital Friends logo" /><span><b>Capital</b> <em>Friends</em></span></a>
-<nav class="nav"><a href="/goal-planner/">Goal planner</a><a href="/tools/">Calculators</a><a href="/mutual-fund-portfolio-tracker/">Portfolio tracker</a><a href="/family-net-worth-tracker/">Family net worth</a><a href="/retirement-bucket-strategy/">Retirement</a><a class="go" href="/">Open the free app</a></nav>
+<nav class="nav"><a href="/goal-planner/">Goal planner</a><a href="/tools/">Calculators</a><a href="/guides/">Guides</a><a class="go" href="/">Open the free app</a></nav>
 </div></header>"""
 
 def footer(tools, feats):
@@ -107,7 +107,8 @@ def footer(tools, feats):
     f = ''.join(f'<a href="/{s}/">{PAGES[s]["nav"]}</a>' for s in feats)
     return f"""<footer class="bot"><div class="in">
 <div><b>Free calculators</b>{t}</div>
-<div><b>Capital Friends</b><a href="/goal-planner/">Goal planner (free)</a>{f}<a href="/">Open the app</a><a href="/donate">Support the project</a></div>
+<div><b>Guides</b>{f}</div>
+<div><b>Capital Friends</b><a href="/goal-planner/">Goal planner (free)</a><a href="/">Open the app</a><a href="/donate">Support the project</a></div>
 <div><b>Trust</b><a href="/privacy/">Privacy policy</a><a href="/terms/">Terms</a><a href="https://github.com/jagadeeshkmanne/capital-friends" rel="noopener">Open source on GitHub</a><a href="https://www.youtube.com/@capitalfriendsin" rel="noopener">YouTube channel</a></div>
 <div class="legal">Capital Friends is a free, open-source family portfolio tracker. Your data stays in your own Google Drive. Calculators and content are for information only and are not investment advice. Mutual fund investments are subject to market risks; read all scheme related documents carefully. © {datetime.date.today().year} Jagadeesh Manne.</div>
 </div></footer>"""
@@ -187,7 +188,7 @@ def page(slug, p, tools, feats):
     pvk = p.get('preview')
     body = p['body'] + (preview(*pvk) if pvk else '')
     html = head(p, url) + '<body>' + header() + '<main>' + \
-        f'<div class="crumbs"><a href="/">Capital Friends</a> › {"<a href=/tools/>Calculators</a> › " if p.get("calc") else ""}{p["h1"]}</div>' + \
+        f'<div class="crumbs"><a href="/">Capital Friends</a> › {"<a href=/tools/>Calculators</a> › " if p.get("calc") else ("<a href=/guides/>Guides</a> › " if slug in FEATS else "")}{p["h1"]}</div>' + \
         f'<h1>{p["h1"]}</h1><p class="lead">{p["lead"]}</p>' + \
         (calc_html(p) if p.get('calc') else '') + body + \
         f'<div class="cta"><div><h2>{t}</h2><p>{d}</p></div><a href="{APP_CTA}">{b} →</a></div>' + \
@@ -548,17 +549,27 @@ add('goal-based-investing', nav='Goal-based investing', blurb='Goals on a road, 
 TOOLS = ['sip-calculator', 'lumpsum-calculator', 'swp-calculator', 'cagr-calculator', 'xirr-calculator', 'retirement-corpus-calculator', 'emergency-fund-calculator', 'fire-calculator', 'net-worth-calculator']
 FEATS = ['mutual-fund-portfolio-tracker', 'family-net-worth-tracker', 'cams-cas-import', 'stock-portfolio-tracker', 'retirement-bucket-strategy', 'goal-based-investing']
 
-# tools index
+# tools index (calculators only) and guides index
 add('tools', nav='All calculators', blurb='',
  title='Free Financial Calculators India – SIP, SWP, XIRR, CAGR, Retirement, FIRE',
- desc='Free, no-login financial calculators for Indian investors: SIP and step-up SIP, lumpsum, SWP, CAGR, XIRR, retirement corpus, emergency fund, FIRE, goal SIP and net worth. By Capital Friends, the free family portfolio tracker.',
+ desc='Free, no-login financial calculators for Indian investors: SIP and step-up SIP, lumpsum, SWP, CAGR, XIRR, retirement corpus, emergency fund, FIRE and net worth. By Capital Friends, the free family portfolio tracker.',
  h1='Free Financial Calculators', lead='Plain calculators with the formula explained, no sign-up and no ads. When you want the same numbers on your real portfolio, open the free Capital Friends app.',
  body='<div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in TOOLS) + '</div>'
-      '<h2>Plan a goal with the real planner</h2><div class="cards"><div class="card"><a href="/goal-planner/">Goal planner</a><p>Retirement, child education, a house or any goal: the app\'s own planner, free, no sign-in to plan.</p></div></div><h2>Then track the real thing</h2><div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in FEATS) + '</div>',
+      '<h2>Plan a goal with the real planner</h2><div class="cards"><div class="card"><a href="/goal-planner/">Goal planner</a><p>Retirement, child education, a house or any goal: the app\'s own planner, free, no sign-in to plan.</p></div></div>',
  faq=[('Are these calculators free?', 'Yes, free with no login and no ads. They run in your browser; nothing you type is sent anywhere.'),
       ('How accurate are they?', 'They use standard formulas (monthly-compounded SIP, compound growth, XIRR by bisection). Results depend on the return and inflation you assume.'),
       ('Can I use the numbers for my own portfolio?', 'Yes: Capital Friends, the free app behind these pages, applies the same maths to your real mutual funds, stocks, EPF and FDs for the whole family.')],
  related=['mutual-fund-portfolio-tracker', 'family-net-worth-tracker', 'retirement-bucket-strategy'])
+add('guides', nav='All guides', blurb='',
+ title='Guides – Track Mutual Funds, Stocks, Family Net Worth, Goals and Retirement (Free)',
+ desc='Plain-English guides from Capital Friends: how to track mutual funds and stocks for the whole family, import a CAMS statement, plan goals, and run retirement with the three-bucket strategy. Free, open source, your data in your own Google Drive.',
+ h1='Guides', lead='How each part of Capital Friends works and why, in plain English. Every guide ends with the free app doing it on your real numbers.',
+ body='<div class="cards">' + ''.join(f'<div class="card"><a href="/{s}/">{PAGES[s]["nav"]}</a><p>{PAGES[s]["blurb"]}</p></div>' for s in FEATS) + '</div>'
+      '<h2>Try the numbers first</h2><div class="cards"><div class="card"><a href="/goal-planner/">Goal planner</a><p>Plan retirement, child education or any goal with the app\'s own planner, no sign-in.</p></div><div class="card"><a href="/tools/">Free calculators</a><p>SIP, lumpsum, SWP, XIRR, CAGR, retirement corpus, FIRE, emergency fund and net worth.</p></div></div>',
+ faq=[('Is Capital Friends free?', 'Yes. It is open source and free for any family. You sign in with Google and your data is saved in one Google Sheet in your own Drive.'),
+      ('Do I need to type in every fund?', 'No. Import one CAMS statement per family member and every fund and transaction comes in; the guide on CAMS import shows the steps.'),
+      ('Is this investment advice?', 'No. The app and these guides show facts about your own money; what you do with them is your decision.')],
+ related=['mutual-fund-portfolio-tracker', 'retirement-bucket-strategy', 'goal-based-investing'])
 
 # ─────────────────────────── write ───────────────────────────
 def main():
@@ -570,7 +581,7 @@ def main():
     for slug, p in PAGES.items():
         d = os.path.join(ROOT, slug); os.makedirs(d, exist_ok=True)
         open(os.path.join(d, 'index.html'), 'w').write(page(slug, p, TOOLS, FEATS))
-        urls.append((slug + '/', TODAY, '0.8' if slug in TOOLS or slug == 'tools' else '0.9'))
+        urls.append((slug + '/', TODAY, '0.8' if slug in TOOLS or slug in ('tools', 'guides') else '0.9'))
     urls += [('goal-planner/', TODAY, '0.9'), ('privacy/', TODAY, '0.3'), ('terms/', TODAY, '0.3'), ('donate', TODAY, '0.4')]
     sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(
         f'  <url><loc>{SITE}/{u}</loc><lastmod>{m}</lastmod><priority>{pr}</priority></url>\n' for u, m, pr in urls) + '</urlset>\n'
