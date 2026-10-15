@@ -7,7 +7,8 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
   const [scrolled, setScrolled] = useState(false)
   const [past, setPast] = useState(false)   // the hero has its own button; the header one shows once you scroll past it
   useEffect(() => {
-    const f = () => { setScrolled(window.scrollY > 8); setPast(window.scrollY > window.innerHeight * 0.6) }
+    // '/#signin' (the Sign in link on the static guide and calculator pages) shows the header button straight away
+    const f = () => { setScrolled(window.scrollY > 8); setPast(window.scrollY > window.innerHeight * 0.6 || window.location.hash === '#signin') }
     f(); window.addEventListener('scroll', f, { passive: true })
     return () => window.removeEventListener('scroll', f)
   }, [])

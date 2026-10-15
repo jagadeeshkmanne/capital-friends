@@ -14,24 +14,36 @@ APP_CTA = '/'
 CSS = r"""
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;line-height:1.65;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;background:#f8fafc;color:#0f172a;line-height:1.7;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 a{color:#0891b2;text-decoration:none}a:hover{text-decoration:underline}
-header.top{position:sticky;top:0;z-index:50;background:rgba(10,15,31,.98);border-bottom:1px solid rgba(255,255,255,.06)}
-header.top .in{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:56px}
-.brand{display:flex;align-items:center;gap:8px;font-family:'Poppins',sans-serif;font-size:17px;letter-spacing:-.3px}
-.brand img{height:40px}.brand b{color:#fff;font-weight:700}.brand em{color:#34d399;font-weight:800;font-style:normal}
-.nav{display:flex;align-items:center;gap:2px}
+header.top{position:sticky;top:0;z-index:100;background:#1e1b4b;box-shadow:0 1px 0 rgba(255,255,255,.06) inset}
+header.top .in{position:relative;max-width:1360px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 40px;height:60px}
+.brand{display:inline-flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#fff;white-space:nowrap}.brand:hover{text-decoration:none}
+.brand img{height:34px;width:auto;display:block}.brand em{color:#34d399;font-style:normal}
+.nav{display:inline-flex;align-items:center;gap:2px;margin-right:auto}
 .nav>a,.menu>a{display:inline-flex;align-items:center;gap:6px;color:#e2e8f0;font-size:13.5px;font-weight:600;padding:8px 10px;border-radius:8px;white-space:nowrap}
 .nav>a:hover,.menu>a:hover,.menu:hover>a,.menu:focus-within>a{background:rgba(255,255,255,.08);color:#fff;text-decoration:none}
-.nav a.gp{color:#a7f3d0}.nav a.on,.menu>a.on{color:#fff;box-shadow:inset 0 -2px 0 #34d399;border-radius:8px 8px 0 0}
-.nav a.go{background:#10b981;color:#06281b;font-weight:700;padding:7px 14px;border-radius:8px;margin-left:8px}.nav a.go:hover{background:#34d399}
+.nav a.gp{margin-left:10px;color:#a7f3d0}.nav a.on,.menu>a.on{color:#fff;box-shadow:inset 0 -2px 0 #34d399;border-radius:8px 8px 0 0}
 .menu{position:relative}.menu svg{width:10px;height:10px}
 .dd{position:absolute;left:0;top:100%;padding-top:8px;display:none;z-index:110}.menu:hover .dd,.menu:focus-within .dd{display:block}
 .dd .col{display:flex;flex-direction:column;min-width:210px;padding:12px 8px;background:#fff;border-radius:12px;box-shadow:0 18px 40px -12px rgba(15,23,42,.35),0 0 0 1px #e2e8f0}
 .dd a{font-size:13.5px;color:#0f172a;padding:6px 10px;border-radius:7px;white-space:nowrap}.dd a:hover{background:#f1f5f9;text-decoration:none}.dd a.cur{background:#ecfdf5;color:#047857;font-weight:700}
 .dd a.all{color:#059669;font-weight:700;margin-top:6px}
+.hr{display:flex;align-items:center;gap:8px}
+.fam{display:none;align-items:center;gap:9px;margin-right:10px;padding:4px 16px 4px 5px;border-radius:999px;background:linear-gradient(90deg,rgba(52,211,153,.22),rgba(52,211,153,.08));box-shadow:inset 0 0 0 1px rgba(52,211,153,.5),0 0 18px -4px rgba(52,211,153,.45);animation:famGlow 3s ease-in-out infinite}
+.fam.on{display:inline-flex}.fam svg{display:block}
+@keyframes famGlow{50%{box-shadow:inset 0 0 0 1px rgba(52,211,153,.75),0 0 26px -2px rgba(52,211,153,.55)}}
+.famt{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#d1fae5;white-space:nowrap}.famt b{color:#fff;font-weight:800;font-size:15px}
+.live{width:7px;height:7px;border-radius:50%;background:#34d399;animation:livePulse 1.8s infinite}
+@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.ic{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.18);transition:transform .15s,box-shadow .15s}
+.ic.yt{background:#ff0000}.ic.ig{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
+.ic:hover{transform:translateY(-1px);box-shadow:0 0 0 3px rgba(255,255,255,.35);text-decoration:none}
+a.go{display:inline-flex;align-items:center;height:36px;padding:0 16px;margin-left:6px;border-radius:999px;color:#0b1120;font-weight:700;font-size:13.5px;background:#fff;white-space:nowrap}a.go:hover{background:#d1fae5;text-decoration:none}
+@media(prefers-reduced-motion:reduce){.fam,.live{animation:none}}
 .burger{display:none}
 @media(max-width:760px){
+ header.top .in{height:54px;padding:0 12px}.brand img{height:30px}.brand span{display:none}.ic{width:34px;height:34px}.hr{gap:6px}.fam{margin-right:2px}.famt span{display:none}a.go{display:none}
  .nav{display:none}
  .burger{display:block;position:relative}.burger summary{list-style:none;cursor:pointer;width:40px;height:40px;display:grid;place-items:center;border-radius:8px;color:#e2e8f0}.burger summary::-webkit-details-marker{display:none}
  .burger[open] summary{background:rgba(255,255,255,.1)}
@@ -41,12 +53,12 @@ header.top .in{max-width:1100px;margin:0 auto;display:flex;align-items:center;ju
  .burger .sheet a.go{background:#10b981;color:#06281b;font-weight:700;text-align:center;margin:8px 0 2px}
 }
 main{max-width:1100px;margin:0 auto;padding:28px 16px 56px}
-.crumbs{font-size:12.5px;color:#64748b;margin-bottom:14px}.crumbs a{color:#64748b}
-h1{font-family:'Poppins',sans-serif;font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.5px;margin-bottom:10px}
-.lead{font-size:17px;color:#334155;max-width:760px;margin-bottom:22px}
-h2{font-family:'Poppins',sans-serif;font-size:22px;margin:36px 0 12px;letter-spacing:-.3px}
-h3{font-size:16px;font-weight:700;margin:18px 0 6px}
-p{margin-bottom:12px;color:#334155}li{color:#334155;margin:4px 0 4px 18px}
+.crumbs{font-size:12.5px;font-weight:500;color:#64748b;margin-bottom:16px}.crumbs a{color:#64748b}
+h1{font-family:'Poppins',sans-serif;font-weight:700;font-size:clamp(26px,3.4vw,34px);line-height:1.2;letter-spacing:-.02em;margin-bottom:12px;max-width:860px}
+.lead{font-size:17px;line-height:1.65;color:#475569;max-width:720px;margin-bottom:26px}
+h2{font-family:'Poppins',sans-serif;font-weight:700;font-size:21px;line-height:1.3;margin:38px 0 12px;letter-spacing:-.01em}
+h3{font-size:16.5px;font-weight:700;margin:22px 0 6px;letter-spacing:-.005em}
+p{margin-bottom:14px;color:#334155}li{color:#334155;margin:5px 0 5px 18px}article p,article li{max-width:72ch}
 .grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:22px;align-items:start}
 @media(max-width:820px){.grid{grid-template-columns:1fr}}
 .calc{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
@@ -104,6 +116,8 @@ def head(p, url):
 <meta name="robots" content="index, follow, max-image-preview:large" />
 <meta name="theme-color" content="#0a0f1f" />
 <link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
 <meta property="og:type" content="website" /><meta property="og:site_name" content="Capital Friends" />
 <meta property="og:url" content="{url}" /><meta property="og:title" content="{p['title']}" />
 <meta property="og:description" content="{p['desc']}" /><meta property="og:image" content="{SITE}/og-image.png" />
@@ -122,7 +136,7 @@ CSS += r"""
 .note-box{background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;color:#78350f;font-size:14px}
 .defs dt{font-weight:700;margin-top:10px}.defs dd{margin:2px 0 0 0;color:#334155}
 .upd{font-size:12.5px;color:#64748b;margin-top:26px}
-.gwrap{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:32px;align-items:start}.gwrap article{min-width:0}
+.gwrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:36px;align-items:start}.gwrap article{min-width:0;order:2}.gside{order:1}
 .gside{position:sticky;top:72px;max-height:calc(100vh - 84px);overflow:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin}
 .gside .box{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 12px}.gside b{display:block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;padding:0 8px 8px}
 .gside .box a{display:flex;align-items:center;gap:9px;font-size:13.5px;color:#0f172a;padding:6px 8px;border-radius:8px;line-height:1.3}.gside .box a:hover{background:#f1f5f9;text-decoration:none}
@@ -146,6 +160,21 @@ def _menu_lists():
         return re.findall(r"\['(/[^']+/)', '([^']+)'\]", m.group(1))
     return arr('const TOOLS'), arr('const GUIDES')
 MENU_TOOLS, MENU_GUIDES = _menu_lists()
+
+# Same social links and live count as the app's landing header (src/pages/LandingPage.jsx)
+YOUTUBE = 'https://www.youtube.com/@capitalfriendsin'
+INSTAGRAM = 'https://www.instagram.com/jags.manne/'
+MASTER = '1pSvGDFTgcCkW6Fk9P2mZ5FSpROVClz7Vu0sW9JnPz9s'
+def _bust(k, r=14):
+    folk = {'you': ('#d9a27a', '#2b2131', '#7c3aed', 'short'), 'spouse': ('#f1c7a1', '#2b2131', '#f43f5e', 'long'), 'mother': ('#d9a27a', '#94a3b8', '#f59e0b', 'bun')}
+    skin, hair, shirt, look = folk[k]; cid = f'hb-{k}'
+    hairp = 'M-13 -6 Q-13 -20 0 -20 Q13 -20 13 -6 Q6 -14 -4 -12 Q-10 -10 -13 -6 Z' if look == 'long' else 'M-12.5 -7 Q-13 -20 0 -19.5 Q13 -20 12.5 -7 Q9 -13 0 -13 Q-8 -13 -12.5 -7 Z'
+    return (f'<g><circle r="{r}" fill="color-mix(in srgb, {shirt} 16%, #fff)"/><clipPath id="{cid}"><circle r="{r}"/></clipPath><g clip-path="url(#{cid})" transform="scale({r/28:.3f})">'
+            + ('<path d="M-15 -14 Q-17 14 -10 20 H10 Q17 14 15 -14 Z" fill="%s"/>' % hair if look == 'long' else '')
+            + f'<path d="M-24 34 Q-24 12 0 12 Q24 12 24 34 Z" fill="{shirt}"/><rect x="-4.5" y="4" width="9" height="10" rx="4" fill="{skin}"/><circle cy="-6" r="12" fill="{skin}"/>'
+            + ('<circle cy="-21" r="5.5" fill="%s"/>' % hair if look == 'bun' else '')
+            + f'<path d="{hairp}" fill="{hair}"/><circle cx="-4" cy="-5" r="1.3" fill="#0f172a"/><circle cx="4" cy="-5" r="1.3" fill="#0f172a"/><path d="M-3.5 0 Q0 2.6 3.5 0" fill="none" stroke="#0f172a" stroke-width="1.3" stroke-linecap="round"/></g></g>')
+BUSTS = '<svg width="64" height="30" viewBox="-16 -16 84 32" aria-hidden="true">' + ''.join(f'<g transform="translate({n * 24} 0)"><circle r="15.5" fill="#25215e"/>{_bust(k)}</g>' for n, k in enumerate(['mother', 'spouse', 'you'])) + '</svg>'
 CHEV = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>'
 def header(cur=''):
     here = f'/{cur}/' if cur else ''
@@ -155,11 +184,18 @@ def header(cur=''):
         on = ' on' if here == href or any(h == here for h, _ in lst) else ''
         return f'<div class="menu"><a href="{href}" class="{on.strip()}" aria-haspopup="true">{label} {CHEV}</a><div class="dd"><div class="col">{items(lst, href, allt)}</div></div></div>'
     sheet = ('<b>Plan</b><a href="/goal-planner/">Goal planner (free)</a><b>Free calculators</b>' + ''.join(f'<a href="{h}"{" class=cur" if h == here else ""}>{t}</a>' for h, t in MENU_TOOLS) + '<a href="/tools/">All calculators →</a>'
-             '<b>Guides</b>' + ''.join(f'<a href="{h}"{" class=cur" if h == here else ""}>{t}</a>' for h, t in MENU_GUIDES) + '<a href="/guides/">All guides →</a><a class="go" href="/">Open the free app</a>')
+             '<b>Guides</b>' + ''.join(f'<a href="{h}"{" class=cur" if h == here else ""}>{t}</a>' for h, t in MENU_GUIDES) + '<a href="/guides/">All guides →</a><a class="go" href="/#signin">Sign in · open the free app</a>')
     return f"""<header class="top"><div class="in">
-<a class="brand" href="/"><img src="/logo-new.png" alt="Capital Friends logo" /><span><b>Capital</b> <em>Friends</em></span></a>
-<nav class="nav" aria-label="Site"><a href="/goal-planner/" class="gp{' on' if here == '/goal-planner/' else ''}">Goal planner</a>{drop('/tools/', 'Free calculators', MENU_TOOLS, 'All calculators')}{drop('/guides/', 'Guides', MENU_GUIDES, 'All guides')}<a class="go" href="/">Open the free app</a></nav>
+<a class="brand" href="/" aria-label="Capital Friends home"><img src="/logo-mark.png" alt="" /><span>Capital <em>Friends</em></span></a>
+<nav class="nav" aria-label="Site"><a href="/goal-planner/" class="gp{' on' if here == '/goal-planner/' else ''}">Goal planner</a>{drop('/tools/', 'Free calculators', MENU_TOOLS, 'All calculators')}{drop('/guides/', 'Guides', MENU_GUIDES, 'All guides')}</nav>
+<div class="hr">
+<span class="fam" id="fam" title="Families using Capital Friends">{BUSTS}<span class="famt"><b id="famn"></b><span> families use it</span><i class="live"></i></span></span>
+<a class="ic yt" href="{YOUTUBE}" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z"/></svg></a>
+<a class="ic ig" href="{INSTAGRAM}" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg></a>
+<a class="go" href="/#signin">Sign in</a>
 <details class="burger"><summary aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></summary><div class="sheet">{sheet}</div></details>
+</div>
+<script>fetch('https://docs.google.com/spreadsheets/d/'+{MASTER!r}+'/gviz/tq?tqx=out:json&sheet=App_Stats&headers=1&tq='+encodeURIComponent('select A, B limit 1')).then(r=>r.text()).then(t=>{{var j=JSON.parse(t.slice(t.indexOf('{{'),t.lastIndexOf('}}')+1));if(String((j.table.cols[0]||{{}}).label||'').toLowerCase()!=='families')return;var n=Number(((j.table.rows[0]||{{}}).c||[])[0].v);if(n>0){{document.getElementById('famn').textContent=n.toLocaleString('en-IN');document.getElementById('fam').classList.add('on')}}}}).catch(function(){{}})</script>
 </div></header>"""
 
 def footer(tools, feats):
