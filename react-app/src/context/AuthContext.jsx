@@ -135,6 +135,10 @@ export function AuthProvider({ children }) {
 
       // Store access token
       api.storeToken(response.access_token, response.expires_in, response.scope)
+      // A permission skipped on Google's screen: ask for it now (Google's screen again, or the dialog if the popup is blocked)
+      const skipped = missingScopes(response)
+      if (skipped.length) askForConsent(skipped[0]).catch(() => { /* Not now: they can still use the rest; a failing call asks again */ })
+
       // Fetch user profile from Google
       const profile = await fetchUserProfile(response.access_token)
       api.setStoredUserName(profile.name || '')
