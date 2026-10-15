@@ -453,8 +453,7 @@ const SCENES_RAW = { drive: SceneDrive, all: SceneAll, cas: SceneCas, ath: Scene
 const SCENES = Object.fromEntries(Object.entries(SCENES_RAW).map(([k, f]) => [k, memoScene(f)]))
 
 // the demo video as the last step: a thumbnail first (nothing loads from YouTube until it is pressed), then the player
-function DemoScene({ id }) {
-  const [play, setPlay] = useState(false)
+function DemoScene({ id, play, setPlay }) {
   return (
     <div className="st-demo">
       {play
@@ -469,8 +468,9 @@ function DemoScene({ id }) {
 
 function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, videoLabel = 'Watch the demo' }) {
   const [i, setI] = useState(0)
-  // with a demo video, it is the last step on the path; the scenes rotate without it (it only opens when chosen)
-  const chapters = videoId ? [...CHAPTERS, { k: 'demo', ph: 'the whole app in 30 minutes', icon: 'play', c: '#ef4444', s: 'Demo', t: 'Watch the full app walkthrough' }] : CHAPTERS
+  // with a demo video, it is the first step on the path: the page opens on the video, the scenes follow and loop back to it
+  const chapters = videoId ? [{ k: 'demo', ph: 'the whole app in 30 minutes', icon: 'play', c: '#ef4444', s: 'Demo', t: 'Watch the full app walkthrough', dur: 7000 }, ...CHAPTERS] : CHAPTERS
+  const [play, setPlay] = useState(false)   // the video is playing: the path stops rotating
   // the scenes play on by themselves; they only wait while the browser tab is hidden
   const [paused, setPaused] = useState(false)
   useEffect(() => {
@@ -479,10 +479,10 @@ function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, 
     return () => document.removeEventListener('visibilitychange', f)
   }, [])
   useEffect(() => {
-    if (paused || i >= CHAPTERS.length) return undefined
-    const t = setTimeout(() => setI((x) => (x + 1) % CHAPTERS.length), CHAPTERS[i].dur || DUR)
+    if (paused || (play && chapters[i].k === 'demo')) return undefined
+    const t = setTimeout(() => setI((x) => (x + 1) % chapters.length), chapters[i].dur || DUR)
     return () => clearTimeout(t)
-  }, [i, paused])
+  }, [i, paused, play, chapters])
   const ch = chapters[i]
   const Scene = SCENES[ch.k]
   // the scene leans towards the mouse (3D tilt), the floating things move the other way (depth)
@@ -514,13 +514,13 @@ function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, 
         </ol>
         {/* the scene, edge to edge */}
         <div className="st-r">
-          {ch.k === 'demo' ? <div key="demo" className="st-scene st-scene-demo"><DemoScene id={videoId} /></div> : <div key={ch.k} className="st-scene" style={{ '--pd': `${ch.dur || DUR}ms` }}><Scene /></div>}
+          {ch.k === 'demo' ? <div key="demo" className="st-scene st-scene-demo"><DemoScene id={videoId} play={play} setPlay={setPlay} /></div> : <div key={ch.k} className="st-scene" style={{ '--pd': `${ch.dur || DUR}ms` }}><Scene /></div>}
         </div>
       </div>
       {/* one dock at the bottom: start, watch, and how many families */}
       <div className="st-dock">
         <button onClick={signIn} className="st-btn"><span className="st-g">{GoogleIcon}</span>Sign in with Google<span className="st-free">FREE</span></button>
-        {videoId ? <button type="button" className="st-btn2" onClick={() => setI(chapters.length - 1)} aria-label={videoLabel}><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">{videoLabel}</span></button>
+        {videoId ? <button type="button" className="st-btn2" onClick={() => { setI(0); setPlay(true) }} aria-label={videoLabel}><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">{videoLabel}</span></button>
           : videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch on YouTube"><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">Watch on YouTube</span></a>}
       </div>
     </section>
