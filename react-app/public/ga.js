@@ -1,7 +1,7 @@
 // Google Analytics 4 for capitalfriends.in (all pages load this file).
 // Put your GA4 Measurement ID here (Admin → Data streams → Web → Measurement ID, looks like G-XXXXXXXXXX).
 // While it is empty, nothing is loaded and nothing is sent.
-window.CF_GA_ID = '';
+window.CF_GA_ID = 'G-2W6YDJ8EZY';
 (function () {
   var id = window.CF_GA_ID;
   if (!id || !/^G-[A-Z0-9]+$/.test(id)) return;

@@ -16,6 +16,7 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
       <style>{CSS}</style>
       <div className="lh-in">
         <a href="#" className="lh-logo" aria-label="Capital Friends home"><LogoMark size={isMobile ? 30 : 34} />{!isMobile && <span className="lh-wm">Capital <em>Friends</em></span>}</a>
+        <ToolsMenu isMobile={isMobile} />
         <div className="lh-r">
           {families ? (
             <span className="lh-fam" title="Families using Capital Friends">
@@ -35,8 +36,38 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
   )
 }
 
+// Free calculators + feature pages (static HTML under /public): a dropdown on desktop, one "Tools" link on phones
+const TOOLS = [['/sip-calculator/', 'SIP calculator'], ['/step-up-sip-calculator/', 'Step-up SIP'], ['/lumpsum-calculator/', 'Lumpsum'], ['/swp-calculator/', 'SWP'], ['/xirr-calculator/', 'XIRR'], ['/cagr-calculator/', 'CAGR'],
+  ['/retirement-corpus-calculator/', 'Retirement corpus'], ['/fire-calculator/', 'FIRE'], ['/goal-sip-calculator/', 'Goal SIP'], ['/emergency-fund-calculator/', 'Emergency fund'], ['/net-worth-calculator/', 'Net worth']]
+const GUIDES = [['/mutual-fund-portfolio-tracker/', 'Mutual fund tracker'], ['/family-net-worth-tracker/', 'Family net worth'], ['/cams-cas-import/', 'CAMS CAS import'], ['/stock-portfolio-tracker/', 'Stock tracker'], ['/retirement-bucket-strategy/', 'Retirement buckets'], ['/goal-based-investing/', 'Goal planning']]
+function ToolsMenu({ isMobile }) {
+  const [open, setOpen] = useState(false)
+  if (isMobile) return <a className="lh-tools" href="/tools/">Calculators</a>
+  return (
+    <div className={`lh-menu ${open ? 'open' : ''}`} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <a className="lh-tools" href="/tools/" aria-haspopup="true" aria-expanded={open} onFocus={() => setOpen(true)}>Free calculators <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg></a>
+      <div className="lh-dd" role="menu">
+        <div className="lh-col"><b>Calculators</b>{TOOLS.map(([h, t]) => <a key={h} href={h} role="menuitem">{t}</a>)}</div>
+        <div className="lh-col"><b>Guides</b>{GUIDES.map(([h, t]) => <a key={h} href={h} role="menuitem">{t}</a>)}<a href="/tools/" className="all">All free tools →</a></div>
+      </div>
+    </div>
+  )
+}
+
 const CSS = `
-.lh{position:sticky;top:0;z-index:100;overflow:hidden;background:#1e1b4b;box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:box-shadow .25s}
+.lh-tools{display:inline-flex;align-items:center;gap:6px;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;font-size:13.5px;font-weight:600;text-decoration:none;padding:8px 10px;border-radius:8px;white-space:nowrap}
+.lh-tools:hover{background:rgba(255,255,255,.08);color:#fff}
+.lh-menu{position:relative;margin-right:auto;margin-left:10px}
+.lh-dd{position:absolute;left:0;top:100%;padding-top:8px;display:none;z-index:110}
+.lh-menu.open .lh-dd{display:block}
+.lh-dd>div{display:none}.lh-menu.open .lh-dd{display:flex;gap:0}
+.lh-dd .lh-col{display:flex;flex-direction:column;min-width:190px;padding:12px 8px;background:#fff;box-shadow:0 18px 40px -12px rgba(15,23,42,.35),0 0 0 1px #e2e8f0}
+.lh-dd .lh-col:first-child{border-radius:12px 0 0 12px}.lh-dd .lh-col:last-child{border-radius:0 12px 12px 0;border-left:1px solid #f1f5f9}
+.lh-dd b{font-family:Inter,system-ui,sans-serif;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;padding:4px 10px 6px}
+.lh-dd a{font-family:Inter,system-ui,sans-serif;font-size:13.5px;color:#0f172a;text-decoration:none;padding:6px 10px;border-radius:7px}.lh-dd a:hover{background:#f1f5f9}.lh-dd a.all{color:#059669;font-weight:700;margin-top:6px}
+.lh.m .lh-tools{font-size:12.5px;padding:6px 8px;margin-left:4px;margin-right:auto}
+
+.lh{position:sticky;top:0;z-index:100;overflow:visible;background:#1e1b4b;box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:box-shadow .25s}
 .lh.sc{box-shadow:0 12px 30px -18px rgba(30,27,75,.75)}
 .lh-in{position:relative;max-width:1360px;margin:0 auto;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-sizing:border-box}
 .lh-logo{text-decoration:none;display:inline-flex;align-items:center;gap:10px}
