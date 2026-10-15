@@ -607,6 +607,13 @@ export default function LandingPage() {
               <a href="https://capitalfriends.in/terms" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', padding: '4px 10px', borderRadius: 5 }}>Terms &amp; Conditions</a>
             </div>
           </div>
+          {/* Free tools and feature pages (static, indexable): the SEO funnel into the app */}
+          <div style={{ maxWidth: 1400, margin: '6px auto 0', padding: '8px 20px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '2px 4px' }}>
+            {[['/tools/', 'Free calculators'], ['/sip-calculator/', 'SIP'], ['/step-up-sip-calculator/', 'Step-up SIP'], ['/lumpsum-calculator/', 'Lumpsum'], ['/swp-calculator/', 'SWP'], ['/xirr-calculator/', 'XIRR'], ['/cagr-calculator/', 'CAGR'], ['/retirement-corpus-calculator/', 'Retirement corpus'], ['/fire-calculator/', 'FIRE'], ['/goal-sip-calculator/', 'Goal SIP'], ['/emergency-fund-calculator/', 'Emergency fund'], ['/net-worth-calculator/', 'Net worth'],
+              ['/mutual-fund-portfolio-tracker/', 'Mutual fund tracker'], ['/stock-portfolio-tracker/', 'Stock tracker'], ['/family-net-worth-tracker/', 'Family net worth'], ['/cams-cas-import/', 'CAMS CAS import'], ['/retirement-bucket-strategy/', 'Retirement buckets'], ['/goal-based-investing/', 'Goal planning']].map(([h, t]) => (
+              <a key={h} href={h} style={{ fontSize: 11.5, color: '#475569', textDecoration: 'none', padding: '3px 8px', borderRadius: 5 }}>{t}</a>
+            ))}
+          </div>
         </div>
       </section>
     </div>
