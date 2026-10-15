@@ -261,10 +261,16 @@ PV = {
 def preview(kinds, title, sub):
     return f'<section class="pv"><h2>{title}</h2><p class="sub">{sub}</p><div class="wrap">' + ''.join(PV[k] for k in kinds) + '</div></section>'
 
+# Sane ranges per field (also enforced in calc.js, since a typed value ignores min/max): ages 1-100, rates 0-50 %, years 1-80, money 0-1000 Cr
+LIMITS = {'f-age': (1, 100), 'f-retire': (1, 100), 'f-life': (1, 110), 'f-years': (1, 80), 'f-months': (1, 60),
+          'f-rate': (0, 50), 'f-prerate': (0, 50), 'f-inflation': (0, 30), 'f-stepup': (0, 50), 'f-swr': (0.5, 20)}
+MONEY_MAX = 10_000_000_000  # 1,000 Cr
 def field(id, label, val, step=None, hint=None, typ='number', attrs=''):
     st = f' step="{step}"' if step else ''
     h = f'<div class="hint">{hint}</div>' if hint else ''
-    return f'<label for="{id}">{label}</label><input id="{id}" type="{typ}" value="{val}" inputmode="decimal"{st} {attrs}/>{h}'
+    lim = LIMITS.get(id, (0, MONEY_MAX) if '(₹)' in label else None)
+    mm = f' min="{lim[0]}" max="{lim[1]}"' if lim and typ == 'number' else ''
+    return f'<label for="{id}">{label}</label><input id="{id}" type="{typ}" value="{val}" inputmode="decimal"{st}{mm} {attrs}/>{h}'
 
 def calc_html(p):
     c = p['calc']

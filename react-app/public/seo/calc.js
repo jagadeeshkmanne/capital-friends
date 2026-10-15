@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var fmt = function (n) {
+  var fmt; fmt = function (n) {
     if (!isFinite(n)) return '—';
     var neg = n < 0; n = Math.abs(Math.round(n));
     var s = n.toString(), last3 = s.slice(-3), rest = s.slice(0, -3);
@@ -12,12 +12,21 @@
   var short = function (n) {
     if (!isFinite(n)) return '—';
     var a = Math.abs(n), s = n < 0 ? '-' : '';
+    if (a >= 1e12) return s + '₹' + Math.round(a / 1e7).toLocaleString('en-IN') + ' Cr';   // never scientific notation
     if (a >= 1e7) return s + '₹' + (a / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
     if (a >= 1e5) return s + '₹' + (a / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' L';
     return fmt(n);
   };
   var pct = function (x) { return (x * 100).toFixed(2).replace(/\.?0+$/, '') + '%'; };
-  var num = function (id) { var v = parseFloat(($(id) || {}).value); return isFinite(v) ? v : 0; };
+  // Read a field, kept inside its min/max (typed values ignore the attributes). The box is corrected too, so the user sees it.
+  var num = function (id) {
+    var el = $(id) || {}, v = parseFloat(el.value); if (!isFinite(v)) return 0;
+    var lo = parseFloat(el.min), hi = parseFloat(el.max), c = v;
+    if (isFinite(lo) && c < lo) c = lo; if (isFinite(hi) && c > hi) c = hi;
+    if (c !== v && document.activeElement !== el) el.value = c;
+    return c;
+  };
+  var fmt0 = fmt; fmt = function (n) { return Math.abs(n) >= 1e12 ? short(n) : fmt0(n); };   // huge rupee amounts also stay readable
   var setText = function (id, t) { var e = $(id); if (e) e.textContent = t; };
 
   // ---------- maths ----------
@@ -111,13 +120,16 @@
     },
     retirement: function () {
       var exp = num('f-expense'), age = num('f-age'), rage = num('f-retire'), life = num('f-life'), inf = num('f-inflation'), ret = num('f-rate'), pre = num('f-prerate'), have = num('f-have');
+      if (rage <= age) { rage = age + 1; } if (life <= rage) { life = rage + 1; }   // retire after today, money lasts past retirement
       var yrs = Math.max(0, rage - age), fexp = exp * Math.pow(1 + inf / 100, yrs), years = Math.max(1, life - rage);
-      // corpus so that inflation-rising withdrawals last till `life` at post-retirement return
-      var rr = (1 + ret / 100) / (1 + inf / 100) - 1, corpus = rr > 0.0001 ? fexp * 12 * (1 - Math.pow(1 + rr, -years)) / rr : fexp * 12 * years;
+      // Same rule as the Capital Friends app: a safe withdrawal rate by how long the money must last (post-retirement years)
+      // 40+ yrs 3.0% (33x) · 35+ 3.3% (30x) · 25+ 4.0% (25x) · 18+ 5.0% (20x) · else 6.0% (17x) of the first year's expenses
+      var swr = years >= 40 ? 0.030 : years >= 35 ? 0.033 : years >= 25 ? 0.040 : years >= 18 ? 0.050 : 0.060;
+      var corpus = fexp * 12 / swr;
       var haveFV = have * Math.pow(1 + pre / 100, yrs), gap = Math.max(0, corpus - haveFV);
       var r = pre / 100 / 12, n = yrs * 12, sip = n > 0 && r > 0 ? gap * r / ((Math.pow(1 + r, n) - 1) * (1 + r)) : (n > 0 ? gap / n : gap);
       setText('r-value', short(corpus)); setText('r-invested', short(fexp)); setText('r-gain', short(sip));
-      setText('r-note', 'Today\'s ' + fmt(exp) + ' a month becomes ' + fmt(fexp) + ' a month at ' + inf + '% inflation when you retire at ' + rage + '. To fund that till ' + life + ' you need about ' + fmt(corpus) + ' at retirement' + (have ? ', of which your current ' + fmt(have) + ' grows to ' + short(haveFV) : '') + '. The gap needs a SIP of about ' + fmt(sip) + ' a month for ' + yrs + ' years.');
+      setText('r-note', 'Today\'s ' + fmt(exp) + ' a month becomes ' + fmt(fexp) + ' a month at ' + inf + '% inflation when you retire at ' + rage + '. For ' + years + ' years of retirement the app plans a ' + (swr * 100).toFixed(1) + '% safe withdrawal rate, so you need about ' + fmt(corpus) + ' at retirement (' + Math.round(1 / swr) + 'x the first year\'s expenses)' + (have ? ', of which your current ' + fmt(have) + ' grows to ' + short(haveFV) : '') + '. The gap needs a SIP of about ' + fmt(sip) + ' a month for ' + yrs + ' years.');
       bar('r-bar', haveFV, gap, 'From what you have', 'Still to build');
       var rows = [], bal = corpus, w = fexp * 12; for (var k = 1; k <= Math.min(years, 40); k++) { bal = bal * (1 + ret / 100) - w; rows.push([rage + k, short(w), short(Math.max(0, bal))]); w *= 1 + inf / 100; }
       table('r-table', ['Age', 'Yearly expenses', 'Corpus left'], rows);
@@ -157,6 +169,7 @@
 
   function run() { var el = document.querySelector('[data-calc]'); if (!el) return; var fn = C[el.getAttribute('data-calc')]; if (fn) { try { fn(); } catch (e) { } } }
   document.addEventListener('input', function (e) { if (e.target && e.target.matches('.calc input, .calc select')) run(); });
+  document.addEventListener('focusout', function (e) { if (e.target && e.target.matches('.calc input[type=number]')) { num(e.target.id); run(); } }, true);
   document.addEventListener('click', function (e) {
     if (e.target && e.target.id === 'add-flow') { var t = document.querySelector('#flows .flow'); var c = t.cloneNode(true); c.querySelector('.fa').value = ''; $('flows').appendChild(c); }
     if (e.target && e.target.classList.contains('rm-flow')) { var rows = document.querySelectorAll('#flows .flow'); if (rows.length > 1) e.target.closest('.flow').remove(); run(); }
