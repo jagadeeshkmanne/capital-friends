@@ -62,10 +62,12 @@ p{margin-bottom:14px;color:#334155}li{color:#334155;margin:5px 0 5px 18px}articl
 .grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:22px;align-items:start}
 @media(max-width:820px){.grid{grid-template-columns:1fr}}
 .calc{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
-.calc label{display:block;font-size:12.5px;font-weight:600;color:#475569;margin:12px 0 5px}.calc label:first-child{margin-top:0}
+.calc .f{margin-top:14px}.calc .f:first-child,.calc .row:first-child .f{margin-top:0}.calc .row+.f,.calc .f+.row,.calc .row+.row{margin-top:14px}
+.calc label{display:block;font-size:12.5px;font-weight:600;color:#475569;margin:0 0 5px;line-height:1.3}
 .calc input,.calc select{width:100%;font:inherit;font-size:15px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc;color:#0f172a}
 .calc input:focus{outline:2px solid #34d399;border-color:#10b981;background:#fff}
-.calc .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.calc .hint{font-size:11.5px;color:#64748b;margin-top:4px}
+.calc .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.calc .row .f{margin-top:0;display:flex;flex-direction:column;justify-content:flex-end}.calc .row .f .hint{margin-top:auto;padding-top:4px}.calc .hint{font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.4}
+@media(max-width:420px){.calc .row{grid-template-columns:1fr}.calc .row .f+.f{margin-top:14px}}
 .flow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:8px;align-items:center}.flow button{font:inherit;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:9px 10px;cursor:pointer;color:#64748b}
 #add-flow{margin-top:10px;font:inherit;font-size:13px;font-weight:600;border:1px dashed #94a3b8;background:#fff;border-radius:8px;padding:9px 12px;cursor:pointer;width:100%;color:#0f172a}
 .result{background:linear-gradient(135deg,#0b1220,#13233b);color:#fff;border-radius:14px;padding:20px}
@@ -262,15 +264,15 @@ def preview(kinds, title, sub):
     return f'<section class="pv"><h2>{title}</h2><p class="sub">{sub}</p><div class="wrap">' + ''.join(PV[k] for k in kinds) + '</div></section>'
 
 # Sane ranges per field (also enforced in calc.js, since a typed value ignores min/max): ages 1-100, rates 0-50 %, years 1-80, money 0-1000 Cr
-LIMITS = {'f-age': (1, 100), 'f-retire': (1, 100), 'f-life': (1, 110), 'f-years': (1, 80), 'f-months': (1, 60),
-          'f-rate': (0, 50), 'f-prerate': (0, 50), 'f-inflation': (0, 30), 'f-stepup': (0, 50), 'f-swr': (0.5, 20)}
+LIMITS = {'f-age': (1, 100), 'f-retire': (1, 100), 'f-life': (1, 110), 'f-years': (1, 60), 'f-months': (1, 60),
+          'f-rate': (0, 30), 'f-prerate': (0, 30), 'f-inflation': (0, 20), 'f-stepup': (0, 30), 'f-swr': (0.5, 20)}
 MONEY_MAX = 10_000_000_000  # 1,000 Cr
 def field(id, label, val, step=None, hint=None, typ='number', attrs=''):
     st = f' step="{step}"' if step else ''
     h = f'<div class="hint">{hint}</div>' if hint else ''
     lim = LIMITS.get(id, (0, MONEY_MAX) if '(₹)' in label else None)
     mm = f' min="{lim[0]}" max="{lim[1]}"' if lim and typ == 'number' else ''
-    return f'<label for="{id}">{label}</label><input id="{id}" type="{typ}" value="{val}" inputmode="decimal"{st}{mm} {attrs}/>{h}'
+    return f'<div class="f"><label for="{id}">{label}</label><input id="{id}" type="{typ}" value="{val}" inputmode="decimal"{st}{mm} {attrs}/>{h}</div>'
 
 def calc_html(p):
     c = p['calc']
