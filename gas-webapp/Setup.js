@@ -213,6 +213,18 @@ function createAllSheets() {
     }
   });
 
+  // Email defaults first (Daily 9 AM, users can change later), so the trigger install below schedules the real
+  // email job (sendScheduledDailyEmail). The old updateEmailSchedule() call here also created a second, legacy
+  // 'sendDailyEmailReport' trigger that ran without a spreadsheet context and failed every morning.
+  try {
+    if (!getSetting('EmailConfigured')) updateSetting('EmailConfigured', 'TRUE');
+    if (!getSetting('EmailFrequency')) updateSetting('EmailFrequency', 'Daily');
+    if (!getSetting('EmailHour')) updateSetting('EmailHour', '9');
+    log('Email schedule defaults: Daily 9 AM');
+  } catch (error) {
+    log('Error setting email defaults: ' + error.message);
+  }
+
   // Install triggers automatically after creating sheets
   try {
     installTriggers(false); // false = don't show popup message
@@ -220,19 +232,6 @@ function createAllSheets() {
   } catch (error) {
     log('Error installing triggers: ' + error.message);
     // Don't fail setup if trigger installation fails
-  }
-
-  // Auto-configure email to Daily 9 AM (users can change later)
-  try {
-    const emailResult = updateEmailSchedule('daily', 9);
-    if (emailResult.success) {
-      log('Email schedule configured: Daily 9 AM');
-    } else {
-      log('Email configuration warning: ' + (emailResult.error || 'Unknown error'));
-    }
-  } catch (error) {
-    log('Error configuring email schedule: ' + error.message);
-    // Don't fail setup if email configuration fails
   }
 
   return results;

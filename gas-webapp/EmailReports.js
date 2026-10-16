@@ -275,9 +275,11 @@ function getScheduleUpdateMessage(scheduleType, hour) {
  * Send daily email report (triggered by schedule)
  */
 function sendDailyEmailReport() {
+  // Legacy handler (the real daily email is sendScheduledDailyEmail in Triggers.js). A trigger from an older
+  // version still pointing here removes itself, so it never runs again without a spreadsheet context.
   try {
-    log('sendDailyEmailReport triggered');
-    sendDashboardEmailReport('daily');
+    log('sendDailyEmailReport: legacy trigger, removing itself');
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sendDailyEmailReport') ScriptApp.deleteTrigger(t); });
   } catch (error) {
     log('Error in sendDailyEmailReport: ' + error.toString());
   }
