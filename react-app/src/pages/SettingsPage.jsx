@@ -282,6 +282,15 @@ function SettingsDesktop() {
               <button onClick={() => { setJobs(null); api.getDailyJobsStatus().then((r) => { setDaily(r && !r.unknown ? !!r.sync : null); setJobs(r && !r.unknown ? r : null) }).catch(() => setDaily(null)) }}
                 className="text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] underline">Check again</button>
             )}
+            {jobs?.lastSync && (
+              <p className={`text-xs ${jobs.lastSync.ok ? 'text-[var(--text-dim)]' : 'text-amber-400'}`}>
+                Last background update: {new Date(jobs.lastSync.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                {jobs.lastSync.ok ? '' : ` · failed: ${jobs.lastSync.error || 'unknown error'}`}
+              </p>
+            )}
+            {jobs && (jobs.stuck || jobs.emailStuck) && (
+              <p className="text-xs text-amber-400">Google has not run your {jobs.stuck ? 'daily update' : 'family email'} for more than a day, although it is switched on. Press Turn on again: it re-asks Google for permission and reinstalls the jobs. If it keeps happening, email capital.friends.dev@gmail.com.</p>
+            )}
             {jobs?.lastEmail && (
               <p className={`text-xs ${jobs.lastEmail.ok ? 'text-[var(--text-dim)]' : 'text-amber-400'}`}>
                 Last scheduled email: {new Date(jobs.lastEmail.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}

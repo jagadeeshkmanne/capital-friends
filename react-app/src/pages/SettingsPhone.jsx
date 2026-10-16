@@ -127,6 +127,8 @@ export default function SettingsPhone() {
               </p>
               {jobs.authorized === false && <p className="!text-[12px]" style={{ color: '#fbbf24' }}>Google permission missing (a box was unticked at sign-in). <a href={jobs.authUrl || '#'} target="_blank" rel="noopener" style={{ color: '#fbbf24', textDecoration: 'underline' }}>Allow on Google</a>, then tap Daily updates again.</p>}
               {!jobs.sync && jobs.authorized !== false && <p className="!text-[12px]">Not turned on yet{jobs.account ? ` for ${jobs.account}` : ''}. Tap Daily updates: a Google page opens; sign in with the same account and keep it open until it says all three are on.</p>}
+              {jobs.lastSync && <p className="!text-[12px]" style={{ color: jobs.lastSync.ok ? undefined : '#fbbf24' }}>Last update: {new Date(jobs.lastSync.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{jobs.lastSync.ok ? '' : ` · failed: ${jobs.lastSync.error || 'unknown error'}`}</p>}
+              {(jobs.stuck || jobs.emailStuck) && <p className="!text-[12px]" style={{ color: '#fbbf24' }}>Google has not run your {jobs.stuck ? 'daily update' : 'family email'} for more than a day. Press Turn on again to reinstall.</p>}
               {jobs.lastEmail && <p className="!text-[12px]" style={{ color: jobs.lastEmail.ok ? undefined : '#fbbf24' }}>Last email: {new Date(jobs.lastEmail.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{jobs.lastEmail.ok ? ` · sent to ${jobs.lastEmail.sent}` : ` · failed: ${jobs.lastEmail.error || 'unknown error'}`}</p>}
             </IonLabel>
           </IonItem>

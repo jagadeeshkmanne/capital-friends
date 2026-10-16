@@ -18,9 +18,13 @@ export default function DailyUpdatesBanner() {
   const [state, setState] = useState('hidden') // hidden | ask | waiting | done
   const pollRef = useRef(null)
 
+  const [why, setWhy] = useState('setup') // setup | stuck | permission
   async function needsSetup() {
     const s = await api.getDailyJobsStatus()
     if (!s || s.unknown) return false // can't tell: never nag
+    if (s.authorized === false) { setWhy('permission'); return true }
+    if (s.stuck || s.emailStuck) { setWhy('stuck'); return true }   // switched on, but Google has not run it for 36 h
+    setWhy('setup')
     return !s.sync || (s.emailConfigured && !s.email)
   }
 
@@ -83,19 +87,23 @@ export default function DailyUpdatesBanner() {
           <RefreshCw size={20} className={`text-violet-400 ${state === 'waiting' ? 'animate-spin' : ''}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Keep your fund values up to date</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{why === 'stuck' ? 'Your daily updates have stopped' : why === 'permission' ? 'One Google permission is missing' : 'Keep your fund values up to date'}</p>
           <p className="text-xs text-[var(--text-dim)] mt-0.5">
             {state === 'waiting'
               ? (blockedUrl
                   ? <>Your browser blocked the window. <a href={blockedUrl} target="_blank" rel="noopener" className="underline font-semibold text-violet-400">Open it here</a>, sign in with the same Google account, then come back.</>
                   : 'A small Google window has opened. Sign in there with the same account and keep it open until it says the updates are on.')
-              : 'Let Capital Friends update your mutual fund prices every day and send your daily summary email, even when the app is closed. You only need to do this once.'}
+              : why === 'stuck'
+                ? 'Daily updates are switched on, but Google has not run them for more than a day, so your fund values and the family email are behind. Press Fix: it re-asks Google for permission and reinstalls the jobs.'
+                : why === 'permission'
+                  ? 'One box was left unticked on the Google screen, so the daily update and the family email cannot run. Press Fix and tick every box.'
+                  : 'Let Capital Friends update your mutual fund prices every day and send your daily summary email, even when the app is closed. You only need to do this once.'}
           </p>
           {state === 'ask' && (
             <div className="flex items-center gap-2 mt-2.5">
               <button onClick={turnOn}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors">
-                Turn on daily updates
+                {why === 'setup' ? 'Turn on daily updates' : 'Fix'}
               </button>
               <button onClick={later}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-hover)] transition-colors">

@@ -459,6 +459,7 @@ function ensureSyncTriggersUpdated() {
  * Email is handled separately by sendScheduledDailyEmail trigger (Triggers.js).
  */
 function installDailyTriggerForUser() {
+  removeStaleTriggers_();
   // Remove any existing sync triggers to avoid duplicates
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
@@ -478,6 +479,7 @@ function installDailyTriggerForUser() {
       .everyDays(1)
       .create();
   }
+  try { updateSetting('TriggersInstalledAt', new Date().toISOString()); } catch (e) {}
 }
 
 /**
@@ -508,6 +510,7 @@ function dailyUserSync() {
     // Refresh master data (MF NAVs, ATH, Stocks)
     var result = refreshAllMasterData();
     log('Data sync complete for ' + email + ': ' + JSON.stringify(result));
+    recordSyncRun_(true, '');
 
     // Monthly retirement income: take this month's amount from savings / sweep-in FD (IncomePlan.js)
     try { var inc = applyMonthlyIncome(); if (inc.applied.length) log('Monthly income: ' + JSON.stringify(inc.applied)); } catch (e) { log('applyMonthlyIncome error: ' + e); }
@@ -518,7 +521,27 @@ function dailyUserSync() {
 
   } catch (e) {
     log('dailyUserSync error: ' + e.toString());
+    try { recordSyncRun_(false, String(e.message || e)); } catch (e2) {}
   }
+}
+
+/** Settings['SyncLastRun'] = {at, ok, error}: the last background sync, shown in the app (Settings, dashboard). */
+function recordSyncRun_(ok, error) {
+  updateSetting('SyncLastRun', JSON.stringify({ at: new Date().toISOString(), ok: !!ok, error: String(error || '').slice(0, 200) }));
+}
+
+// Handler names the app no longer uses. A trigger left behind from an older version keeps firing (and failing)
+// every day on the user's account, so every install and every status check removes them.
+var STALE_TRIGGER_HANDLERS_ = ['dailyScreenerRun', 'hourlyPriceCheck', 'sendDailyEmailReport', 'sendWeeklyEmailReport', 'updateAllMFInvestmentsNAV'];
+function removeStaleTriggers_() {
+  var removed = 0;
+  try {
+    ScriptApp.getProjectTriggers().forEach(function (t) {
+      if (STALE_TRIGGER_HANDLERS_.indexOf(t.getHandlerFunction()) !== -1) { ScriptApp.deleteTrigger(t); removed++; }
+    });
+  } catch (e) { log('removeStaleTriggers_: ' + e.message); }
+  if (removed) log('Removed ' + removed + ' stale trigger(s)');
+  return removed;
 }
 
 // ============================================================================
@@ -596,15 +619,32 @@ function syncMasterDataIfStale() {
  */
 function getMyDailyJobsStatus() {
   try {
+    removeStaleTriggers_();
     var names = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
     var emailOn = false;
     try { emailOn = isEmailConfigured(); } catch (e) {}
+    var parse = function (k) { try { var v = getSetting(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
+    var lastSync = parse('SyncLastRun'), installedAt = null;
+    try { var ia = getSetting('TriggersInstalledAt'); installedAt = ia ? new Date(ia) : null; } catch (e) {}
+    var hasSync = names.indexOf('dailyUserSync') !== -1;
+    // "stuck": the trigger exists, was installed more than 36 h ago, and no background sync has succeeded in the last 36 h.
+    // That is what a trigger Google refuses to start looks like from inside (nothing of ours runs, so nothing else can record it).
+    var H36 = 36 * 3600 * 1000, now = Date.now();
+    var lastOk = lastSync && lastSync.ok ? new Date(lastSync.at).getTime() : 0;
+    var oldEnough = installedAt && !isNaN(installedAt.getTime()) ? (now - installedAt.getTime() > H36) : !!lastSync; // never recorded an install: judge only if a run was ever recorded
+    var stuck = hasSync && oldEnough && (now - lastOk > H36);
+    var lastEmail = parse('EmailLastRun'), hasEmail = names.indexOf('sendScheduledDailyEmail') !== -1;
+    var lastEmailOk = lastEmail && lastEmail.ok ? new Date(lastEmail.at).getTime() : 0;
+    var emailStuck = hasEmail && emailOn && oldEnough && (now - lastEmailOk > H36);
     return {
-      sync: names.indexOf('dailyUserSync') !== -1,
+      sync: hasSync,
+      lastSync: lastSync,
+      stuck: !!stuck,
+      emailStuck: !!emailStuck,
       email: names.indexOf('sendScheduledDailyEmail') !== -1,
       emailConfigured: emailOn,
       reminders: names.indexOf('checkAndSendReminders') !== -1,
-      lastEmail: (function () { try { var v = getSetting('EmailLastRun'); return v ? JSON.parse(v) : null; } catch (e) { return null; } })(),
+      lastEmail: lastEmail,
       // has this user granted every permission the background jobs need? (a scope unticked at sign-in makes sends fail)
       authorized: (function () { try { return ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL).getAuthorizationStatus() !== ScriptApp.AuthorizationStatus.REQUIRED; } catch (e) { return null; } })(),
       authUrl: (function () { try { var a = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL); return a.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED ? a.getAuthorizationUrl() : null; } catch (e) { return null; } })(),
