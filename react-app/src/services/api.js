@@ -7,6 +7,8 @@
  */
 
 // GAS IDs — Script ID for devMode, Deployment ID for production
+import { track } from './track'
+
 const SCRIPT_ID = import.meta.env.VITE_GAS_SCRIPT_ID || ''
 const DEPLOYMENT_ID = import.meta.env.VITE_GAS_DEPLOYMENT_ID || ''
 
@@ -372,6 +374,7 @@ export const getMarketData = () => callAPI('data:market')
 export const importEnabled = () => callAPI('import:enabled')
 export const importPreview = (statement, mapping) => callAPI('import:preview', { statement, mapping })
 export const importSave = (statement, mapping, token, accounts) => callAPI('import:save', { statement, mapping, token, accounts })
+  .then((r) => { track('cams_import'); return r })
 export const importStatus = () => callAPI('import:status')
 export const importUndo = (importId) => callAPI('import:undo', { importId })
 export const importMoveFund = (fromPortfolioId, toPortfolioId, code, folio) => callAPI('import:move-fund', { fromPortfolioId, toPortfolioId, code, folio })

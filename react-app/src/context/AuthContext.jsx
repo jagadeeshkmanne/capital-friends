@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../services/api'
 import * as idb from '../services/idb'
+import { track } from '../services/track'
 
 const AuthContext = createContext(null)
 
@@ -147,6 +148,8 @@ export function AuthProvider({ children }) {
       const me = await api.getMe()
       
       // New accounts: the DailyUpdatesBanner asks to switch on the daily jobs with a click (a timed popup is blocked)
+      // Analytics: a new account (the server just created the user's sheet) vs a returning sign-in
+      track(me.isNew ? 'sign_up' : 'login', { method: 'Google' })
 
       setUserAndCache({
         email: me.email || profile.email,

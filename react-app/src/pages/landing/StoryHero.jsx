@@ -2,6 +2,7 @@
 // Left: what it is + Sign in + five chapters. Right: a stage that plays each chapter as a small animated scene
 // (flat illustrations + Open Peeps people, CSS3 animations) and moves on by itself; tap a chapter to jump.
 import { memo, useEffect, useRef, useState } from 'react'
+import { track } from '../../services/track'
 import { C, G, Disc, ART_CSS } from './LandingArt'
 
 // family members as simple flat busts (one style for everyone): tinted disc, shoulders, head, hair
@@ -458,7 +459,7 @@ function DemoScene({ id, play, setPlay }) {
     <div className="st-demo">
       {play
         ? <iframe src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`} title="Capital Friends: full app walkthrough" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-        : <button type="button" className="st-demo-th" onClick={() => setPlay(true)} aria-label="Play the demo video" style={{ backgroundImage: `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)` }}>
+        : <button type="button" className="st-demo-th" onClick={() => { track('demo_video_play', { from: 'hero_player' }); setPlay(true) }} aria-label="Play the demo video" style={{ backgroundImage: `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)` }}>
             <span className="st-demo-p"><svg width="26" height="26" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="#fff" /></svg></span>
             <span className="st-demo-t">Full app demo · 30 min</span>
           </button>}
@@ -520,7 +521,7 @@ function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, 
       {/* one dock at the bottom: start, watch, and how many families */}
       <div className="st-dock">
         <button onClick={signIn} className="st-btn"><span className="st-g">{GoogleIcon}</span>Sign in with Google<span className="st-free">FREE</span></button>
-        {videoId ? <button type="button" className="st-btn2" onClick={() => { setI(0); setPlay(true) }} aria-label={videoLabel}><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">{videoLabel}</span></button>
+        {videoId ? <button type="button" className="st-btn2" onClick={() => { track('demo_video_play', { from: 'hero_button' }); setI(0); setPlay(true) }} aria-label={videoLabel}><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">{videoLabel}</span></button>
           : videoUrl && <a className="st-btn2" href={videoUrl} target="_blank" rel="noopener noreferrer" aria-label="Watch on YouTube"><span className="st-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="currentColor" /></svg></span><span className="st-btn2t">Watch on YouTube</span></a>}
       </div>
     </section>
