@@ -19,7 +19,8 @@ export default function LandingHeader({ signIn, isMobile, youtube, instagram, fa
         <a href="#" className="lh-logo" aria-label="Capital Friends home"><LogoMark size={isMobile ? 30 : 34} />{!isMobile && <span className="lh-wm">Capital <em>Friends</em></span>}</a>
         <ToolsMenu isMobile={isMobile} />
         <div className="lh-r">
-          {families ? (
+          {/* on phones the count sits under the hero headline instead (the header has no room) */}
+          {families && !isMobile ? (
             <span className="lh-fam" title="Families using Capital Friends">
               <svg width={isMobile ? 52 : 64} height={isMobile ? 26 : 30} viewBox="-16 -16 84 32" aria-hidden="true">
                 {['mother', 'spouse', 'you'].map((k, n) => <g key={k} transform={`translate(${n * 24} 0)`}><circle r="15.5" fill="#25215e" /><Bust k={k} r={14} /></g>)}
@@ -71,12 +72,12 @@ const CSS = `
 .lh-dd .lh-col{border-radius:12px}
 .lh-dd b{font-family:Inter,system-ui,sans-serif;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;padding:4px 10px 6px}
 .lh-dd a{font-family:Inter,system-ui,sans-serif;font-size:13.5px;color:#0f172a;text-decoration:none;padding:6px 10px;border-radius:7px}.lh-dd a:hover{background:#f1f5f9}.lh-dd a.all{color:#059669;font-weight:700;margin-top:6px}
-.lh.m .lh-tools{font-size:12.5px;padding:6px 8px;margin-left:4px;margin-right:auto}
+.lh.m .lh-tools{font-size:12.5px;padding:6px 6px;margin-left:4px;margin-right:auto}
 
 .lh{position:sticky;top:0;z-index:100;overflow:visible;background:#1e1b4b;box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:box-shadow .25s}
 .lh.sc{box-shadow:0 12px 30px -18px rgba(30,27,75,.75)}
 .lh-in{position:relative;max-width:1360px;margin:0 auto;height:60px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-sizing:border-box}
-.lh-logo{text-decoration:none;display:inline-flex;align-items:center;gap:10px}
+.lh-logo{text-decoration:none;display:inline-flex;align-items:center;gap:10px;flex-shrink:0}
 .lh-wm{font-family:Inter,system-ui,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#fff;white-space:nowrap}.lh-wm em{font-style:normal;color:#34d399}
 .lh-r{display:flex;align-items:center;gap:8px}
 .lh-fam{display:inline-flex;align-items:center;gap:9px;margin-right:10px;padding:4px 16px 4px 5px;border-radius:999px;background:linear-gradient(90deg,rgba(52,211,153,.22),rgba(52,211,153,.08));box-shadow:inset 0 0 0 1px rgba(52,211,153,.5),0 0 18px -4px rgba(52,211,153,.45);animation:lhFam 3s ease-in-out infinite}
@@ -96,5 +97,6 @@ const CSS = `
 .lh-line{display:none;background:linear-gradient(90deg,#14b8a6,#7c3aed,#0ea5e9,#f59e0b,#10b981,#14b8a6);background-size:200% 100%;animation:lhLine 12s linear infinite;opacity:.9}
 @keyframes lhLine{to{background-position:200% 0}}
 .lh.m .lh-in{height:54px;padding:0 12px}.lh.m .lh-ic{width:34px;height:34px}.lh.m .lh-r{gap:6px}.lh.m .lh-fam{margin-right:2px}.lh.m .lh-wm{font-size:15.5px}
+@media (max-width:380px){.lh.m .lh-ic.ig{display:none}}
 @media (prefers-reduced-motion:reduce){.lh-line{animation:none}}
 `

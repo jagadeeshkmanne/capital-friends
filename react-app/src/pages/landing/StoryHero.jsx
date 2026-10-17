@@ -500,6 +500,16 @@ function StoryHero({ signIn, isMobile, GoogleIcon, families, videoUrl, videoId, 
       {/* the whole hero is the stage: a soft glow in the scene's colour and floating things everywhere */}
       <div className="st-glow" aria-hidden="true" />
       <h1 className="st-h"><span className="st-h1a">Your family's money,</span> <span className="st-rot"><span key={ch.k} style={{ '--c': ch.c }}>{ch.ph}</span></span></h1>
+      {/* social proof right under the headline (the header pill in the corner was easy to miss) */}
+      {families ? (
+        <div className="st-proof" title="Families using Capital Friends">
+          <svg width={isMobile ? 58 : 70} height={isMobile ? 26 : 30} viewBox="-16 -16 84 32" aria-hidden="true">
+            {['mother', 'spouse', 'you'].map((k, n) => <g key={k} transform={`translate(${n * 24} 0)`}><circle r="15.5" fill="#25215e" stroke="#fff" strokeWidth="2" /><Bust k={k} r={14} /></g>)}
+          </svg>
+          <span><b>{Number(families).toLocaleString('en-IN')} families</b> {isMobile ? 'already use it' : 'already track their money here'}</span>
+          <i className="st-live" aria-hidden="true" />
+        </div>
+      ) : null}
       <div className="st-mid">
       {/* how it works, as a path: Your Drive → Track → Import → Goals → Family */}
         <ol className="st-path" role="tablist">
@@ -549,6 +559,11 @@ const CSS = `
 .st:not(.m) .st-path li.on button{background:#fff;box-shadow:0 8px 20px -12px rgba(15,23,42,.4);padding-right:14px}
 .st-h{position:relative;z-index:3;margin:0;padding:26px 24px 0;text-align:center;font-family:Inter,system-ui,sans-serif;font-weight:700;letter-spacing:-.025em;line-height:1.2;color:#0b1120;font-size:clamp(22px,2.1vw,32px)}
 .st-h1a{display:inline}
+.st-proof{position:relative;z-index:3;align-self:center;display:inline-flex;align-items:center;gap:10px;margin:12px auto 0;padding:5px 16px 5px 6px;border-radius:999px;background:#ecfdf5;box-shadow:inset 0 0 0 1.5px #6ee7b7,0 8px 22px -12px rgba(5,150,105,.55);font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:500;color:#065f46;white-space:nowrap;animation:stProofIn .6s ease-out both}
+.st-proof b{font-weight:800;color:#047857;font-size:15.5px}
+.st-live{width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 0 rgba(16,185,129,.6);animation:stLive 1.8s infinite}
+@keyframes stLive{0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+@keyframes stProofIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .st-rot{display:inline-block;position:relative;overflow:hidden;vertical-align:top;line-height:inherit}.st-rot>span{vertical-align:top}
 .st-rot>span{display:inline-block;animation:stWord .6s cubic-bezier(.2,.8,.2,1) both;color:var(--c)}
 @keyframes stWord{from{transform:translateY(60%);opacity:0;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
@@ -680,8 +695,8 @@ button.st-btn2{border:0;cursor:pointer;font-family:inherit}
 .st.m .st-scene{position:relative;inset:auto;height:min(400px,100%);width:100%;transform:none}
 .st.m .st-svg{height:100%;width:auto;max-width:none;animation:stPan var(--pd,7s) ease-in-out both}
 @keyframes stPan{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(calc(-100% + 100vw))}}
-.st.m .st-h{font-size:22px;padding:16px 16px 0}.st.m .st-rot{display:block}
+.st.m .st-h{font-size:22px;padding:16px 16px 0}.st.m .st-proof{margin-top:10px;font-size:13px;padding:4px 12px 4px 5px;gap:7px}.st.m .st-proof b{font-size:14px}.st.m .st-rot{display:block}
 .st.m .st-legal{position:relative;right:auto;bottom:auto;justify-content:center;padding:0 0 14px}.st.m .st-dock{margin:0 0 10px;flex-wrap:nowrap}.st.m .st-btn{font-size:14px}.st.m .st-btn2t,.st.m .st-fam{display:none}
 .st.m .st-glow{left:-30%;top:20%;width:160%;height:60%}
-@media (prefers-reduced-motion:reduce){.st-flow,.st-scan,.st-car,.st-env,.st-play::after,.st-am,.st-spark{animation:none!important}.st-flow,.st-env,.st-spark{display:none}}
+@media (prefers-reduced-motion:reduce){.st-flow,.st-scan,.st-car,.st-env,.st-play::after,.st-am,.st-spark,.st-live,.st-proof{animation:none!important}.st-flow,.st-env,.st-spark{display:none}}
 `
