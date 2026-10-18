@@ -43,9 +43,11 @@ export default function PaperBookPage() {
     if (!b) return null
     const hold = b.holdings || []
     const gold = hold.filter((h) => h[0] === 'GOLDBEES').reduce((a, h) => a + h[4], 0)
-    const stocks = hold.filter((h) => h[0] !== 'GOLDBEES').reduce((a, h) => a + h[4], 0)
+    const isStock = (h) => h[0] !== 'GOLDBEES' && h[0] !== 'LIQUIDCASE'
+    const stocks = hold.filter(isStock).reduce((a, h) => a + h[4], 0)
     const liquid = Math.max(0, (b.nav || 0) - gold - stocks)
-    return { hold, gold, stocks, liquid, held: new Set(hold.map((h) => h[0])), maxW: Math.max(1, ...hold.filter((h) => h[0] !== 'GOLDBEES').map((h) => h[6])) }
+    const nStocks = hold.filter(isStock).length
+    return { hold, gold, stocks, liquid, nStocks, held: new Set(hold.map((h) => h[0])), maxW: Math.max(1, ...hold.filter(isStock).map((h) => h[6])) }
   }, [b])
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
@@ -89,7 +91,7 @@ export default function PaperBookPage() {
         <div className="xl:col-span-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Holdings</h3>
-            <span className="text-xs text-[var(--text-dim)]">{view.hold.length - (view.held.has('GOLDBEES') ? 1 : 0)} stocks + gold</span>
+            <span className="text-xs text-[var(--text-dim)]">{view.nStocks} stocks + gold + liquid</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -102,10 +104,10 @@ export default function PaperBookPage() {
               </thead>
               <tbody>
                 {view.hold.map(([s, q, avg, px, val, pnl, w, rank]) => {
-                  const g = s === 'GOLDBEES'
+                  const g = s === 'GOLDBEES', lq = s === 'LIQUIDCASE'
                   return (
-                    <tr key={s} className={`border-b border-[var(--border-row)] last:border-0 hover:bg-[var(--bg-hover)] ${g ? 'bg-amber-500/5' : ''}`}>
-                      <td className={`${TD} text-left font-semibold ${g ? 'text-amber-400' : 'text-[var(--text-primary)]'}`}>{s}</td>
+                    <tr key={s} className={`border-b border-[var(--border-row)] last:border-0 hover:bg-[var(--bg-hover)] ${g ? 'bg-amber-500/5' : lq ? 'bg-sky-500/5' : ''}`}>
+                      <td className={`${TD} text-left font-semibold ${g ? 'text-amber-400' : lq ? 'text-sky-400' : 'text-[var(--text-primary)]'}`}>{s}{lq && <span className="ml-1.5 text-[10px] font-medium text-[var(--text-dim)]">liquid</span>}</td>
                       <td className={`${TD} text-right`}>{num(q)}</td>
                       <td className={`${TD} text-right`}>{num(avg)}</td>
                       <td className={`${TD} text-right`}>{num(px)}</td>
@@ -114,12 +116,12 @@ export default function PaperBookPage() {
                       <td className={`${TD} text-left`}>
                         <div className="flex items-center gap-2">
                           <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden">
-                            <div className={`h-full rounded-full ${g ? 'bg-amber-400' : 'bg-violet-400'}`} style={{ width: `${g ? 100 : Math.min(100, (w / view.maxW) * 100)}%` }} />
+                            <div className={`h-full rounded-full ${g ? 'bg-amber-400' : lq ? 'bg-sky-400' : 'bg-violet-400'}`} style={{ width: `${g || lq ? 100 : Math.min(100, (w / view.maxW) * 100)}%` }} />
                           </div>
                           <span className="text-xs">{w}%</span>
                         </div>
                       </td>
-                      <td className={`${TD} text-right`}>{g ? '—' : rank ?? '—'}</td>
+                      <td className={`${TD} text-right`}>{g || lq ? '—' : rank ?? '—'}</td>
                     </tr>
                   )
                 })}
