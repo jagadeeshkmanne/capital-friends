@@ -53,3 +53,16 @@ function publishAppStatsNow() {
   Logger.log(JSON.stringify(r));
   return r;
 }
+
+/** Admin page: the private paper-trading book kept by the master DB (needs MASTER_DB_ADMIN_SECRET). */
+function getPaperBook_() {
+  var secret = PropertiesService.getScriptProperties().getProperty('MASTER_DB_ADMIN_SECRET');
+  if (!secret) throw new Error('MASTER_DB_ADMIN_SECRET is not set');
+  var res = UrlFetchApp.fetch(APPSTATS_MASTER_URL_, {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true, followRedirects: true,
+    payload: JSON.stringify({ secret: secret, action: 'paperGet' })
+  });
+  var j = JSON.parse(res.getContentText());
+  if (!j.success) throw new Error(j.error || 'Paper book unavailable');
+  return j.data;
+}

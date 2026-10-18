@@ -195,6 +195,10 @@ function routeAction(action, params, userRecord) {
         isAdmin: Session.getActiveUser().getEmail() === CONFIG.adminEmail
       };
 
+    case 'admin:paper-book':   // hidden admin page: private paper-trading book (admin email only)
+      if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
+      return getPaperBook_();
+
     case 'auth:shared-members':
       return getSharedMembers(userRecord.spreadsheetId);
 

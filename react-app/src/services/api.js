@@ -370,6 +370,9 @@ if (typeof window !== 'undefined') {
 // Market Data
 export const getMarketData = () => callAPI('data:market')
 
+// Hidden admin page: private paper-trading book
+export const getPaperBook = () => callAPI('admin:paper-book')
+
 // Statement import (beta, only for accounts in the server's IMPORT_BETA_EMAILS list)
 export const importEnabled = () => callAPI('import:enabled')
 export const importPreview = (statement, mapping) => callAPI('import:preview', { statement, mapping })

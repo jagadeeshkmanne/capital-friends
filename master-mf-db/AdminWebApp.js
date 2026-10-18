@@ -32,6 +32,11 @@ function doPost(e) {
   var secret = body.secret;
   var action = body.action;
 
+  // Paper-trading snapshot from the scheduled run (see PaperBook.js): no secret, fixed shape only
+  if (action === 'paperSave') {
+    return _runAction('paperSave', function() { return paperSave_(body.data); });
+  }
+
   // --- Validate secret ---
   var storedSecret = PropertiesService.getScriptProperties().getProperty('ADMIN_API_SECRET');
   if (!storedSecret || secret !== storedSecret) {
@@ -69,6 +74,9 @@ function doPost(e) {
       return _runAction('setAppStats', function() {
         return setAppStats_(body.stats || {});
       });
+
+    case 'paperGet':      // from gas-webapp, admin only: the private paper book
+      return _runAction('paperGet', function() { return paperGet_(); });
 
     case 'status':
       return _runAction('status', function() {

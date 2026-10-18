@@ -30,6 +30,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsAndConditions from './pages/TermsAndConditions'
 // Statement import (beta): loaded only when opened, so the PDF reader is not in the main bundle
 const ImportStatementPage = lazy(() => import('./pages/ImportStatementPage'))
+const PaperBookPage = lazy(() => import('./pages/PaperBookPage'))
 
 export default function App() {
   return (
@@ -84,6 +85,7 @@ export default function App() {
           {/* Settings */}
           <Route path="settings" element={<SettingsPage />} />
           <Route path="import" element={<Suspense fallback={null}><ImportStatementPage /></Suspense>} />
+          <Route path="admin/paper" element={<Suspense fallback={null}><PaperBookPage /></Suspense>} />
 
           {/* More (mobile) */}
           <Route path="more" element={<MorePage />} />
