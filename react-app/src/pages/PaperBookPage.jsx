@@ -26,7 +26,7 @@ const td = 'px-3 py-1.5 text-xs text-[var(--text-secondary)] whitespace-nowrap t
 
 export default function PaperBookPage() {
   const { isAdmin } = useAuth()
-  const [data, setData] = useState(null)
+  const [data, setData] = useState(undefined)
   const [err, setErr] = useState('')
   const [book, setBook] = useState('lump')
 
@@ -37,7 +37,8 @@ export default function PaperBookPage() {
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   if (err) return <p className="text-sm text-rose-400 p-4">{err}</p>
-  if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
+  if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
+  if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
 
   const b = data.books?.[book] || {}
   const held = new Set((b.holdings || []).map((h) => h[0]))
