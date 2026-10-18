@@ -1,28 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { Wallet, TrendingUp, Gauge, CalendarClock, Coins } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getPaperBook } from '../services/api'
 
 // Hidden admin page (/admin/paper): private paper-trading book. Only the admin email gets data (checked on the server too).
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
 const pct = (v) => (v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(1) + '%')
-const tone = (v) => (v == null ? '' : v >= 0 ? 'text-emerald-400' : 'text-rose-400')
+const tone = (v) => (v == null ? 'text-[var(--text-primary)]' : v >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')
 const day = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
+const num = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }))
 
-function Card({ title, right, children }) {
+const TH = 'py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider whitespace-nowrap'
+const TD = 'py-2 px-3 text-sm text-[var(--text-secondary)] whitespace-nowrap tabular-nums'
+
+function Stat({ icon: Icon, color, label, value, sub, valueClass }) {
   return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-[var(--border-light)] bg-[var(--bg-inset)] flex items-center justify-between gap-2">
-        <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{title}</h3>
-        {right}
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3.5 min-w-0">
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className={`w-6 h-6 rounded-md flex items-center justify-center ${color}`}><Icon size={13} /></div>
+        <p className="text-xs text-[var(--text-dim)] font-medium truncate">{label}</p>
       </div>
-      <div className="overflow-x-auto">{children}</div>
+      <p className={`text-lg font-bold tabular-nums truncate ${valueClass || 'text-[var(--text-primary)]'}`}>{value}</p>
+      {sub && <p className="text-xs text-[var(--text-dim)] truncate">{sub}</p>}
     </div>
   )
 }
-
-const th = 'px-3 py-2 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wide whitespace-nowrap'
-const td = 'px-3 py-1.5 text-xs text-[var(--text-secondary)] whitespace-nowrap tabular-nums'
 
 export default function PaperBookPage() {
   const { isAdmin } = useAuth()
@@ -32,78 +35,128 @@ export default function PaperBookPage() {
 
   useEffect(() => {
     if (!isAdmin) return
-    getPaperBook().then(setData).catch((e) => setErr(e.message || 'Could not load'))
+    getPaperBook().then((d) => setData(d || null)).catch((e) => setErr(e.message || 'Could not load'))
   }, [isAdmin])
 
-  if (!isAdmin) return <Navigate to="/dashboard" replace />
-  if (err) return <p className="text-sm text-rose-400 p-4">{err}</p>
-  if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
-  if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
+  const b = data?.books?.[book]
+  const view = useMemo(() => {
+    if (!b) return null
+    const hold = b.holdings || []
+    const gold = hold.filter((h) => h[0] === 'GOLDBEES').reduce((a, h) => a + h[4], 0)
+    const stocks = hold.filter((h) => h[0] !== 'GOLDBEES').reduce((a, h) => a + h[4], 0)
+    const liquid = Math.max(0, (b.nav || 0) - gold - stocks)
+    return { hold, gold, stocks, liquid, held: new Set(hold.map((h) => h[0])), maxW: Math.max(1, ...hold.filter((h) => h[0] !== 'GOLDBEES').map((h) => h[6])) }
+  }, [b])
 
-  const b = data.books?.[book] || {}
-  const held = new Set((b.holdings || []).map((h) => h[0]))
+  if (!isAdmin) return <Navigate to="/dashboard" replace />
+  if (err) return <p className="text-sm text-[var(--accent-rose)] p-4">{err}</p>
+  if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
+  if (!data || !view) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
+
   const half = b.x < 1
+  const ret = book === 'sip' ? b.xirr : b.ret_pct
+  const tot = Math.max(1, b.nav)
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-base font-bold text-[var(--text-primary)] mr-auto">Paper book</h1>
-        {['lump', 'sip'].map((k) => (
-          <button key={k} onClick={() => setBook(k)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${book === k ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'border-[var(--border)] text-[var(--text-muted)]'}`}>
-            {k === 'lump' ? '₹10L lump sum' : '₹1L SIP'}
-          </button>
-        ))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
+          {[['lump', '₹10L lump sum'], ['sip', '₹1L monthly SIP']].map(([k, l]) => (
+            <button key={k} onClick={() => setBook(k)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${book === k ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`px-2.5 py-1 rounded-lg font-semibold ${half ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+            {half ? 'Half-cut on · stocks 50%' : 'Fully invested'}
+          </span>
+          <span className="text-[var(--text-dim)]">Prices {day(data.updated)}</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {[
-          ['Value', inr(b.nav), ''],
-          ['Gain', `${inr(b.gain)} (${pct(b.ret_pct)})`, tone(b.gain)],
-          ['Stocks', `${Math.round((b.x || 0) * 100)}%${half ? ' · half-cut' : ''}`, half ? 'text-amber-400' : ''],
-          ['Next rebalance', day(data.next_rebalance), ''],
-        ].map(([l, v, c]) => (
-          <div key={l} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-3 py-2.5 min-w-0">
-            <p className="text-[11px] text-[var(--text-dim)] uppercase tracking-wide">{l}</p>
-            <p className={`text-sm font-semibold text-[var(--text-primary)] truncate ${c}`}>{v}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <Stat icon={Wallet} color="text-violet-400 bg-violet-500/15" label="Value" value={inr(b.nav)} sub={`Invested ${inr(b.invested)}`} />
+        <Stat icon={TrendingUp} color="text-emerald-400 bg-emerald-500/15" label="Gain" value={inr(b.gain)} valueClass={tone(b.gain)} sub={`${pct(ret)}${book === 'sip' ? ' XIRR' : ''}`} />
+        <Stat icon={Gauge} color="text-amber-400 bg-amber-500/15" label="Stocks / Gold / Liquid"
+          value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}`} sub="% of value" />
+        <Stat icon={Coins} color="text-sky-400 bg-sky-500/15" label="vs Nifty 500 TRI" value={b.bench ? pct((b.nav / b.bench - 1) * 100) : '—'} valueClass={b.bench ? tone(b.nav - b.bench) : ''} sub={b.bench ? `Index ${inr(b.bench)}` : ''} />
+        <Stat icon={CalendarClock} color="text-rose-400 bg-rose-500/15" label="Next rebalance" value={day(data.next_rebalance)} sub="first trading day" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Holdings</h3>
+            <span className="text-xs text-[var(--text-dim)]">{view.hold.length - (view.held.has('GOLDBEES') ? 1 : 0)} stocks + gold</span>
           </div>
-        ))}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                  <th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
+                  <th className={`${TH} text-right`}>Price</th><th className={`${TH} text-right`}>Value</th><th className={`${TH} text-right`}>P&amp;L</th>
+                  <th className={`${TH} text-left`}>Weight</th><th className={`${TH} text-right`}>Rank</th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.hold.map(([s, q, avg, px, val, pnl, w, rank]) => {
+                  const g = s === 'GOLDBEES'
+                  return (
+                    <tr key={s} className={`border-b border-[var(--border-row)] last:border-0 hover:bg-[var(--bg-hover)] ${g ? 'bg-amber-500/5' : ''}`}>
+                      <td className={`${TD} text-left font-semibold ${g ? 'text-amber-400' : 'text-[var(--text-primary)]'}`}>{s}</td>
+                      <td className={`${TD} text-right`}>{num(q)}</td>
+                      <td className={`${TD} text-right`}>{num(avg)}</td>
+                      <td className={`${TD} text-right`}>{num(px)}</td>
+                      <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(val)}</td>
+                      <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pct(pnl)}</td>
+                      <td className={`${TD} text-left`}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden">
+                            <div className={`h-full rounded-full ${g ? 'bg-amber-400' : 'bg-violet-400'}`} style={{ width: `${g ? 100 : Math.min(100, (w / view.maxW) * 100)}%` }} />
+                          </div>
+                          <span className="text-xs">{w}%</span>
+                        </div>
+                      </td>
+                      <td className={`${TD} text-right`}>{g ? '—' : rank ?? '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Top 40 ranks</h3>
+            <span className="text-xs text-emerald-400 font-semibold">● held</span>
+          </div>
+          <div className="overflow-y-auto xl:max-h-[640px]">
+            <table className="w-full">
+              <thead className="sticky top-0">
+                <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                  <th className={`${TH} text-right w-10`}>#</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data.ranks || []).map(([s, r, sc]) => {
+                  const h = view.held.has(s)
+                  return (
+                    <tr key={s} className={`border-b border-[var(--border-row)] last:border-0 ${r === 20 ? 'border-b-2 border-b-[var(--border)]' : ''}`}>
+                      <td className={`${TD} text-right text-[var(--text-dim)]`}>{r}</td>
+                      <td className={`${TD} text-left font-semibold ${h ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{h ? '● ' : ''}{s}</td>
+                      <td className={`${TD} text-right`}>{sc}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-
-      <Card title="Holdings" right={<span className="text-[11px] text-[var(--text-dim)]">prices {day(data.updated)}</span>}>
-        <table className="w-full text-left">
-          <thead><tr><th className={th}>Stock</th><th className={`${th} text-right`}>Qty</th><th className={`${th} text-right`}>Avg</th><th className={`${th} text-right`}>Price</th><th className={`${th} text-right`}>Value</th><th className={`${th} text-right`}>P&amp;L</th><th className={`${th} text-right`}>Wt</th><th className={`${th} text-right`}>Rank</th></tr></thead>
-          <tbody>
-            {(b.holdings || []).map(([s, q, avg, px, val, pnl, w, rank]) => (
-              <tr key={s} className="border-t border-[var(--border-row)]">
-                <td className={`${td} font-semibold text-[var(--text-primary)]`}>{s}</td>
-                <td className={`${td} text-right`}>{q}</td>
-                <td className={`${td} text-right`}>{avg}</td>
-                <td className={`${td} text-right`}>{px}</td>
-                <td className={`${td} text-right`}>{inr(val)}</td>
-                <td className={`${td} text-right ${tone(pnl)}`}>{pct(pnl)}</td>
-                <td className={`${td} text-right`}>{w}%</td>
-                <td className={`${td} text-right`}>{s === 'GOLDBEES' ? 'gold' : rank ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
-      <Card title="Top 40 momentum ranks" right={<span className="text-[11px] text-[var(--text-dim)]">● held</span>}>
-        <table className="w-full text-left">
-          <thead><tr><th className={th}>#</th><th className={th}>Stock</th><th className={`${th} text-right`}>Score</th></tr></thead>
-          <tbody>
-            {(data.ranks || []).map(([s, r, sc]) => (
-              <tr key={s} className="border-t border-[var(--border-row)]">
-                <td className={td}>{r}</td>
-                <td className={`${td} font-semibold ${held.has(s) ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{held.has(s) ? '● ' : ''}{s}</td>
-                <td className={`${td} text-right`}>{sc}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <p className="text-xs text-[var(--text-dim)]">Paper trading only · information, not advice</p>
     </div>
   )
 }
