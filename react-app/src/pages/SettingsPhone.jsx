@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../phone/ionic-setup'
 import { IonList, IonListHeader, IonItem, IonLabel, IonToggle, IonSelect, IonSelectOption, IonNote, IonSpinner, IonBadge } from '@ionic/react'
-import { Moon, Eye, CloudDownload, RefreshCw, Clock, FileUp, Mail, Send, BellRing, CalendarDays, Users, Zap, Heart, LogOut } from 'lucide-react'
+import { Moon, Eye, CloudDownload, RefreshCw, Clock, FileUp, Mail, Send, BellRing, Target, CalendarDays, Users, Zap, Heart, LogOut } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -168,6 +168,7 @@ export default function SettingsPhone() {
       <Head>Alerts and reminders</Head>
       <IonList inset lines="inset" className="cf-inset">
         <IonItem><Ico I={BellRing} c="#34d399" /><IonToggle checked={on('AlertsBuckets')} onIonChange={(e) => save({ AlertsBuckets: e.detail.checked ? 'ON' : 'OFF' })}><span>Retirement and income alerts</span><span className="block text-[12px] text-[var(--ion-color-medium)]">Refill due, income running low, FD matured</span></IonToggle></IonItem>
+        <IonItem><Ico I={Target} c="#fbbf24" /><IonToggle checked={on('AlertsGoals')} onIonChange={(e) => save({ AlertsGoals: e.detail.checked ? 'ON' : 'OFF' })}><span>Goal de-risk alerts</span><span className="block text-[12px] text-[var(--ion-color-medium)]">When a goal has more equity than its glide path</span></IonToggle></IonItem>
         <IonItem><Ico I={FileUp} c="#a78bfa" /><IonToggle checked={on('CasReminder')} onIonChange={(e) => save({ CasReminder: e.detail.checked ? 'ON' : 'OFF' })}><span>Monthly CAS import reminder</span><span className="block text-[12px] text-[var(--ion-color-medium)]">{sug.sipDays.length ? `Your SIPs run on the ${sug.sipDays.join(', ')}` : 'A few days after your SIP dates'}</span></IonToggle></IonItem>
         {on('CasReminder') && sel('Reminder day', String(s.CasReminderDay || sug.day), Array.from({ length: 28 }, (_, i) => [String(i + 1), `Day ${i + 1} of the month`]), (v) => save({ CasReminderDay: String(v) }), <Ico I={CalendarDays} c="#a78bfa" />)}
         {sel('Send alerts to', s.AlertsTo === 'all' ? 'all' : 'self', [['self', 'Only me'], ['all', 'Everyone on the report']], (v) => save({ AlertsTo: v }), <Ico I={Users} c="#60a5fa" />)}

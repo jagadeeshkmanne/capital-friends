@@ -444,3 +444,63 @@ function sendCasReminder_(today) {
   if (n) updateSetting('CasReminderSent', month);
   return { sent: n };
 }
+
+// ============================================================================
+// GOAL DE-RISK ALERT (Settings > Alerts & reminders: "Goal de-risk alerts", on by default)
+// ============================================================================
+// The family report shows each goal's glide path (recommended vs actual equity) for information only. When a goal
+// holds clearly more equity than its glide path (more than 15 points), send a short separate email, once a day at
+// most, and a reminder every 14 days until it is back in line. A new glide step (e.g. 3 years left) is a new alert.
+var GOAL_DERISK_GAP_ = 15, GOAL_DERISK_REMIND_DAYS_ = 14;
+
+function sendGoalDeriskAlerts_(today) {
+  today = today || new Date();
+  if (String(getSetting('AlertsGoals') || 'ON').toUpperCase() === 'OFF') return { sent: 0, off: true };
+  var tz = Session.getScriptTimeZone(), todayKey = Utilities.formatDate(today, tz, 'yyyy-MM-dd');
+  if (settingDay_(getSetting('GoalAlertsChecked'), 'yyyy-MM-dd') === todayKey) return { sent: 0, checked: true }; // the sync runs 3 times a day
+  var data = buildDashboardReportData();
+  var health = (data && data.goalHealth) || {}, goals = (data && data.activeGoals) || [];
+  var items = [];
+  goals.forEach(function (g) {
+    var gh = health[g.goalId];
+    if (!gh || !gh.isMapped || gh.actualEquity === null || g.status === 'Achieved') return;
+    if (!(gh.mismatch > GOAL_DERISK_GAP_)) return;
+    var yrs = gh.yearsLeft < 1 ? 'less than a year' : Math.round(gh.yearsLeft * 10) / 10 + ' years';
+    items.push({ key: g.goalId + ':eq' + gh.recommendedEquity, goal: g.goalName || 'Goal', yrs: yrs, rec: gh.recommendedEquity, act: gh.actualEquity, move: gh.mismatch });
+  });
+  updateSetting('GoalAlertsChecked', todayKey);
+  var sentMap = incomeJson_(getSetting('GoalAlertsSent'), {});
+  var due = items.filter(function (it) {
+    var r = sentMap[it.key];
+    return !r || (today - new Date(r.last + 'T00:00:00')) / 864e5 >= GOAL_DERISK_REMIND_DAYS_;
+  });
+  // forget goals that are back in line, so a later drift is a fresh alert
+  var live = {}; items.forEach(function (it) { live[it.key] = true; });
+  Object.keys(sentMap).forEach(function (k) { if (!live[k]) delete sentMap[k]; });
+  if (!due.length) { updateSetting('GoalAlertsSent', JSON.stringify(sentMap)); return { sent: 0 }; }
+  var recipients = alertRecipients_();
+  if (!recipients.length) return { sent: 0 };
+  var isReminder = due.every(function (it) { return !!sentMap[it.key]; });
+  var subject = (isReminder ? 'Reminder: ' : '') + 'Action needed: ' + due[0].goal + ' has more equity than its plan' + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
+  var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:20px"><div style="max-width:600px;margin:0 auto">'
+    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:12px">Capital Friends</div>'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #fde68a;border-radius:12px"><tbody><tr><td style="padding:20px">'
+    + '<div style="font-size:15px;font-weight:800;color:#b45309;margin-bottom:6px">Time to move part of the goal money to safer funds</div>'
+    + '<div style="font-size:13px;color:#475569;line-height:1.5;margin-bottom:6px">As a goal gets closer, its glide path keeps less in equity so a market fall can\'t hurt it late.</div>';
+  due.forEach(function (it, i) {
+    html += '<div style="padding:10px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '"><div style="font-size:13px;font-weight:700;color:#0f172a">' + escHtml_(it.goal) + ' · ' + escHtml_(it.yrs) + ' left</div>'
+      + '<div style="font-size:13px;color:#475569;line-height:1.5;margin-top:2px">Plan: <b>' + it.rec + '% equity</b>. Now: <b style="color:#b45309">' + it.act + '% equity</b>. Move about <b>' + it.move + '% of this goal\'s money</b> from equity to debt funds.</div></div>';
+  });
+  html += '<div style="margin-top:14px"><a href="' + APP_GOALS_URL_ + '" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:8px">Open Goals &rsaquo;</a></div>'
+    + '<div style="font-size:11px;color:#94a3b8;margin-top:10px">A reminder comes every ' + GOAL_DERISK_REMIND_DAYS_ + ' days until the goal is back on its plan. Turn it off in Settings &rsaquo; Alerts &amp; reminders. Information only, not advice.</div>'
+    + '</td></tr></tbody></table></div></div>';
+  var text = due.map(function (it) { return it.goal + ': plan ' + it.rec + '% equity, now ' + it.act + '%. Move about ' + it.move + '% of the goal money to debt funds.'; }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_;
+  var n = 0;
+  recipients.forEach(function (r) {
+    try { GmailApp.sendEmail(r.email, subject, text, { htmlBody: html, name: 'Capital Friends' }); n++; }
+    catch (e) { log('sendGoalDeriskAlerts_ to ' + r.email + ': ' + e); }
+  });
+  if (n) due.forEach(function (it) { var r = sentMap[it.key]; sentMap[it.key] = { first: r ? r.first : todayKey, last: todayKey, n: (r ? r.n : 0) + 1 }; });
+  updateSetting('GoalAlertsSent', JSON.stringify(sentMap));
+  return { sent: n, goals: due.length };
+}

@@ -518,6 +518,8 @@ function dailyUserSync() {
     try { var al = sendBucketAlerts_(); if (al.sent) log('Bucket alerts sent: ' + JSON.stringify(al)); } catch (e) { log('sendBucketAlerts_ error: ' + e); }
     // Monthly CAS reminder on the day the family picked (IncomePlan.js)
     try { var cr = sendCasReminder_(); if (cr.sent) log('CAS reminder sent: ' + cr.sent); } catch (e) { log('sendCasReminder_ error: ' + e); }
+    // Goals with clearly more equity than their glide path: a separate short email (IncomePlan.js)
+    try { var gd = sendGoalDeriskAlerts_(); if (gd.sent) log('Goal de-risk alert sent: ' + JSON.stringify(gd)); } catch (e) { log('sendGoalDeriskAlerts_ error: ' + e); }
 
   } catch (e) {
     log('dailyUserSync error: ' + e.toString());

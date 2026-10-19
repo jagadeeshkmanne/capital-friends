@@ -462,6 +462,7 @@ function AlertsCard() {
   const { showToast } = useToast()
   const sug = suggestCasDay(mfTransactions || [])
   const [buckets, setBuckets] = useState('ON')
+  const [goalsAl, setGoalsAl] = useState('ON')
   const [to, setTo] = useState('self')
   const [cas, setCas] = useState('ON')
   const [casDay, setCasDay] = useState(String(sug.day))
@@ -470,6 +471,7 @@ function AlertsCard() {
   useEffect(() => {
     if (!settings) return
     setBuckets(String(settings.AlertsBuckets || 'ON').toUpperCase())
+    setGoalsAl(String(settings.AlertsGoals || 'ON').toUpperCase())
     setTo(settings.AlertsTo || 'self')
     setCas(String(settings.CasReminder || 'ON').toUpperCase())
     if (settings.CasReminderDay) setCasDay(String(settings.CasReminderDay))
@@ -477,7 +479,7 @@ function AlertsCard() {
   const save = async () => {
     setSaving(true)
     try {
-      await updateSettings({ AlertsBuckets: buckets, AlertsTo: to, CasReminder: cas, CasReminderDay: String(casDay) })
+      await updateSettings({ AlertsBuckets: buckets, AlertsGoals: goalsAl, AlertsTo: to, CasReminder: cas, CasReminderDay: String(casDay) })
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) { showToast(e.message || 'Failed to save', 'error') } finally { setSaving(false) }
   }
@@ -495,6 +497,10 @@ function AlertsCard() {
         <div className="space-y-1">
           <Row label="Retirement & income alerts"><Toggle on={buckets} set={setBuckets} /></Row>
           <p className="text-[11px] text-[var(--text-dim)]">Bucket refill due, Income running low or short, FD matured, EPF, check your savings balance. Reminders until it's done.</p>
+        </div>
+        <div className="space-y-1">
+          <Row label="Goal de-risk alerts"><Toggle on={goalsAl} set={setGoalsAl} /></Row>
+          <p className="text-[11px] text-[var(--text-dim)]">When a goal holds clearly more equity than its glide path (more than 15 points), for example as it gets close. Reminder every 14 days until it's back in line.</p>
         </div>
         <div className="space-y-1">
           <Row label="Monthly CAS import reminder"><Toggle on={cas} set={setCas} /></Row>
