@@ -195,6 +195,10 @@ function routeAction(action, params, userRecord) {
         isAdmin: Session.getActiveUser().getEmail() === CONFIG.adminEmail
       };
 
+    case 'admin:paper-live':   // hidden admin page: live (Google Finance, ~15 min delayed) prices for the paper holdings
+      if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
+      return getPaperLive_(params.symbols || []);
+
     case 'admin:paper-book':   // hidden admin page: private paper-trading book (admin email only)
       if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
       return getPaperBook_();

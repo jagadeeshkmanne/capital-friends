@@ -372,6 +372,7 @@ export const getMarketData = () => callAPI('data:market')
 
 // Hidden admin page: private paper-trading book
 export const getPaperBook = () => callAPI('admin:paper-book')
+export const getPaperLive = (symbols) => callAPI('admin:paper-live', { symbols })
 
 // Statement import (beta, only for accounts in the server's IMPORT_BETA_EMAILS list)
 export const importEnabled = () => callAPI('import:enabled')

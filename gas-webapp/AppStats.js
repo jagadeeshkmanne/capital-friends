@@ -66,3 +66,22 @@ function getPaperBook_() {
   if (!j.success) throw new Error(j.error || 'Paper book unavailable');
   return j.data;
 }
+
+/** Admin page: live price and previous close for NSE symbols (GOOGLEFINANCE via temp cells, cached 2 minutes). */
+function getPaperLive_(symbols) {
+  var syms = (symbols || []).map(String).filter(function (x) { return /^[A-Z0-9&_.-]{1,20}$/.test(x); }).slice(0, 60);
+  var cache = CacheService.getScriptCache(), key = 'paperlive:' + syms.join(',');
+  var hit = key.length < 240 ? cache.get(key) : null;
+  if (hit) return JSON.parse(hit);
+  var f = [];
+  syms.forEach(function (x) {
+    f.push('=IFERROR(GOOGLEFINANCE("NSE:' + x + '", "price"), 0)', '=IFERROR(GOOGLEFINANCE("NSE:' + x + '", "closeyest"), 0)');
+  });
+  var v = gfValues_(f), out = { at: new Date().toISOString(), prices: {} };
+  syms.forEach(function (x, i) {
+    var p = Number(v[i * 2]) || 0, c = Number(v[i * 2 + 1]) || 0;
+    if (p > 0) out.prices[x] = { price: p, prev: c > 0 ? c : null };
+  });
+  if (key.length < 240) { try { cache.put(key, JSON.stringify(out), 120); } catch (e) { /* ignore */ } }
+  return out;
+}
