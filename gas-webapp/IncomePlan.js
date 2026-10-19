@@ -33,6 +33,12 @@ function incomePayMonths_(plan, today) {
   return out;
 }
 
+/** A month / day saved in Settings comes back as a Date (Google Sheets converts "2026-10" and "2026-10-19"): compare as text. */
+function settingDay_(v, fmt) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), fmt);
+  return String(v == null ? '' : v).slice(0, fmt.length);
+}
+
 /** She typed the balance herself since the last deduction (it differs, or was saved on a later day): remember the date,
  *  so the "check your savings balance" reminder counts 3 months from then. */
 function noteTypedBalance_(ref, inv, entries, settings) {
@@ -44,7 +50,7 @@ function noteTypedBalance_(ref, inv, entries, settings) {
   var manual = (last.bal !== undefined && Math.abs(cv - last.bal) > 1) || (upd && autoDay && upd > autoDay);
   if (!manual) return;
   var day = Utilities.formatDate(upd || new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  if (settings['BalanceChecked:' + ref] !== day) { updateSetting('BalanceChecked:' + ref, day); settings['BalanceChecked:' + ref] = day; }
+  if (settingDay_(settings['BalanceChecked:' + ref], 'yyyy-MM-dd') !== day) { updateSetting('BalanceChecked:' + ref, day); settings['BalanceChecked:' + ref] = day; }
 }
 
 /** Deduct this month's (and any missed month's) income from cash sources. Returns what was done. */
@@ -407,7 +413,7 @@ function sendCasReminder_(today) {
   var day = Math.min(28, Math.max(1, parseInt(getSetting('CasReminderDay'), 10) || (sipMax ? sipMax + 5 : 10)));
   if (today.getDate() < day) return { sent: 0 };
   var month = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM');
-  if (getSetting('CasReminderSent') === month) return { sent: 0 };
+  if (settingDay_(getSetting('CasReminderSent'), 'yyyy-MM') === month) return { sent: 0 }; // Sheets turns "2026-10" into a date
   var recipients = alertRecipients_();
   if (!recipients.length) return { sent: 0 };
   var since = '';
