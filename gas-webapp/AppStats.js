@@ -67,20 +67,27 @@ function getPaperBook_() {
   return j.data;
 }
 
-/** Admin page: live price and previous close for NSE symbols (GOOGLEFINANCE via temp cells, cached 2 minutes). */
+/** Admin page: live price and previous close for NSE symbols (Yahoo Finance chart API in parallel, cached 2 minutes). */
 function getPaperLive_(symbols) {
   var syms = (symbols || []).map(String).filter(function (x) { return /^[A-Z0-9&_.-]{1,20}$/.test(x); }).slice(0, 60);
-  var cache = CacheService.getScriptCache(), key = 'paperlive:' + syms.join(',');
+  var cache = CacheService.getScriptCache(), key = 'paperlive2:' + syms.join(',');
   var hit = key.length < 240 ? cache.get(key) : null;
   if (hit) return JSON.parse(hit);
-  var f = [];
-  syms.forEach(function (x) {
-    f.push('=IFERROR(GOOGLEFINANCE("NSE:' + x + '", "price"), 0)', '=IFERROR(GOOGLEFINANCE("NSE:' + x + '", "closeyest"), 0)');
+  var reqs = syms.map(function (x) {
+    return { url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(x + '.NS') + '?range=1d&interval=5m',
+             muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } };
   });
-  var v = gfValues_(f), out = { at: new Date().toISOString(), prices: {} };
-  syms.forEach(function (x, i) {
-    var p = Number(v[i * 2]) || 0, c = Number(v[i * 2 + 1]) || 0;
-    if (p > 0) out.prices[x] = { price: p, prev: c > 0 ? c : null };
+  var res = reqs.length ? UrlFetchApp.fetchAll(reqs) : [];
+  var out = { at: new Date().toISOString(), source: 'Yahoo Finance', prices: {}, missing: [] };
+  res.forEach(function (r, i) {
+    var x = syms[i];
+    try {
+      if (r.getResponseCode() !== 200) throw new Error('HTTP ' + r.getResponseCode());
+      var m = JSON.parse(r.getContentText()).chart.result[0].meta;
+      var p = Number(m.regularMarketPrice) || 0, c = Number(m.previousClose || m.chartPreviousClose) || 0;
+      if (p > 0) out.prices[x] = { price: p, prev: c > 0 ? c : null, time: m.regularMarketTime || null };
+      else out.missing.push(x);
+    } catch (e) { out.missing.push(x); }
   });
   if (key.length < 240) { try { cache.put(key, JSON.stringify(out), 120); } catch (e) { /* ignore */ } }
   return out;
