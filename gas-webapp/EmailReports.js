@@ -1170,12 +1170,28 @@ function buildDashboardReportData() {
     // a shared portfolio go first to the goals that need them most, and stocks / FDs / other investments count too.
     var goalExtras = {};
     try { goalExtras = JSON.parse((getAllSettings() || {}).GoalExtras || '{}') || {}; } catch (e) { goalExtras = {}; }
-    var withExtras = activeGoals.filter(function(g) { return g.status !== 'Achieved'; }).map(function(g) {
+    var allWithExtras = activeGoals.map(function(g) {
       var x = goalExtras[g.goalId] || {};
       return x.payYears ? Object.assign({}, g, { payYears: x.payYears }) : g;
     });
-    var goalAtt = {};
-    try { goalAtt = attributeGoals_(withExtras, allGoalMappings, activeMFHoldings, activeStockHoldings, activeOther, allocMap, now); } catch (e) { log('attributeGoals_ error: ' + e); }
+    var withExtras = allWithExtras.filter(function(g) { return g.status !== 'Achieved'; });
+    // all active goals take part in the split, as in the app; the family plan gives the exact switches of the
+    // app's Goals page ("To do this month")
+    var goalAtt = {}, goalMoves = { steps: [] };
+    try {
+      var mv = goalMoves_(allWithExtras, allGoalMappings, activeMFHoldings, activeStockHoldings, activeOther, allocMap, now);
+      goalAtt = mv.att;
+      var pInfo = function(pid) { var p = activeMFPortfolios.filter(function(x) { return x.portfolioId === pid; })[0] || {}; return { name: String(p.portfolioName || '').replace(/^PFL-/, ''), owner: p.ownerName || '', platform: p.platformBroker || '' }; };
+      var fRow = function(r) { return { fundName: r.fund ? r.fund.fundName : '', units: r.units, value: Math.round(r.value || 0), nav: r.fund ? goalNavOf_(r.fund) : 0, all: !!r.all }; };
+      goalMoves = { haveEq: Math.round(mv.family.haveEq), needEq: Math.round(mv.family.needEq), status: mv.family.status,
+        steps: mv.steps.filter(function(st) { return st.t === 'protect' || st.toSafe; }).map(function(st) {
+          var pi = pInfo(st.portfolioId);
+          var buyFund = st.t === 'switch' ? (st.buys[0] && st.buys[0].fund) : st.buy;
+          return { t: st.t, goalId: st.goal ? st.goal.goalId : '', portfolioId: st.portfolioId, portfolioName: pi.name, owner: pi.owner, platform: pi.platform,
+            goalName: st.goal ? st.goal.goalName : '', goalYears: st.years || 0, eqNow: st.eqNow, eqTarget: st.eqTarget,
+            total: Math.round(st.total), sells: st.sells.map(fRow), buyFund: buyFund ? buyFund.fundName : '' };
+        }) };
+    } catch (e) { log('goalMoves_ error: ' + e); }
     var goalHealth = {};
     withExtras.forEach(function(g) {
       var targetDate = new Date(g.targetDate);
@@ -1259,6 +1275,7 @@ function buildDashboardReportData() {
       activeInsurance: activeInsurance,
       activeGoals: activeGoals,
       goalHealth: goalHealth,
+      goalMoves: goalMoves,
       upcomingReminders: upcomingReminders.slice(0, 10),
       topGainers: topGainers,
       topLosers: topLosers,

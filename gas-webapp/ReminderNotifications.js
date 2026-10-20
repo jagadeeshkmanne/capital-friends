@@ -239,7 +239,7 @@ function buildReminderEmailHTML(reminders) {
     day: '2-digit', month: 'short', year: 'numeric'
   });
 
-  var logoUrl = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/react-app/public/logo-new.png';
+  var logoUrl = 'https://capitalfriends.in/email/logo.png';
 
   // Group: due today vs upcoming (no overdue)
   var dueToday = reminders.filter(function(r) { return r.daysUntilDue === 0; });

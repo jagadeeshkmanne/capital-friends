@@ -385,19 +385,51 @@ function bucketActionsHTML_(items) {
   return h;
 }
 
-/** Outer layout of the short alert emails: the same dark header with the logo as the family report, then the card. */
-var CF_LOGO_URL_ = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-new.png';
+/** Outer layout of the alert emails: the same header and footer as the family report (EmailTemplate.js). */
+var CF_LOGO_URL_ = 'https://capitalfriends.in/email/logo.png';
+var CF_CARD_ = 'background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px;';
 function alertShell_(inner, why) {
-  return '<div style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc">'
-    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc"><tbody><tr><td style="padding:20px">'
-    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;margin:0 auto"><tbody><tr><td>'
-    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0a0f1f;border-radius:10px;margin-bottom:14px"><tbody><tr><td style="padding:12px 18px">'
-    + '<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tbody><tr><td style="vertical-align:middle;padding-right:8px"><img src="' + CF_LOGO_URL_ + '" alt="Capital Friends" style="display:block;border:0;height:32px;width:auto"></td>'
-    + '<td style="vertical-align:middle"><span style="font-size:16px;line-height:1"><span style="font-weight:700;color:#f1f5f9">Capital</span> <span style="font-weight:800;color:#34d399">Friends</span></span></td></tr></tbody></table>'
-    + '</td></tr></tbody></table>'
-    + inner
-    + '<div style="font-size:11px;color:#94a3b8;line-height:1.5;margin-top:4px;text-align:center">' + why + '<br>Sent by Capital Friends (capitalfriends.in) from your own Google account. Information only, not investment advice.</div>'
-    + '</td></tr></tbody></table></td></tr></tbody></table></div>';
+  var tz = Session.getScriptTimeZone();
+  var h = '<div style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Arial,sans-serif;background-color:#f8fafc">'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f8fafc"><tbody><tr><td style="padding:24px">'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;margin:0 auto"><tbody><tr><td>';
+  // header (same as the family report)
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0a0f1f;border-radius:10px;margin-bottom:16px"><tbody><tr><td style="padding:14px 20px">'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody><tr>'
+    + '<td style="vertical-align:middle;padding-right:12px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tbody><tr>'
+    + '<td style="vertical-align:middle;padding-right:8px"><img src="' + CF_LOGO_URL_ + '" alt="Capital Friends" style="display:block;border:0;height:36px;width:auto"></td>'
+    + '<td style="vertical-align:middle"><span style="font-family:\'Poppins\',sans-serif;font-size:16px;letter-spacing:-0.3px;line-height:1"><span style="font-weight:700;color:#f1f5f9">Capital</span> <span style="font-weight:800;color:#34d399">Friends</span></span></td>'
+    + '</tr></tbody></table></td>'
+    + '<td align="right" style="vertical-align:middle;padding-left:12px">'
+    + '<div style="font-size:13px;color:#94a3b8;margin-bottom:4px">Auto-generated from your Google Sheets</div>'
+    + '<div style="font-size:13px;color:#cbd5e1;font-weight:500">Made with &#10084;&#65039; by <strong style="color:#f1f5f9">Jagadeesh Manne</strong></div>'
+    + '</td></tr></tbody></table></td></tr></tbody></table>';
+  h += inner;
+  // footer (same as the family report) + why this email came
+  h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + CF_CARD_ + '"><tbody><tr><td style="padding:20px;text-align:center">'
+    + '<div style="font-size:13px;color:#64748b;margin-bottom:8px">Auto-generated from your Google Sheets &middot; Generated: ' + Utilities.formatDate(new Date(), tz, 'dd MMM yyyy') + '</div>'
+    + '<div style="font-size:14px;color:#475569;font-weight:600;margin-bottom:10px">Made with &#10084;&#65039; in India by <strong style="color:#1e293b">Jagadeesh Manne</strong></div>'
+    + '<a href="https://capitalfriends.in/donate" style="display:inline-block;background:rgba(5,150,105,0.08);border:1px solid rgba(5,150,105,0.2);color:#059669;font-size:13px;font-weight:600;padding:6px 16px;border-radius:6px;text-decoration:none;letter-spacing:0.3px">&#9829; Support this project</a>'
+    + '<div style="font-size:12px;color:#94a3b8;line-height:1.55;margin-top:14px">' + why + '<br>Information only, not investment advice.</div>'
+    + '</td></tr></tbody></table>';
+  h += '</td></tr></tbody></table></td></tr></tbody></table></div>';
+  return h;
+}
+
+/** Section title with the coloured bar, as in the family report. */
+function alertSecH_(label, accent, right) {
+  return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:14px"><tbody><tr>'
+    + '<td style="width:3px"><div style="width:3px;height:14px;background:' + accent + ';border-radius:2px"></div></td>'
+    + '<td style="padding-left:10px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1.5px">' + label + '</td>'
+    + (right ? '<td align="right">' + right + '</td>' : '') + '</tr></tbody></table>';
+}
+
+/** The green "Open Capital Friends" button card of the family report. */
+function alertAppButton_(url, label, note) {
+  return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + CF_CARD_ + '"><tbody><tr><td style="padding:18px;text-align:center">'
+    + (note ? '<div style="font-size:12.5px;color:#64748b;line-height:1.6;margin-bottom:14px;text-align:left">' + note + '</div>' : '')
+    + '<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center"><tbody><tr><td style="background:#10b981;border-radius:8px"><a href="' + url + '" style="display:inline-block;padding:11px 24px;font-size:13.5px;font-weight:700;color:#06281b;text-decoration:none">' + label + ' &rarr;</a></td></tr></tbody></table>'
+    + '</td></tr></tbody></table>';
 }
 
 function buildBucketAlertHTML_(items) {
@@ -471,51 +503,99 @@ function sendGoalDeriskAlerts_(today) {
   var tz = Session.getScriptTimeZone(), todayKey = Utilities.formatDate(today, tz, 'yyyy-MM-dd');
   if (settingDay_(getSetting('GoalAlertsChecked'), 'yyyy-MM-dd') === todayKey) return { sent: 0, checked: true }; // the sync runs 3 times a day
   var data = buildDashboardReportData();
-  var health = (data && data.goalHealth) || {}, goals = (data && data.activeGoals) || [];
-  var items = [];
-  goals.forEach(function (g) {
-    var gh = health[g.goalId];
-    if (!gh || !gh.isMapped || gh.actualEquity === null || gh.bucketMode || g.status === 'Achieved') return;
-    if (!(gh.mismatch > GOAL_DERISK_GAP_)) return;
-    var yrs = gh.yearsLeft < 1 ? 'less than a year' : Math.round(gh.yearsLeft * 10) / 10 + ' years';
-    items.push({ key: g.goalId + ':eq' + gh.recommendedEquity, goal: g.goalName || 'Goal', yrs: yrs, rec: gh.recommendedEquity, act: gh.actualEquity, move: gh.mismatch,
-      amount: gh.value > 0 ? Math.round(gh.value * gh.mismatch / 100 / 1000) * 1000 : 0 });
+  var moves = (data && data.goalMoves) || { steps: [] };
+  // the same steps as the app's Goals page ("To do this month"): family switches to safe funds, and near goals
+  // that hold far more equity than their plan
+  var items = (moves.steps || []).map(function (st) {
+    return Object.assign({ key: st.t === 'protect' ? 'goal:' + st.goalId + ':eq' + st.eqTarget : 'family:' + st.portfolioId }, st);
   });
   updateSetting('GoalAlertsChecked', todayKey);
   var sentMap = incomeJson_(getSetting('GoalAlertsSent'), {});
+  var live = {}; items.forEach(function (it) { live[it.key] = true; });
+  Object.keys(sentMap).forEach(function (k) { if (!live[k]) delete sentMap[k]; }); // back in line: a later drift is a fresh alert
   var due = items.filter(function (it) {
     var r = sentMap[it.key];
     return !r || (today - new Date(r.last + 'T00:00:00')) / 864e5 >= GOAL_DERISK_REMIND_DAYS_;
   });
-  // forget goals that are back in line, so a later drift is a fresh alert
-  var live = {}; items.forEach(function (it) { live[it.key] = true; });
-  Object.keys(sentMap).forEach(function (k) { if (!live[k]) delete sentMap[k]; });
   if (!due.length) { updateSetting('GoalAlertsSent', JSON.stringify(sentMap)); return { sent: 0 }; }
   var recipients = alertRecipients_();
   if (!recipients.length) return { sent: 0 };
   var isReminder = due.every(function (it) { return !!sentMap[it.key]; });
-  var subject = 'Capital Friends' + (isReminder ? ' reminder' : '') + ': ' + due[0].goal + ' is ready for a safer mix' + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
-  var card = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px"><tbody><tr><td style="padding:20px">'
-    + '<div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:4px">' + (due.length > 1 ? 'Some goals are ready for a safer mix' : 'A goal is ready for a safer mix') + '</div>'
-    + '<div style="font-size:13px;color:#64748b;line-height:1.55;margin-bottom:6px">As a goal gets close, its plan keeps less in equity, so a market fall near the date can\'t hurt it.</div>';
-  due.forEach(function (it, i) {
-    card += '<div style="padding:12px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '">'
-      + '<div style="font-size:14px;font-weight:700;color:#0f172a">' + escHtml_(it.goal) + ' <span style="font-weight:500;color:#64748b">&middot; ' + escHtml_(it.yrs) + ' left</span></div>'
-      + '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:8px"><tbody><tr>'
-      + '<td style="padding:6px 12px;background:#f1f5f9;border-radius:8px;font-size:12px;color:#475569">Plan <b style="color:#0f172a">' + it.rec + '% equity</b></td><td style="width:8px"></td>'
-      + '<td style="padding:6px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e">Now <b>' + it.act + '% equity</b></td></tr></tbody></table>'
-      + '<div style="font-size:13px;color:#475569;line-height:1.55;margin-top:8px">Move about <b>' + it.move + '% of this goal\'s money' + (it.amount > 0 ? ' (around ' + escHtml_(formatCurrency(it.amount)) + ')' : '') + '</b> from equity funds to debt funds. Open the goal in the app to see which funds to switch.</div></div>';
-  });
-  card += '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:6px"><tbody><tr><td style="background:#10b981;border-radius:8px"><a href="' + APP_GOALS_URL_ + '" style="display:inline-block;padding:10px 20px;font-size:13px;font-weight:700;color:#ffffff;text-decoration:none">Open my goals &rsaquo;</a></td></tr></tbody></table>'
-    + '</td></tr></tbody></table>';
-  var html = alertShell_(card, 'You get this because Goal de-risk alerts are on in Settings &rsaquo; Alerts &amp; reminders. A reminder comes every ' + GOAL_DERISK_REMIND_DAYS_ + ' days until the goal is back on its plan.');
-  var text = due.map(function (it) { return it.goal + ': plan ' + it.rec + '% equity, now ' + it.act + '%. Move about ' + it.move + '% of the goal money to debt funds.'; }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_;
+  var html = alertShell_(goalDeriskHTML_(items, moves), 'You get this because Goal de-risk alerts are on in Settings &rsaquo; Alerts &amp; reminders. A reminder comes every ' + GOAL_DERISK_REMIND_DAYS_ + ' days until the steps are done. Check exit load and tax before you sell.');
+  var near = items.filter(function (it) { return it.t === 'protect'; })[0];
+  var subject = 'Capital Friends' + (isReminder ? ' reminder' : '') + ': ' + (near ? near.goalName + ' needs a safer mix' : 'time to make your goal money safer')
+    + ' (' + items.length + ' switch' + (items.length > 1 ? 'es' : '') + ')';
+  var text = items.map(function (it, i) {
+    return 'Step ' + (i + 1) + ' - ' + (it.portfolioName || 'Portfolio') + ': ' + it.sells.map(function (r) { return 'sell ' + goalUnitsTxt_(r) + ' of ' + r.fundName; }).join(', ')
+      + '; buy ' + (it.buyFund || 'a debt / liquid fund of your choice') + ' for about Rs ' + it.total + '.';
+  }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_;
   var n = 0;
   recipients.forEach(function (r) {
     try { GmailApp.sendEmail(r.email, subject, text, { htmlBody: html, name: 'Capital Friends' }); n++; }
     catch (e) { log('sendGoalDeriskAlerts_ to ' + r.email + ': ' + e); }
   });
-  if (n) due.forEach(function (it) { var r = sentMap[it.key]; sentMap[it.key] = { first: r ? r.first : todayKey, last: todayKey, n: (r ? r.n : 0) + 1 }; });
+  if (n) items.forEach(function (it) { var r = sentMap[it.key]; sentMap[it.key] = { first: r ? r.first : todayKey, last: todayKey, n: (r ? r.n : 0) + 1 }; });
   updateSetting('GoalAlertsSent', JSON.stringify(sentMap));
-  return { sent: n, goals: due.length };
+  return { sent: n, steps: items.length };
+}
+
+function goalUnitsTxt_(r) {
+  if (r.units == null) return 'about ' + formatCurrency(r.value);
+  return (r.all ? 'all ' : '') + (Math.floor(r.units * 1000) / 1000).toFixed(3) + ' units';
+}
+
+/** Body of the goal de-risk email: the goals' mix, then one card per switch with the exact funds and units. */
+function goalDeriskHTML_(items, moves) {
+  var C = CF_CARD_, money = function (v) { return escHtml_(formatCurrency(Math.round(v))); };
+  var total = items.reduce(function (t, it) { return t + (it.total || 0); }, 0);
+  var h = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + C + '"><tbody><tr><td style="padding:20px">'
+    + alertSecH_('Goal alert', '#d97706', '<span style="background:rgba(217,119,6,0.08);color:#b45309;font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px">' + items.length + ' STEP' + (items.length > 1 ? 'S' : '') + '</span>')
+    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px">Time to move some goal money to safer funds</div>'
+    + '<div style="font-size:13px;color:#64748b;line-height:1.6">As a goal comes closer, its plan keeps less in equity, so a market fall just before the date can\'t hurt it. '
+    + 'Switch about <strong style="color:#0f172a">' + money(total) + '</strong> as shown below. These are the same steps as in the app, on the Goals page under <strong style="color:#475569">To do this month</strong>.</div>';
+  if (moves && moves.haveEq != null && moves.status === 'steps') {
+    var bar = function (label, pct, col) {
+      return '<tr><td style="font-size:12px;color:#64748b;padding:4px 10px 4px 0;white-space:nowrap;width:110px">' + label + '</td>'
+        + '<td style="padding:4px 0"><div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden"><div style="height:8px;border-radius:4px;background:' + col + ';width:' + Math.max(0, Math.min(100, pct)) + '%"></div></div></td>'
+        + '<td style="font-size:13px;font-weight:700;color:#1e293b;padding:4px 0 4px 10px;text-align:right;white-space:nowrap;width:90px">' + pct + '% equity</td></tr>';
+    };
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:14px;background:#f8fafc;border-radius:8px"><tbody><tr><td style="padding:10px 12px">'
+      + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tbody>'
+      + bar('All goals now', moves.haveEq, '#d97706') + bar('Their plan today', moves.needEq, '#059669')
+      + '</tbody></table></td></tr></tbody></table>';
+  }
+  h += '</td></tr></tbody></table>';
+
+  items.forEach(function (it, i) {
+    var who = [it.owner, it.platform].filter(function (x) { return x; }).join(' &middot; ');
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="' + C + '"><tbody><tr><td style="padding:20px">'
+      + alertSecH_('Step ' + (i + 1) + ' &middot; ' + (it.t === 'protect' ? 'Protect ' + escHtml_(it.goalName) : 'Switch in ' + escHtml_(it.portfolioName || 'portfolio')), it.t === 'protect' ? '#7c3aed' : '#2563eb',
+        '<span style="font-size:13px;font-weight:700;color:#1e293b">' + money(it.total) + '</span>');
+    if (it.t === 'protect') {
+      var yrs = it.goalYears < 1 ? 'less than a year' : (Math.round(it.goalYears * 10) / 10) + ' years';
+      h += '<div style="font-size:13px;color:#64748b;line-height:1.55;margin:-4px 0 12px 0">' + escHtml_(it.goalName) + ' is ' + yrs + ' away. Its plan is <strong style="color:#059669">' + it.eqTarget + '% equity</strong>, its money is <strong style="color:#b45309">' + it.eqNow + '% equity</strong> now.'
+        + (it.portfolioName ? ' In ' + escHtml_(it.portfolioName) + (who ? ' (' + who + ')' : '') + '.' : '') + '</div>';
+    } else if (who) {
+      h += '<div style="font-size:13px;color:#64748b;margin:-4px 0 12px 0">' + who + '</div>';
+    }
+    h += '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate"><tbody>'
+      + '<tr style="background:#f8fafc"><td style="padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border-radius:8px 0 0 0">Fund</td>'
+      + '<td style="padding:8px 6px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;text-align:right;width:70px">Units</td>'
+      + '<td style="padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;text-align:right;border-radius:0 8px 0 0">About</td></tr>';
+    it.sells.forEach(function (r) {
+      h += '<tr><td style="padding:10px;border-top:1px solid #f1f5f9;font-size:13px;color:#1e293b"><span style="background:rgba(220,38,38,0.08);color:#dc2626;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;margin-right:6px">SELL</span>' + escHtml_(r.fundName) + '</td>'
+        + '<td style="padding:10px 6px;border-top:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#1e293b;text-align:right;white-space:nowrap">' + (r.units == null ? '&ndash;' : (r.all ? 'All &middot; ' : '') + (Math.floor(r.units * 1000) / 1000).toFixed(3)) + '</td>'
+        + '<td style="padding:10px;border-top:1px solid #f1f5f9;font-size:13px;color:#475569;text-align:right;white-space:nowrap">' + money(r.value) + '</td></tr>';
+    });
+    h += '<tr><td style="padding:10px;border-top:1px solid #f1f5f9;font-size:13px;color:#1e293b"><span style="background:rgba(5,150,105,0.1);color:#059669;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;margin-right:6px">BUY</span>'
+      + (it.buyFund ? escHtml_(it.buyFund) : '<span style="color:#64748b">A debt or liquid fund of your choice in this portfolio</span>')
+      + '<div style="font-size:11px;color:#94a3b8;margin-top:3px">Units depend on that day\'s NAV</div></td>'
+      + '<td style="padding:10px;border-top:1px solid #f1f5f9;font-size:13px;color:#94a3b8;text-align:right">&ndash;</td>'
+      + '<td style="padding:10px;border-top:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#059669;text-align:right;white-space:nowrap">' + money(it.total) + '</td></tr>'
+      + '</tbody></table>'
+      + '</td></tr></tbody></table>';
+  });
+  h += alertAppButton_(APP_GOALS_URL_, 'Open Capital Friends',
+    '&#128161; Same fund house? Use <strong>Switch</strong> on your platform and the money moves in one go. Otherwise redeem first and buy when the money reaches your bank. After the switch, import your statement or add the transactions so the app sees it.');
+  return h;
 }
