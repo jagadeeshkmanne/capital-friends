@@ -1166,60 +1166,27 @@ function buildDashboardReportData() {
     var bottomPortfolios = portfolioPerf.filter(function(p) { return p.plPct < 0; }).sort(function(a, b) { return a.plPct - b.plPct; }).slice(0, 5);
 
     // ── 19. Goal Allocation Health ──
-    var EQUITY_CATS = { Equity: true, ELSS: true, Index: true };
-    var GLIDE_PATH = [
-      { maxYears: 1, equity: 10, label: 'Short-term' },
-      { maxYears: 3, equity: 30, label: 'Short-term' },
-      { maxYears: 5, equity: 50, label: 'Medium-term' },
-      { maxYears: 7, equity: 65, label: 'Medium-term' },
-      { maxYears: 10, equity: 75, label: 'Long-term' },
-      { maxYears: Infinity, equity: 85, label: 'Long-term' }
-    ];
-
-    // goals paid over several years (Settings → GoalExtras): each year's part has its own glide path (same as the app)
+    // Same glide path and the same split of shared portfolios as the app (GoalAttribution.js): the debt-like funds of
+    // a shared portfolio go first to the goals that need them most, and stocks / FDs / other investments count too.
     var goalExtras = {};
     try { goalExtras = JSON.parse((getAllSettings() || {}).GoalExtras || '{}') || {}; } catch (e) { goalExtras = {}; }
-    var stepEq = function(y) { var st = GLIDE_PATH.find(function(s) { return y <= s.maxYears; }); return st.equity; };
-    var goalEquity = function(g, y) {
-      var n = Math.max(1, Math.round(Number((goalExtras[g.goalId] || {}).payYears) || 1));
-      if (n === 1 || g.goalType === 'Retirement') return stepEq(y);
-      var r = Number(g.expectedCAGR) > 0 ? Number(g.expectedCAGR) : 0.12, w = 0, eq = 0;
-      for (var k = 0; k < n; k++) { var yk = y + k, wk = 1 / Math.pow(1 + r, Math.max(0, yk)); w += wk; eq += wk * (yk > 0 ? stepEq(yk) : 0); }
-      return Math.round(eq / w);
-    };
+    var withExtras = activeGoals.filter(function(g) { return g.status !== 'Achieved'; }).map(function(g) {
+      var x = goalExtras[g.goalId] || {};
+      return x.payYears ? Object.assign({}, g, { payYears: x.payYears }) : g;
+    });
+    var goalAtt = {};
+    try { goalAtt = attributeGoals_(withExtras, allGoalMappings, activeMFHoldings, activeStockHoldings, activeOther, allocMap, now); } catch (e) { log('attributeGoals_ error: ' + e); }
     var goalHealth = {};
-    activeGoals.forEach(function(g) {
-      if (g.status === 'Achieved') return;
+    withExtras.forEach(function(g) {
       var targetDate = new Date(g.targetDate);
       var yearsLeft = Math.max(0, (targetDate - now) / (365.25 * 24 * 60 * 60 * 1000));
       if (yearsLeft <= 0) return;
-
-      // Recommended allocation
-      var rec;
-      if (g.goalType === 'Emergency Fund') { rec = { equity: 0, debt: 100, label: 'Safety' }; }
-      else {
-        var step = GLIDE_PATH.find(function(s) { return yearsLeft <= s.maxYears; });
-        var geq = goalEquity(g, yearsLeft);
-        rec = { equity: geq, debt: 100 - geq, label: step.label };
-      }
-
-      // Actual allocation from mapped portfolios (use fund breakdown when available)
+      var rec = goalAllocation_(g, yearsLeft);
+      var bucketMode = g.goalType === 'Retirement' && yearsLeft <= 5;   // the Retirement Buckets plan decides, not a fixed %
+      var att = goalAtt[g.goalId] || { total: 0, equity: 0 };
       var maps = allGoalMappings.filter(function(m) { return m.goalId === g.goalId; });
-      var totalVal = 0, eqVal = 0;
-      maps.forEach(function(m) {
-        activeMFHoldings.filter(function(h) { return h.portfolioId === m.portfolioId && h.units > 0; }).forEach(function(h) {
-          var v = (parseFloat(h.currentValue) || 0) * (m.allocationPct / 100);
-          totalVal += v;
-          var detailed = allocMap[h.schemeCode || h.fundCode];
-          if (detailed && detailed.Equity !== undefined) {
-            eqVal += v * ((detailed.Equity || 0) / 100);
-          } else if (EQUITY_CATS[h.category]) eqVal += v;
-          else if (h.category === 'Hybrid') eqVal += v * 0.65;
-          else if (h.category === 'Multi-Asset') eqVal += v * 0.50;
-        });
-      });
-      var actualEq = totalVal > 0 ? Math.round((eqVal / totalVal) * 100) : null;
-      var mismatch = maps.length > 0 && actualEq !== null ? Math.round(actualEq - rec.equity) : null;
+      var actualEq = att.total > 0 ? Math.round(att.equity / att.total * 100) : null;
+      var mismatch = !bucketMode && actualEq !== null ? Math.round(actualEq - rec.equity) : null;
 
       // Live SIP/lumpsum needed
       var gTarget = parseFloat(g.targetAmount) || 0;
@@ -1234,11 +1201,12 @@ function buildDashboardReportData() {
         ? (monthlyRate > 0 ? Math.ceil(gapAtMat / ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)) : Math.ceil(gapAtMat / months))
         : 0;
 
+
       goalHealth[g.goalId] = {
         yearsLeft: yearsLeft, label: rec.label,
-        recommendedEquity: rec.equity, recommendedDebt: rec.debt,
-        actualEquity: actualEq, isMapped: maps.length > 0,
-        mismatch: mismatch, needsAttention: mismatch !== null && Math.abs(mismatch) > 15,
+        recommendedEquity: rec.equity, recommendedDebt: 100 - rec.equity,
+        actualEquity: actualEq, isMapped: maps.length > 0, value: Math.round(att.total), bucketMode: bucketMode,
+        mismatch: mismatch, needsAttention: mismatch !== null && Math.abs(mismatch) > 10,   // the app shows "On target" within 10 points
         liveSIP: liveSIP, liveLumpsum: liveLumpsum
       };
     });

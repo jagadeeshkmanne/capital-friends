@@ -348,7 +348,7 @@ function sendBucketAlerts_(today) {
   if (!recipients.length) return { sent: 0 };
   var isReminder = due.every(function (it) { return !!rec(it.key); });
   var crit = due.some(function (it) { return it.type === 'critical'; });
-  var subject = (isReminder ? 'Reminder: ' : '') + (crit ? 'Action needed today: ' : 'Action needed: ') + due[0].title + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
+  var subject = 'Capital Friends' + (isReminder ? ' reminder' : '') + ': ' + (crit ? 'today, ' : '') + due[0].title + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
   var html = buildBucketAlertHTML_(due.map(function (it) {
     var r = rec(it.key);
     return r ? { type: it.type, title: it.title, description: it.description + ' (Still open since ' + incomeFmtDate_(new Date(r.first + 'T00:00:00')) + '.)' } : it;
@@ -385,9 +385,23 @@ function bucketActionsHTML_(items) {
   return h;
 }
 
+/** Outer layout of the short alert emails: the same dark header with the logo as the family report, then the card. */
+var CF_LOGO_URL_ = 'https://raw.githubusercontent.com/jagadeeshkmanne/capital-friends/refs/heads/main/logo-new.png';
+function alertShell_(inner, why) {
+  return '<div style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc">'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc"><tbody><tr><td style="padding:20px">'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;margin:0 auto"><tbody><tr><td>'
+    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0a0f1f;border-radius:10px;margin-bottom:14px"><tbody><tr><td style="padding:12px 18px">'
+    + '<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tbody><tr><td style="vertical-align:middle;padding-right:8px"><img src="' + CF_LOGO_URL_ + '" alt="Capital Friends" style="display:block;border:0;height:32px;width:auto"></td>'
+    + '<td style="vertical-align:middle"><span style="font-size:16px;line-height:1"><span style="font-weight:700;color:#f1f5f9">Capital</span> <span style="font-weight:800;color:#34d399">Friends</span></span></td></tr></tbody></table>'
+    + '</td></tr></tbody></table>'
+    + inner
+    + '<div style="font-size:11px;color:#94a3b8;line-height:1.5;margin-top:4px;text-align:center">' + why + '<br>Sent by Capital Friends (capitalfriends.in) from your own Google account. Information only, not investment advice.</div>'
+    + '</td></tr></tbody></table></td></tr></tbody></table></div>';
+}
+
 function buildBucketAlertHTML_(items) {
-  return '<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:20px"><div style="max-width:600px;margin:0 auto">'
-    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:12px">Capital Friends</div>' + bucketActionsHTML_(items) + '</div></div>';
+  return alertShell_(bucketActionsHTML_(items), 'You get this because Retirement &amp; income alerts are on in Settings &rsaquo; Alerts &amp; reminders.');
 }
 
 function escHtml_(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -425,20 +439,18 @@ function sendCasReminder_(today) {
     { type: 'warning', title: '1. Ask CAMS for your statement', description: 'On the CAMS website choose Detailed statement, the period from your last import (or 01-Jan-2000), with zero-balance folios, and your email. It arrives as a PDF with your password.' },
     { type: 'warning', title: '2. Import it in Capital Friends', description: 'Mutual Funds → Import statement: choose the PDF, type the password. New SIPs, SWPs and switches are added; nothing you have is duplicated.' + since }
   ];
-  var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:20px"><div style="max-width:600px;margin:0 auto">'
-    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:12px">Capital Friends</div>'
-    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #ddd6fe;border-radius:12px"><tbody><tr><td style="padding:20px">'
+  var html = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #ddd6fe;border-radius:12px;margin-bottom:14px"><tbody><tr><td style="padding:20px">'
     + '<div style="font-size:15px;font-weight:800;color:#7c3aed;margin-bottom:10px">Time for your monthly mutual fund update</div>';
   items.forEach(function (it, i) {
     html += '<div style="padding:10px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '"><div style="font-size:13px;font-weight:700;color:#0f172a">' + escHtml_(it.title) + '</div><div style="font-size:13px;color:#475569;line-height:1.5;margin-top:2px">' + escHtml_(it.description) + '</div></div>';
   });
   html += '<div style="margin-top:14px"><a href="' + CAMS_CAS_URL_ + '" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:8px;margin-right:8px">Open CAMS &rsaquo;</a>'
     + '<a href="' + APP_IMPORT_URL_ + '" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:8px">Import in Capital Friends &rsaquo;</a></div>'
-    + '<div style="font-size:11px;color:#94a3b8;margin-top:10px">You get this on day ' + day + ' of each month. Change the day or turn it off in Settings &rsaquo; Alerts &amp; reminders.</div>'
-    + '</td></tr></tbody></table></div></div>';
+    + '</td></tr></tbody></table>';
+  html = alertShell_(html, 'You get this on day ' + day + ' of each month. Change the day or turn it off in Settings &rsaquo; Alerts &amp; reminders.');
   var n = 0;
   recipients.forEach(function (r) {
-    try { GmailApp.sendEmail(r.email, 'Monthly update: import your mutual fund statement', '1) Request your CAS from CAMS: ' + CAMS_CAS_URL_ + '\n2) Import it: ' + APP_IMPORT_URL_, { htmlBody: html, name: 'Capital Friends' }); n++; }
+    try { GmailApp.sendEmail(r.email, 'Capital Friends: your monthly mutual fund update', '1) Request your CAS from CAMS: ' + CAMS_CAS_URL_ + '\n2) Import it: ' + APP_IMPORT_URL_, { htmlBody: html, name: 'Capital Friends' }); n++; }
     catch (e) { log('sendCasReminder_ to ' + r.email + ': ' + e); }
   });
   if (n) updateSetting('CasReminderSent', month);
@@ -463,10 +475,11 @@ function sendGoalDeriskAlerts_(today) {
   var items = [];
   goals.forEach(function (g) {
     var gh = health[g.goalId];
-    if (!gh || !gh.isMapped || gh.actualEquity === null || g.status === 'Achieved') return;
+    if (!gh || !gh.isMapped || gh.actualEquity === null || gh.bucketMode || g.status === 'Achieved') return;
     if (!(gh.mismatch > GOAL_DERISK_GAP_)) return;
     var yrs = gh.yearsLeft < 1 ? 'less than a year' : Math.round(gh.yearsLeft * 10) / 10 + ' years';
-    items.push({ key: g.goalId + ':eq' + gh.recommendedEquity, goal: g.goalName || 'Goal', yrs: yrs, rec: gh.recommendedEquity, act: gh.actualEquity, move: gh.mismatch });
+    items.push({ key: g.goalId + ':eq' + gh.recommendedEquity, goal: g.goalName || 'Goal', yrs: yrs, rec: gh.recommendedEquity, act: gh.actualEquity, move: gh.mismatch,
+      amount: gh.value > 0 ? Math.round(gh.value * gh.mismatch / 100 / 1000) * 1000 : 0 });
   });
   updateSetting('GoalAlertsChecked', todayKey);
   var sentMap = incomeJson_(getSetting('GoalAlertsSent'), {});
@@ -481,19 +494,21 @@ function sendGoalDeriskAlerts_(today) {
   var recipients = alertRecipients_();
   if (!recipients.length) return { sent: 0 };
   var isReminder = due.every(function (it) { return !!sentMap[it.key]; });
-  var subject = (isReminder ? 'Reminder: ' : '') + 'Action needed: ' + due[0].goal + ' has more equity than its plan' + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
-  var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:20px"><div style="max-width:600px;margin:0 auto">'
-    + '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:12px">Capital Friends</div>'
-    + '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #fde68a;border-radius:12px"><tbody><tr><td style="padding:20px">'
-    + '<div style="font-size:15px;font-weight:800;color:#b45309;margin-bottom:6px">Time to move part of the goal money to safer funds</div>'
-    + '<div style="font-size:13px;color:#475569;line-height:1.5;margin-bottom:6px">As a goal gets closer, its glide path keeps less in equity so a market fall can\'t hurt it late.</div>';
+  var subject = 'Capital Friends' + (isReminder ? ' reminder' : '') + ': ' + due[0].goal + ' is ready for a safer mix' + (due.length > 1 ? ' (+' + (due.length - 1) + ' more)' : '');
+  var card = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px"><tbody><tr><td style="padding:20px">'
+    + '<div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:4px">' + (due.length > 1 ? 'Some goals are ready for a safer mix' : 'A goal is ready for a safer mix') + '</div>'
+    + '<div style="font-size:13px;color:#64748b;line-height:1.55;margin-bottom:6px">As a goal gets close, its plan keeps less in equity, so a market fall near the date can\'t hurt it.</div>';
   due.forEach(function (it, i) {
-    html += '<div style="padding:10px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '"><div style="font-size:13px;font-weight:700;color:#0f172a">' + escHtml_(it.goal) + ' · ' + escHtml_(it.yrs) + ' left</div>'
-      + '<div style="font-size:13px;color:#475569;line-height:1.5;margin-top:2px">Plan: <b>' + it.rec + '% equity</b>. Now: <b style="color:#b45309">' + it.act + '% equity</b>. Move about <b>' + it.move + '% of this goal\'s money</b> from equity to debt funds.</div></div>';
+    card += '<div style="padding:12px 0;' + (i ? 'border-top:1px solid #f1f5f9;' : '') + '">'
+      + '<div style="font-size:14px;font-weight:700;color:#0f172a">' + escHtml_(it.goal) + ' <span style="font-weight:500;color:#64748b">&middot; ' + escHtml_(it.yrs) + ' left</span></div>'
+      + '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:8px"><tbody><tr>'
+      + '<td style="padding:6px 12px;background:#f1f5f9;border-radius:8px;font-size:12px;color:#475569">Plan <b style="color:#0f172a">' + it.rec + '% equity</b></td><td style="width:8px"></td>'
+      + '<td style="padding:6px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e">Now <b>' + it.act + '% equity</b></td></tr></tbody></table>'
+      + '<div style="font-size:13px;color:#475569;line-height:1.55;margin-top:8px">Move about <b>' + it.move + '% of this goal\'s money' + (it.amount > 0 ? ' (around ' + escHtml_(formatCurrency(it.amount)) + ')' : '') + '</b> from equity funds to debt funds. Open the goal in the app to see which funds to switch.</div></div>';
   });
-  html += '<div style="margin-top:14px"><a href="' + APP_GOALS_URL_ + '" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:8px">Open Goals &rsaquo;</a></div>'
-    + '<div style="font-size:11px;color:#94a3b8;margin-top:10px">A reminder comes every ' + GOAL_DERISK_REMIND_DAYS_ + ' days until the goal is back on its plan. Turn it off in Settings &rsaquo; Alerts &amp; reminders. Information only, not advice.</div>'
-    + '</td></tr></tbody></table></div></div>';
+  card += '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:6px"><tbody><tr><td style="background:#10b981;border-radius:8px"><a href="' + APP_GOALS_URL_ + '" style="display:inline-block;padding:10px 20px;font-size:13px;font-weight:700;color:#ffffff;text-decoration:none">Open my goals &rsaquo;</a></td></tr></tbody></table>'
+    + '</td></tr></tbody></table>';
+  var html = alertShell_(card, 'You get this because Goal de-risk alerts are on in Settings &rsaquo; Alerts &amp; reminders. A reminder comes every ' + GOAL_DERISK_REMIND_DAYS_ + ' days until the goal is back on its plan.');
   var text = due.map(function (it) { return it.goal + ': plan ' + it.rec + '% equity, now ' + it.act + '%. Move about ' + it.move + '% of the goal money to debt funds.'; }).join('\n') + '\n\nOpen Capital Friends: ' + APP_GOALS_URL_;
   var n = 0;
   recipients.forEach(function (r) {
