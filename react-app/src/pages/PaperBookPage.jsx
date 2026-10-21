@@ -188,7 +188,7 @@ export default function PaperBookPage() {
     })
     // stocks sorted by the chosen column (default momentum rank, strongest first); gold and liquid always at the bottom
     const grp = (h) => (h.row[0] === 'GOLDBEES' ? 1 : h.row[0] === 'LIQUIDCASE' ? 2 : 0)
-    const key = { rank: (h) => h.row[7] ?? 999, pnl: (h) => -(h.pnlAmt ?? -1e12), today: (h) => -(h.todayPct ?? -1e9),
+    const key = { rank: (h) => h.row[7] ?? 999, pnl: (h) => -(h.pnlPct ?? -1e9), today: (h) => -(h.todayPct ?? -1e9),
       value: (h) => -h.value, stock: (h) => h.row[0] }[sort.k]
     hold.sort((x, y) => grp(x) - grp(y) || (sort.k === 'stock' ? key(x).localeCompare(key(y)) : key(x) - key(y)) * sort.d)
     const liveNav = hold.reduce((a, h) => a + h.value, 0)
@@ -295,7 +295,7 @@ export default function PaperBookPage() {
                   <SortTh k="rank" sort={sort} setSort={setSort} cls="text-right w-12" title="Momentum rank today (sold at the next rebalance if below 40)">Rank</SortTh>
                   <SortTh k="stock" sort={sort} setSort={setSort} cls="text-left">Stock</SortTh><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
                   <th className={`${TH} text-right`}>Price</th><SortTh k="today" sort={sort} setSort={setSort} cls="text-right">Today</SortTh>
-                  <SortTh k="value" sort={sort} setSort={setSort} cls="text-right">Value</SortTh><SortTh k="pnl" sort={sort} setSort={setSort} cls="text-right">P&amp;L</SortTh>
+                  <SortTh k="value" sort={sort} setSort={setSort} cls="text-right">Value</SortTh><SortTh k="pnl" sort={sort} setSort={setSort} cls="text-right" title="Sorts by % (fair across bigger and smaller holdings)">P&amp;L</SortTh>
                   <th className={`${TH} text-left`}>Weight</th>
                 </tr>
               </thead>
@@ -312,7 +312,10 @@ export default function PaperBookPage() {
                       <td className={`${TD} text-right`}>{num(q)}</td>
                       <td className={`${TD} text-right`}>{num(avg)}</td>
                       <td className={`${TD} text-right transition-colors duration-700 ${flash[s] === 'up' ? 'bg-emerald-500/20 text-emerald-300' : flash[s] === 'down' ? 'bg-rose-500/20 text-rose-300' : ''}`}>{num(price)}</td>
-                      <td className={`${TD} text-right ${tone(todayPct)}`}>{todayPct == null ? '—' : pct(todayPct)}</td>
+                      <td className={`${TD} text-right ${tone(todayPct)}`} title={todayPct != null && todayPct <= -8 && !g && !lq ? 'Big fall: if it closes 10%+ down on heavy volume, B, C and D sell it at the next open' : undefined}>
+                        {todayPct != null && todayPct <= -8 && !g && !lq && <span className="mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-400">WATCH</span>}
+                        {todayPct == null ? '—' : pct(todayPct)}
+                      </td>
                       <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(value)}</td>
                       <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pnlAmt == null ? '—' : <>{sgn(pnlAmt)}{inr(Math.abs(pnlAmt))} <span className="text-xs font-medium opacity-80">· {pct(pnl)}</span></>}</td>
                       <td className={`${TD} text-left`}>
