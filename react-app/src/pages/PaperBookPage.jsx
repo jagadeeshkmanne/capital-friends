@@ -106,7 +106,6 @@ function Mini({ label, value, sub, tone: t, title }) {
     </div>
   )
 }
-const Dot = ({ on, k }) => <span className={`inline-block w-2.5 h-2.5 rounded-full ${on ? BOOK_DOT[k] : 'border border-[var(--border)]'}`} />
 
 /** Which stocks the three books share, and why B / C left some out (latest rebalance). */
 export default function PaperBookPage() {
@@ -124,7 +123,7 @@ export default function PaperBookPage() {
   const livePx = (s) => live?.prices?.[s]?.price
 
   const loadLive = (d) => {
-    const syms = [...new Set(Object.values(d?.books || {}).flatMap((bk) => (bk.holdings || []).map((h) => h[0])).filter((x) => x !== 'LIQUIDCASE'))]
+    const syms = [...new Set(Object.values(d?.books || {}).flatMap((bk) => (bk.holdings || []).map((h) => h[0])).filter((x) => x !== 'LIQUIDCASE'))].concat(['NIFTY500'])
     if (!syms.length) return
     setLiveBusy(true)
     setLiveErr('')
@@ -194,8 +193,11 @@ export default function PaperBookPage() {
   if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The four paper books (A Momentum, B Momentum + Safety, C Momentum + Quality, D Top 10 Common) open together on ${day(data.start_on)}.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
 
   const half = b.x < 1
-  const sets = Object.fromEntries(Object.entries(data.overlap?.sets || {}).map(([k, v]) => [k, new Set(v)]))
   const tot = Math.max(1, view.liveNav)
+  // Nifty 500 at live prices: the same Rs 10 lakh in the index, moved by the index since the snapshot (n500_px = index level then)
+  const nLive = live?.prices?.NIFTY500?.price, nBase = data.n500_px?.[1]
+  const benchNow = (x) => (x.bench && nLive && nBase ? x.bench * (nLive / nBase) : x.bench)
+  const vsNifty = (x, v) => (x.bench ? (v / benchNow(x) - 1) * 100 : null)
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
@@ -245,7 +247,7 @@ export default function PaperBookPage() {
               </div>
               <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(v)}</p>
               <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(gp)}</p>
-              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}{x.bench ? ` · vs Nifty 500 ${pct((x.nav / x.bench - 1) * 100)}` : ''}</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}{x.bench ? ` · vs Nifty 500 ${pct(vsNifty(x, v))}` : ''}</p>
             </button>
           )
         })}
@@ -258,13 +260,14 @@ export default function PaperBookPage() {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? tone(view.today) : ''} />
-        <Mini label="vs Nifty 500" value={b.bench ? pct((b.nav / b.bench - 1) * 100) : '—'} sub={b.bench ? `Index ${lakhs(b.bench)}` : ''} tone={b.bench ? tone(b.nav - b.bench) : ''} title="At the last close, against the same ₹10 lakh in the Nifty 500 TRI" />
+        <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={b.bench ? pct(vsNifty(b, view.liveNav)) : '—'} sub={b.bench ? `Same ₹10 L in index: ${inr(benchNow(b))}` : ''} tone={b.bench ? tone(vsNifty(b, view.liveNav)) : ''}
+          title={nLive && nBase ? `Book value now vs the same ₹10 lakh in the Nifty 500 (index ${num(nLive)} live)` : 'At the last close, against the same ₹10 lakh in the Nifty 500'} />
         <Mini label="Stocks / Gold / Cash" value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}%`} sub={`${view.nStocks} stocks`} />
         <Mini label="Next rebalance" value={day(data.next_rebalance)} sub="first trading day" />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Holdings</h3>
             <span className="text-xs text-[var(--text-dim)]">{view.nStocks} stocks + gold + liquid</span>
@@ -282,6 +285,7 @@ export default function PaperBookPage() {
                 {view.hold.map(({ row: [s, q, avg, , , , , rank], price, value, todayPct }) => {
                   const g = s === 'GOLDBEES', lq = s === 'LIQUIDCASE'
                   const pnl = avg ? (price / avg - 1) * 100 : null
+                  const pnlAmt = avg && !lq ? q * (price - avg) : null
                   const w = Math.round((value / tot) * 1000) / 10
                   return (
                     <tr key={s} onClick={() => !lq && setChartSym(s)} className={`border-b border-[var(--border-row)] last:border-0 hover:bg-[var(--bg-hover)] ${lq ? '' : 'cursor-pointer'} ${g ? 'bg-amber-500/5' : lq ? 'bg-sky-500/5' : ''}`}>
@@ -292,7 +296,7 @@ export default function PaperBookPage() {
                       <td className={`${TD} text-right transition-colors duration-700 ${flash[s] === 'up' ? 'bg-emerald-500/20 text-emerald-300' : flash[s] === 'down' ? 'bg-rose-500/20 text-rose-300' : ''}`}>{num(price)}</td>
                       <td className={`${TD} text-right ${tone(todayPct)}`}>{todayPct == null ? '—' : pct(todayPct)}</td>
                       <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(value)}</td>
-                      <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pct(pnl)}</td>
+                      <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pnlAmt == null ? '—' : <>{sgn(pnlAmt)}{inr(Math.abs(pnlAmt))} <span className="text-xs font-medium opacity-80">· {pct(pnl)}</span></>}</td>
                       <td className={`${TD} text-left`}>
                         <div className="flex items-center gap-2">
                           <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden">
@@ -309,35 +313,6 @@ export default function PaperBookPage() {
           </div>
         </div>
 
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Top 40 ranks</h3>
-            <span className="text-xs text-emerald-400 font-semibold">● held</span>
-          </div>
-          <div className="overflow-y-auto xl:max-h-[640px]">
-            <table className="w-full">
-              <thead className="sticky top-0">
-                <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-                  <th className={`${TH} text-right w-10`}>#</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Score</th>
-                  {data.overlap && ['A', 'B', 'C', 'D'].map((k) => <th key={k} className={`${TH} text-center w-7`}>{k}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {(data.ranks || []).map(([s, r, sc]) => {
-                  const h = view.held.has(s)
-                  return (
-                    <tr key={s} onClick={() => setChartSym(s)} className={`border-b border-[var(--border-row)] last:border-0 cursor-pointer hover:bg-[var(--bg-hover)] ${r === 20 ? 'border-b-2 border-b-[var(--border)]' : ''}`}>
-                      <td className={`${TD} text-right text-[var(--text-dim)]`}>{r}</td>
-                      <td className={`${TD} text-left font-semibold ${h ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{h ? '● ' : ''}{s}</td>
-                      <td className={`${TD} text-right`}>{sc}</td>
-                      {data.overlap && ['A', 'B', 'C', 'D'].map((k) => <td key={k} className={`${TD} text-center`}><Dot on={sets[k]?.has(s)} k={k} /></td>)}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
       <p className="text-xs text-[var(--text-dim)]">Tap a stock for its chart · paper trading only · information, not advice</p>
       {chartSym && <BigChart data={data} sym={chartSym} livePrice={livePx(chartSym)} onClose={() => setChartSym(null)} />}

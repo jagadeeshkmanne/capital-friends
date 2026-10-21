@@ -74,7 +74,8 @@ function getPaperLive_(symbols) {
   var hit = key.length < 240 ? cache.get(key) : null;
   if (hit) return JSON.parse(hit);
   var reqs = syms.map(function (x) {
-    return { url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(x + '.NS') + '?range=1d&interval=5m',
+    var y = x === 'NIFTY500' ? '^CRSLDX' : x + '.NS';   // Nifty 500 index on Yahoo
+    return { url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(y) + '?range=1d&interval=5m',
              muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } };
   });
   var res = reqs.length ? UrlFetchApp.fetchAll(reqs) : [];
