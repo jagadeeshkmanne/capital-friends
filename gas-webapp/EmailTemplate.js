@@ -475,7 +475,7 @@ function buildDashboardPDFHTML(data) {
       var boLabel = bo.isStrongBuy ? 'FAR BELOW HIGH' : 'BELOW HIGH';
       h += '<tr' + (boi < buyOpportunities.length - 1 ? ' style="' + _rowBd + '"' : '') + '>';
       h += '<td style="padding:8px 10px;font-size:13px;color:#1e293b">' + _escHtml(bo.fundName) + '</td>';
-      h += '<td style="padding:8px 10px;font-size:13px;color:#475569">' + _escHtml(bo.portfolioName) + '</td>';
+      h += '<td style="padding:8px 10px;font-size:13px;color:#475569;line-height:1.5">' + (bo.portfolios && bo.portfolios.length ? bo.portfolios.map(_escHtml).join('<br>') : _escHtml(bo.portfolioName)) + '</td>';
       h += '<td style="padding:8px 10px;font-size:13px;font-weight:700;color:' + boColor + ';text-align:right">-' + bo.belowATHPct.toFixed(1) + '%</td>';
       h += '<td style="padding:8px 10px;text-align:right"><span style="background:' + _hexBg(boColor, 0.08) + ';color:' + boColor + ';font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px">' + boLabel + '</span></td></tr>';
     }

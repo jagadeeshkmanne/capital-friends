@@ -862,7 +862,9 @@ function buildDashboardReportData() {
     }
 
     // ── 9. Buy opportunities (MF holdings 5%+ below ATH) ──
+    // one row per fund: a fund held in several portfolios is listed once, with all its portfolios
     const buyOpportunities = [];
+    const buyByFund = {};
     activeMFPortfolios.forEach(function(p) {
       const pHoldings = activeMFHoldings.filter(function(h) { return h.portfolioId === p.portfolioId; });
       pHoldings.forEach(function(h) {
@@ -870,13 +872,15 @@ function buildDashboardReportData() {
         const belowATHPct = parseFloat(h.belowATHPct) || 0;
         // 95%+ below the high means today's NAV is missing (shows as -100%), not a real fall
         if (athNav > 0 && belowATHPct >= 5 && belowATHPct < 95) {
-          buyOpportunities.push({
-            fundName: _splitFundName(h.fundName),
-            portfolioName: p.portfolioName,
-            ownerName: p.ownerName,
-            belowATHPct: belowATHPct,
-            isStrongBuy: belowATHPct >= 10
-          });
+          const key = String(h.fundCode || h.fundName);
+          const pName = String(p.portfolioName || '').replace(/^PFL-/, '');
+          let bo = buyByFund[key];
+          if (!bo) {
+            bo = buyByFund[key] = { fundName: _splitFundName(h.fundName), portfolioName: '', portfolios: [], ownerName: p.ownerName, belowATHPct: belowATHPct, isStrongBuy: belowATHPct >= 10 };
+            buyOpportunities.push(bo);
+          }
+          if (bo.portfolios.indexOf(pName) < 0) bo.portfolios.push(pName);
+          bo.portfolioName = bo.portfolios.join(', ');
         }
       });
     });
