@@ -104,8 +104,8 @@ function BigChart({ data, sym, livePrice, onClose }) {
     </Modal>, document.body)
 }
 
-const BOOK_LABEL = { A: 'A · Momentum', B: 'B · Earnings filter', C: 'C · Earnings re-rank', lump: '₹10L lump sum', sip: '₹1L monthly SIP' }
-const BOOK_DOT = { A: 'bg-teal-400', B: 'bg-violet-400', C: 'bg-orange-400' }
+const BOOK_LABEL = { A: 'A · Momentum', B: 'B · Momentum + Safety', C: 'C · Momentum + Quality', D: 'D · Top 10 Common', lump: '₹10L lump sum', sip: '₹1L monthly SIP' }
+const BOOK_DOT = { A: 'bg-emerald-400', B: 'bg-violet-400', C: 'bg-blue-400', D: 'bg-amber-400' }
 const Dot = ({ on, k }) => <span className={`inline-block w-2.5 h-2.5 rounded-full ${on ? BOOK_DOT[k] : 'border border-[var(--border)]'}`} />
 
 /** Which stocks the three books share, and why B / C left some out (latest rebalance). */
