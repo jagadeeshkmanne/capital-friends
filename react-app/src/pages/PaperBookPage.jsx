@@ -216,7 +216,11 @@ export default function PaperBookPage() {
   const vsNifty = (x, v) => (x.bench ? (v / benchNow(x) - 1) * 100 : null)
   // best strategy so far: highest return since the start at live prices
   const perf = keys.map((k) => { const x = data.books[k], v = liveValue(x, live?.prices); return { k, ret: x.invested ? (v / x.invested - 1) * 100 : 0 } }).sort((p1, p2) => p2.ret - p1.ret)
-  const lead = perf.length > 1 && perf[0].ret - perf[1].ret > 0.005 ? perf[0] : null
+  const lead = perf.length > 1 ? perf[0] : null
+  const close = lead && perf[0].ret - perf[1].ret < 0.05   // under 0.05 points apart: practically level
+  // plain words for the market comparison: ahead / behind the Nifty 500 by x%
+  const vsTone = (d) => (d == null || Math.abs(d) < 0.05 ? 'text-[var(--text-muted)]' : tone(d))
+  const vsWord = (d) => (d == null ? '—' : Math.abs(d) < 0.05 ? 'Level with Nifty' : d > 0 ? `Ahead by ${Math.abs(d).toFixed(1)}%` : `Behind by ${Math.abs(d).toFixed(1)}%`)
   const days = b.start ? Math.max(0, Math.round((Date.now() - new Date(b.start + 'T00:00:00+05:30').getTime()) / 86400e3)) : 0
   const nRet = nLive && nBase && b.bench ? (benchNow(b) / b.invested - 1) * 100 : null
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
@@ -251,8 +255,9 @@ export default function PaperBookPage() {
           <span className={`w-2 h-2 rounded-full ${BOOK_DOT[lead.k] || 'bg-slate-400'}`} />
           <span className="font-bold text-[var(--text-primary)]">{lead.k} · {BOOK_NAME[lead.k] || lead.k}</span>
           <span className={`font-semibold tabular-nums ${tone(lead.ret)}`}>{pct(lead.ret)}</span>
-          <span className="text-[var(--text-dim)]">· order {perf.map((x) => `${x.k} ${pct(x.ret)}`).join(' > ')}{nRet != null ? ` · Nifty 500 ${pct(nRet)}` : ''}</span>
-        </> : <span className="text-[var(--text-muted)]">All four are level so far</span>}
+          {close && <span className="text-xs text-[var(--text-dim)]">(just ahead of {perf[1].k})</span>}
+          <span className="w-full sm:w-auto text-xs text-[var(--text-dim)] tabular-nums">{perf.map((x) => `${x.k} ${pct(x.ret)}`).join(' > ')}{nRet != null ? ` · Nifty 500 ${pct(nRet)}` : ''}</span>
+        </> : <span className="text-[var(--text-muted)]">—</span>}
         <span className="ml-auto text-xs text-[var(--text-dim)]">Day {days + 1} · judge after about 3 months</span>
       </div>
 
@@ -281,7 +286,8 @@ export default function PaperBookPage() {
               </div>
               <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(v)}</p>
               <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(gp)}</p>
-              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}{x.bench ? ` · vs Nifty 500 ${pct(vsNifty(x, v))}` : ''}</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}</p>
+              {x.bench && <p className={`text-[11px] font-semibold mt-0.5 truncate ${vsTone(vsNifty(x, v))}`}>vs Nifty: {vsWord(vsNifty(x, v))}</p>}
             </button>
           )
         })}
@@ -294,7 +300,7 @@ export default function PaperBookPage() {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? tone(view.today) : ''} />
-        <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={b.bench ? pct(vsNifty(b, view.liveNav)) : '—'} sub={b.bench ? `Same ₹10 L in index: ${inr(benchNow(b))}` : ''} tone={b.bench ? tone(vsNifty(b, view.liveNav)) : ''}
+        <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={b.bench ? vsWord(vsNifty(b, view.liveNav)) : '—'} sub={b.bench ? `₹10 L in Nifty now ${lakhs(benchNow(b))}` : ''} tone={b.bench ? vsTone(vsNifty(b, view.liveNav)) : ''}
           title={nLive && nBase ? `Book value now vs the same ₹10 lakh in the Nifty 500 (index ${num(nLive)} live)` : 'At the last close, against the same ₹10 lakh in the Nifty 500'} />
         <Mini label="Stocks / Gold / Cash" value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}%`} sub={`${view.nStocks} stocks`} />
         <Mini label="Next rebalance" value={day(data.next_rebalance)} sub="first trading day" />
