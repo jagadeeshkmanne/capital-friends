@@ -215,6 +215,16 @@ export default function PaperBookPage() {
   const nLive = live?.prices?.NIFTY500?.price, nBase = data.n500_px?.[1]
   const benchNow = (x) => (x.bench && nLive && nBase ? x.bench * (nLive / nBase) : x.bench)
   const vsNifty = (x, v) => (x.bench ? (v / benchNow(x) - 1) * 100 : null)
+  // mix benchmark (same money in Nifty 500 + gold at the book's gold share), moved live by both parts since the snapshot
+  const gLive = live?.prices?.GOLDBEES?.price
+  const mixNow = (x) => {
+    if (!x.mix) return null
+    const gw = x.mix_gold_w ?? x.mix_gold ?? 0.35
+    const nf = nLive && nBase ? nLive / nBase : 1, gf = gLive && x.gold_px ? gLive / x.gold_px : 1
+    return x.mix * ((1 - gw) * nf + gw * gf)
+  }
+  const vsMix = (x, v) => { const m = mixNow(x); return m ? (v / m - 1) * 100 : null }
+  const mixLabel = (x) => `${Math.round((1 - (x.mix_gold ?? 0.35)) * 100)}/${Math.round((x.mix_gold ?? 0.35) * 100)} mix`
   // best strategy so far: highest return since the start at live prices
   const perf = keys.map((k) => { const x = data.books[k], v = liveValue(x, live?.prices); return { k, ret: x.invested ? (v / x.invested - 1) * 100 : 0 } }).sort((p1, p2) => p2.ret - p1.ret)
   const lead = perf.length > 1 ? perf[0] : null
@@ -300,10 +310,12 @@ export default function PaperBookPage() {
         <span className={`w-2 h-2 rounded-full ${BOOK_DOT[bk] || 'bg-slate-400'}`} />
         <h3 className="text-sm font-bold text-[var(--text-primary)]">{bk} · {BOOK_NAME[bk] || bk}</h3>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct2(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? tone(view.today) : ''} />
         <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={b.bench ? vsWord(vsNifty(b, view.liveNav)) : '—'} sub={b.bench ? `₹10 L in Nifty now ${lakhs(benchNow(b))}` : ''} tone={b.bench ? vsTone(vsNifty(b, view.liveNav)) : ''}
           title={nLive && nBase ? `Book value now vs the same ₹10 lakh in the Nifty 500 (index ${num(nLive)} live)` : 'At the last close, against the same ₹10 lakh in the Nifty 500'} />
+        <Mini label={`vs ${mixLabel(b)}`} value={b.mix ? vsWord(vsMix(b, view.liveNav)).replace('Nifty 500', 'mix') : '—'} sub={b.mix ? `₹10 L in Nifty + gold now ${lakhs(mixNow(b))}` : ''} tone={b.mix ? vsTone(vsMix(b, view.liveNav)) : ''}
+          title="Same money in Nifty 500 + gold at this book's gold share, rebalanced monthly: shows whether the stock picks and the safety switch add anything beyond the gold split" />
         <Mini label="Stocks / Gold / Cash" value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}%`} sub={`${view.nStocks} stocks`} />
         <Mini label="Next rebalance" value={day(data.next_rebalance)} sub="first trading day" />
       </div>
