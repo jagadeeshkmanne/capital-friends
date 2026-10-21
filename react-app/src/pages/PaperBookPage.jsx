@@ -97,6 +97,17 @@ const liveValue = (b, lp) => (b?.holdings || []).reduce((a, [s, q, , px, val]) =
 const sgn = (v) => (v == null ? '' : v >= 0 ? '+' : '−')
 const lakhs = (v) => (v == null ? '—' : '₹' + (Math.abs(v) / 1e5).toFixed(2) + ' L')
 
+// clickable column header: first click sorts best-first, second click reverses
+function SortTh({ k, sort, setSort, cls, title, children }) {
+  const on = sort.k === k
+  return (
+    <th className={`${TH} ${cls} cursor-pointer select-none hover:text-[var(--text-primary)] ${on ? 'text-[var(--text-primary)]' : ''}`} title={title}
+      onClick={() => setSort(on ? { k, d: -sort.d } : { k, d: 1 })}>
+      {children}<span className={`ml-1 ${on ? 'opacity-80' : 'opacity-25'}`}>{on ? (sort.d > 0 ? '▲' : '▼') : '↕'}</span>
+    </th>
+  )
+}
+
 function Mini({ label, value, sub, tone: t, title }) {
   return (
     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 min-w-0" title={title}>
@@ -118,6 +129,7 @@ export default function PaperBookPage() {
   const [liveErr, setLiveErr] = useState('')
   const [chartSym, setChartSym] = useState(null)
   const [flash, setFlash] = useState({})
+  const [sort, setSort] = useState({ k: 'rank', d: 1 })   // holdings sort: rank (default), pnl, pnlPct, today, value, stock
   const [open, setOpen] = useState(marketOpen())
   const lastPx = useRef({})
   const livePx = (s) => live?.prices?.[s]?.price
@@ -170,11 +182,15 @@ export default function PaperBookPage() {
       const boughtToday = h[8] && h[8] === new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)
       const prev = boughtToday && h[2] ? h[2] : L && L.prev ? L.prev : price
       const value = s === 'LIQUIDCASE' ? val : q * price
-      return { row: h, price, value, today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: L && prev ? (price / prev - 1) * 100 : null }
+      const pnlAmt = h[2] && s !== 'LIQUIDCASE' ? q * (price - h[2]) : null
+      return { row: h, price, value, pnlAmt, pnlPct: h[2] && s !== 'LIQUIDCASE' ? (price / h[2] - 1) * 100 : null,
+        today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: L && prev ? (price / prev - 1) * 100 : null }
     })
-    // stocks by momentum rank (strongest first; out of the top 40 last), then gold and liquid at the bottom
+    // stocks sorted by the chosen column (default momentum rank, strongest first); gold and liquid always at the bottom
     const grp = (h) => (h.row[0] === 'GOLDBEES' ? 1 : h.row[0] === 'LIQUIDCASE' ? 2 : 0)
-    hold.sort((x, y) => grp(x) - grp(y) || (x.row[7] ?? 999) - (y.row[7] ?? 999))
+    const key = { rank: (h) => h.row[7] ?? 999, pnl: (h) => -(h.pnlAmt ?? -1e12), today: (h) => -(h.todayPct ?? -1e9),
+      value: (h) => -h.value, stock: (h) => h.row[0] }[sort.k]
+    hold.sort((x, y) => grp(x) - grp(y) || (sort.k === 'stock' ? key(x).localeCompare(key(y)) : key(x) - key(y)) * sort.d)
     const liveNav = hold.reduce((a, h) => a + h.value, 0)
     const today = hold.reduce((a, h) => a + h.today, 0)
     const gold = hold.filter((h) => h.row[0] === 'GOLDBEES').reduce((a, h) => a + h.value, 0)
@@ -184,7 +200,7 @@ export default function PaperBookPage() {
     const nStocks = hold.filter(isStock).length
     return { hold, gold, stocks, liquid, nStocks, liveNav, today, todayPct: liveNav - today > 0 ? (today / (liveNav - today)) * 100 : 0,
       held: new Set(hold.map((h) => h.row[0])), maxW: Math.max(1, ...hold.filter(isStock).map((h) => h.row[6])) }
-  }, [b, live])
+  }, [b, live, sort])
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   if (err) return <p className="text-sm text-[var(--accent-rose)] p-4">{err}</p>
@@ -276,8 +292,10 @@ export default function PaperBookPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-                  <th className={`${TH} text-right w-12`} title="Momentum rank today (sold at the next rebalance if below 40)">Rank</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
-                  <th className={`${TH} text-right`}>Price</th><th className={`${TH} text-right`}>Today</th><th className={`${TH} text-right`}>Value</th><th className={`${TH} text-right`}>P&amp;L</th>
+                  <SortTh k="rank" sort={sort} setSort={setSort} cls="text-right w-12" title="Momentum rank today (sold at the next rebalance if below 40)">Rank</SortTh>
+                  <SortTh k="stock" sort={sort} setSort={setSort} cls="text-left">Stock</SortTh><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
+                  <th className={`${TH} text-right`}>Price</th><SortTh k="today" sort={sort} setSort={setSort} cls="text-right">Today</SortTh>
+                  <SortTh k="value" sort={sort} setSort={setSort} cls="text-right">Value</SortTh><SortTh k="pnl" sort={sort} setSort={setSort} cls="text-right">P&amp;L</SortTh>
                   <th className={`${TH} text-left`}>Weight</th>
                 </tr>
               </thead>
