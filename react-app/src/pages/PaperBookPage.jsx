@@ -221,7 +221,8 @@ export default function PaperBookPage() {
   const close = lead && perf[0].ret - perf[1].ret < 0.05   // under 0.05 points apart: practically level
   // plain words for the market comparison: ahead / behind the Nifty 500 by x%
   const vsTone = (d) => (d == null || Math.abs(d) < 0.05 ? 'text-[var(--text-muted)]' : tone(d))
-  const vsWord = (d) => (d == null ? '—' : Math.abs(d) < 0.05 ? 'Level with Nifty' : d > 0 ? `Ahead by ${Math.abs(d).toFixed(1)}%` : `Behind by ${Math.abs(d).toFixed(1)}%`)
+  // the BOOK compared with the Nifty 500 since the start: beating = book did better than the market
+  const vsWord = (d) => (d == null ? '—' : Math.abs(d) < 0.05 ? 'Same as Nifty 500' : d > 0 ? `Beating Nifty 500 by ${Math.abs(d).toFixed(1)}%` : `Trailing Nifty 500 by ${Math.abs(d).toFixed(1)}%`)
   const days = b.start ? Math.max(0, Math.round((Date.now() - new Date(b.start + 'T00:00:00+05:30').getTime()) / 86400e3)) : 0
   const nRet = nLive && nBase && b.bench ? (benchNow(b) / b.invested - 1) * 100 : null
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
@@ -288,7 +289,7 @@ export default function PaperBookPage() {
               <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(v)}</p>
               <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct2(gp)}</p>
               <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}{x.costs ? ` · costs ${inr(x.costs)}` : ''}</p>
-              {x.bench && <p className={`text-[11px] font-semibold mt-0.5 truncate ${vsTone(vsNifty(x, v))}`}>vs Nifty: {vsWord(vsNifty(x, v))}</p>}
+              {x.bench && <p className={`text-[11px] font-semibold mt-0.5 truncate ${vsTone(vsNifty(x, v))}`}>{vsWord(vsNifty(x, v))}</p>}
             </button>
           )
         })}
