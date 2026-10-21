@@ -30,7 +30,24 @@ const HEADER_RE = /ISIN|Security|\bBal\b|^Bal|Value$|^Value|Pledge|^Market|Curre
 const CONT_RE = /^(LIMITED|LTD|EQUITY|ASSET|AFTER|SHARES\b|OF R[SE]|RS\.?\s?\d|RE\.?\s?\d|CAPITAL REDUCTION|CONSOLIDATION|SUB-?DIVISION|SPLIT|FUND-|PLAN-|\(I\) LTD\]|1\/-|WITH FACE VALUE|\[FORMERLY)/i
 const DEPOSITORY_RE = /(CDSL|NSDL)\s+Demat\s+Account/i
 const ENTER_RE = /HOLDING STATEMENT AS ON|^\s*(Equities|Equity Shares|Equity)\s*(\(E\))?\s*$/i
-const LEAVE_RE = /Other Details|Portfolio Value|MUTUAL FUND UNITS HELD|STATEMENT OF TRANSACTIONS|Mutual Fund Folios \(F\)|^\s*Total\b/i
+const LEAVE_RE = /Other Details|Portfolio Value|MUTUAL FUND UNITS HELD|STATEMENT OF TRANSACTIONS|Mutual Fund Folios \(F\)|^\s*Total\b|Corporate Bonds|Government Securities|Money Market|Securitised|Mutual Funds \(M\)/i
+// NSDL layout: "NSDL Demat Account  <BROKER>  DP ID:IN300214 Client ID:12345678" (one line, or the type / broker
+// on the lines just above the DP ID line; joint accounts add holder names and PANs on those lines)
+const DP_CLIENT_RE = /DP\s*ID\s*:?\s*([A-Z0-9]{8})\s*,?\s*Client\s*ID\s*:?\s*(\d{8})/i
+const TYPE_RE = /\b(NSDL|CDSL)\s+Demat\s+Account\b/i
+const BROKER_WORDS = /\b(LIMITED|LTD|BANK|SECURITIES|BROKING|BROKERS?|CAPITAL|PVT|PRIVATE|INVESTMENTS?|FINANCIAL|STOCK|SHARES?|WEALTH|DEPOSITORY)\b/i
+/** The broker's name from an NSDL account header (the text around "Demat Account" and before "DP ID"), or ''. */
+function nsdlBroker(texts) {
+  for (const t of texts) {
+    const s = String(t || '').replace(TYPE_RE, ' ').replace(/DP\s*ID[\s\S]*$/i, ' ').replace(/[^\s()]*\(\s*PAN\s*:[^)]*\)/gi, ' ')
+      .replace(/ACCOUNT HOLDERS?/gi, ' ').replace(/\s{2,}/g, '  ').trim()
+    // the broker is the part that reads like a company ("ZERODHA BROKING LIMITED"), not a person's name
+    const parts = s.split(/\s{2,}/).map((x) => x.trim()).filter(Boolean)
+    const hit = parts.find((x) => BROKER_WORDS.test(x)) || (parts.length === 1 && s.length < 60 && !/\d{4}/.test(s) ? parts[0] : '')
+    if (hit) return hit.replace(/[:\s]+$/, '')
+  }
+  return ''
+}
 
 /**
  * @returns {{ holder, pan, asOf, depository, accounts: [{ depository, broker, dpId, clientId, boId, holdings: [{ isin, name, qty, price, value }] }] }}
@@ -61,6 +78,28 @@ export function parseDematCas(lines) {
       inHold = false
       continue
     }
+    // NSDL account header (no "DP Name :" label): the DP ID / Client ID line, with "NSDL|CDSL Demat Account" on it or
+    // just above. Footnotes that mention "demat account" have no DP ID, so they never start an account.
+    const dpc = line.match(DP_CLIENT_RE)
+    if (dpc) {
+      const above = [lines[i - 1], lines[i - 2], lines[i - 3]].map((x) => String(x || ''))
+      const typeAt = TYPE_RE.test(line) ? 0 : above.findIndex((x) => TYPE_RE.test(x)) + 1
+      if (typeAt > 0 || TYPE_RE.test(line)) {
+        const tm = (typeAt === 0 ? line : above[typeAt - 1]).match(TYPE_RE)
+        const dpId = dpc[1].toUpperCase(), clientId = dpc[2]
+        const broker = nsdlBroker([line, ...above.slice(0, Math.max(typeAt, 1))])
+        const found = out.accounts.find((a) => a.dpId === dpId && a.clientId === clientId)
+        // the same account's header again at the top of the next page: the table it was in carries on
+        const carryOn = !!found && found === acc && inHold
+        acc = found || { depository: tm ? tm[1].toUpperCase() : /^IN/.test(dpId) ? 'NSDL' : 'CDSL', broker, dpId, clientId, boId: dpId + clientId, holdings: [] }
+        if (!found) out.accounts.push(acc)
+        else if (!found.broker && broker) found.broker = broker
+        if (!out.depository) out.depository = acc.depository
+        inHold = carryOn
+        buf = []
+        continue
+      }
+    }
     if (!acc) continue
     if (LEAVE_RE.test(line)) { inHold = false; buf = []; continue }
     if (ENTER_RE.test(line)) { inHold = true; buf = []; continue }
@@ -85,6 +124,7 @@ export function parseDematCas(lines) {
     else acc.holdings.push({ isin, name, qty: nums.qty, price: nums.price, value: nums.value, flag: rights ? 'rights' : flag })
     buf = []
   }
+  if (!out.asOf) { const m = lines.join('\n').match(/period\s+from\s+\S+\s+to\s+(\d{2}-\d{2}-\d{4}|\d{2}-[A-Za-z]{3}-\d{4})/i); if (m) out.asOf = m[1] }
   out.accounts = out.accounts.filter((a) => a.holdings.length || a.broker)
   return out
 }

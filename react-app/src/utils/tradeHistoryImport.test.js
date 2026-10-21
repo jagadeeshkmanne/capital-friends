@@ -91,4 +91,33 @@ describe('trade history import', () => {
     // the missing year was uploaded before: no gap
     expect(fileChecks(z, '2021-10-01', ['2021-01-05']).map((c) => c.text).join(' | ')).not.toMatch(/No trades between/)
   })
+  it('reads the Excel template / another broker\'s sheet: any column names we know, ISIN in the symbol column, value instead of price', () => {
+    const rows = [
+      ['Date', 'Buy/Sell', 'Symbol or ISIN', 'Quantity', 'Price', 'Broker', 'Order no.'],
+      ['15-03-2023', 'Buy', 'HDFCBANK', '10', '1,500', 'ICICI Direct', ''],
+      ['15-03-2023', 'Buy', 'HDFCBANK', '10', '1,500', 'ICICI Direct', ''],          // a second identical trade that day
+      [45000, 'B', 'INE009A01021', '5', '1400', 'HDFC Securities', 'A-77'],
+      ['20/06/2024', 'Sell', 'HDFCBANK', '15', '1600', 'ICICI Direct', ''],
+      ['', 'Sell', 'TCS', '1', '1', '', ''],
+    ]
+    const r = parseTradeHistory(rows, 'my-trades.xlsx')
+    expect(r.broker).toBe('Template')
+    expect(r.trades.map((t) => [t.date, t.type, t.symbol, t.isin, t.qty, t.price, t.platform, t.refKind])).toEqual([
+      ['2023-03-15', 'BUY', 'HDFCBANK', '', 10, 1500, 'ICICI Direct', 'row'],
+      ['2023-03-15', 'BUY', 'HDFCBANK', '', 10, 1500, 'ICICI Direct', 'row'],
+      ['2023-03-15', 'BUY', 'INE009A01021', 'INE009A01021', 5, 1400, 'HDFC Securities', 'order'],
+      ['2024-06-20', 'SELL', 'HDFCBANK', '', 15, 1600, 'ICICI Direct', 'row'],
+    ])
+    expect(r.trades[0].ref).not.toBe(r.trades[1].ref)          // both identical rows are kept
+    expect(r.skipped[0].reason).toMatch(/Date not readable/)
+    const accts = groupAccounts([{ ...r, fileName: 'my-trades.xlsx' }])
+    expect(accts.map((a) => [a.platform, a.trades.length])).toEqual([['ICICI Direct', 3], ['HDFC Securities', 1]])
+    // the same file again: same references, so nothing doubles
+    const again = parseTradeHistory(rows)
+    expect(again.trades.map((t) => t.ref)).toEqual(r.trades.map((t) => t.ref))
+    expect(parseTradeHistory([['Date', 'Amount', 'Value'], ['1', '2', '3']]).broker).toBeUndefined()
+    const pasted = parseTradeHistory([['Trade Date', 'Transaction Type', 'Scrip', 'Qty', 'Net Amount'], ['01-02-2024', 'Purchase', 'INFY', '2', '3000']])
+    expect(pasted.trades[0]).toMatchObject({ type: 'BUY', symbol: 'INFY', price: 1500 })
+    expect(parseTradeHistory([['Date', 'Buy/Sell', 'Symbol or ISIN', 'Quantity', 'Price']]).error).toMatch(/no trades yet/)
+  })
 })

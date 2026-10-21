@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Lock, Info } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useMask } from '../../context/MaskContext'
@@ -29,9 +29,11 @@ function whyNot(r) {
   if (r.flag === 'rights') return 'rights entitlement — temporary, not a share yet'
   return 'not in the stock list (suspended or delisted?)'
 }
-const isoFromDmy = (s) => { const m = String(s || '').match(/^(\d{2})-(\d{2})-(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : '' }
+const MON = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' }
+// "31-08-2026" (CDSL) or "30-Sep-2026" (NSDL) → "2026-09-30"
+const isoFromDmy = (s) => { const m = String(s || '').match(/^(\d{2})-(\d{2}|[A-Za-z]{3})-(\d{4})$/); const mm = m && (/\d/.test(m[2]) ? m[2] : MON[m[2].toLowerCase()]); return mm ? `${m[3]}-${mm}-${m[1]}` : '' }
 
-export default function ImportDematForm({ onCancel }) {
+export default function ImportDematForm({ onCancel, initialFile }) {
   const { stockPortfolios, stockHoldings, activeMembers, activeInvestmentAccounts, addStockPortfolio, importStocks, otherInvList, addOtherInvestment, addMember, addInvestmentAccount } = useData()
   const { user } = useAuth()
   const { mv } = useMask()
@@ -46,6 +48,9 @@ export default function ImportDematForm({ onCancel }) {
   const [date, setDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null)
+
+  // opened from the Import stocks page with the PDF already chosen
+  useEffect(() => { if (initialFile) { setFile(initialFile); read(initialFile) } }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function read(f, password) {
     setError(''); setReading(true)

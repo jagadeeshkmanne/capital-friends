@@ -14,9 +14,9 @@
  *             then write the broker history
  * Never throws for a bad trade: unknown stocks / bad numbers come back in `skipped`.
  *
- * @param {Object} params { portfolioId, broker: 'Groww'|'Zerodha', mode, after?, trades: [{ date: 'YYYY-MM-DD', time?, type, symbol, isin?, sourceSymbol?, qty, price, ref?, refKind? }] }
+ * @param {Object} params { portfolioId, broker: 'Groww'|'Zerodha'|'Template', mode, after?, trades: [{ date: 'YYYY-MM-DD', time?, type, symbol, isin?, sourceSymbol?, qty, price, ref?, refKind? }] }
  */
-var TRADE_NOTE_RE_ = /^(Groww|Zerodha) · (order|trade) (\S+)/;
+var TRADE_NOTE_RE_ = /^(Groww|Zerodha|Template) · (order|trade|row) (\S+)/;
 function isTradeHistoryNote_(note) { return TRADE_NOTE_RE_.test(String(note || '')); }
 
 /** Cost of the shares still held, first in first out. rows = StockTransactions rows of one stock in one portfolio. */
@@ -41,9 +41,9 @@ function importStockTrades(params) {
     var p = params || {};
     var portfolioId = p.portfolioId, trades = p.trades || [];
     var mode = p.mode === 'replace' ? 'replace' : 'add';
-    var broker = p.broker === 'Groww' || p.broker === 'Zerodha' ? p.broker : '';
+    var broker = p.broker === 'Groww' || p.broker === 'Zerodha' || p.broker === 'Template' ? p.broker : '';
     if (!portfolioId) throw new Error('Portfolio ID is required');
-    if (!broker) throw new Error('Only Groww and Zerodha files are supported');
+    if (!broker) throw new Error('Only Groww, Zerodha and Excel-template files are supported');
     if (!trades.length) throw new Error('No trades to import');
     if (trades.length > 5000) throw new Error('Too many trades (max 5,000 per import)');
     var after = mode === 'add' && /^\d{4}-\d{2}-\d{2}$/.test(String(p.after || '')) ? String(p.after) : '';
@@ -91,7 +91,7 @@ function importStockTrades(params) {
       if (!m) { skipped.push({ symbol: label, date: t.date || '', reason: 'Not found in the stock list' }); return; }
       if (!type || !dm || !(qty > 0) || !(price > 0)) { skipped.push({ symbol: label, date: t.date || '', reason: 'Date, type, quantity or price missing' }); return; }
       if (after && t.date <= after) { before++; return; }
-      var kind = t.refKind === 'trade' ? 'trade' : 'order', ref = String(t.ref || '').trim().replace(/\s+/g, '');
+      var kind = t.refKind === 'trade' || t.refKind === 'row' ? t.refKind : 'order', ref = String(t.ref || '').trim().replace(/\s+/g, '');
       var k = ref ? kind + '|' + ref + '|' + String(m[0]).toUpperCase() + '|' + t.date : '';
       if (k && have[k]) { duplicates++; return; }
       if (k) have[k] = true;

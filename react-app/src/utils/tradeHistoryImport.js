@@ -3,6 +3,8 @@
 //    there is no price column, so price = Value ÷ Quantity. Only "Executed" orders are kept.
 //  - Zerodha: Console → Reports → Tradebook, segment Equity (.csv or .xlsx), one year per file. The client ID
 //    is only in the file name (tradebook-AB1234-EQ.csv).
+//  - Any other broker: our Excel template (public/stock-trades-template.xlsx) or any sheet with the columns
+//    Date, Buy/Sell, Symbol (or ISIN), Quantity, Price (or Value), optional Broker and Order no.
 // The format is found from the column names, so a file renamed by the user still reads.
 import { toIsoDate, toNumber, normalizeSymbol, findColumns } from './holdingsImport'
 
@@ -11,6 +13,27 @@ const key = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const FORMATS = {
   Groww: { need: ['symbol', 'isin', 'type', 'quantity', 'value', 'executiondateandtime'], optional: ['stockname', 'exchange', 'exchangeorderid', 'orderstatus'] },
   Zerodha: { need: ['symbol', 'isin', 'tradedate', 'tradetype', 'quantity', 'price'], optional: ['exchange', 'segment', 'series', 'tradeid', 'orderid', 'orderexecutiontime'] },
+}
+
+// the template (and other brokers' sheets): each column may have a few names, the first one found wins
+const TEMPLATE = {
+  date: ['date', 'tradedate', 'transactiondate', 'orderdate', 'dateoftrade', 'tradedon', 'executiondate', 'executiondateandtime'],
+  type: ['buysell', 'buyorsell', 'type', 'tradetype', 'transactiontype', 'transaction', 'action', 'side', 'ordertype'],
+  symbol: ['symbol', 'symbolorisin', 'stocksymbol', 'nsesymbol', 'scrip', 'scripcode', 'tradingsymbol', 'stock', 'stockname', 'security', 'companyname'],
+  isin: ['isin', 'isincode'],
+  quantity: ['quantity', 'qty', 'shares', 'noofshares', 'units', 'tradedqty', 'tradequantity'],
+  price: ['price', 'rate', 'pricepershare', 'tradeprice', 'avgprice', 'averageprice', 'netrate', 'marketrate'],
+  value: ['value', 'amount', 'tradevalue', 'totalamount', 'netamount', 'grossamount'],
+  broker: ['broker', 'brokername', 'platform', 'platformbroker'],
+  ref: ['orderno', 'ordernumber', 'orderid', 'tradeno', 'tradenumber', 'tradeid', 'contractnoteno', 'referenceno'],
+  time: ['time', 'tradetime', 'ordertime', 'executiontime'],
+}
+function findTemplate(h) {
+  const col = {}
+  for (const [k, names] of Object.entries(TEMPLATE)) { col[k] = -1; for (const n of names) { const i = h.indexOf(n); if (i >= 0) { col[k] = i; break } } }
+  // "Symbol or ISIN" column: symbol and isin may be the same column
+  const ok = col.date >= 0 && col.type >= 0 && (col.symbol >= 0 || col.isin >= 0) && col.quantity >= 0 && (col.price >= 0 || col.value >= 0)
+  return ok ? col : null
 }
 
 function findFormat(rows) {
@@ -23,6 +46,8 @@ function findFormat(rows) {
         return { broker, headerRow: r, col }
       }
     }
+    const t = findTemplate(h)
+    if (t) return { broker: 'Template', headerRow: r, col: t }
   }
   return null
 }
@@ -79,6 +104,7 @@ export function parseTradeHistory(rows, fileName = '') {
   if (!f) return { error: wrongFile(rows || []) }
   const { broker, headerRow, col } = f
   const cell = (row, n) => (col[n] >= 0 ? row[col[n]] : '')
+  if (broker === 'Template') return parseTemplate(rows, headerRow, col)
   const meta = broker === 'Groww' ? growwMeta(rows, headerRow) : { clientId: zerodhaClientId(fileName) }
   const trades = [], skipped = []
   for (let r = headerRow + 1; r < rows.length; r++) {
@@ -116,6 +142,39 @@ export function parseTradeHistory(rows, fileName = '') {
   return { broker, clientId: meta.clientId || '', holderName: meta.holderName || '', range: meta.range || null, trades, skipped }
 }
 
+// Template / other broker sheet. Rows without an order number get a reference from their own values
+// (date, buy/sell, quantity, price and how many identical rows came before), so a second upload adds nothing twice.
+function parseTemplate(rows, headerRow, col) {
+  const cell = (row, k) => (col[k] >= 0 ? row[col[k]] : '')
+  const trades = [], skipped = [], same = {}
+  for (let r = headerRow + 1; r < rows.length; r++) {
+    const row = rows[r], line = r + 1
+    const raw = clean(cell(row, 'symbol'))
+    let isin = clean(cell(row, 'isin')).toUpperCase()
+    let symbol = raw
+    if (/^IN[A-Z0-9]{10}$/i.test(raw)) { isin = isin || raw.toUpperCase(); symbol = '' }
+    symbol = normalizeSymbol(symbol)
+    if (!symbol && !isin) continue
+    if (/^(e\.?g\.?|example)/i.test(clean(cell(row, 'date'))) || /^example/i.test(raw)) continue
+    const date = toIsoDate(cell(row, 'date'))
+    const time = toTime(cell(row, 'time')) || (typeof cell(row, 'date') === 'number' ? toTime(cell(row, 'date')) : toTime(String(cell(row, 'date')).replace(/^\S+/, '')))
+    const type = side(cell(row, 'type'))
+    const qty = Math.abs(toNumber(cell(row, 'quantity')))
+    const value = Math.abs(toNumber(cell(row, 'value')))
+    let price = toNumber(cell(row, 'price'))
+    if (!(price > 0) && qty > 0 && value > 0) price = value / qty
+    if (!date) { skipped.push({ line, symbol: symbol || isin, reason: 'Date not readable (write it like 15-03-2024)' }); continue }
+    if (!type) { skipped.push({ line, symbol: symbol || isin, reason: 'Buy/Sell column must say Buy or Sell' }); continue }
+    if (!(qty > 0) || !(price > 0)) { skipped.push({ line, symbol: symbol || isin, reason: 'Quantity or price missing' }); continue }
+    price = Math.round(price * 10000) / 10000
+    let ref = clean(cell(row, 'ref')).replace(/\s+/g, ''), refKind = 'order'
+    if (!ref) { const base = `${date}-${type[0]}-${qty}-${price}`; same[base + symbol + isin] = (same[base + symbol + isin] || 0) + 1; ref = `${base}-${same[base + symbol + isin]}`; refKind = 'row' }
+    trades.push({ date, time, symbol: symbol || isin, isin, name: '', type, qty, price, exchange: '', ref, refKind, line, platform: clean(cell(row, 'broker')) })
+  }
+  if (!trades.length && !skipped.length) return { error: 'The template has no trades yet. Fill one row per buy or sell (the examples are on the "How to fill" sheet) and upload again.' }
+  return { broker: 'Template', clientId: '', holderName: '', range: null, trades, skipped }
+}
+
 const tradeKey = (t) => t.ref ? `${t.refKind}:${t.ref}:${t.symbol}` : `${t.date}|${t.time}|${t.symbol}|${t.type}|${t.qty}|${t.price}`
 export const byTime = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.time || '') < (b.time || '') ? -1 : (a.time || '') > (b.time || '') ? 1 : a.type === b.type ? 0 : a.type === 'BUY' ? -1 : 1)
 
@@ -126,11 +185,20 @@ export const byTime = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a
 export function groupAccounts(parsed) {
   const acc = new Map()
   const ok = parsed.filter((p) => !p.error)
+  // template rows: one account per broker named in the Broker column ('' = not given: picked on the page)
+  const split = []
   for (const p of ok) {
+    if (p.broker !== 'Template') { split.push(p); continue }
+    const by = new Map()
+    for (const t of p.trades) { const b = t.platform || ''; const k = b.toLowerCase(); if (!by.has(k)) by.set(k, { ...p, platform: b, trades: [], skipped: by.size ? [] : p.skipped }); by.get(k).trades.push(t) }
+    if (!by.size) split.push(p); else split.push(...by.values())
+  }
+  for (const p of split) {
     let id = p.clientId
     if (!id) { const same = [...new Set(ok.filter((q) => q.broker === p.broker && q.clientId).map((q) => q.clientId))]; if (same.length === 1) id = same[0] }
-    const k = `${p.broker}|${id || '?'}`
-    if (!acc.has(k)) acc.set(k, { key: k, broker: p.broker, clientId: id || '', holderName: p.holderName || '', range: null, files: [], trades: [], seen: new Set(), repeats: 0, skipped: [] })
+    const k = p.broker === 'Template' ? `Template|${(p.platform || '').toLowerCase()}` : `${p.broker}|${id || '?'}`
+    // platform: the broker name the account is matched / created with (template: from its Broker column)
+    if (!acc.has(k)) acc.set(k, { key: k, broker: p.broker, platform: p.broker === 'Template' ? p.platform || '' : p.broker, clientId: id || '', holderName: p.holderName || '', range: null, files: [], trades: [], seen: new Set(), repeats: 0, skipped: [] })
     const a = acc.get(k)
     a.files.push(p.fileName || '')
     if (!a.holderName && p.holderName) a.holderName = p.holderName
@@ -206,9 +274,10 @@ export function fileChecks(a, today, alreadyIn = []) {
   const end = a.range?.to || dates[dates.length - 1] || ''
   if (a.range && days(a.range.to, today) > 7) out.push({ tone: 'warn', text: `The file only goes up to ${a.range.to}. Download it again up to today, or trades after that date will be missing.` })
   if (!a.range && a.broker === 'Zerodha' && end && days(end, today) > 400) out.push({ tone: 'info', text: `The last trade in these files is on ${end}. If you traded after that, add the tradebook for those years too.` })
-  for (let i = 1; i < dates.length; i++) {
+  // a long gap only means something for Zerodha (one file per year: a year may be missing); elsewhere it's just no trading
+  if (a.broker === 'Zerodha') for (let i = 1; i < dates.length; i++) {
     if (days(dates[i - 1], dates[i]) > 365) out.push({ tone: 'info', text: `No trades between ${dates[i - 1]} and ${dates[i]}.${a.broker === 'Zerodha' ? ' If you traded then, add that year\'s tradebook.' : ''}` })
   }
-  if (!a.clientId) out.push({ tone: 'warn', text: a.broker === 'Zerodha' ? 'The client ID is not in the file name (it was renamed), so pick the account by hand. Keep Zerodha file names as downloaded: tradebook-AB1234-EQ.csv.' : 'No client code in the file, so pick the account by hand.' })
+  if (!a.clientId && a.broker !== 'Template') out.push({ tone: 'warn', text: a.broker === 'Zerodha' ? 'The client ID is not in the file name (it was renamed), so pick the account by hand. Keep Zerodha file names as downloaded: tradebook-AB1234-EQ.csv.' : 'No client code in the file, so pick the account by hand.' })
   return out
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Download } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
@@ -15,7 +15,7 @@ const today = () => new Date().toISOString().split('T')[0]
 // Import holdings from a broker file: Symbol, Quantity, Avg price. Live price, value and P&L come from
 // Google Finance in the sheet, the same as for a stock bought by hand.
 // A symbol we can't find never stops the import: the row waits for the user to pick the stock, or is skipped.
-export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
+export default function ImportStocksForm({ portfolioId, onImport, onCancel, initialFile }) {
   const { stockPortfolios, stockHoldings } = useData()
   const { selectedMember } = useFamily()
   const { mv } = useMask()
@@ -87,6 +87,9 @@ export default function ImportStocksForm({ portfolioId, onImport, onCancel }) {
   const [result, setResult] = useState(null)
 
   const held = useMemo(() => new Set((stockHoldings || []).filter((h) => h.portfolioId === pid).map((h) => String(h.symbol).toUpperCase())), [stockHoldings, pid])
+
+  // opened from the Import stocks page with the file already chosen
+  useEffect(() => { if (initialFile) handleFile(initialFile) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleFile(file) {
     if (!file) return
