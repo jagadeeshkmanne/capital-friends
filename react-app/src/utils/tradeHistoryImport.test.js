@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseCSV } from './holdingsImport'
-import { parseTradeHistory, parseIciciTransactionPdf, groupAccounts, summarize, zerodhaClientId, toTime, fyOf, sameName, fileChecks } from './tradeHistoryImport'
+import { parseTradeHistory, parseIciciTransactionPdf, groupAccounts, summarize, zerodhaClientId, toTime, fyOf, sameName, fileChecks, missingPeriods } from './tradeHistoryImport'
 
 // Groww order history (.xlsx, read into rows): Name / Unique Client Code above the table, header on its own row
 const growwRows = [
@@ -155,5 +155,11 @@ describe('trade history import', () => {
     expect(parseIciciTransactionPdf(['NSDL Demat Account', 'INE040A01034 HDFC BANK 1 2 3'])).toBe(null)
     const [a] = groupAccounts([{ ...r, fileName: 'TRX-Equity_q1.PDF' }, { ...r, fileName: 'TRX-Equity_q1 (copy).PDF' }])
     expect([a.platform, a.clientId, a.trades.length, a.repeats]).toEqual(['ICICI Direct', '1234567890', 2, 2])
+  })
+  it('finds the periods no statement covers (quarterly and yearly statements mixed, overlaps fine)', () => {
+    const r = (from, to) => ({ from, to })
+    expect(missingPeriods([r('2019-04-01', '2020-03-31'), r('2020-01-01', '2020-03-31'), r('2020-04-01', '2021-03-31'), r('2021-04-01', '2021-06-30'), r('2021-07-01', '2021-09-30'), r('2022-04-01', '2023-03-31')]))
+      .toEqual([{ from: '2021-10-01', to: '2022-03-31' }])
+    expect(missingPeriods([r('2024-01-01', '2024-03-31'), r('2024-04-01', '2024-06-30')])).toEqual([])
   })
 })

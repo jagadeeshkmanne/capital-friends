@@ -151,8 +151,14 @@ export default function StockTradesImportPage() {
   }
 
   // trades that will be sent: stock found (or picked), not left out
-  const tradesOf = (a) => a.trades.filter((t) => a.stocks[t.isin || t.symbol])
-  const summaries = useMemo(() => (accounts || []).map((a) => summarize(tradesOf(a), (t) => a.stocks[t.isin || t.symbol]?.symbol || t.symbol)), [accounts]) // eslint-disable-line react-hooks/exhaustive-deps
+  // shares the files never bought (IPO, bonus, transfer…) that the user gave a date and price for on this page
+  const extrasOf = (a) => Object.entries(a.extra || {}).filter(([, x]) => x && x.date && Number(x.price) > 0 && Number(x.qty) > 0)
+    .map(([sym, x]) => ({ date: x.date, time: '', type: 'BUY', symbol: sym, appSymbol: sym, isin: '', qty: Number(x.qty), price: Number(x.price), ref: `added-${sym}-${x.date}-${Number(x.qty)}`, refKind: 'row' }))
+  const keyOf = (a) => (t) => t.appSymbol || a.stocks[t.isin || t.symbol]?.symbol || t.symbol
+  const tradesOf = (a) => [...a.trades.filter((t) => a.stocks[t.isin || t.symbol]), ...extrasOf(a)]
+  // base: the files alone (decides which stocks need a price); summaries: with what was added here
+  const bases = useMemo(() => (accounts || []).map((a) => summarize(a.trades.filter((t) => a.stocks[t.isin || t.symbol]), keyOf(a))), [accounts]) // eslint-disable-line react-hooks/exhaustive-deps
+  const summaries = useMemo(() => (accounts || []).map((a) => summarize(tradesOf(a), keyOf(a))), [accounts]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const ready = (accounts || []).filter((a) => { const p = a.include && tradesOf(a).length ? plan(a) : null; return p && p.memberId && (p.memberId !== 'new' || newName(a)) && p.how !== 'conflict' && (p.account || platOf(a)) })
@@ -201,7 +207,7 @@ export default function StockTradesImportPage() {
         const res = await api.importStockTrades({
           portfolioId, broker: a.broker, mode: p.mode === 'replace' ? 'replace' : 'add',
           after: p.mode !== 'replace' && p.kinds.manual && a.onlyAfter ? p.lastManual : '',
-          trades: list.map((t) => ({ date: t.date, time: t.time, type: t.type, symbol: a.stocks[t.isin || t.symbol].symbol, isin: t.isin, sourceSymbol: t.symbol, qty: t.qty, price: t.price, ref: t.ref, refKind: t.refKind })),
+          trades: list.map((t) => ({ date: t.date, time: t.time, type: t.type, symbol: t.appSymbol || a.stocks[t.isin || t.symbol].symbol, isin: t.isin, sourceSymbol: t.symbol, qty: t.qty, price: t.price, ref: t.ref, refKind: t.refKind })),
         })
         if (!res || res.success === false) { tick(true); throw new Error(res?.error || 'Import failed') }
         tick()
@@ -224,7 +230,7 @@ export default function StockTradesImportPage() {
           <p className="text-sm font-semibold text-[var(--text-primary)]">{r.broker} · {mv(r.member, 'name')}</p>
           <p className="text-xs text-[var(--text-secondary)]"><strong>{r.imported}</strong> trades added across {r.stocks} stocks{r.replaced ? ` · ${r.replaced} earlier entries replaced` : ''}{r.duplicates ? ` · ${r.duplicates} already there` : ''}{r.before ? ` · ${r.before} on or before your own entries left out` : ''}.</p>
           {r.skipped?.length > 0 && <Note tone="warn"><p>Not imported: {r.skipped.slice(0, 8).map((s) => `${s.symbol} (${s.reason})`).join(', ')}{r.skipped.length > 8 ? ` and ${r.skipped.length - 8} more` : ''}</p></Note>}
-          {r.shortfall?.length > 0 && <Note tone="info"><p>Price needed: {r.shortfall.map((s) => `${s.symbol} ${s.qty}`).join(', ')} shares were sold but never bought in the file (IPO, transfer, gift or bonus shares). Add them as a buy with their date and price on the Stocks page.</p></Note>}
+          {r.shortfall?.length > 0 && <Note tone="info"><p>Still without a buy: {r.shortfall.map((s) => `${s.symbol} (${s.qty})`).join(', ')}. Upload the missing statement, or add these as a buy with their date and price on the Stocks page.</p></Note>}
         </Card>
       ))}
       {error && <Note tone="bad"><p>{error}</p></Note>}
@@ -310,7 +316,10 @@ export default function StockTradesImportPage() {
       {error && <Note tone="bad"><p>{error}</p></Note>}
 
       {(accounts || []).map((a, i) => {
-        const p = plan(a), s = summaries[i]
+        const p = plan(a), s = summaries[i], base = bases[i]
+        const firstSell = (sym) => (a.trades.find((t) => t.type === 'SELL' && keyOf(a)(t) === sym) || {}).date || ''
+        const nameOf = (sym) => (Object.values(a.stocks).find((st) => st && st.symbol === sym) || {}).companyName || ''
+        const setExtra = (sym, patch) => update(a.key, { extra: { ...(a.extra || {}), [sym]: { qty: base.shortfall.find((x) => x.key === sym)?.qty, date: (a.extra || {})[sym]?.date || firstSell(sym), price: '', ...(a.extra || {})[sym], ...patch } } })
         const missing = Object.entries(a.stocks).filter(([, v]) => v === null || v === undefined)
         const memberOpts = [...members.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` })), { value: 'new', label: a.holderName ? `Add ${mv(a.holderName, 'name')} to Family` : 'Add a new family member' }]
         const checks = fileChecks(a, new Date().toISOString().slice(0, 10), p.rows.filter((t) => TRADE_NOTE.test(t.notes)).map((t) => t.date))
@@ -384,7 +393,20 @@ export default function StockTradesImportPage() {
                   </table></div>}
                 </div>
               )}
-              {s.shortfall.length > 0 && <Note tone="info"><p><strong>Price needed later:</strong> {s.shortfall.map((x) => `${x.symbol} (${x.qty})`).join(', ')}: shares sold that this file never bought. Usually IPO, transfer, gift or bonus shares, or bought before the file starts. Add them as a buy with date and price after the import.</p></Note>}
+              {base.shortfall.length > 0 && (
+                <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 space-y-2 text-xs">
+                  <p className="text-[var(--text-primary)]"><strong>Price needed: {base.shortfall.length} stock{base.shortfall.length === 1 ? '' : 's'}</strong> were sold for more shares than the files bought.</p>
+                  <p className="text-[var(--text-secondary)]">Bought before the first file, or in a period with no file (see the missing statements above)? Upload that statement instead. Got them in an IPO, bonus, split, rights issue, gift or transfer? Enter the date and price (IPO: the issue price) and they are added as a buy. Or leave them: the rest imports fine.</p>
+                  <div className="divide-y divide-[var(--border-light)]">
+                    {base.shortfall.map((x) => { const e = (a.extra || {})[x.key] || {}; const done = e.date && Number(e.price) > 0; return (
+                      <div key={x.key} className="py-2 grid grid-cols-2 sm:grid-cols-[minmax(0,1fr)_140px_110px] gap-2 items-center">
+                        <div className="min-w-0 col-span-2 sm:col-span-1"><p className="font-semibold text-[var(--text-primary)] truncate">{x.key} <span className="font-normal text-[var(--text-dim)]">{nameOf(x.key)}</span>{done && <CheckCircle2 size={12} className="inline ml-1 text-emerald-400" />}</p><p className="text-[var(--text-dim)]">{x.qty} shares · first sold {fmtDate(firstSell(x.key))}</p></div>
+                        <input type="date" value={e.date || firstSell(x.key)} max={firstSell(x.key) || undefined} onChange={(ev) => setExtra(x.key, { date: ev.target.value })} className="w-full min-w-0 px-2 py-1.5 rounded-md bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)]" />
+                        <input type="number" min="0" step="0.01" placeholder="Price ₹" value={e.price ?? ''} onChange={(ev) => setExtra(x.key, { price: ev.target.value })} className="w-full min-w-0 px-2 py-1.5 rounded-md bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] text-right tabular-nums" />
+                      </div>) })}
+                  </div>
+                </div>
+              )}
               {a.skipped.length > 0 && <p className="text-[11px] text-[var(--text-dim)]">{a.skipped.length} rows left out (cancelled or rejected orders, other segments).</p>}
             </div>
           </Card>

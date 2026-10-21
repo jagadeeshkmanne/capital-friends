@@ -217,6 +217,7 @@ export function groupAccounts(parsed) {
     const a = acc.get(k)
     a.files.push(p.fileName || '')
     if (!a.holderName && p.holderName) a.holderName = p.holderName
+    if (p.range) (a.ranges = a.ranges || []).push(p.range)
     if (p.range) a.range = a.range ? { from: p.range.from < a.range.from ? p.range.from : a.range.from, to: p.range.to > a.range.to ? p.range.to : a.range.to } : p.range
     for (const t of p.trades) { const tk = tradeKey(t); if (a.seen.has(tk)) { a.repeats++; continue } a.seen.add(tk); a.trades.push(t) }
     a.skipped.push(...p.skipped.map((s) => ({ ...s, file: p.fileName || '' })))
@@ -293,6 +294,11 @@ export function fileChecks(a, today, alreadyIn = []) {
   if (a.broker === 'Zerodha') for (let i = 1; i < dates.length; i++) {
     if (days(dates[i - 1], dates[i]) > 365) out.push({ tone: 'info', text: `No trades between ${dates[i - 1]} and ${dates[i]}.${a.broker === 'Zerodha' ? ' If you traded then, add that year\'s tradebook.' : ''}` })
   }
+  // statements that each cover a period (ICICI's quarterly / yearly PDFs): the periods no statement covers
+  if (a.broker === 'Template' && (a.ranges || []).length) {
+    const gaps = missingPeriods(a.ranges)
+    if (gaps.length) out.push({ tone: 'warn', text: `No statement for ${gaps.map((g) => `${g.from} to ${g.to}`).join(', ')}. Trades in that time are missing: download and add ${gaps.length === 1 ? 'that statement' : 'those statements'}.` })
+  }
   if (!a.clientId && a.broker !== 'Template') out.push({ tone: 'warn', text: a.broker === 'Zerodha' ? 'The client ID is not in the file name (it was renamed), so pick the account by hand. Keep Zerodha file names as downloaded: tradebook-AB1234-EQ.csv.' : 'No client code in the file, so pick the account by hand.' })
   return out
 }
@@ -335,4 +341,17 @@ export function parseIciciTransactionPdf(lines) {
       exchange: ex >= 0 ? nums[ex].toUpperCase() : '', ref: tradeNo || orderNo, refKind: tradeNo ? 'trade' : 'order', line: i + 1, platform: 'ICICI Direct', clientId, dpId: '' })
   }
   return { broker: 'Template', clientId, holderName, range, trades, skipped }
+}
+
+/** Periods between the earliest and latest statement that no statement covers: [{ from, to }] (ISO dates). */
+export function missingPeriods(ranges) {
+  const day = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+  const rs = [...(ranges || [])].filter((r) => r && r.from && r.to).sort((x, y) => (x.from < y.from ? -1 : 1))
+  const out = []
+  let end = ''
+  for (const r of rs) {
+    if (end && r.from > day(end, 1)) out.push({ from: day(end, 1), to: day(r.from, -1) })
+    if (!end || r.to > end) end = r.to
+  }
+  return out
 }
