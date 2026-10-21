@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Modal from '../components/Modal'
 import { Navigate } from 'react-router-dom'
-import { Wallet, TrendingUp, Gauge, CalendarClock, Coins, Activity, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getPaperBook, getPaperLive } from '../services/api'
 
@@ -21,18 +21,6 @@ const num = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN', { maxi
 const TH = 'py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider whitespace-nowrap'
 const TD = 'py-2 px-3 text-sm text-[var(--text-secondary)] whitespace-nowrap tabular-nums'
 
-function Stat({ icon: Icon, color, label, value, sub, valueClass }) {
-  return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-3.5 min-w-0">
-      <div className="flex items-center gap-2 mb-1.5">
-        <div className={`w-6 h-6 rounded-md flex items-center justify-center ${color}`}><Icon size={13} /></div>
-        <p className="text-xs text-[var(--text-dim)] font-medium truncate">{label}</p>
-      </div>
-      <p className={`text-lg font-bold tabular-nums truncate ${valueClass || 'text-[var(--text-primary)]'}`}>{value}</p>
-      {sub && <p className="text-xs text-[var(--text-dim)] truncate">{sub}</p>}
-    </div>
-  )
-}
 
 // ── price charts (1 year of daily closes from the snapshot, live price appended) ──
 const RANGES = [['1M', 21], ['3M', 63], ['6M', 126], ['1Y', 252]]
@@ -42,14 +30,6 @@ function series(data, sym, livePrice, n) {
   const pts = c.map((v, i) => [d[i], v]).filter((p) => p[1] != null).slice(-n)
   if (livePrice && pts.length && Math.abs(livePrice / pts[pts.length - 1][1] - 1) > 1e-6) pts.push(['live', livePrice])
   return pts.length > 1 ? pts : null
-}
-
-function Spark({ pts }) {
-  if (!pts) return <span className="text-[var(--text-dim)]">—</span>
-  const W = 84, H = 24, v = pts.map((p) => p[1]), lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1
-  const xy = v.map((y, i) => `${((i / (v.length - 1)) * W).toFixed(1)},${(H - 2 - ((y - lo) / r) * (H - 4)).toFixed(1)}`).join(' ')
-  const up = v[v.length - 1] >= v[0]
-  return <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block"><polyline points={xy} fill="none" strokeWidth="1.5" strokeLinejoin="round" className={up ? 'stroke-emerald-400' : 'stroke-rose-400'} /></svg>
 }
 
 function BigChart({ data, sym, livePrice, onClose }) {
@@ -109,48 +89,26 @@ function BigChart({ data, sym, livePrice, onClose }) {
     </Modal>, document.body)
 }
 
-const BOOK_LABEL = { A: 'A · Momentum', B: 'B · Momentum + Safety', C: 'C · Momentum + Quality', D: 'D · Top 10 Common', lump: '₹10L lump sum', sip: '₹1L monthly SIP' }
 const BOOK_DOT = { A: 'bg-emerald-400', B: 'bg-violet-400', C: 'bg-blue-400', D: 'bg-amber-400' }
-const Dot = ({ on, k }) => <span className={`inline-block w-2.5 h-2.5 rounded-full ${on ? BOOK_DOT[k] : 'border border-[var(--border)]'}`} />
+const BOOK_RING = { A: 'ring-emerald-400 border-emerald-400', B: 'ring-violet-400 border-violet-400', C: 'ring-blue-400 border-blue-400', D: 'ring-amber-400 border-amber-400' }
+const BOOK_NAME = { A: 'Momentum', B: 'Momentum + Safety', C: 'Momentum + Quality', D: 'Top 10 Common' }
+// value of a book at live prices (falls back to the last close for anything without a live price)
+const liveValue = (b, lp) => (b?.holdings || []).reduce((a, [s, q, , px, val]) => a + (s === 'LIQUIDCASE' ? val : q * (lp?.[s]?.price ?? px)), 0)
+const sgn = (v) => (v == null ? '' : v >= 0 ? '+' : '−')
+const lakhs = (v) => (v == null ? '—' : '₹' + (Math.abs(v) / 1e5).toFixed(2) + ' L')
 
-/** Which stocks the three books share, and why B / C left some out (latest rebalance). */
-function Overlap({ o, onPick }) {
-  if (!o || !o.rows?.length) return null
-  const v = o.venn || {}
-  const why = (r) => [r.why_B && !r.held?.B ? `B skipped: ${r.why_B}` : null,
-    r.crank_C && (r.held?.A !== r.held?.C || Math.abs(r.crank_C[0] - r.crank_C[1]) >= 5) ? `C: #${r.crank_C[0]} → #${r.crank_C[1]}${r.crank_C[2] != null ? ` · earnings ${r.crank_C[2]}/100` : ''}` : null,
-    r.why_C && !r.held?.C ? `C: ${r.why_C}` : null].filter(Boolean)
+function Mini({ label, value, sub, tone: t, title }) {
   return (
-    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-sm font-bold text-[var(--text-primary)]">Overlap between the books</h3>
-        <span className="text-xs text-[var(--text-dim)]">{v.all3} in all three · A+B {v.AB} · A+C {v.AC} · B+C {v.BC} · only A {v.A} · only B {v.B} · only C {v.C}</span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-              <th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Rank</th>
-              {['A', 'B', 'C'].map((k) => <th key={k} className={`${TH} text-center w-10`}>{k}</th>)}
-              <th className={`${TH} text-left`}>Why they differ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {o.rows.map((r) => (
-              <tr key={r.sym} onClick={() => onPick(r.sym)} className="border-b border-[var(--border-row)] last:border-0 cursor-pointer hover:bg-[var(--bg-hover)]">
-                <td className={`${TD} text-left font-semibold text-[var(--text-primary)]`}>{r.sym}</td>
-                <td className={`${TD} text-right text-[var(--text-dim)]`}>{r.rank ?? '—'}</td>
-                {['A', 'B', 'C'].map((k) => <td key={k} className={`${TD} text-center`}><Dot on={r.held?.[k]} k={k} /></td>)}
-                <td className={`${TD} text-left text-xs text-[var(--text-muted)] whitespace-normal`}>{why(r).join(' · ')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3 min-w-0" title={title}>
+      <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1 truncate">{label}</p>
+      <p className={`text-sm font-semibold tabular-nums truncate ${t || 'text-[var(--text-primary)]'}`}>{value}</p>
+      {sub && <p className={`text-xs font-semibold tabular-nums mt-0.5 truncate ${t || 'text-[var(--text-dim)]'}`}>{sub}</p>}
     </div>
   )
 }
+const Dot = ({ on, k }) => <span className={`inline-block w-2.5 h-2.5 rounded-full ${on ? BOOK_DOT[k] : 'border border-[var(--border)]'}`} />
 
+/** Which stocks the three books share, and why B / C left some out (latest rebalance). */
 export default function PaperBookPage() {
   const { isAdmin } = useAuth()
   const [data, setData] = useState(undefined)
@@ -198,7 +156,8 @@ export default function PaperBookPage() {
     return () => clearInterval(id)
   }, [data])
 
-  const keys = Object.keys(data?.books || {})
+  // always A, B, C, D (the saved snapshot does not keep key order)
+  const keys = Object.keys(data?.books || {}).sort()
   const bk = data?.books?.[book] ? book : keys[0]
   const b = data?.books?.[bk]
   const view = useMemo(() => {
@@ -233,7 +192,6 @@ export default function PaperBookPage() {
   if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The four paper books (A Momentum, B Momentum + Safety, C Momentum + Quality, D Top 10 Common) open together on ${day(data.start_on)}.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
 
   const half = b.x < 1
-  const ret = bk === 'sip' ? b.xirr : b.ret_pct
   const sets = Object.fromEntries(Object.entries(data.overlap?.sets || {}).map(([k, v]) => [k, new Set(v)]))
   const tot = Math.max(1, view.liveNav)
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
@@ -241,14 +199,7 @@ export default function PaperBookPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
-          {keys.map((k) => [k, BOOK_LABEL[k] || k]).map(([k, l]) => (
-            <button key={k} onClick={() => setBook(k)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${bk === k ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-              {l}
-            </button>
-          ))}
-        </div>
+        <h2 className="text-base font-bold text-[var(--text-primary)]">Paper books <span className="text-xs font-medium text-[var(--text-dim)]">· ₹10 lakh each · started {day(b.start)}</span></h2>
         <div className="flex items-center gap-2 text-xs">
           <span className={`px-2.5 py-1 rounded-lg font-semibold ${half ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
             {half ? 'Half-cut on · stocks 50%' : 'Fully invested'}
@@ -268,14 +219,46 @@ export default function PaperBookPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
-        <Stat icon={Wallet} color="text-violet-400 bg-violet-500/15" label="Value now" value={inr(view.liveNav)} sub={`At last close ${inr(b.nav)}`} />
-        <Stat icon={Activity} color="text-cyan-400 bg-cyan-500/15" label="Today" value={`${view.today >= 0 ? '+' : '−'}${inr(Math.abs(view.today))}`} valueClass={tone(view.today)} sub={live ? pct(view.todayPct) : liveBusy ? 'loading live prices…' : `live prices failed${liveErr ? ': ' + liveErr : ''}`} />
-        <Stat icon={TrendingUp} color="text-emerald-400 bg-emerald-500/15" label="Gain" value={inr(view.liveNav - b.invested)} valueClass={tone(view.liveNav - b.invested)} sub={`${pct(((view.liveNav / b.invested) - 1) * 100)} on ${inr(b.invested)}${bk === 'sip' && ret != null ? ` · XIRR ${pct(ret)}` : ''}`} />
-        <Stat icon={Gauge} color="text-amber-400 bg-amber-500/15" label="Stocks / Gold / Liquid"
-          value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}`} sub="% of value" />
-        <Stat icon={Coins} color="text-sky-400 bg-sky-500/15" label="vs Nifty 500 TRI" value={b.bench ? pct((b.nav / b.bench - 1) * 100) : '—'} valueClass={b.bench ? tone(b.nav - b.bench) : ''} sub={b.bench ? `Index ${inr(b.bench)}` : ''} />
-        <Stat icon={CalendarClock} color="text-rose-400 bg-rose-500/15" label="Next rebalance" value={day(data.next_rebalance)} sub="first trading day" />
+      {/* the four books: tap one to see its numbers and holdings */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" role="tablist">
+        {(() => {
+          const inv = keys.reduce((a, k) => a + data.books[k].invested, 0), val = keys.reduce((a, k) => a + liveValue(data.books[k], live?.prices), 0), g = val - inv
+          return (
+            <div className="col-span-2 lg:col-span-1 rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-3 min-w-0">
+              <p className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">All {keys.length} books</p>
+              <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(val)}</p>
+              <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(inv ? (g / inv) * 100 : 0)}</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Invested {lakhs(inv)}</p>
+            </div>
+          )
+        })()}
+        {keys.map((k) => {
+          const x = data.books[k], v = liveValue(x, live?.prices), g = v - x.invested, gp = x.invested ? (g / x.invested) * 100 : 0, on = k === bk
+          return (
+            <button key={k} role="tab" aria-selected={on} onClick={() => setBook(k)}
+              className={`text-left rounded-xl border px-4 py-3 transition-colors min-w-0 ${on ? `bg-[var(--bg-card)] ring-1 ${BOOK_RING[k] || ''}` : 'bg-[var(--bg-card)] border-[var(--border)] hover:border-[var(--text-dim)] opacity-80 hover:opacity-100'}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`w-2 h-2 rounded-full flex-none ${BOOK_DOT[k] || 'bg-slate-400'}`} />
+                <span className="text-xs font-semibold text-[var(--text-primary)] truncate">{k} · {BOOK_NAME[k] || k}</span>
+              </div>
+              <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(v)}</p>
+              <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(gp)}</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}{x.bench ? ` · vs Nifty 500 ${pct((x.nav / x.bench - 1) * 100)}` : ''}</p>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* selected book: compact numbers */}
+      <div className="flex items-center gap-2 pt-1">
+        <span className={`w-2 h-2 rounded-full ${BOOK_DOT[bk] || 'bg-slate-400'}`} />
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">{bk} · {BOOK_NAME[bk] || bk}</h3>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? tone(view.today) : ''} />
+        <Mini label="vs Nifty 500" value={b.bench ? pct((b.nav / b.bench - 1) * 100) : '—'} sub={b.bench ? `Index ${lakhs(b.bench)}` : ''} tone={b.bench ? tone(b.nav - b.bench) : ''} title="At the last close, against the same ₹10 lakh in the Nifty 500 TRI" />
+        <Mini label="Stocks / Gold / Cash" value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}%`} sub={`${view.nStocks} stocks`} />
+        <Mini label="Next rebalance" value={day(data.next_rebalance)} sub="first trading day" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -288,9 +271,9 @@ export default function PaperBookPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-                  <th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-left`}>6M</th><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
+                  <th className={`${TH} text-right w-12`} title="Momentum rank today (sold at the next rebalance if below 40)">Rank</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
                   <th className={`${TH} text-right`}>Price</th><th className={`${TH} text-right`}>Today</th><th className={`${TH} text-right`}>Value</th><th className={`${TH} text-right`}>P&amp;L</th>
-                  <th className={`${TH} text-left`}>Weight</th><th className={`${TH} text-right`}>Rank</th>
+                  <th className={`${TH} text-left`}>Weight</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,8 +283,8 @@ export default function PaperBookPage() {
                   const w = Math.round((value / tot) * 1000) / 10
                   return (
                     <tr key={s} onClick={() => !lq && setChartSym(s)} className={`border-b border-[var(--border-row)] last:border-0 hover:bg-[var(--bg-hover)] ${lq ? '' : 'cursor-pointer'} ${g ? 'bg-amber-500/5' : lq ? 'bg-sky-500/5' : ''}`}>
+                      <td className={`${TD} text-right font-semibold ${g || lq ? 'text-[var(--text-dim)]' : rank == null || rank > 40 ? 'text-[var(--accent-rose)]' : rank > 30 ? 'text-amber-400' : 'text-[var(--text-primary)]'}`}>{g || lq ? '—' : rank == null ? 'out' : rank}</td>
                       <td className={`${TD} text-left font-semibold ${g ? 'text-amber-400' : lq ? 'text-sky-400' : 'text-[var(--text-primary)]'}`}>{s}{lq && <span className="ml-1.5 text-[10px] font-medium text-[var(--text-dim)]">liquid</span>}</td>
-                      <td className={`${TD} text-left`}>{lq ? '' : <Spark pts={series(data, s, livePx(s), 126)} />}</td>
                       <td className={`${TD} text-right`}>{num(q)}</td>
                       <td className={`${TD} text-right`}>{num(avg)}</td>
                       <td className={`${TD} text-right transition-colors duration-700 ${flash[s] === 'up' ? 'bg-emerald-500/20 text-emerald-300' : flash[s] === 'down' ? 'bg-rose-500/20 text-rose-300' : ''}`}>{num(price)}</td>
@@ -316,7 +299,6 @@ export default function PaperBookPage() {
                           <span className="text-xs">{w}%</span>
                         </div>
                       </td>
-                      <td className={`${TD} text-right`}>{g || lq ? '—' : rank ?? '—'}</td>
                     </tr>
                   )
                 })}
@@ -334,8 +316,8 @@ export default function PaperBookPage() {
             <table className="w-full">
               <thead className="sticky top-0">
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-                  <th className={`${TH} text-right w-10`}>#</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-left`}>6M</th><th className={`${TH} text-right`}>Score</th>
-                  {data.overlap && ['A', 'B', 'C'].map((k) => <th key={k} className={`${TH} text-center w-7`}>{k}</th>)}
+                  <th className={`${TH} text-right w-10`}>#</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Score</th>
+                  {data.overlap && ['A', 'B', 'C', 'D'].map((k) => <th key={k} className={`${TH} text-center w-7`}>{k}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -345,9 +327,8 @@ export default function PaperBookPage() {
                     <tr key={s} onClick={() => setChartSym(s)} className={`border-b border-[var(--border-row)] last:border-0 cursor-pointer hover:bg-[var(--bg-hover)] ${r === 20 ? 'border-b-2 border-b-[var(--border)]' : ''}`}>
                       <td className={`${TD} text-right text-[var(--text-dim)]`}>{r}</td>
                       <td className={`${TD} text-left font-semibold ${h ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{h ? '● ' : ''}{s}</td>
-                      <td className={`${TD} text-left`}><Spark pts={series(data, s, livePx(s), 126)} /></td>
                       <td className={`${TD} text-right`}>{sc}</td>
-                      {data.overlap && ['A', 'B', 'C'].map((k) => <td key={k} className={`${TD} text-center`}><Dot on={sets[k]?.has(s)} k={k} /></td>)}
+                      {data.overlap && ['A', 'B', 'C', 'D'].map((k) => <td key={k} className={`${TD} text-center`}><Dot on={sets[k]?.has(s)} k={k} /></td>)}
                     </tr>
                   )
                 })}
@@ -356,7 +337,6 @@ export default function PaperBookPage() {
           </div>
         </div>
       </div>
-      {data.overlap && <Overlap o={data.overlap} onPick={setChartSym} />}
       <p className="text-xs text-[var(--text-dim)]">Tap a stock for its chart · paper trading only · information, not advice</p>
       {chartSym && <BigChart data={data} sym={chartSym} livePrice={livePx(chartSym)} onClose={() => setChartSym(null)} />}
     </div>
