@@ -67,7 +67,7 @@ function getPaperBook_() {
   return j.data;
 }
 
-/** Admin page: live price and previous close for NSE symbols (Yahoo Finance chart API in parallel, cached 2 minutes). */
+/** Admin page: live price and previous close for NSE symbols (Yahoo Finance chart API in parallel, cached 55 seconds). */
 function getPaperLive_(symbols) {
   var syms = (symbols || []).map(String).filter(function (x) { return /^[A-Z0-9&_.-]{1,20}$/.test(x); }).slice(0, 60);
   var cache = CacheService.getScriptCache(), key = 'paperlive2:' + syms.join(',');
@@ -89,6 +89,6 @@ function getPaperLive_(symbols) {
       else out.missing.push(x);
     } catch (e) { out.missing.push(x); }
   });
-  if (key.length < 240) { try { cache.put(key, JSON.stringify(out), 120); } catch (e) { /* ignore */ } }
+  if (key.length < 240) { try { cache.put(key, JSON.stringify(out), 55); } catch (e) { /* ignore */ } }
   return out;
 }

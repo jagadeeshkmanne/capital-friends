@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Modal from '../components/Modal'
 import { Navigate } from 'react-router-dom'
@@ -11,6 +11,11 @@ const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en
 const pct = (v) => (v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(1) + '%')
 const tone = (v) => (v == null ? 'text-[var(--text-primary)]' : v >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')
 const day = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
+// NSE cash market hours (Mon-Fri 9:15-15:30 IST): live prices refresh every minute only then
+const marketOpen = () => {
+  const t = new Date(Date.now() + 5.5 * 3600e3), d = t.getUTCDay(), m = t.getUTCHours() * 60 + t.getUTCMinutes()
+  return d >= 1 && d <= 5 && m >= 555 && m <= 930
+}
 const num = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }))
 
 const TH = 'py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider whitespace-nowrap'
@@ -155,6 +160,9 @@ export default function PaperBookPage() {
   const [liveBusy, setLiveBusy] = useState(false)
   const [liveErr, setLiveErr] = useState('')
   const [chartSym, setChartSym] = useState(null)
+  const [flash, setFlash] = useState({})
+  const [open, setOpen] = useState(marketOpen())
+  const lastPx = useRef({})
   const livePx = (s) => live?.prices?.[s]?.price
 
   const loadLive = (d) => {
@@ -162,7 +170,16 @@ export default function PaperBookPage() {
     if (!syms.length) return
     setLiveBusy(true)
     setLiveErr('')
-    getPaperLive(syms).then((r) => { setLive(r); if (r && !Object.keys(r.prices || {}).length) setLiveErr('no prices returned') })
+    getPaperLive(syms).then((r) => {
+      // flash a price green / red when it moved since the last refresh
+      const fl = {}
+      Object.entries(r?.prices || {}).forEach(([s, v]) => {
+        const old = lastPx.current[s]
+        if (old && v.price !== old) fl[s] = v.price > old ? 'up' : 'down'
+        lastPx.current[s] = v.price
+      })
+      setFlash(fl); if (Object.keys(fl).length) setTimeout(() => setFlash({}), 1600)
+      setLive(r); if (r && !Object.keys(r.prices || {}).length) setLiveErr('no prices returned') })
       .catch((e) => { setLive(null); setLiveErr(e.message || 'failed') }).finally(() => setLiveBusy(false))
   }
 
@@ -170,6 +187,16 @@ export default function PaperBookPage() {
     if (!isAdmin) return
     getPaperBook().then((d) => { setData(d || null); if (d) loadLive(d) }).catch((e) => setErr(e.message || 'Could not load'))
   }, [isAdmin])
+
+  // auto-refresh live prices every 60 s while the market is open and the tab is visible
+  useEffect(() => {
+    if (!data) return
+    const id = setInterval(() => {
+      const o = marketOpen(); setOpen(o)
+      if (o && document.visibilityState === 'visible') loadLive(data)
+    }, 60000)
+    return () => clearInterval(id)
+  }, [data])
 
   const keys = Object.keys(data?.books || {})
   const bk = data?.books?.[book] ? book : keys[0]
@@ -200,7 +227,7 @@ export default function PaperBookPage() {
   if (err) return <p className="text-sm text-[var(--accent-rose)] p-4">{err}</p>
   if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
   if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
-  if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The three paper books (A momentum, B earnings filter, C earnings re-rank) open together on ${day(data.start_on)}. Prices are kept up to date until then.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
+  if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The four paper books (A Momentum, B Momentum + Safety, C Momentum + Quality, D Top 10 Common) open together on ${day(data.start_on)}.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
 
   const half = b.x < 1
   const ret = bk === 'sip' ? b.xirr : b.ret_pct
@@ -223,13 +250,20 @@ export default function PaperBookPage() {
           <span className={`px-2.5 py-1 rounded-lg font-semibold ${half ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
             {half ? 'Half-cut on · stocks 50%' : 'Fully invested'}
           </span>
-          <span className="text-[var(--text-dim)]">{liveAt ? `Live ${liveAt}` : `Closing prices ${day(data.updated)}`}</span>
+          {open && live && <span className="flex items-center gap-1.5 text-emerald-400 font-semibold"><span className="relative flex w-2 h-2"><span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" /><span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-400" /></span>Live</span>}
+          <span className="text-[var(--text-dim)]">{liveAt ? `${open ? 'Updated' : 'Last price'} ${liveAt}${open ? ' · every minute' : ''}` : `Closing prices ${day(data.updated)}`}</span>
           <button onClick={() => loadLive(data)} disabled={liveBusy} title="Refresh live prices"
             className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
             <RefreshCw size={13} className={liveBusy ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
+
+      {Object.keys(data.morning?.sells?.[bk] || {}).length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-400">
+          Selling at the 9:15 open: {Object.entries(data.morning.sells[bk]).map(([s, w]) => `${s} (${w})`).join(' · ')}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
         <Stat icon={Wallet} color="text-violet-400 bg-violet-500/15" label="Value now" value={inr(view.liveNav)} sub={`At last close ${inr(b.nav)}`} />
@@ -267,7 +301,7 @@ export default function PaperBookPage() {
                       <td className={`${TD} text-left`}>{lq ? '' : <Spark pts={series(data, s, livePx(s), 126)} />}</td>
                       <td className={`${TD} text-right`}>{num(q)}</td>
                       <td className={`${TD} text-right`}>{num(avg)}</td>
-                      <td className={`${TD} text-right`}>{num(price)}</td>
+                      <td className={`${TD} text-right transition-colors duration-700 ${flash[s] === 'up' ? 'bg-emerald-500/20 text-emerald-300' : flash[s] === 'down' ? 'bg-rose-500/20 text-rose-300' : ''}`}>{num(price)}</td>
                       <td className={`${TD} text-right ${tone(todayPct)}`}>{todayPct == null ? '—' : pct(todayPct)}</td>
                       <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(value)}</td>
                       <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pct(pnl)}</td>
