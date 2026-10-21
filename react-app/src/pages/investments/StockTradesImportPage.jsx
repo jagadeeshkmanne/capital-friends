@@ -227,8 +227,8 @@ export default function StockTradesImportPage() {
                 <ol className="list-decimal pl-4 space-y-1">
                   <li>On console.zerodha.com open Reports → <strong>Tradebook</strong>.</li>
                   <li>Segment <strong>Equity</strong>. Pick one year (that is the most it allows).</li>
-                  <li>Download, then repeat for every year since the account was opened.</li>
-                  <li>Upload all the files together. Keep the names (tradebook-AB1234-EQ.csv carries your client ID).</li>
+                  <li>Download each year since the account was opened. Upload them together, or one at a time whenever you like, in any order.</li>
+                  <li>Keep the file names as downloaded (tradebook-AB1234-EQ.csv carries your client ID).</li>
                 </ol>
               </div>
             </div>
@@ -236,7 +236,8 @@ export default function StockTradesImportPage() {
               <li>• Don't open and re-save the file in Excel first: upload the download as it is.</li>
               <li>• Family: upload everyone's files at once. Each account goes to its owner's portfolio by its client ID, and anyone missing is added to Family.</li>
               <li>• Only stocks and ETFs are imported. Mutual funds come from the CAS import.</li>
-              <li>• Nothing is saved until you press Import, and importing the same file again adds nothing twice.</li>
+              <li>• Later, upload only the new file (this year's tradebook, or a fresh Groww order history): trades already in the app are skipped, nothing is added twice.</li>
+              <li>• Nothing is saved until you press Import.</li>
             </ul>
           </div>
         )}
@@ -258,7 +259,7 @@ export default function StockTradesImportPage() {
         const p = plan(a), s = summaries[i]
         const missing = Object.entries(a.stocks).filter(([, v]) => v === null || v === undefined)
         const memberOpts = [...members.map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` })), { value: 'new', label: a.holderName ? `Add ${mv(a.holderName, 'name')} to Family` : 'Add a new family member' }]
-        const checks = fileChecks(a, new Date().toISOString().slice(0, 10))
+        const checks = fileChecks(a, new Date().toISOString().slice(0, 10), p.rows.filter((t) => TRADE_NOTE.test(t.notes)).map((t) => t.date))
         const acctOpts = [...p.brokerAccts.map((x) => ({ value: x.accountId, label: `${mv(x.accountName, 'name')}${x.accountClientId ? ` · ${mv(x.accountClientId, 'clientId')}` : ''}` })), { value: 'new', label: `New ${a.broker} account` }]
         return (
           <Card key={a.key} className="overflow-hidden">

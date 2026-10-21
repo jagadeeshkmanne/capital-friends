@@ -88,5 +88,7 @@ describe('trade history import', () => {
     const zc = fileChecks(z, '2021-10-01').map((c) => c.text).join(' | ')
     expect(zc).toMatch(/No trades between 2020-08-14 and 2021-09-01/)
     expect(zc).toMatch(/client ID is not in the file name/)
+    // the missing year was uploaded before: no gap
+    expect(fileChecks(z, '2021-10-01', ['2021-01-05']).map((c) => c.text).join(' | ')).not.toMatch(/No trades between/)
   })
 })

@@ -199,14 +199,15 @@ export function sameName(a, b) {
  * - a long gap with no trades (a yearly Zerodha tradebook probably not uploaded)
  * - no client ID (renamed Zerodha file), so the account has to be picked by hand
  */
-export function fileChecks(a, today) {
+export function fileChecks(a, today, alreadyIn = []) {
+  // alreadyIn: dates of broker trades already in the portfolio (earlier uploads), so one new year alone raises no gap
   const out = [], days = (x, y) => Math.round((new Date(y + 'T00:00:00Z') - new Date(x + 'T00:00:00Z')) / 86400000)
-  const end = a.range?.to || (a.trades.length ? a.trades[a.trades.length - 1].date : '')
+  const dates = [...new Set([...a.trades.map((t) => t.date), ...alreadyIn])].sort()
+  const end = a.range?.to || dates[dates.length - 1] || ''
   if (a.range && days(a.range.to, today) > 7) out.push({ tone: 'warn', text: `The file only goes up to ${a.range.to}. Download it again up to today, or trades after that date will be missing.` })
   if (!a.range && a.broker === 'Zerodha' && end && days(end, today) > 400) out.push({ tone: 'info', text: `The last trade in these files is on ${end}. If you traded after that, add the tradebook for those years too.` })
-  for (let i = 1; i < a.trades.length; i++) {
-    const g = days(a.trades[i - 1].date, a.trades[i].date)
-    if (g > 365) out.push({ tone: 'info', text: `No trades between ${a.trades[i - 1].date} and ${a.trades[i].date}.${a.broker === 'Zerodha' ? ' If you traded then, add that year\'s tradebook.' : ''}` })
+  for (let i = 1; i < dates.length; i++) {
+    if (days(dates[i - 1], dates[i]) > 365) out.push({ tone: 'info', text: `No trades between ${dates[i - 1]} and ${dates[i]}.${a.broker === 'Zerodha' ? ' If you traded then, add that year\'s tradebook.' : ''}` })
   }
   if (!a.clientId) out.push({ tone: 'warn', text: a.broker === 'Zerodha' ? 'The client ID is not in the file name (it was renamed), so pick the account by hand. Keep Zerodha file names as downloaded: tradebook-AB1234-EQ.csv.' : 'No client code in the file, so pick the account by hand.' })
   return out

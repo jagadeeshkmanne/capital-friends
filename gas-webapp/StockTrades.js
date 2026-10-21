@@ -143,6 +143,9 @@ function importStockTrades(params) {
     }
     if (newRows.length) tx.getRange(tx.getLastRow() + 1, 1, newRows.length, 16).setValues(newRows);
     flushSheets_();
+    // files can come in any order (a Zerodha year uploaded later than the next one): redo the realised P&L of
+    // every imported sell of these stocks, first in first out over the portfolio's whole history
+    try { refreshTradeGains_(tx, portfolioId, symbols); } catch (e) { log('importStockTrades: gains refresh failed: ' + e); }
     Object.keys(symbols).forEach(function (s) {
       try { recalculateStockHoldings(portfolioId, s); }
       catch (e) { log('importStockTrades: recalc failed for ' + s + ': ' + e); }
@@ -157,6 +160,30 @@ function importStockTrades(params) {
     log('Error importing stock trades: ' + error.toString());
     return { success: false, error: error.message };
   }
+}
+
+/** Realised P&L (column P) of imported SELL rows, FIFO in date (+ time in the note) order. Hand-entered rows are left as they are. */
+function refreshTradeGains_(tx, portfolioId, symbols) {
+  var last = tx.getLastRow();
+  if (last <= 2) return;
+  var rows = tx.getRange(3, 1, last - 2, 16).getValues();
+  var timeOf = function (note) { var m = String(note || '').match(/ · (\d{2}:\d{2})$/); return m ? m[1] : ''; };
+  Object.keys(symbols).forEach(function (sym) {
+    var mine = [];
+    rows.forEach(function (r, i) { if (r[1] === portfolioId && r[3] === sym) mine.push({ r: r, i: i, t: new Date(r[8]).getTime(), tm: timeOf(r[14]) }); });
+    mine.sort(function (a, b) { return (a.t - b.t) || (a.tm < b.tm ? -1 : a.tm > b.tm ? 1 : 0) || (a.i - b.i); });
+    var lots = [];
+    mine.forEach(function (o) {
+      var q = Number(o.r[9]) || 0, px = Number(o.r[10]) || 0;
+      if (o.r[7] === 'BUY') { lots.push({ q: q, px: px }); return; }
+      if (o.r[7] !== 'SELL') return;
+      var cost = 0, matched = 0;
+      while (q > 1e-9 && lots.length) { var take = Math.min(q, lots[0].q); cost += take * lots[0].px; matched += take; lots[0].q -= take; q -= take; if (lots[0].q <= 1e-9) lots.shift(); }
+      if (!isTradeHistoryNote_(o.r[14])) return;
+      var pl = matched * px - cost;
+      if (Math.abs((Number(o.r[15]) || 0) - pl) > 0.005) tx.getRange(o.i + 3, 16).setValue(pl);
+    });
+  });
 }
 
 /** Delete the given sheet row numbers (any order), one block of neighbouring rows at a time, bottom first. */
