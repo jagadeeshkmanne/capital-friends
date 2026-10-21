@@ -46,12 +46,10 @@ function addInvestmentAccount(data) {
     }
     const memberName = member.memberName;
 
-    // Get bank account name from bank account ID
-    const bankAccount = getBankAccountById(data.bankAccountId);
-    if (!bankAccount) {
-      throw new Error('Selected bank account not found');
-    }
-    const bankAccountName = bankAccount.accountName;
+    // Bank account is optional: no bank (or one that was removed) just leaves it blank, never blocks saving
+    const bankAccount = data.bankAccountId ? getBankAccountById(data.bankAccountId) : null;
+    if (!bankAccount) data.bankAccountId = '';
+    const bankAccountName = bankAccount ? bankAccount.accountName : '';
 
     // Add account
     const now = getCurrentTimestamp();
@@ -243,12 +241,10 @@ function updateInvestmentAccount(data) {
     }
     const memberName = member.memberName;
 
-    // Get bank account name from bank account ID
-    const bankAccount = getBankAccountById(data.bankAccountId);
-    if (!bankAccount) {
-      throw new Error('Selected bank account not found');
-    }
-    const bankAccountName = bankAccount.accountName;
+    // Bank account is optional: no bank (or one that was removed) just leaves it blank, never blocks saving
+    const bankAccount = data.bankAccountId ? getBankAccountById(data.bankAccountId) : null;
+    if (!bankAccount) data.bankAccountId = '';
+    const bankAccountName = bankAccount ? bankAccount.accountName : '';
 
     // Update account (keep Record ID, Created Date, update rest)
     const createdDate = sheet.getRange(rowIndex, 14).getValue(); // Column N is Created Date
