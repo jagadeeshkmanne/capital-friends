@@ -11,7 +11,7 @@ import * as api from '../../services/api'
 import { readTableFile, buildStockIndex, matchStock, findColumns } from '../../utils/holdingsImport'
 import ImportDematForm from '../../components/forms/ImportDematForm'
 import ImportStocksForm from '../../components/forms/ImportStocksForm'
-import { parseTradeHistory, groupAccounts, summarize, fileChecks } from '../../utils/tradeHistoryImport'
+import { parseTradeHistory, parseIciciTransactionPdf, groupAccounts, summarize, fileChecks } from '../../utils/tradeHistoryImport'
 import { matchMemberName, nameFit } from '../../utils/nameMatch'
 
 // Import stocks (beta, /investments/stocks/import-trades, open to every signed-in user): one place for every stock file.
@@ -73,38 +73,41 @@ export default function StockTradesImportPage() {
   const newName = (a) => String(a?.newName ?? (a?.holderName || (!members.length ? user?.name : '') || '')).trim()
 
   async function handleFiles(list) {
-    let files = [...(list || [])]
+    const files = [...(list || [])]
     if (!files.length) return
-    setReading(true); setError(''); setResults(null); setFileErrors([]); setOther(null)
+    setReading(true); setError(''); setResults(null); setFileErrors([]); setOther(null); setAccounts(null)
     try {
-      // a statement PDF: the CDSL / NSDL import (one statement at a time)
-      const pdf = files.find((f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf')
-      if (pdf) {
-        if (files.length > 1) setFileErrors([{ file: files.filter((f) => f !== pdf).map((f) => f.name).join(', '), error: 'Upload the statement PDF on its own. These files were not read: add them after this import.' }])
-        setAccounts(null); setOther({ kind: 'cas', file: pdf }); return
-      }
-      // a holdings file (what you own today, no trade dates): the holdings import
-      const tables = []
-      for (const f of files) { try { tables.push({ f, rows: await readTableFile(f) }) } catch (e) { tables.push({ f, error: e.message || 'Could not read this file' }) } }
-      const holdings = tables.find((t) => t.rows && !parseTradeHistory(t.rows, t.f.name).broker && findColumns(t.rows))
-      if (holdings && tables.every((t) => !t.rows || !parseTradeHistory(t.rows, t.f.name).broker)) {
-        setAccounts(null); setOther({ kind: 'holdings', file: holdings.f }); return
-      }
-      files = tables
-      if (stocksFromCache()) clearStocksCache()
-      const stocks = await loadStocks()
-      const idx = buildStockIndex(stocks)
-      const parsed = [], errs = []
-      for (const { f, rows, error: readErr } of files) {
-        if (readErr) { errs.push({ file: f.name, error: readErr }); continue }
+      // sort every file: trade files (this page), a CDSL / NSDL statement or a holdings file (their own import, shown
+      // below; one at a time). Everything can be dropped in together.
+      const isPdf = (f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf'
+      const parsed = [], errs = [], statements = [], holdings = []
+      for (const f of files) {
         try {
+          if (isPdf(f)) {
+            // an ICICI Direct transaction statement is read here; any other PDF is taken as the CDSL / NSDL statement
+            let r = null
+            try { const { readPdfLines } = await import('../../utils/cas/casPdf'); r = parseIciciTransactionPdf((await readPdfLines(f)).lines) } catch { r = null }   // locked PDF: the statement import asks for the password
+            if (r && r.trades.length) parsed.push({ ...r, fileName: f.name })
+            else if (r) errs.push({ file: f.name, error: 'No trades in this statement (that quarter had none).' })
+            else statements.push(f)
+            continue
+          }
+          const rows = await readTableFile(f)
           const r = parseTradeHistory(rows, f.name)
+          if (!r.broker && findColumns(rows)) { holdings.push(f); continue }
           if (r.error) errs.push({ file: f.name, error: r.error })
           else if (!r.trades.length) errs.push({ file: f.name, error: 'No executed trades in this file.' })
           else parsed.push({ ...r, fileName: f.name })
         } catch (e) { errs.push({ file: f.name, error: e.message || 'Could not read this file' }) }
       }
+      const later = [...statements.slice(1), ...holdings.slice(statements.length ? 0 : 1)]
+      if (later.length) errs.push({ file: later.map((f) => f.name).join(', '), error: 'Statements and holdings files go one at a time: import these after the one below.' })
       setFileErrors(errs)
+      if (statements[0]) setOther({ kind: 'cas', file: statements[0] })
+      else if (holdings[0]) setOther({ kind: 'holdings', file: holdings[0] })
+      if (!parsed.length) return
+      if (stocksFromCache()) clearStocksCache()
+      const idx = buildStockIndex(await loadStocks())
       const groups = groupAccounts(parsed).map((a) => {
         const stocksMap = {}
         for (const t of a.trades) { const k = t.isin || t.symbol; if (!(k in stocksMap)) stocksMap[k] = matchStock({ sourceSymbol: t.symbol, isin: t.isin }, idx) }
@@ -257,7 +260,7 @@ export default function StockTradesImportPage() {
         <div className="space-y-4 text-xs text-[var(--text-secondary)]">
           <div className="space-y-2">
             {[
-              ['Groww order history · Zerodha tradebook · ICICI Direct order book', 'Every buy and sell with its price: money put in, realised gains by financial year, when each holding turns long term.', 'Best'],
+              ['Groww order history · Zerodha tradebook · ICICI Direct statements', 'Every buy and sell with its price: money put in, realised gains by financial year, when each holding turns long term.', 'Best'],
               ['Excel template (any other broker)', 'The same, from trades you fill in or paste from your broker\'s report.', ''],
               ['CDSL / NSDL statement (PDF)', 'What you hold today in every demat account of that PAN. No buy price: the statement price is used, and you can edit it later.', ''],
               ['Holdings file', 'Symbol, Quantity and Avg price from any broker.', ''],
@@ -274,13 +277,14 @@ export default function StockTradesImportPage() {
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">Zerodha</p>
               <ol className="list-decimal pl-4 space-y-0.5"><li>On console.zerodha.com open Reports → <strong>Tradebook</strong>, segment <strong>Equity</strong>.</li><li>One year per download: get each year since the account opened, all now or one at a time later, in any order.</li><li>Keep the file names as downloaded (they carry your client ID).</li></ol></div>
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">ICICI Direct</p>
-              <ol className="list-decimal pl-4 space-y-0.5"><li>Open Equity → <strong>Order book</strong> (or Trade book), pick the widest date range it allows and <strong>export</strong> the CSV.</li><li>Upload it as it is (orderBook_Equity_….csv). The demat account is read from the file.</li></ol></div>
+              <ol className="list-decimal pl-4 space-y-0.5"><li>Best: the quarterly <strong>Equity Transaction Statement</strong> PDFs (TRX-Equity_….PDF, emailed by ICICI Securities or under Reports). Upload every quarter at once.</li><li>Or: Equity → <strong>Order book</strong> / Trade book with the widest date range, <strong>exported</strong> as CSV.</li></ol></div>
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">CDSL / NSDL statement</p>
               <ol className="list-decimal pl-4 space-y-0.5"><li>The monthly <strong>CAS</strong> emailed by CDSL or NSDL: one statement covers every demat of that PAN.</li><li>Upload the PDF. The password is usually your PAN in capitals.</li></ol></div>
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">Any other broker</p>
               <ol className="list-decimal pl-4 space-y-0.5"><li><button type="button" onClick={() => downloadFile('stock-trades-template.xlsx', 'stock-trades-template.xlsx')} className="text-violet-400 font-semibold">Download the Excel template</button>.</li><li>One row per buy or sell: date, Buy/Sell, symbol or ISIN, quantity, price, broker.</li><li>Upload it here. Only stocks you hold today? Use the <button type="button" onClick={() => downloadFile('stock-holdings-sample.xlsx', 'stock-holdings-template.xlsx')} className="text-violet-400 font-semibold">holdings template</button> instead.</li></ol></div>
           </div>
           <ul className="space-y-1 text-[11px] text-[var(--text-dim)]">
+            <li>• You can drop in everything at once: all trade files and quarterly statements together. A CDSL / NSDL statement or a holdings file opens below them, one at a time.</li>
             <li>• Upload the download as it is: don't open and re-save it in Excel first.</li>
             <li>• Family: upload everyone's files. Each account goes to its owner's portfolio, and anyone missing is added to Family.</li>
             <li>• Later, upload only the new file: trades already in the app are skipped. A statement never overwrites real trades.</li>

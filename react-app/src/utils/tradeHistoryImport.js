@@ -5,6 +5,7 @@
 //    is only in the file name (tradebook-AB1234-EQ.csv).
 //  - ICICI Direct: Order book export (orderBook_Equity_….csv): Date, Stock, Action, Qty, Price, Order Ref., and the
 //    demat account in "DP Id - Client DP Id" (IN303028-75292398), read like the template plus the account.
+//  - ICICI Direct: quarterly "Equity Transaction Statement" PDF (TRX-Equity_….PDF): parseIciciTransactionPdf (text lines).
 //  - Any other broker: our Excel template (public/stock-trades-template.xlsx) or any sheet with the columns
 //    Date, Buy/Sell, Symbol (or ISIN), Quantity, Price (or Value), optional Broker and Order no.
 // The format is found from the column names, so a file renamed by the user still reads.
@@ -286,7 +287,7 @@ export function fileChecks(a, today, alreadyIn = []) {
   const out = [], days = (x, y) => Math.round((new Date(y + 'T00:00:00Z') - new Date(x + 'T00:00:00Z')) / 86400000)
   const dates = [...new Set([...a.trades.map((t) => t.date), ...alreadyIn])].sort()
   const end = a.range?.to || dates[dates.length - 1] || ''
-  if (a.range && days(a.range.to, today) > 7) out.push({ tone: 'warn', text: `The file only goes up to ${a.range.to}. Download it again up to today, or trades after that date will be missing.` })
+  if (a.broker === 'Groww' && a.range && days(a.range.to, today) > 7) out.push({ tone: 'warn', text: `The file only goes up to ${a.range.to}. Download it again up to today, or trades after that date will be missing.` })
   if (!a.range && a.broker === 'Zerodha' && end && days(end, today) > 400) out.push({ tone: 'info', text: `The last trade in these files is on ${end}. If you traded after that, add the tradebook for those years too.` })
   // a long gap only means something for Zerodha (one file per year: a year may be missing); elsewhere it's just no trading
   if (a.broker === 'Zerodha') for (let i = 1; i < dates.length; i++) {
@@ -294,4 +295,44 @@ export function fileChecks(a, today, alreadyIn = []) {
   }
   if (!a.clientId && a.broker !== 'Template') out.push({ tone: 'warn', text: a.broker === 'Zerodha' ? 'The client ID is not in the file name (it was renamed), so pick the account by hand. Keep Zerodha file names as downloaded: tradebook-AB1234-EQ.csv.' : 'No client code in the file, so pick the account by hand.' })
   return out
+}
+
+/**
+ * ICICI Securities "Equity Transaction Statement" (quarterly PDF), as text lines (readPdfLines).
+ * Each trade: a contract line "ISEC/… <order date> <trade date>", then "<settlement no> <exchange> <order no> <trade no>
+ * <settlement date> <ISIN> <security> <B|S> <qty> <rate> <total> <brokerage> <GST> <net>", then the times.
+ * Returns null when the lines are not this statement.
+ */
+export function parseIciciTransactionPdf(lines) {
+  const text = (lines || []).join('\n')
+  if (!/Equity Transaction Statement/i.test(text) || !/ICICI Securities/i.test(text)) return null
+  const clientId = (text.match(/UNIQUE CLIENT CODE\s*:\s*(\d{6,})/i) || [])[1] || (text.match(/TRADING CODE NO\s*:\s*(\d{6,})/i) || [])[1] || ''
+  const to = lines.findIndex((l) => /^\s*To,?\s*$/i.test(l))
+  // the holder's name: the first line after "To," that reads like a name (the broker's own details share those lines)
+  const nameLike = (l) => { const t = clean(String(l).split(/\s{3,}/)[0]); return /^[A-Za-z][A-Za-z .']{2,60}$/.test(t) && !/\b(CODE|NO|LIMITED|LTD|SEBI|REGN|MEMBER|EXCHANGE|OFFICE|SEGMENT|MARKET|ICICI|COMPLIANCE|STREET|ROAD)\b/i.test(t) ? t : '' }
+  const holderName = to >= 0 ? lines.slice(to + 1, to + 6).map(nameLike).find(Boolean) || '' : ''
+  const pm = text.match(/Statement from\s+(\S+)\s+to\s+(\S+)/i)
+  const range = pm && toIsoDate(pm[1]) && toIsoDate(pm[2]) ? { from: toIsoDate(pm[1]), to: toIsoDate(pm[2]) } : null
+  const trades = [], skipped = []
+  const ISIN = /\b(IN[EF9][A-Z0-9]{8}\d)\b/      // shares, ETFs / funds, partly paid (not the SEBI registration INZ…)
+  for (let i = 0; i < lines.length; i++) {
+    const line = String(lines[i] || ''), im = line.match(ISIN)
+    if (!im || /Contract Date|Summary/i.test(line)) continue
+    const before = line.slice(0, im.index), after = line.slice(im.index + im[1].length)
+    const m = after.match(/^\s*(.+?)\s+(B|S|BUY|SELL)\s+([\d,]+(?:\.\d+)?)\s+([\d,]+(?:\.\d+)?)\s+([\d,]+(?:\.\d+)?)/i)
+    if (!m) { skipped.push({ line: i + 1, symbol: im[1], reason: 'Trade row not readable' }); continue }
+    const nums = before.trim().split(/\s+/)
+    const ex = nums.findIndex((t) => /^(NSE|BSE)$/i.test(t))
+    const orderNo = ex >= 0 ? nums[ex + 1] || '' : '', tradeNo = ex >= 0 ? nums[ex + 2] || '' : ''
+    // trade date: the second date on the contract line just above (the first is the order date)
+    let date = ''
+    for (let k = i - 1; k >= Math.max(0, i - 3) && !date; k--) { const ds = String(lines[k] || '').match(/\d{2}-\d{2}-\d{4}/g); if (ds && ds.length) date = toIsoDate(ds[ds.length - 1]) }
+    if (!date) { skipped.push({ line: i + 1, symbol: m[1], reason: 'Trade date not found' }); continue }
+    const times = String(lines[i + 1] || '').match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g)
+    const qty = toNumber(m[3]), price = toNumber(m[4])
+    if (!(qty > 0) || !(price > 0)) { skipped.push({ line: i + 1, symbol: m[1], reason: 'Quantity or price missing' }); continue }
+    trades.push({ date, time: times ? toTime(times[times.length - 1]) : '', symbol: im[1], isin: im[1], name: clean(m[1]), type: /^b/i.test(m[2]) ? 'BUY' : 'SELL', qty, price: Math.round(price * 10000) / 10000,
+      exchange: ex >= 0 ? nums[ex].toUpperCase() : '', ref: tradeNo || orderNo, refKind: tradeNo ? 'trade' : 'order', line: i + 1, platform: 'ICICI Direct', clientId, dpId: '' })
+  }
+  return { broker: 'Template', clientId, holderName, range, trades, skipped }
 }

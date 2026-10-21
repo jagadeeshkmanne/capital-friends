@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseCSV } from './holdingsImport'
-import { parseTradeHistory, groupAccounts, summarize, zerodhaClientId, toTime, fyOf, sameName, fileChecks } from './tradeHistoryImport'
+import { parseTradeHistory, parseIciciTransactionPdf, groupAccounts, summarize, zerodhaClientId, toTime, fyOf, sameName, fileChecks } from './tradeHistoryImport'
 
 // Groww order history (.xlsx, read into rows): Name / Unique Client Code above the table, header on its own row
 const growwRows = [
@@ -132,5 +132,28 @@ describe('trade history import', () => {
     ])
     const [a] = groupAccounts([{ ...r, fileName: 'orderBook_Equity_1.csv' }])
     expect([a.platform, a.clientId, a.dpId, a.trades.length]).toEqual(['ICICI Direct', '11112222', 'IN300000', 2])
+  })
+  it('reads an ICICI Securities quarterly Equity Transaction Statement (PDF text lines, made-up data)', () => {
+    const lines = [
+      'ICICI Securities Limited', 'MEMBER BOMBAY STOCK EXCHANGE LIMITED.', 'To,', 'ICCL CODE NO. 103', 'TEST PERSON KUMAR', 'SEBI REGN. NO.:   INZ000183631',
+      'UNIQUE CLIENT CODE :   1234567890', 'Equity Transaction Statement from 01-Jan-2020 to 31-Mar-2020',
+      'ISEC/2020051/10814   12-03-2020   12-03-2020',
+      '2020051   NSE   1200000011291941   53314779   16-03-2020   INE805C01028   KCP LTD   B   50   50.00   2500.00   25.00   4.51   2529.51',
+      '458   13:49:00   13:49',
+      'ISEC/2020060/11111   20-03-2020   23-03-2020',
+      '2020060   BSE   1200000011299999   53319999   25-03-2020   INE002A01018   RELIANCE INDUSTRIES LTD   S   2   1,105.50   2211.00   22.11   3.98   2184.91',
+      '459   10:05:00   10:05',
+      '12-03-2020   ISEC/2020051/1081   NSE   2020051   16-03-2020   3   0.05   0.50   Net amount payable by Client Rs. 2533.06',
+    ]
+    const r = parseIciciTransactionPdf(lines)
+    expect([r.clientId, r.holderName, r.range]).toEqual(['1234567890', 'TEST PERSON KUMAR', { from: '2020-01-01', to: '2020-03-31' }])
+    expect(r.trades.map((t) => [t.date, t.time, t.isin, t.type, t.qty, t.price, t.exchange, t.ref, t.platform])).toEqual([
+      ['2020-03-12', '13:49', 'INE805C01028', 'BUY', 50, 50, 'NSE', '53314779', 'ICICI Direct'],
+      ['2020-03-23', '10:05', 'INE002A01018', 'SELL', 2, 1105.5, 'BSE', '53319999', 'ICICI Direct'],
+    ])
+    expect(r.skipped).toEqual([])
+    expect(parseIciciTransactionPdf(['NSDL Demat Account', 'INE040A01034 HDFC BANK 1 2 3'])).toBe(null)
+    const [a] = groupAccounts([{ ...r, fileName: 'TRX-Equity_q1.PDF' }, { ...r, fileName: 'TRX-Equity_q1 (copy).PDF' }])
+    expect([a.platform, a.clientId, a.trades.length, a.repeats]).toEqual(['ICICI Direct', '1234567890', 2, 2])
   })
 })
