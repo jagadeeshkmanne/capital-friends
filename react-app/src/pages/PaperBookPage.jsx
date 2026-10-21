@@ -214,6 +214,11 @@ export default function PaperBookPage() {
   const nLive = live?.prices?.NIFTY500?.price, nBase = data.n500_px?.[1]
   const benchNow = (x) => (x.bench && nLive && nBase ? x.bench * (nLive / nBase) : x.bench)
   const vsNifty = (x, v) => (x.bench ? (v / benchNow(x) - 1) * 100 : null)
+  // best strategy so far: highest return since the start at live prices
+  const perf = keys.map((k) => { const x = data.books[k], v = liveValue(x, live?.prices); return { k, ret: x.invested ? (v / x.invested - 1) * 100 : 0 } }).sort((p1, p2) => p2.ret - p1.ret)
+  const lead = perf.length > 1 && perf[0].ret - perf[1].ret > 0.005 ? perf[0] : null
+  const days = b.start ? Math.max(0, Math.round((Date.now() - new Date(b.start + 'T00:00:00+05:30').getTime()) / 86400e3)) : 0
+  const nRet = nLive && nBase && b.bench ? (benchNow(b) / b.invested - 1) * 100 : null
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
@@ -239,6 +244,18 @@ export default function PaperBookPage() {
         </div>
       )}
 
+      {/* best strategy so far */}
+      <div className="flex items-center gap-2 flex-wrap rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Best so far</span>
+        {lead ? <>
+          <span className={`w-2 h-2 rounded-full ${BOOK_DOT[lead.k] || 'bg-slate-400'}`} />
+          <span className="font-bold text-[var(--text-primary)]">{lead.k} · {BOOK_NAME[lead.k] || lead.k}</span>
+          <span className={`font-semibold tabular-nums ${tone(lead.ret)}`}>{pct(lead.ret)}</span>
+          <span className="text-[var(--text-dim)]">· order {perf.map((x) => `${x.k} ${pct(x.ret)}`).join(' > ')}{nRet != null ? ` · Nifty 500 ${pct(nRet)}` : ''}</span>
+        </> : <span className="text-[var(--text-muted)]">All four are level so far</span>}
+        <span className="ml-auto text-xs text-[var(--text-dim)]">Day {days + 1} · judge after about 3 months</span>
+      </div>
+
       {/* the four books: tap one to see its numbers and holdings */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" role="tablist">
         {(() => {
@@ -260,6 +277,7 @@ export default function PaperBookPage() {
               <div className="flex items-center gap-2 min-w-0">
                 <span className={`w-2 h-2 rounded-full flex-none ${BOOK_DOT[k] || 'bg-slate-400'}`} />
                 <span className="text-xs font-semibold text-[var(--text-primary)] truncate">{k} · {BOOK_NAME[k] || k}</span>
+                {lead?.k === k && <span className="ml-auto flex-none px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400">LEADING</span>}
               </div>
               <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(v)}</p>
               <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(gp)}</p>
