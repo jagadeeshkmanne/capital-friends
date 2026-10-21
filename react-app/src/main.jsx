@@ -28,6 +28,8 @@ const reloadForUpdate = () => {
   freshReload()
   return true
 }
+// once the new version has loaded, take the ?v=… back out of the address bar
+try { const u = new URL(window.location.href); if (u.searchParams.has('v')) { u.searchParams.delete('v'); window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash) } } catch { /* ignore */ }
 window.addEventListener('vite:preloadError', (e) => { if (reloadForUpdate()) e.preventDefault() })
 window.addEventListener('unhandledrejection', (e) => {
   const m = String(e.reason?.message || e.reason || '')
