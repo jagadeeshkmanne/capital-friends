@@ -11,19 +11,21 @@ import { MaskProvider } from './context/MaskContext'
 import './index.css'
 import App from './App.jsx'
 import FilePickerGate from './components/FilePickerGate'
+import UpdateBoundary, { freshReload } from './components/UpdateBoundary'
 
 // After a new deploy, an open tab still points at the old file names: a lazy page then fails to
 // load (blank screen). Reload once to pick up the new version.
 // A plain reload can serve the cached old index.html again (GitHub Pages caches for 10 minutes), so reload with a
 // fresh query string, which always fetches the new index.html and its new file names.
+// At most one automatic reload a minute (so a page that keeps failing can't loop); after that UpdateBoundary
+// shows a Reload button.
 const reloadForUpdate = () => {
   try {
-    if (sessionStorage.getItem('cf-reloaded-for-update')) return false
-    sessionStorage.setItem('cf-reloaded-for-update', '1')
+    const last = Number(sessionStorage.getItem('cf-reloaded-for-update') || 0)
+    if (Date.now() - last < 60000) return false
+    sessionStorage.setItem('cf-reloaded-for-update', String(Date.now()))
   } catch { /* storage blocked: still reload */ }
-  const u = new URL(window.location.href)
-  u.searchParams.set('v', Date.now().toString(36))
-  window.location.replace(u.toString())
+  freshReload()
   return true
 }
 window.addEventListener('vite:preloadError', (e) => { if (reloadForUpdate()) e.preventDefault() })
@@ -31,7 +33,6 @@ window.addEventListener('unhandledrejection', (e) => {
   const m = String(e.reason?.message || e.reason || '')
   if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(m) && reloadForUpdate()) e.preventDefault()
 })
-window.addEventListener('load', () => { setTimeout(() => { try { sessionStorage.removeItem('cf-reloaded-for-update') } catch { /* ignore */ } }, 10000) })
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
@@ -42,7 +43,7 @@ createRoot(document.getElementById('root')).render(
             <ConfirmProvider>
               <DataProvider>
                 <FamilyProvider>
-                  <App />
+                  <UpdateBoundary onChunkError={reloadForUpdate}><App /></UpdateBoundary>
                   <FilePickerGate />
                 </FamilyProvider>
               </DataProvider>

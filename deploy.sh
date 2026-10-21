@@ -36,6 +36,15 @@ git stash --quiet 2>/dev/null || true
 git checkout gh-pages
 git pull origin gh-pages --quiet
 
+# Keep the page files (assets/) of the last 3 deploys: a tab, or a cached index.html (GitHub's CDN keeps it up to
+# 10 minutes), still asks for the old file names, and deleting them gives "Failed to fetch dynamically imported module".
+KEEP_TMP="/tmp/cf-deploy-keep"
+rm -rf "$KEEP_TMP" && mkdir -p "$KEEP_TMP"
+for rev in HEAD~2 HEAD~1 HEAD; do
+  git rev-parse -q --verify "$rev^{commit}" >/dev/null || continue
+  for f in $(git ls-tree --name-only "$rev" assets/); do git show "$rev:$f" > "$KEEP_TMP/$(basename "$f")"; done
+done
+
 echo "🗑️  Replacing the published site with the new build..."
 # Everything in dist/ is the site: index.html, 404.html, assets/, the static calculator and guide pages, goal-planner/,
 # seo/, sitemap.xml, robots.txt, ga.js, logos. Only the files tracked on gh-pages are removed (ignored files from main,
@@ -45,6 +54,9 @@ for f in $OLD_FILES; do
   case "$f" in .nojekyll|upi-qr-code.png) ;; *) rm -rf "$f" ;; esac
 done
 cp -r "$DIST_TMP"/. .
+# old page files the new build doesn't have (see KEEP_TMP above)
+for f in "$KEEP_TMP"/*; do [ -e "$f" ] && [ ! -e "assets/$(basename "$f")" ] && cp "$f" assets/; done
+rm -rf "$KEEP_TMP"
 touch .nojekyll
 
 echo "📄 Ensuring CNAME is present..."
