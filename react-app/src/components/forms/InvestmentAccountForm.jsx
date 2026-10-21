@@ -26,14 +26,19 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
+  // the nickname fills itself in ("Zerodha - Rupa") until the user types their own
+  const [nameTouched, setNameTouched] = useState(isEdit)
+  const autoName = (f) => (nameTouched || !f.platformBroker.trim() || !f.memberId ? f : { ...f, accountName: `${f.platformBroker.trim()} - ${(activeMembers.find((m) => m.memberId === f.memberId)?.memberName || '').split(' ')[0]}` })
+
   function set(key, val) {
-    setForm((f) => ({ ...f, [key]: val }))
+    if (key === 'accountName') setNameTouched(true)
+    setForm((f) => (key === 'platformBroker' ? autoName({ ...f, [key]: val }) : { ...f, [key]: val }))
     setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
   function setMember(val) {
     // Reset bank account when member changes
-    setForm((f) => ({ ...f, memberId: val, bankAccountId: '' }))
+    setForm((f) => autoName({ ...f, memberId: val, bankAccountId: '' }))
     setErrors((e) => ({ ...e, memberId: undefined }))
   }
 
@@ -66,8 +71,9 @@ export default function InvestmentAccountForm({ initial, onSave, onDelete, onCan
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Account Name" required error={errors.accountName}>
-          <FormInput sensitive value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., Zerodha Demat" />
+        <FormField label="Nickname for this account" required error={errors.accountName}>
+          <FormInput sensitive value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., Zerodha - Rupa" />
+          <p className="text-[11px] text-[var(--text-dim)] mt-1">Any name to recognise it in the app. Not the holder's name: pick the holder in Family Member.</p>
         </FormField>
         <FormField label="Family Member" required error={errors.memberId}>
           <FormSelect value={form.memberId} onChange={setMember} options={memberOptions} placeholder="Select member..." />

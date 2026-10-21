@@ -52,8 +52,9 @@ export default function BankAccountForm({ initial, onSave, onDelete, onCancel })
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Account Name" required error={errors.accountName}>
-          <FormInput sensitive value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., HDFC Savings" />
+        <FormField label="Nickname for this account" required error={errors.accountName}>
+          <FormInput sensitive value={form.accountName} onChange={(v) => set('accountName', v)} placeholder="e.g., HDFC Savings - Rupa" />
+          <p className="text-[11px] text-[var(--text-dim)] mt-1">Any name to recognise it in the app. Not the holder's name.</p>
         </FormField>
         <FormField label="Family Member" required error={errors.memberId}>
           <FormSelect value={form.memberId} onChange={(v) => set('memberId', v)} options={memberOptions} placeholder="Select member..." />

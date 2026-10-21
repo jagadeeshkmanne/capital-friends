@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react'
 import { Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Lock, Info } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useMask } from '../../context/MaskContext'
+import { useAuth } from '../../context/AuthContext'
 import { formatINR } from '../../data/familyData'
 import * as api from '../../services/api'
 import { FormField, FormDateInput, FormSelect, FormInput, FormActions } from '../Modal'
@@ -15,6 +16,8 @@ import { shortBroker } from '../../utils/cas/dematParser'
 // The statement has no buy price: the statement price is used unless the user types their own.
 
 const NEW = '__new__'
+const NEW_MEMBER = '__new_member__'   // the statement's holder is not in Family yet: added on import
+const NEW_ACCT = '__new_acct__'       // no demat account for this broker yet: created on import (broker, client ID, DP ID)
 const titleCase = (s) => String(s || '').replace(/\s*[-#]\s*(NEW )?EQUITY.*$|\s*-\s*$/i, '').trim().toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\bLtd\b/g, 'Ltd')
 const rs = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 // why a holding can't be imported as a stock (the statement's own marks)
@@ -30,7 +33,8 @@ const tokens = (s) => new Set(String(s || '').toUpperCase().split(/[^A-Z]+/).fil
 function nameScore(a, b) { const A = tokens(a), B = tokens(b); let n = 0; A.forEach((t) => { if (B.has(t)) n++ }); return n }
 
 export default function ImportDematForm({ onCancel }) {
-  const { stockPortfolios, stockHoldings, activeMembers, activeInvestmentAccounts, addStockPortfolio, importStocks, otherInvList, addOtherInvestment } = useData()
+  const { stockPortfolios, stockHoldings, activeMembers, activeInvestmentAccounts, addStockPortfolio, importStocks, otherInvList, addOtherInvestment, addMember, addInvestmentAccount } = useData()
+  const { user } = useAuth()
   const { mv } = useMask()
   const fileRef = useRef(null)
   const [file, setFile] = useState(null)
@@ -59,7 +63,8 @@ export default function ImportDematForm({ onCancel }) {
         const t = [...tokens(m.memberName)]
         return t.length && nameScore(m.memberName, res.holder) === t.length && (t.length >= 2 || t[0] === first)
       })
-      const ownerId = byPan ? byPan.memberId : byName.length === 1 ? byName[0].memberId : ''
+      // nobody matches (first sign-in, or a family member not added yet): add the holder to Family on import
+      const ownerId = byPan ? byPan.memberId : byName.length === 1 ? byName[0].memberId : res.holder ? NEW_MEMBER : ''
       setCas(res); setNeedPw(false)
       setDate(isoFromDmy(res.asOf) || new Date().toISOString().slice(0, 10))
       setAccts(res.accounts.filter((a) => a.holdings.length).map((a) => {
@@ -68,7 +73,7 @@ export default function ImportDematForm({ onCancel }) {
           const fund = !stock && h.isin.startsWith('INF')
           return { key: k, ...h, stock, fund, include: !!stock, unlisted: !stock && !fund && h.flag !== 'rights', avgPrice: String(h.price) }
         })
-        return withIncludes({ ...a, ownerId, ...pickPortfolio(ownerId, a), rows })
+        return withIncludes({ ...a, ownerId, ...pickPortfolio(ownerId, a, res.holder), rows })
       }))
     } catch (e) {
       if (e?.needsPassword) { setNeedPw(true); setError(e.wrongPassword ? e.message : '') }
@@ -77,7 +82,7 @@ export default function ImportDematForm({ onCancel }) {
   }
 
   // the owner's portfolio for this demat account (same demat account linked, else same broker), or a new one
-  function pickPortfolio(ownerId, a) {
+  function pickPortfolio(ownerId, a, holder) {
     const ias = (activeInvestmentAccounts || []).filter((x) => x.memberId === ownerId)
     const brokerKey = shortBroker(a.broker).toUpperCase()
     const ia = ias.find((x) => a.clientId && String(x.accountClientId || '').includes(a.clientId))
@@ -85,7 +90,8 @@ export default function ImportDematForm({ onCancel }) {
     const pfs = (stockPortfolios || []).filter((p) => p.status !== 'Inactive' && p.ownerId === ownerId)
     const pf = (ia && pfs.find((p) => p.investmentAccountId === ia.accountId)) || pfs.find((p) => brokerKey && String(p.portfolioName || '').toUpperCase().includes(brokerKey))
     const member = (activeMembers || []).find((m) => m.memberId === ownerId)
-    return { portfolioId: pf ? pf.portfolioId : NEW, newName: `${shortBroker(a.broker) || 'Demat'}${member ? ' · ' + member.memberName.split(' ')[0] : ''}`, iaId: ia ? ia.accountId : '' }
+    const first = member ? member.memberName.split(' ')[0] : ownerId === NEW_MEMBER ? holderName(holder).split(' ')[0] : ''
+    return { portfolioId: pf ? pf.portfolioId : NEW, newName: `${shortBroker(a.broker) || 'Demat'}${first ? ' · ' + first : ''}`, iaId: ia ? ia.accountId : NEW_ACCT }
   }
 
   // ticked: found in the list and not already in the chosen portfolio (importing the same statement twice must not double it)
@@ -96,6 +102,8 @@ export default function ImportDematForm({ onCancel }) {
   function updAcct(i, patch) { setAccts((as) => as.map((a, k) => (k === i ? ('portfolioId' in patch ? withIncludes({ ...a, ...patch }) : { ...a, ...patch }) : a))) }
   function updRow(i, key, patch) { setAccts((as) => as.map((a, k) => (k === i ? { ...a, rows: a.rows.map((r) => (r.key === key ? { ...r, ...patch } : r)) } : a))) }
 
+  // the holder's name as it reads in Family ("RUPA LAKSHMI KATAKAM" → "Rupa Lakshmi Katakam")
+  const holderName = (h = cas?.holder) => String(h || '').toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\s+/g, ' ').trim()
   const heldIn = (pid) => new Set((stockHoldings || []).filter((h) => h.portfolioId === pid).map((h) => String(h.symbol).toUpperCase()))
   const take = (a) => a.rows.filter((r) => r.stock && r.include && Number(r.avgPrice) > 0)
   // holdings with no market price, ticked to go to Other Investments → Unlisted Shares (value kept by hand)
@@ -109,6 +117,23 @@ export default function ImportDematForm({ onCancel }) {
     setSaving(true); setError('')
     const done = [], skipped = []
     try {
+      // first: anyone / any demat account the statement needs that the app doesn't have yet
+      const work = accts.filter((a) => take(a).length || takeUnlisted(a).length)
+      if (work.some((a) => a.ownerId === NEW_MEMBER)) {
+        const self = !(activeMembers || []).some((m) => m.relationship === 'Self') && (!user?.name || nameScore(user.name, cas.holder) > 0)
+        const r = await addMember({ memberName: holderName(), relationship: self ? 'Self' : 'Other', email: self ? user?.email || '' : '', includeInEmailReports: true, pan: cas.pan || '', aadhar: '', mobile: '', dynamicFields: {} })
+        const id = r?.memberId || r?.data?.memberId || r?.id
+        if (!id) throw new Error(r?.message || r?.error || `Could not add ${holderName()} to Family`)
+        work.forEach((a) => { if (a.ownerId === NEW_MEMBER) a.ownerId = id })
+      }
+      for (const a of work) {
+        if (!take(a).length || a.portfolioId !== NEW || a.iaId !== NEW_ACCT) continue
+        const broker = shortBroker(a.broker) || a.broker || 'Demat'
+        const owner = (activeMembers || []).find((m) => m.memberId === a.ownerId)
+        const r = await addInvestmentAccount({ accountName: `${broker} - ${(owner?.memberName || holderName()).split(' ')[0]}`, memberId: a.ownerId, bankAccountId: '', accountType: 'Demat + Trading', platformBroker: broker, accountClientId: a.clientId || '', dematDpId: a.dpId || '', registeredEmail: owner?.email || user?.email || '', registeredPhone: '' })
+        a.iaId = r?.accountId || r?.data?.accountId
+        if (!a.iaId) throw new Error(r?.message || r?.error || `Could not create the ${broker} demat account`)
+      }
       const unl = accts.flatMap((a) => takeUnlisted(a).map((r) => ({ a, r })))
       for (let k = 0; k < unl.length; k++) {
         const { a, r } = unl[k]
@@ -148,7 +173,7 @@ export default function ImportDematForm({ onCancel }) {
     } finally { setSaving(false) }
   }
 
-  const memberOptions = (activeMembers || []).map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` }))
+  const memberOptions = [...(activeMembers || []).map((m) => ({ value: m.memberId, label: `${mv(m.memberName, 'name')} (${m.relationship})` })), ...(cas?.holder ? [{ value: NEW_MEMBER, label: `+ Add ${mv(holderName(), 'name')} to Family` }] : [])]
 
   if (result) return (
     <div className="space-y-4">
@@ -229,14 +254,15 @@ export default function ImportDematForm({ onCancel }) {
                   <FormSelect value={a.portfolioId} onChange={(v) => updAcct(i, { portfolioId: v })}
                     options={[...pfs.map((p) => ({ value: p.portfolioId, label: mv(p.portfolioName, 'name') })), { value: NEW, label: '+ New portfolio' }]} />
                 </FormField>}
+                {(a.ownerId === NEW_MEMBER || (a.portfolioId === NEW && a.iaId === NEW_ACCT)) && (
+                  <p className="sm:col-span-2 text-[11px] text-sky-400">Nothing to set up first. Created when you import: {[a.ownerId === NEW_MEMBER && `${mv(holderName(), 'name')} in Family`, a.portfolioId === NEW && a.iaId === NEW_ACCT && `the ${shortBroker(a.broker) || 'demat'} account (client ID and DP ID from the statement)`, a.portfolioId === NEW && 'the portfolio'].filter(Boolean).join(' · ')}.</p>
+                )}
                 {matched > 0 && a.portfolioId === NEW && a.ownerId && (<>
                   <FormField label="New portfolio name" required>
                     <FormInput value={a.newName} onChange={(v) => updAcct(i, { newName: v })} />
                   </FormField>
                   <FormField label="Demat account" required>
-                    {ias.length
-                      ? <FormSelect value={a.iaId} onChange={(v) => updAcct(i, { iaId: v })} options={ias.map((x) => ({ value: x.accountId, label: `${mv(x.accountName, 'name')} - ${x.platformBroker}` }))} placeholder="Select demat account…" />
-                      : <p className="text-xs text-amber-500 py-2">Add this {shortBroker(a.broker)} demat account under <strong>Accounts → Investment accounts</strong> first, then import again.</p>}
+                    <FormSelect value={a.iaId} onChange={(v) => updAcct(i, { iaId: v })} options={[...ias.map((x) => ({ value: x.accountId, label: `${mv(x.accountName, 'name')} - ${x.platformBroker}` })), { value: NEW_ACCT, label: `+ Create ${shortBroker(a.broker) || 'demat'} account (client …${String(a.clientId).slice(-4)})` }]} placeholder="Select demat account…" />
                   </FormField>
                 </>)}
               </div>
