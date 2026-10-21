@@ -212,6 +212,9 @@ export default function PaperBookPage() {
       const value = s === 'LIQUIDCASE' ? val : q * price
       return { row: h, price, value, today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: L && L.prev ? (price / L.prev - 1) * 100 : null }
     })
+    // stocks by momentum rank (strongest first; out of the top 40 last), then gold and liquid at the bottom
+    const grp = (h) => (h.row[0] === 'GOLDBEES' ? 1 : h.row[0] === 'LIQUIDCASE' ? 2 : 0)
+    hold.sort((x, y) => grp(x) - grp(y) || (x.row[7] ?? 999) - (y.row[7] ?? 999))
     const liveNav = hold.reduce((a, h) => a + h.value, 0)
     const today = hold.reduce((a, h) => a + h.today, 0)
     const gold = hold.filter((h) => h.row[0] === 'GOLDBEES').reduce((a, h) => a + h.value, 0)
