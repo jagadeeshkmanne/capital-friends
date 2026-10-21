@@ -104,11 +104,53 @@ function BigChart({ data, sym, livePrice, onClose }) {
     </Modal>, document.body)
 }
 
+const BOOK_LABEL = { A: 'A · Momentum', B: 'B · Earnings filter', C: 'C · Earnings re-rank', lump: '₹10L lump sum', sip: '₹1L monthly SIP' }
+const BOOK_DOT = { A: 'bg-teal-400', B: 'bg-violet-400', C: 'bg-orange-400' }
+const Dot = ({ on, k }) => <span className={`inline-block w-2.5 h-2.5 rounded-full ${on ? BOOK_DOT[k] : 'border border-[var(--border)]'}`} />
+
+/** Which stocks the three books share, and why B / C left some out (latest rebalance). */
+function Overlap({ o, onPick }) {
+  if (!o || !o.rows?.length) return null
+  const v = o.venn || {}
+  const why = (r) => [r.why_B && !r.held?.B ? `B skipped: ${r.why_B}` : null,
+    r.crank_C && (r.held?.A !== r.held?.C || Math.abs(r.crank_C[0] - r.crank_C[1]) >= 5) ? `C: #${r.crank_C[0]} → #${r.crank_C[1]}${r.crank_C[2] != null ? ` · earnings ${r.crank_C[2]}/100` : ''}` : null,
+    r.why_C && !r.held?.C ? `C: ${r.why_C}` : null].filter(Boolean)
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Overlap between the books</h3>
+        <span className="text-xs text-[var(--text-dim)]">{v.all3} in all three · A+B {v.AB} · A+C {v.AC} · B+C {v.BC} · only A {v.A} · only B {v.B} · only C {v.C}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+              <th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-right`}>Rank</th>
+              {['A', 'B', 'C'].map((k) => <th key={k} className={`${TH} text-center w-10`}>{k}</th>)}
+              <th className={`${TH} text-left`}>Why they differ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {o.rows.map((r) => (
+              <tr key={r.sym} onClick={() => onPick(r.sym)} className="border-b border-[var(--border-row)] last:border-0 cursor-pointer hover:bg-[var(--bg-hover)]">
+                <td className={`${TD} text-left font-semibold text-[var(--text-primary)]`}>{r.sym}</td>
+                <td className={`${TD} text-right text-[var(--text-dim)]`}>{r.rank ?? '—'}</td>
+                {['A', 'B', 'C'].map((k) => <td key={k} className={`${TD} text-center`}><Dot on={r.held?.[k]} k={k} /></td>)}
+                <td className={`${TD} text-left text-xs text-[var(--text-muted)] whitespace-normal`}>{why(r).join(' · ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function PaperBookPage() {
   const { isAdmin } = useAuth()
   const [data, setData] = useState(undefined)
   const [err, setErr] = useState('')
-  const [book, setBook] = useState('lump')
+  const [book, setBook] = useState('A')
   const [live, setLive] = useState(null)
   const [liveBusy, setLiveBusy] = useState(false)
   const [liveErr, setLiveErr] = useState('')
@@ -129,7 +171,9 @@ export default function PaperBookPage() {
     getPaperBook().then((d) => { setData(d || null); if (d) loadLive(d) }).catch((e) => setErr(e.message || 'Could not load'))
   }, [isAdmin])
 
-  const b = data?.books?.[book]
+  const keys = Object.keys(data?.books || {})
+  const bk = data?.books?.[book] ? book : keys[0]
+  const b = data?.books?.[bk]
   const view = useMemo(() => {
     if (!b) return null
     const lp = live?.prices || {}
@@ -155,10 +199,12 @@ export default function PaperBookPage() {
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   if (err) return <p className="text-sm text-[var(--accent-rose)] p-4">{err}</p>
   if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
-  if (!data || !view) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
+  if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
+  if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The three paper books (A momentum, B earnings filter, C earnings re-rank) open together on ${day(data.start_on)}. Prices are kept up to date until then.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
 
   const half = b.x < 1
-  const ret = book === 'sip' ? b.xirr : b.ret_pct
+  const ret = bk === 'sip' ? b.xirr : b.ret_pct
+  const sets = Object.fromEntries(Object.entries(data.overlap?.sets || {}).map(([k, v]) => [k, new Set(v)]))
   const tot = Math.max(1, view.liveNav)
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
 
@@ -166,9 +212,9 @@ export default function PaperBookPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1 bg-[var(--bg-inset)] rounded-lg p-0.5">
-          {[['lump', '₹10L lump sum'], ['sip', '₹1L monthly SIP']].map(([k, l]) => (
+          {keys.map((k) => [k, BOOK_LABEL[k] || k]).map(([k, l]) => (
             <button key={k} onClick={() => setBook(k)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${book === k ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${bk === k ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
               {l}
             </button>
           ))}
@@ -188,7 +234,7 @@ export default function PaperBookPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
         <Stat icon={Wallet} color="text-violet-400 bg-violet-500/15" label="Value now" value={inr(view.liveNav)} sub={`At last close ${inr(b.nav)}`} />
         <Stat icon={Activity} color="text-cyan-400 bg-cyan-500/15" label="Today" value={`${view.today >= 0 ? '+' : '−'}${inr(Math.abs(view.today))}`} valueClass={tone(view.today)} sub={live ? pct(view.todayPct) : liveBusy ? 'loading live prices…' : `live prices failed${liveErr ? ': ' + liveErr : ''}`} />
-        <Stat icon={TrendingUp} color="text-emerald-400 bg-emerald-500/15" label="Gain" value={inr(view.liveNav - b.invested)} valueClass={tone(view.liveNav - b.invested)} sub={`${pct(((view.liveNav / b.invested) - 1) * 100)} on ${inr(b.invested)}${book === 'sip' && ret != null ? ` · XIRR ${pct(ret)}` : ''}`} />
+        <Stat icon={TrendingUp} color="text-emerald-400 bg-emerald-500/15" label="Gain" value={inr(view.liveNav - b.invested)} valueClass={tone(view.liveNav - b.invested)} sub={`${pct(((view.liveNav / b.invested) - 1) * 100)} on ${inr(b.invested)}${bk === 'sip' && ret != null ? ` · XIRR ${pct(ret)}` : ''}`} />
         <Stat icon={Gauge} color="text-amber-400 bg-amber-500/15" label="Stocks / Gold / Liquid"
           value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}`} sub="% of value" />
         <Stat icon={Coins} color="text-sky-400 bg-sky-500/15" label="vs Nifty 500 TRI" value={b.bench ? pct((b.nav / b.bench - 1) * 100) : '—'} valueClass={b.bench ? tone(b.nav - b.bench) : ''} sub={b.bench ? `Index ${inr(b.bench)}` : ''} />
@@ -252,6 +298,7 @@ export default function PaperBookPage() {
               <thead className="sticky top-0">
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                   <th className={`${TH} text-right w-10`}>#</th><th className={`${TH} text-left`}>Stock</th><th className={`${TH} text-left`}>6M</th><th className={`${TH} text-right`}>Score</th>
+                  {data.overlap && ['A', 'B', 'C'].map((k) => <th key={k} className={`${TH} text-center w-7`}>{k}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -263,6 +310,7 @@ export default function PaperBookPage() {
                       <td className={`${TD} text-left font-semibold ${h ? 'text-emerald-400' : 'text-[var(--text-primary)]'}`}>{h ? '● ' : ''}{s}</td>
                       <td className={`${TD} text-left`}><Spark pts={series(data, s, livePx(s), 126)} /></td>
                       <td className={`${TD} text-right`}>{sc}</td>
+                      {data.overlap && ['A', 'B', 'C'].map((k) => <td key={k} className={`${TD} text-center`}><Dot on={sets[k]?.has(s)} k={k} /></td>)}
                     </tr>
                   )
                 })}
@@ -271,6 +319,7 @@ export default function PaperBookPage() {
           </div>
         </div>
       </div>
+      {data.overlap && <Overlap o={data.overlap} onPick={setChartSym} />}
       <p className="text-xs text-[var(--text-dim)]">Tap a stock for its chart · paper trading only · information, not advice</p>
       {chartSym && <BigChart data={data} sym={chartSym} livePrice={livePx(chartSym)} onClose={() => setChartSym(null)} />}
     </div>
