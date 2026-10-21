@@ -90,9 +90,9 @@ function BigChart({ data, sym, livePrice, onClose }) {
     </Modal>, document.body)
 }
 
-const BOOK_DOT = { A: 'bg-emerald-400', B: 'bg-violet-400', C: 'bg-blue-400', D: 'bg-amber-400' }
-const BOOK_RING = { A: 'ring-emerald-400 border-emerald-400', B: 'ring-violet-400 border-violet-400', C: 'ring-blue-400 border-blue-400', D: 'ring-amber-400 border-amber-400' }
-const BOOK_NAME = { A: 'Momentum', B: 'Momentum + Safety', C: 'Momentum + Quality', D: 'Top 10 Common' }
+const BOOK_DOT = { A: 'bg-emerald-400', B: 'bg-violet-400', C: 'bg-blue-400', D: 'bg-amber-400', E: 'bg-pink-400' }
+const BOOK_RING = { A: 'ring-emerald-400 border-emerald-400', B: 'ring-violet-400 border-violet-400', C: 'ring-blue-400 border-blue-400', D: 'ring-amber-400 border-amber-400', E: 'ring-pink-400 border-pink-400' }
+const BOOK_NAME = { A: 'Momentum', B: 'Momentum + Safety', C: 'Momentum + Quality', D: 'Top 10 Common', E: 'Momentum · Top 1000' }
 // value of a book at live prices (falls back to the last close for anything without a live price)
 const liveValue = (b, lp) => (b?.holdings || []).reduce((a, [s, q, , px, val]) => a + (s === 'LIQUIDCASE' ? val : q * (lp?.[s]?.price ?? px)), 0)
 const sgn = (v) => (v == null ? '' : v >= 0 ? '+' : '−')
@@ -263,7 +263,7 @@ export default function PaperBookPage() {
       </div>
 
       {/* the four books: tap one to see its numbers and holdings */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" role="tablist">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" role="tablist">
         {(() => {
           const inv = keys.reduce((a, k) => a + data.books[k].invested, 0), val = keys.reduce((a, k) => a + liveValue(data.books[k], live?.prices), 0), g = val - inv
           return (
