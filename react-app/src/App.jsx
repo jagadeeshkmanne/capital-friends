@@ -31,7 +31,7 @@ import TermsAndConditions from './pages/TermsAndConditions'
 // Statement import (beta): loaded only when opened, so the PDF reader is not in the main bundle
 const ImportStatementPage = lazy(() => import('./pages/ImportStatementPage'))
 const PaperBookPage = lazy(() => import('./pages/PaperBookPage'))
-// Stock trade-history import (beta, admin only until it is tested): hidden page, not in the menu
+// Import stocks (beta): every stock file in one page, open to every signed-in user
 const StockTradesImportPage = lazy(() => import('./pages/investments/StockTradesImportPage'))
 
 export default function App() {

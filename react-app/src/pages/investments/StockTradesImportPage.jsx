@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { Navigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Info, ArrowLeft, ChevronDown, ChevronRight, Download, HelpCircle } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useData } from '../../context/DataContext'
@@ -14,7 +14,7 @@ import ImportStocksForm from '../../components/forms/ImportStocksForm'
 import { parseTradeHistory, groupAccounts, summarize, fileChecks } from '../../utils/tradeHistoryImport'
 import { matchMemberName, nameFit } from '../../utils/nameMatch'
 
-// Hidden beta page (/investments/stocks/import-trades, admin only for now): one place for every stock file.
+// Import stocks (beta, /investments/stocks/import-trades, open to every signed-in user): one place for every stock file.
 // The file decides what happens:
 //   Groww order history / Zerodha tradebook / our Excel template (other brokers) → trade history (this page)
 //   CDSL or NSDL statement (PDF)                                                    → ImportDematForm
@@ -49,7 +49,7 @@ function Stat({ label, value, tone }) {
 }
 
 export default function StockTradesImportPage() {
-  const { isAdmin, user } = useAuth()
+  const { user } = useAuth()
   const { activeMembers, activeInvestmentAccounts, stockPortfolios, stockTransactions, addMember, addInvestmentAccount, updateInvestmentAccount, addStockPortfolio, refreshStocks } = useData()
   const { mv } = useMask()
   const fileRef = useRef(null)
@@ -151,7 +151,6 @@ export default function StockTradesImportPage() {
   const tradesOf = (a) => a.trades.filter((t) => a.stocks[t.isin || t.symbol])
   const summaries = useMemo(() => (accounts || []).map((a) => summarize(tradesOf(a), (t) => a.stocks[t.isin || t.symbol]?.symbol || t.symbol)), [accounts]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!isAdmin) return <Navigate to="/investments/stocks" replace />
 
   const ready = (accounts || []).filter((a) => { const p = a.include && tradesOf(a).length ? plan(a) : null; return p && p.memberId && (p.memberId !== 'new' || newName(a)) && p.how !== 'conflict' && (p.account || platOf(a)) })
   const total = ready.reduce((s, a) => s + tradesOf(a).length, 0)
