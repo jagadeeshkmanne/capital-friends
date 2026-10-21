@@ -3,6 +3,8 @@
 //    there is no price column, so price = Value ÷ Quantity. Only "Executed" orders are kept.
 //  - Zerodha: Console → Reports → Tradebook, segment Equity (.csv or .xlsx), one year per file. The client ID
 //    is only in the file name (tradebook-AB1234-EQ.csv).
+//  - ICICI Direct: Order book export (orderBook_Equity_….csv): Date, Stock, Action, Qty, Price, Order Ref., and the
+//    demat account in "DP Id - Client DP Id" (IN303028-75292398), read like the template plus the account.
 //  - Any other broker: our Excel template (public/stock-trades-template.xlsx) or any sheet with the columns
 //    Date, Buy/Sell, Symbol (or ISIN), Quantity, Price (or Value), optional Broker and Order no.
 // The format is found from the column names, so a file renamed by the user still reads.
@@ -25,7 +27,8 @@ const TEMPLATE = {
   price: ['price', 'rate', 'pricepershare', 'tradeprice', 'avgprice', 'averageprice', 'netrate', 'marketrate'],
   value: ['value', 'amount', 'tradevalue', 'totalamount', 'netamount', 'grossamount'],
   broker: ['broker', 'brokername', 'platform', 'platformbroker'],
-  ref: ['orderno', 'ordernumber', 'orderid', 'tradeno', 'tradenumber', 'tradeid', 'contractnoteno', 'referenceno'],
+  ref: ['orderno', 'ordernumber', 'orderid', 'orderref', 'orderreference', 'tradeno', 'tradenumber', 'tradeid', 'contractnoteno', 'referenceno'],
+  account: ['dpidclientdpid', 'dpidclientid', 'demataccount', 'demataccountno', 'boid'],
   time: ['time', 'tradetime', 'ordertime', 'executiontime'],
 }
 function findTemplate(h) {
@@ -33,6 +36,8 @@ function findTemplate(h) {
   for (const [k, names] of Object.entries(TEMPLATE)) { col[k] = -1; for (const n of names) { const i = h.indexOf(n); if (i >= 0) { col[k] = i; break } } }
   // "Symbol or ISIN" column: symbol and isin may be the same column
   const ok = col.date >= 0 && col.type >= 0 && (col.symbol >= 0 || col.isin >= 0) && col.quantity >= 0 && (col.price >= 0 || col.value >= 0)
+  // brokers whose export we know by its columns: the broker name comes with the file
+  if (ok && h.includes('dpidclientdpid') && h.includes('orderref')) col.knownBroker = 'ICICI Direct'
   return ok ? col : null
 }
 
@@ -144,6 +149,13 @@ export function parseTradeHistory(rows, fileName = '') {
 
 // Template / other broker sheet. Rows without an order number get a reference from their own values
 // (date, buy/sell, quantity, price and how many identical rows came before), so a second upload adds nothing twice.
+// "IN303028-75292398" → { dpId: 'IN303028', clientId: '75292398' }; a 16-digit CDSL BO ID → first 8 / last 8
+function splitDemat(v) {
+  const s = clean(v).toUpperCase().replace(/\s+/g, '')
+  let m = s.match(/^(IN[A-Z0-9]{6})[-/]?(\d{8})$/) || s.match(/^(\d{8})[-/]?(\d{8})$/)
+  return m ? { dpId: m[1], clientId: m[2] } : { dpId: '', clientId: s }
+}
+
 function parseTemplate(rows, headerRow, col) {
   const cell = (row, k) => (col[k] >= 0 ? row[col[k]] : '')
   const trades = [], skipped = [], same = {}
@@ -169,10 +181,11 @@ function parseTemplate(rows, headerRow, col) {
     price = Math.round(price * 10000) / 10000
     let ref = clean(cell(row, 'ref')).replace(/\s+/g, ''), refKind = 'order'
     if (!ref) { const base = `${date}-${type[0]}-${qty}-${price}`; same[base + symbol + isin] = (same[base + symbol + isin] || 0) + 1; ref = `${base}-${same[base + symbol + isin]}`; refKind = 'row' }
-    trades.push({ date, time, symbol: symbol || isin, isin, name: '', type, qty, price, exchange: '', ref, refKind, line, platform: clean(cell(row, 'broker')) })
+    const acct = col.account >= 0 ? splitDemat(cell(row, 'account')) : { dpId: '', clientId: '' }
+    trades.push({ date, time, symbol: symbol || isin, isin, name: '', type, qty, price, exchange: '', ref, refKind, line, platform: clean(cell(row, 'broker')) || col.knownBroker || '', clientId: acct.clientId, dpId: acct.dpId })
   }
   if (!trades.length && !skipped.length) return { error: 'The template has no trades yet. Fill one row per buy or sell (the examples are on the "How to fill" sheet) and upload again.' }
-  return { broker: 'Template', clientId: '', holderName: '', range: null, trades, skipped }
+  return { broker: 'Template', knownBroker: col.knownBroker || '', clientId: '', holderName: '', range: null, trades, skipped }
 }
 
 const tradeKey = (t) => t.ref ? `${t.refKind}:${t.ref}:${t.symbol}` : `${t.date}|${t.time}|${t.symbol}|${t.type}|${t.qty}|${t.price}`
@@ -190,15 +203,16 @@ export function groupAccounts(parsed) {
   for (const p of ok) {
     if (p.broker !== 'Template') { split.push(p); continue }
     const by = new Map()
-    for (const t of p.trades) { const b = t.platform || ''; const k = b.toLowerCase(); if (!by.has(k)) by.set(k, { ...p, platform: b, trades: [], skipped: by.size ? [] : p.skipped }); by.get(k).trades.push(t) }
+    // ... and per demat account when the file names it (ICICI Direct's "DP Id - Client DP Id")
+    for (const t of p.trades) { const b = t.platform || ''; const k = `${b.toLowerCase()}|${t.clientId || ''}`; if (!by.has(k)) by.set(k, { ...p, platform: b, clientId: t.clientId || '', dpId: t.dpId || '', trades: [], skipped: by.size ? [] : p.skipped }); by.get(k).trades.push(t) }
     if (!by.size) split.push(p); else split.push(...by.values())
   }
   for (const p of split) {
     let id = p.clientId
     if (!id) { const same = [...new Set(ok.filter((q) => q.broker === p.broker && q.clientId).map((q) => q.clientId))]; if (same.length === 1) id = same[0] }
-    const k = p.broker === 'Template' ? `Template|${(p.platform || '').toLowerCase()}` : `${p.broker}|${id || '?'}`
+    const k = p.broker === 'Template' ? `Template|${(p.platform || '').toLowerCase()}|${p.clientId || ''}` : `${p.broker}|${id || '?'}`
     // platform: the broker name the account is matched / created with (template: from its Broker column)
-    if (!acc.has(k)) acc.set(k, { key: k, broker: p.broker, platform: p.broker === 'Template' ? p.platform || '' : p.broker, clientId: id || '', holderName: p.holderName || '', range: null, files: [], trades: [], seen: new Set(), repeats: 0, skipped: [] })
+    if (!acc.has(k)) acc.set(k, { key: k, broker: p.broker, platform: p.broker === 'Template' ? p.platform || '' : p.broker, clientId: id || '', dpId: p.dpId || '', holderName: p.holderName || '', range: null, files: [], trades: [], seen: new Set(), repeats: 0, skipped: [] })
     const a = acc.get(k)
     a.files.push(p.fileName || '')
     if (!a.holderName && p.holderName) a.holderName = p.holderName

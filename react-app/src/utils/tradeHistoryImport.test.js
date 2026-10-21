@@ -120,4 +120,17 @@ describe('trade history import', () => {
     expect(pasted.trades[0]).toMatchObject({ type: 'BUY', symbol: 'INFY', price: 1500 })
     expect(parseTradeHistory([['Date', 'Buy/Sell', 'Symbol or ISIN', 'Quantity', 'Price']]).error).toMatch(/no trades yet/)
   })
+  it('reads an ICICI Direct order book export: broker and demat account from the file, 2-digit years', () => {
+    const csv = '\ufeffDate,Stock,Action,Qty,Price,Trade Value,Order Ref.,Settlement,Segment,DP Id - Client DP Id,Exchange,STT,Transaction and SEBI Turnover charges,Stamp Duty,Brokerage + Service Tax,Brokerage Incl. Taxes\n'
+      + '"19-Oct-26","ICICIBANK","Buy","10","1405","14050","20261019N900006350","2026197","Rolling T1","IN300000-11112222","NSE","14","0.45","2","48.16","64.61"\n'
+      + '"16-Oct-26","HFCL","Sell","100","256","25600","20261016T200019626","2026196","TT T1","IN300000-11112222","NSE","25.6","0.81","0","87.75","114.16"\n'
+    const r = parseTradeHistory(parseCSV(csv.replace(/^\ufeff/, '')), 'orderBook_Equity_1.csv')
+    expect(r.broker).toBe('Template')
+    expect(r.trades.map((t) => [t.date, t.type, t.symbol, t.qty, t.price, t.ref, t.platform, t.dpId, t.clientId])).toEqual([
+      ['2026-10-19', 'BUY', 'ICICIBANK', 10, 1405, '20261019N900006350', 'ICICI Direct', 'IN300000', '11112222'],
+      ['2026-10-16', 'SELL', 'HFCL', 100, 256, '20261016T200019626', 'ICICI Direct', 'IN300000', '11112222'],
+    ])
+    const [a] = groupAccounts([{ ...r, fileName: 'orderBook_Equity_1.csv' }])
+    expect([a.platform, a.clientId, a.dpId, a.trades.length]).toEqual(['ICICI Direct', '11112222', 'IN300000', 2])
+  })
 })

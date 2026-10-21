@@ -27,6 +27,8 @@ export function toIsoDate(v) {
   if (m) return ok(+m[3], +m[2], +m[1])
   m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{4})/)
   if (m && MONTHS[m[2].toLowerCase()]) return ok(+m[3], MONTHS[m[2].toLowerCase()], +m[1])
+  m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{2})(?!\d)/)   // "19-Oct-26" (ICICI Direct): 2-digit year = 20xx
+  if (m && MONTHS[m[2].toLowerCase()]) return ok(2000 + +m[3], MONTHS[m[2].toLowerCase()], +m[1])
   return ''
 }
 const normCcy = (v) => { const c = String(v ?? '').trim().toUpperCase().replace(/[^A-Z]/g, ''); return c === 'RS' || c === 'INR' || c === '' ? '' : c === 'GBP' && /p$/.test(String(v).trim()) ? 'GBX' : c }

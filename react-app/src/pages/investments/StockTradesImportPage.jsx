@@ -180,7 +180,7 @@ export default function StockTradesImportPage() {
           const n = p.brokerAccts.filter((x) => x.memberId === p.memberId).length
           const name = `${labelOf(a)} - ${mName}${n ? ` ${n + 1}` : ''}`
           step(`Creating investment account ${name}`)
-          const r = await addInvestmentAccount({ accountName: name, memberId: p.memberId, bankAccountId: '', accountType: 'Demat + Trading', platformBroker: labelOf(a), accountClientId: a.clientId, registeredEmail: user?.email || '', registeredPhone: '' })
+          const r = await addInvestmentAccount({ accountName: name, memberId: p.memberId, bankAccountId: '', accountType: 'Demat + Trading', platformBroker: labelOf(a), accountClientId: a.clientId, dematDpId: a.dpId || '', registeredEmail: user?.email || '', registeredPhone: '' })
           accountId = r?.accountId || r?.data?.accountId
           if (!accountId) throw new Error(r?.error || 'Could not create the investment account')
           tick()
@@ -245,7 +245,7 @@ export default function StockTradesImportPage() {
           <Upload size={16} /> {reading ? 'Reading…' : accounts || other ? 'Choose other files' : 'Choose files'}
         </button>
         <p className="text-xs text-[var(--text-dim)]">or drop them here · Excel, CSV or statement PDF · several trade files at once is fine</p>
-        <p className="text-[11px] text-[var(--text-secondary)]">Groww · Zerodha · CDSL / NSDL statement · Excel template for any other broker</p>
+        <p className="text-[11px] text-[var(--text-secondary)]">Groww · Zerodha · ICICI Direct · CDSL / NSDL statement · Excel template for any other broker</p>
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           <button type="button" onClick={() => setHelp(true)} className="flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"><HelpCircle size={13} /> How to get the file</button>
           <button type="button" onClick={() => downloadFile('stock-trades-template.xlsx', 'stock-trades-template.xlsx')} className="flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"><Download size={13} /> Excel template</button>
@@ -257,7 +257,7 @@ export default function StockTradesImportPage() {
         <div className="space-y-4 text-xs text-[var(--text-secondary)]">
           <div className="space-y-2">
             {[
-              ['Groww order history · Zerodha tradebook', 'Every buy and sell with its price: money put in, realised gains by financial year, when each holding turns long term.', 'Best'],
+              ['Groww order history · Zerodha tradebook · ICICI Direct order book', 'Every buy and sell with its price: money put in, realised gains by financial year, when each holding turns long term.', 'Best'],
               ['Excel template (any other broker)', 'The same, from trades you fill in or paste from your broker\'s report.', ''],
               ['CDSL / NSDL statement (PDF)', 'What you hold today in every demat account of that PAN. No buy price: the statement price is used, and you can edit it later.', ''],
               ['Holdings file', 'Symbol, Quantity and Avg price from any broker.', ''],
@@ -273,6 +273,8 @@ export default function StockTradesImportPage() {
               <ol className="list-decimal pl-4 space-y-0.5"><li>On groww.in open Profile → <strong>Reports</strong>.</li><li>Under Stocks pick <strong>Order history</strong> (not P&L or Holdings).</li><li>From: the month the account was opened. To: today. Download.</li></ol></div>
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">Zerodha</p>
               <ol className="list-decimal pl-4 space-y-0.5"><li>On console.zerodha.com open Reports → <strong>Tradebook</strong>, segment <strong>Equity</strong>.</li><li>One year per download: get each year since the account opened, all now or one at a time later, in any order.</li><li>Keep the file names as downloaded (they carry your client ID).</li></ol></div>
+            <div><p className="font-semibold text-[var(--text-primary)] mb-1">ICICI Direct</p>
+              <ol className="list-decimal pl-4 space-y-0.5"><li>Open Equity → <strong>Order book</strong> (or Trade book), pick the widest date range it allows and <strong>export</strong> the CSV.</li><li>Upload it as it is (orderBook_Equity_….csv). The demat account is read from the file.</li></ol></div>
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">CDSL / NSDL statement</p>
               <ol className="list-decimal pl-4 space-y-0.5"><li>The monthly <strong>CAS</strong> emailed by CDSL or NSDL: one statement covers every demat of that PAN.</li><li>Upload the PDF. The password is usually your PAN in capitals.</li></ol></div>
             <div><p className="font-semibold text-[var(--text-primary)] mb-1">Any other broker</p>
@@ -285,7 +287,7 @@ export default function StockTradesImportPage() {
             <li>• Only stocks and ETFs are imported here. Mutual funds: <Link to="/import" className="underline">Import statement</Link>.</li>
           </ul>
           <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 space-y-1">
-            <p className="font-semibold text-[var(--text-primary)]">Tested so far: Groww, Zerodha and CDSL statements. NSDL statements are new.</p>
+            <p className="font-semibold text-[var(--text-primary)]">Tested so far: Groww, Zerodha, ICICI Direct and CDSL statements. NSDL statements are new.</p>
             <p>Another broker, or a file that doesn't read? Email <strong className="select-all break-all text-[var(--text-primary)]">{SUPPORT_EMAIL}</strong> with the broker's name and a sample of its trade report. Before sending, delete or blank out your name, client ID, PAN and account numbers: a few rows are enough. Until then, the Excel template works for any broker.</p>
           </div>
         </div>
@@ -314,7 +316,7 @@ export default function StockTradesImportPage() {
             <div className="flex items-start gap-3 px-4 py-3 border-b border-[var(--border-light)]">
               <input type="checkbox" checked={a.include} onChange={(e) => update(a.key, { include: e.target.checked })} className="mt-1 w-4 h-4 rounded border-[var(--border-input)] text-violet-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><FileSpreadsheet size={14} /> {a.broker === 'Template' ? <>Excel template · {labelOf(a)}</> : <>{a.broker} · client {a.clientId ? mv(a.clientId, 'clientId') : 'ID not in the file'}</>}</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><FileSpreadsheet size={14} /> {a.broker === 'Template' && !a.clientId ? <>Excel template · {labelOf(a)}</> : <>{labelOf(a)} · client {a.clientId ? mv(a.clientId, 'clientId') : 'ID not in the file'}</>}</p>
                 <p className="text-xs text-[var(--text-dim)]">{a.holderName ? <>Name in file: {mv(a.holderName, 'name')} · </> : null}{a.files.length} file{a.files.length === 1 ? '' : 's'} · {a.trades.length} trades · {fmtDate(a.trades[0]?.date)} to {fmtDate(a.trades[a.trades.length - 1]?.date)}{a.repeats ? ` · ${a.repeats} repeated trades dropped` : ''}</p>
               </div>
             </div>
