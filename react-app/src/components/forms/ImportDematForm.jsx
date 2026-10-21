@@ -66,7 +66,9 @@ export default function ImportDematForm({ onCancel }) {
           const fund = !stock && h.isin.startsWith('INF')
           return { key: k, ...h, stock, fund, include: !!stock, unlisted: !stock && !fund && h.flag !== 'rights', avgPrice: String(h.price) }
         })
-        return withIncludes({ ...a, ownerId, ...pickPortfolio(ownerId, a, res.holder), rows })
+        // an account whose client ID is already saved belongs to that member, whatever the statement name says
+        const owner = byClientId(a)?.memberId || ownerId
+        return withIncludes({ ...a, ownerId: owner, ...pickPortfolio(owner, a, res.holder, res.accounts), rows })
       }))
     } catch (e) {
       if (e?.needsPassword) { setNeedPw(true); setError(e.wrongPassword ? e.message : '') }
@@ -75,16 +77,25 @@ export default function ImportDematForm({ onCancel }) {
   }
 
   // the owner's portfolio for this demat account (same demat account linked, else same broker), or a new one
-  function pickPortfolio(ownerId, a, holder) {
+  // Each demat account in the statement is its own investment account + portfolio. Found by its client ID first
+  // (whoever it belongs to); a same-broker account is reused only if it has no client ID saved yet, so a person's
+  // second Zerodha demat never lands in the first one.
+  const idOf = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const byClientId = (a) => (a.clientId ? (activeInvestmentAccounts || []).find((x) => idOf(x.accountClientId) && (idOf(x.accountClientId) === idOf(a.clientId) || idOf(x.accountClientId) === idOf(a.boId) || idOf(x.dematDpId) === idOf(a.boId))) : null)
+  function pickPortfolio(ownerId, a, holder, all) {
     const ias = (activeInvestmentAccounts || []).filter((x) => x.memberId === ownerId)
     const brokerKey = shortBroker(a.broker).toUpperCase()
-    const ia = ias.find((x) => a.clientId && String(x.accountClientId || '').includes(a.clientId))
-      || ias.find((x) => brokerKey && String(x.platformBroker || x.accountName || '').toUpperCase().includes(brokerKey))
+    const sameBroker = (x) => brokerKey && String(x.platformBroker || x.accountName || '').toUpperCase().includes(brokerKey)
+    const byId = byClientId(a)
+    const ia = (byId && byId.memberId === ownerId ? byId : null) || (!byId && ias.find((x) => sameBroker(x) && !idOf(x.accountClientId))) || null
     const pfs = (stockPortfolios || []).filter((p) => p.status !== 'Inactive' && p.ownerId === ownerId)
-    const pf = (ia && pfs.find((p) => p.investmentAccountId === ia.accountId)) || pfs.find((p) => brokerKey && String(p.portfolioName || '').toUpperCase().includes(brokerKey))
+    const pf = ia ? pfs.find((p) => p.investmentAccountId === ia.accountId) : null
     const member = (activeMembers || []).find((m) => m.memberId === ownerId)
     const first = member ? member.memberName.split(' ')[0] : ownerId === NEW_MEMBER ? holderName(holder).split(' ')[0] : ''
-    return { portfolioId: pf ? pf.portfolioId : NEW, newName: `${shortBroker(a.broker) || 'Demat'}${first ? ' · ' + first : ''}`, iaId: ia ? ia.accountId : NEW_ACCT }
+    // two demats at one broker: the name says which ("Zerodha · Rupa …4821")
+    const twin = ias.some(sameBroker) || (all || accts).filter((x) => x !== a && shortBroker(x.broker).toUpperCase() === brokerKey).length > 0
+    const tail = twin && a.clientId ? ` …${String(a.clientId).slice(-4)}` : ''
+    return { portfolioId: pf ? pf.portfolioId : NEW, newName: `${shortBroker(a.broker) || 'Demat'}${first ? ' · ' + first : ''}${tail}`, iaId: ia ? ia.accountId : NEW_ACCT }
   }
 
   // ticked: found in the list and not already in the chosen portfolio (importing the same statement twice must not double it)
@@ -124,7 +135,8 @@ export default function ImportDematForm({ onCancel }) {
         if (!take(a).length || a.portfolioId !== NEW || a.iaId !== NEW_ACCT) continue
         const broker = shortBroker(a.broker) || a.broker || 'Demat'
         const owner = (activeMembers || []).find((m) => m.memberId === a.ownerId)
-        const r = await addInvestmentAccount({ accountName: `${broker} - ${(owner?.memberName || holderName()).split(' ')[0]}`, memberId: a.ownerId, bankAccountId: '', accountType: 'Demat + Trading', platformBroker: broker, accountClientId: a.clientId || '', dematDpId: a.dpId || '', registeredEmail: owner?.email || user?.email || '', registeredPhone: '' })
+        const tail = / …\w{4}$/.test(a.newName) ? a.newName.match(/ …\w{4}$/)[0] : ''
+        const r = await addInvestmentAccount({ accountName: `${broker} - ${(owner?.memberName || holderName()).split(' ')[0]}${tail}`, memberId: a.ownerId, bankAccountId: '', accountType: 'Demat + Trading', platformBroker: broker, accountClientId: a.clientId || '', dematDpId: a.dpId || '', registeredEmail: owner?.email || user?.email || '', registeredPhone: '' })
         a.iaId = r?.accountId || r?.data?.accountId
         if (!a.iaId) throw new Error(r?.message || r?.error || `Could not create the ${broker} demat account`)
       }
