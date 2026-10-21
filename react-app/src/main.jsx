@@ -36,6 +36,36 @@ window.addEventListener('unhandledrejection', (e) => {
   if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(m) && reloadForUpdate()) e.preventDefault()
 })
 
+// A tab opened before a deploy keeps showing the old version (the old files are kept, so nothing fails).
+// Every few minutes, and when the tab comes back to the front, look at the live index.html: if its main file has a
+// new name, the next page change in the app does a full reload into the new version (forms in progress are safe:
+// it waits for a page change).
+;(() => {
+  if (import.meta.env.DEV) return
+  const mine = (document.querySelector('script[type="module"][src*="/assets/"]') || {}).src || ''
+  if (!mine) return
+  let stale = false, last = 0
+  const check = async () => {
+    if (stale || Date.now() - last < 120000) return
+    last = Date.now()
+    try {
+      const html = await (await fetch(`${import.meta.env.BASE_URL || '/'}index.html?cb=${Date.now().toString(36)}`, { cache: 'no-store' })).text()
+      const live = (html.match(/<script[^>]+type="module"[^>]+src="([^"]*\/assets\/[^"]+\.js)"/) || [])[1]
+      if (live && !mine.endsWith(live.replace(/^.*\/assets\//, '/assets/'))) stale = true
+    } catch { /* offline: try later */ }
+  }
+  setInterval(check, 300000)
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check() })
+  setTimeout(check, 30000)
+  // page changes in the app (links, back / forward): reload into the new version
+  const onNav = () => { if (stale) { stale = false; freshReload() } }
+  for (const k of ['pushState', 'replaceState']) {
+    const orig = window.history[k]
+    window.history[k] = function (...args) { const r = orig.apply(this, args); if (k === 'pushState') setTimeout(onNav, 0); return r }
+  }
+  window.addEventListener('popstate', onNav)
+})()
+
 createRoot(document.getElementById('root')).render(
   <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
     <AuthProvider>
