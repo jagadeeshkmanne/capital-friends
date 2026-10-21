@@ -9,6 +9,7 @@ import { getPaperBook, getPaperLive } from '../services/api'
 // Hidden admin page (/admin/paper): private paper-trading book. Only the admin email gets data (checked on the server too).
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
 const pct = (v) => (v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(1) + '%')
+const pct2 = (v) => (v == null ? '—' : Math.abs(v) < 1 ? (v > 0 ? '+' : '') + Number(v).toFixed(2) + '%' : pct(v))   // small moves: 2 decimals so +₹112 is not shown as +0.0%
 const tone = (v) => (v == null ? 'text-[var(--text-primary)]' : v >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')
 const day = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
 // NSE cash market hours (Mon-Fri 9:15-15:30 IST): live prices refresh every minute only then
@@ -269,7 +270,7 @@ export default function PaperBookPage() {
             <div className="col-span-2 lg:col-span-1 rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-3 min-w-0">
               <p className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">All {keys.length} books</p>
               <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(val)}</p>
-              <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(inv ? (g / inv) * 100 : 0)}</p>
+              <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct2(inv ? (g / inv) * 100 : 0)}</p>
               <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Invested {lakhs(inv)}</p>
             </div>
           )
@@ -285,8 +286,8 @@ export default function PaperBookPage() {
                 {lead?.k === k && <span className="ml-auto flex-none px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400">LEADING</span>}
               </div>
               <p className="mt-1.5 text-base font-bold tabular-nums text-[var(--text-primary)]">{inr(v)}</p>
-              <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct(gp)}</p>
-              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}</p>
+              <p className={`text-xs font-semibold tabular-nums ${tone(g)}`}>{sgn(g)}{inr(Math.abs(g))} · {pct2(gp)}</p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">Invested {lakhs(x.invested)}{x.costs ? ` · costs ${inr(x.costs)}` : ''}</p>
               {x.bench && <p className={`text-[11px] font-semibold mt-0.5 truncate ${vsTone(vsNifty(x, v))}`}>vs Nifty: {vsWord(vsNifty(x, v))}</p>}
             </button>
           )
@@ -299,7 +300,7 @@ export default function PaperBookPage() {
         <h3 className="text-sm font-bold text-[var(--text-primary)]">{bk} · {BOOK_NAME[bk] || bk}</h3>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? tone(view.today) : ''} />
+        <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct2(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? tone(view.today) : ''} />
         <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={b.bench ? vsWord(vsNifty(b, view.liveNav)) : '—'} sub={b.bench ? `₹10 L in Nifty now ${lakhs(benchNow(b))}` : ''} tone={b.bench ? vsTone(vsNifty(b, view.liveNav)) : ''}
           title={nLive && nBase ? `Book value now vs the same ₹10 lakh in the Nifty 500 (index ${num(nLive)} live)` : 'At the last close, against the same ₹10 lakh in the Nifty 500'} />
         <Mini label="Stocks / Gold / Cash" value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}%`} sub={`${view.nStocks} stocks`} />
