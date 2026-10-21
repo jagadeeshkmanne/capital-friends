@@ -1152,7 +1152,12 @@ function recalculateStockHoldings(portfolioId, stockSymbol) {
     }
 
     // Calculate weighted average buy price
-    const avgBuyPrice = buyQuantity > 0 ? totalInvestment / buyQuantity : 0;
+    let avgBuyPrice = buyQuantity > 0 ? totalInvestment / buyQuantity : 0;
+    // Trade-history imports (Groww / Zerodha files, StockTrades.js): cost of the shares still held, first in first out
+    if (relevantTransactions.some(row => isTradeHistoryNote_(row[14]))) {
+      const fifo = fifoRemaining_(relevantTransactions);
+      if (fifo.qty > 0) avgBuyPrice = fifo.cost / fifo.qty;
+    }
     const currentInvestment = totalQuantity * avgBuyPrice;
 
     // Get stock details (if the list / Google Finance can't tell us right now, use what the transaction saved)

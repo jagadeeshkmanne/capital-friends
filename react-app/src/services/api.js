@@ -309,6 +309,7 @@ export const deleteAllStocks = () => callAPI('stocks:delete-all', { confirm: 'DE
 // Stock Transactions
 export const buyStock = (data) => callAPI('stock:buy', data)
 export const importStocks = (data) => callAPI('stock:import', data)
+export const importStockTrades = (data) => callAPI('stock:import-trades', data)
 export const sellStock = (data) => callAPI('stock:sell', data)
 export const getStockHoldings = (portfolioId) => callAPI('stock:holdings', { portfolioId })
 export const getStockTransactions = (portfolioId) => callAPI('stock:transactions', { portfolioId })

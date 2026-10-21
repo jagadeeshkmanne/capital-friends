@@ -423,6 +423,9 @@ function routeAction(action, params, userRecord) {
     case 'stock:import':
       return importStockHoldings(params);
 
+    case 'stock:import-trades':
+      return importStockTrades(params);
+
     case 'stock:price':
       return fetchStockPrice(params.symbol);
 

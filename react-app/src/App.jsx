@@ -31,6 +31,8 @@ import TermsAndConditions from './pages/TermsAndConditions'
 // Statement import (beta): loaded only when opened, so the PDF reader is not in the main bundle
 const ImportStatementPage = lazy(() => import('./pages/ImportStatementPage'))
 const PaperBookPage = lazy(() => import('./pages/PaperBookPage'))
+// Stock trade-history import (beta, admin only until it is tested): hidden page, not in the menu
+const StockTradesImportPage = lazy(() => import('./pages/investments/StockTradesImportPage'))
 
 export default function App() {
   return (
@@ -62,6 +64,7 @@ export default function App() {
           <Route path="investments/mutual-funds" element={<MutualFundsPage />} />
           <Route path="investments/funds" element={<FundsDashboardPage />} />
           <Route path="investments/stocks" element={<StocksPage />} />
+          <Route path="investments/stocks/import-trades" element={<Suspense fallback={null}><StockTradesImportPage /></Suspense>} />
           <Route path="investments/other" element={<OtherInvestmentsTab />} />
 
           {/* Liabilities */}
