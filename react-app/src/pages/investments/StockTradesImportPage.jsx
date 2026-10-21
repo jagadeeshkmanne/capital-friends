@@ -9,7 +9,8 @@ import { FormSelect } from '../../components/Modal'
 import StockSearchInput, { loadStocks, clearStocksCache, stocksFromCache } from '../../components/forms/StockSearchInput'
 import * as api from '../../services/api'
 import { readTableFile, buildStockIndex, matchStock } from '../../utils/holdingsImport'
-import { parseTradeHistory, groupAccounts, summarize, sameName, fileChecks } from '../../utils/tradeHistoryImport'
+import { parseTradeHistory, groupAccounts, summarize, fileChecks } from '../../utils/tradeHistoryImport'
+import { matchMemberName, nameFit } from '../../utils/nameMatch'
 
 // Hidden beta page (/investments/stocks/import-trades, admin only for now): import a Groww order history or
 // Zerodha tradebooks. Each broker account in the files goes to its own portfolio, found by the client ID saved
@@ -95,7 +96,7 @@ export default function StockTradesImportPage() {
     if (byId) { account = byId; how = 'matched'; memberId = byId.memberId }
     else if (a.accountId && a.accountId !== 'new') { account = brokerAccts.find((x) => x.accountId === a.accountId) || null; how = account ? (normId(account.accountClientId) ? (a.clientId ? 'conflict' : 'chosen') : a.clientId ? 'fill' : 'chosen') : 'new'; memberId = account?.memberId || '' }
     else {
-      memberId = a.memberId || (a.holderName && members.find((m) => sameName(a.holderName, m.memberName))?.memberId) || (!members.length || a.holderName ? 'new' : members.length === 1 ? members[0].memberId : '')
+      memberId = a.memberId || (a.holderName && matchMemberName(members, a.holderName)?.memberId) || (!members.length || a.holderName ? 'new' : members.length === 1 ? members[0].memberId : '')
       // the member's account at this broker with no client ID saved yet → save the ID onto it
       const blank = a.accountId === 'new' ? null : brokerAccts.find((x) => x.memberId === memberId && !normId(x.accountClientId))
       if (blank) { account = blank; how = a.clientId ? 'fill' : 'chosen' }
@@ -109,7 +110,7 @@ export default function StockTradesImportPage() {
     const snapStocks = new Set(rows.filter((t) => SNAPSHOT_NOTE.test(t.notes)).map((t) => t.symbol)).size
     const defMode = !rows.length ? 'add' : kinds.manual ? 'add' : kinds.snapshot ? 'replace' : 'add'
     const mode = a.mode || defMode
-    const nameOk = !a.holderName || !memberId || memberId === 'new' || sameName(a.holderName, memberName(memberId))
+    const nameOk = !a.holderName || !memberId || memberId === 'new' || !!nameFit(a.holderName, memberName(memberId))
     return { account, how, memberId, pfs, portfolio, rows, kinds, lastManual, snapStocks, mode, nameOk, brokerAccts }
   }
 
@@ -131,7 +132,7 @@ export default function StockTradesImportPage() {
       for (const a of ready) {
         const p = plan(a), mName = memberName(p.memberId, a)
         if (p.memberId === 'new') {
-          const self = !members.some((m) => m.relationship === 'Self') && (!a.holderName || sameName(a.holderName, user?.name))
+          const self = !members.some((m) => m.relationship === 'Self') && (!members.length || !a.holderName || !user?.name || !!nameFit(a.holderName, user.name))
           step(`Adding ${mName} to Family`)
           const r = await addMember({ memberName: mName, relationship: self ? 'Self' : 'Other', email: self ? user?.email || '' : '', includeInEmailReports: true, pan: '', aadhar: '', mobile: '', dynamicFields: {} })
           p.memberId = r?.memberId || r?.data?.memberId || r?.id

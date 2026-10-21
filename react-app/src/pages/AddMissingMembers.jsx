@@ -3,6 +3,7 @@ import { Loader2, CheckCircle2 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { useMask } from '../context/MaskContext'
+import { nameFit } from '../utils/nameMatch'
 
 // The CAS statement names people who are not in Family yet: add them here in one go, then check again.
 // The same person often appears twice ("Jagadeesh Kumar Manne" and "MANNE JAGADEESH KUMAR"): grouped by
@@ -23,10 +24,11 @@ export function groupHolders(missing, folios) {
   for (const m of missing || []) {
     const t = uniq(tokens(m.holder)).sort()
     const pans = panOf[String(m.holder || '').toUpperCase()] || new Set()
+    // the same person written two ways in one statement ("J K MANNE", "Jagadeesh Kumar Manne"): names that fit
+    // (utils/nameMatch) and share a PAN
     const same = people.find((p) => {
       if (p.key === t.join(' ')) return true
-      const sub = t.every((x) => p.tokens.includes(x)) || p.tokens.every((x) => t.includes(x))
-      return sub && [...pans].some((x) => p.pans.has(x))
+      return p.names.some((n) => nameFit(n, m.holder)) && [...pans].some((x) => p.pans.has(x))
     })
     if (same) {
       same.names.push(m.holder); same.folios += m.folios || 0
@@ -67,6 +69,21 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
   const people = useMemo(() => groupHolders(missing, folios), [missing, folios])
   const hasSelf = (members || []).some((m) => m.relationship === 'Self' && m.status !== 'Inactive')
   const rows = useMemo(() => defaultRows(people, { hasSelf, me, statementEmail }), [people, hasSelf, me, statementEmail])
+  // PAN saved with the new member (next imports then match for sure): only the person's single PAN, and only when
+  // no other holder on the statement or member in Family has it (a minor's old folios carry the parent's PAN)
+  const panFor = useMemo(() => {
+    const holdersOf = {}
+    ;(folios || []).forEach((f) => { const p = String(f.pan || '').toUpperCase(); if (p) (holdersOf[p] = holdersOf[p] || new Set()).add(String(f.holder || '').toUpperCase()) })
+    const taken = new Set((members || []).map((m) => String(m.pan || '').toUpperCase()).filter(Boolean))
+    const out = {}
+    people.forEach((p) => {
+      if (p.pans.size !== 1) return
+      const pan = [...p.pans][0].toUpperCase()
+      const mine = new Set(p.names.map((n) => String(n).toUpperCase()))
+      if (!taken.has(pan) && [...(holdersOf[pan] || [])].every((h) => mine.has(h))) out[p.key] = pan
+    })
+    return out
+  }, [people, folios, members])
   const [done, setDone] = useState([])      // keys added so far
   const [err, setErr] = useState('')
   const started = useRef(false)
@@ -77,7 +94,7 @@ export default function AddMissingMembers({ missing, folios, statementEmail, onD
     ;(async () => {
       try {
         for (const r of rows) {
-          await addMember({ memberName: r.name.trim(), relationship: r.rel, email: r.email, includeInEmailReports: !!r.report, pan: '', aadhar: '', mobile: '', dynamicFields: {} })
+          await addMember({ memberName: r.name.trim(), relationship: r.rel, email: r.email, includeInEmailReports: !!r.report, pan: panFor[r.key] || '', aadhar: '', mobile: '', dynamicFields: {} })
           setDone((d) => [...d, r.key])
         }
         onDone?.()

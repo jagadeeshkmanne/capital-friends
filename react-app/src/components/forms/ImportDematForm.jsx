@@ -9,6 +9,7 @@ import { FormField, FormDateInput, FormSelect, FormInput, FormActions } from '..
 import { loadStocks, clearStocksCache, stocksFromCache } from './StockSearchInput'
 import { buildStockIndex } from '../../utils/holdingsImport'
 import { shortBroker } from '../../utils/cas/dematParser'
+import { matchMemberName, nameFit } from '../../utils/nameMatch'
 
 // Import the shares from a CDSL / NSDL statement (CAS). The PDF is read in the browser; only the
 // holdings go to the user's sheet. One CAS covers every demat account of a PAN (CDSL and NSDL), so each
@@ -29,8 +30,6 @@ function whyNot(r) {
   return 'not in the stock list (suspended or delisted?)'
 }
 const isoFromDmy = (s) => { const m = String(s || '').match(/^(\d{2})-(\d{2})-(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : '' }
-const tokens = (s) => new Set(String(s || '').toUpperCase().split(/[^A-Z]+/).filter((t) => t.length > 1))  // in order
-function nameScore(a, b) { const A = tokens(a), B = tokens(b); let n = 0; A.forEach((t) => { if (B.has(t)) n++ }); return n }
 
 export default function ImportDematForm({ onCancel }) {
   const { stockPortfolios, stockHoldings, activeMembers, activeInvestmentAccounts, addStockPortfolio, importStocks, otherInvList, addOtherInvestment, addMember, addInvestmentAccount } = useData()
@@ -55,16 +54,10 @@ export default function ImportDematForm({ onCancel }) {
       if (stocksFromCache()) clearStocksCache()
       const [res, stocks] = await Promise.all([readDematPdf(f, password), loadStocks()])
       const idx = buildStockIndex(stocks)
-      // owner: the family member with this PAN, else one whose whole name is in the holder's name
-      // ("Rupa" or "Rupa Katakam" for RUPA LAKSHMI KATAKAM — but not just a shared middle name)
-      const byPan = res.pan && (activeMembers || []).find((m) => String(m.pan || '').toUpperCase() === res.pan)
-      const first = [...tokens(res.holder)][0]
-      const byName = (activeMembers || []).filter((m) => {
-        const t = [...tokens(m.memberName)]
-        return t.length && nameScore(m.memberName, res.holder) === t.length && (t.length >= 2 || t[0] === first)
-      })
+      // owner: name and PAN matched to Family (word order, initials, spellings, middle names: utils/nameMatch)
+      const found = matchMemberName(activeMembers || [], res.holder, res.pan)
       // nobody matches (first sign-in, or a family member not added yet): add the holder to Family on import
-      const ownerId = byPan ? byPan.memberId : byName.length === 1 ? byName[0].memberId : res.holder ? NEW_MEMBER : ''
+      const ownerId = found ? found.memberId : res.holder ? NEW_MEMBER : ''
       setCas(res); setNeedPw(false)
       setDate(isoFromDmy(res.asOf) || new Date().toISOString().slice(0, 10))
       setAccts(res.accounts.filter((a) => a.holdings.length).map((a) => {
@@ -120,7 +113,8 @@ export default function ImportDematForm({ onCancel }) {
       // first: anyone / any demat account the statement needs that the app doesn't have yet
       const work = accts.filter((a) => take(a).length || takeUnlisted(a).length)
       if (work.some((a) => a.ownerId === NEW_MEMBER)) {
-        const self = !(activeMembers || []).some((m) => m.relationship === 'Self') && (!user?.name || nameScore(user.name, cas.holder) > 0)
+        // you, when Family is empty (first sign-in) or the name is yours
+        const self = !(activeMembers || []).some((m) => m.relationship === 'Self') && (!(activeMembers || []).length || !user?.name || !!nameFit(user.name, cas.holder))
         const r = await addMember({ memberName: holderName(), relationship: self ? 'Self' : 'Other', email: self ? user?.email || '' : '', includeInEmailReports: true, pan: cas.pan || '', aadhar: '', mobile: '', dynamicFields: {} })
         const id = r?.memberId || r?.data?.memberId || r?.id
         if (!id) throw new Error(r?.message || r?.error || `Could not add ${holderName()} to Family`)

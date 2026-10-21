@@ -288,26 +288,9 @@ function casBuildPlan_(statement, data, mapping) {
   // member must be in the statement name (or the other way round). "Manne Sanjith" is Sanjith Manne,
   // never Jagadeesh Manne. Word order and short initials don't matter. PAN only breaks ties.
   function matchMember(f) {
-    var ht = casNameTokens_(f.holder);
-    if (!ht.length) return null;
-    var cands = members.map(function (m) {
-      var mt = casNameTokens_(m.memberName);
-      var shared = mt.filter(function (t) { return ht.indexOf(t) >= 0; }).length;
-      var ok = mt.length > 0 && (shared === casUniq_(mt).length || shared === casUniq_(ht).length);
-      return { m: m, ok: ok, shared: shared };
-    }).filter(function (x) { return x.ok; });
-    if (cands.length === 1) return cands[0].m;
-    var pan0 = String(f.pan || '').toUpperCase();
-    if (!cands.length) {
-      // surname changed (e.g. after marriage): same PAN and the member's first name is in the statement name
-      var byPanFirst = members.filter(function (m) { var mt = casNameTokens_(m.memberName); return pan0 && String(m.pan || '').toUpperCase() === pan0 && mt.length && ht.indexOf(mt[0]) >= 0; });
-      return byPanFirst.length === 1 ? byPanFirst[0] : null;
-    }
-    var pan = String(f.pan || '').toUpperCase();
-    var byPan = cands.filter(function (x) { return pan && String(x.m.pan || '').toUpperCase() === pan; });
-    if (byPan.length === 1) return byPan[0].m;
-    cands.sort(function (a, b) { return b.shared - a.shared; });
-    return cands[0].shared > cands[1].shared ? cands[0].m : null;
+    // NameMatch.js: word order, titles, initials, close spellings and joined words don't matter; a family
+    // surname alone never matches; PAN breaks ties and finds a changed surname
+    return matchMemberName(members, f.holder, f.pan);
   }
 
   // Specialised Investment Funds (SIF) are left out of the import for now: AMFI lists them separately and
