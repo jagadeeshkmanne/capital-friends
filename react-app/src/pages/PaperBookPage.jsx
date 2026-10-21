@@ -167,9 +167,11 @@ export default function PaperBookPage() {
       const [s, q, , px, val] = h
       const L = s === 'LIQUIDCASE' ? null : lp[s]
       const price = L ? L.price : px
-      const prev = L && L.prev ? L.prev : price
+      // bought today (opening or rebalance day): today's change counts from the buy price, not yesterday's close
+      const boughtToday = h[8] && h[8] === new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)
+      const prev = boughtToday && h[2] ? h[2] : L && L.prev ? L.prev : price
       const value = s === 'LIQUIDCASE' ? val : q * price
-      return { row: h, price, value, today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: L && L.prev ? (price / L.prev - 1) * 100 : null }
+      return { row: h, price, value, today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: L && prev ? (price / prev - 1) * 100 : null }
     })
     // stocks by momentum rank (strongest first; out of the top 40 last), then gold and liquid at the bottom
     const grp = (h) => (h.row[0] === 'GOLDBEES' ? 1 : h.row[0] === 'LIQUIDCASE' ? 2 : 0)
