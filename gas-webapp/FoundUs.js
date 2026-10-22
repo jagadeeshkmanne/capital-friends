@@ -66,19 +66,26 @@ function sendFeedback_(params, userRecord) {
   return { sent: true };
 }
 
-/** Run from the editor: how many families came from where, and the details they wrote (newest first). */
-function foundUsReport() {
+/** Where families came from: counts per answer and the details they wrote (newest first). */
+function foundUsStats_() {
   var all = PropertiesService.getScriptProperties().getProperties();
-  var counts = {}, details = [], total = 0;
+  var counts = {}, list = [], total = 0;
   Object.keys(all).forEach(function (k) {
     if (k.indexOf('fu:') !== 0) return;
     var p = String(all[k]).split('|'), via = p[0];
     total++;
     counts[via] = (counts[via] || 0) + 1;
-    if (p[2]) details.push(p[1] + '  ' + via + ': ' + p.slice(2).join('|'));
+    list.push({ date: p[1] || '', via: via, detail: p.slice(2).join('|') });
   });
-  details.sort().reverse();
-  var out = { total: total, counts: counts, details: details.slice(0, 100) };
+  list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  var families = null;
+  try { families = countAppUsers_().families; } catch (e) { /* ignore */ }
+  return { total: total, families: families, counts: counts, list: list.slice(0, 500), at: new Date().toISOString() };
+}
+
+/** Run from the editor to see the same numbers as the admin page (/admin/found-us). */
+function foundUsReport() {
+  var out = foundUsStats_();
   Logger.log(JSON.stringify(out, null, 2));
   return out;
 }

@@ -10,7 +10,7 @@ import * as api from '../services/api'
 // The little friend at the top reacts: waves, is happy when you pick, sad for a bug, thinks for a feature, cheers at the end.
 
 const DEV_EMAIL = 'capital.friends.dev@gmail.com'
-const OPTIONS = [
+export const FOUND_US_OPTIONS = [
   { k: 'google', label: 'Google search', Icon: Search, line: 'Google sent you? Nice!' },
   { k: 'youtube', label: 'YouTube', Icon: Youtube, ask: 'Which channel or video? (optional)', line: 'Yay! Thanks for watching.' },
   { k: 'friend', label: 'Friend or family', Icon: Users, ask: 'Who told you? (optional)', line: 'Best way! Thank them for us.' },
@@ -82,7 +82,7 @@ function Dialog({ onDone }) {
   // mandatory: keep the page behind from scrolling
   useEffect(() => { const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = o } }, [])
 
-  const opt = OPTIONS.find((o) => o.k === pick)
+  const opt = FOUND_US_OPTIONS.find((o) => o.k === pick)
   const canGo = !!pick && !(pick === 'other' && !detail.trim()) && !done
 
   function choose(o) {
@@ -142,7 +142,7 @@ function Dialog({ onDone }) {
             <h2 id="cfq-title">How did you hear about Capital Friends?</h2>
             <p className="cfq-sub">Asked once for your family.</p>
             <div className="cfq-opts">
-              {OPTIONS.map((o) => (
+              {FOUND_US_OPTIONS.map((o) => (
                 <button key={o.k} type="button" className={`cfq-o${pick === o.k ? ' on' : ''}`} onClick={() => choose(o)}>
                   <o.Icon size={16} /><span>{o.label}</span><span className="cfq-rd" />
                 </button>

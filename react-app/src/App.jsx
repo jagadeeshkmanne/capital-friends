@@ -31,6 +31,7 @@ import TermsAndConditions from './pages/TermsAndConditions'
 // Statement import (beta): loaded only when opened, so the PDF reader is not in the main bundle
 const ImportStatementPage = lazy(() => import('./pages/ImportStatementPage'))
 const PaperBookPage = lazy(() => import('./pages/PaperBookPage'))
+const FoundUsAdminPage = lazy(() => import('./pages/FoundUsAdminPage'))
 // Import stocks (beta): every stock file in one page, open to every signed-in user
 const StockTradesImportPage = lazy(() => import('./pages/investments/StockTradesImportPage'))
 
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="import" element={<Suspense fallback={null}><ImportStatementPage /></Suspense>} />
           <Route path="admin/paper" element={<Suspense fallback={null}><PaperBookPage /></Suspense>} />
+          <Route path="admin/found-us" element={<Suspense fallback={null}><FoundUsAdminPage /></Suspense>} />
 
           {/* More (mobile) */}
           <Route path="more" element={<MorePage />} />

@@ -204,6 +204,10 @@ function routeAction(action, params, userRecord) {
       if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
       return getPaperBook_();
 
+    case 'admin:found-us':     // hidden admin page: where families heard about the app (FoundUs.js)
+      if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
+      return foundUsStats_();
+
     case 'auth:shared-members':
       return getSharedMembers(userRecord.spreadsheetId);
 
