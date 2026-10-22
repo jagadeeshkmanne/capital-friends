@@ -378,7 +378,7 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
         {tab === 'portfolios' && (<>
           <HoldingsCard count={funds.length} stats={stats} returns={returns} onChart={() => open({ v: 'growth' })} />
           <IonList lines="full" className="cf-flat -mx-4 mt-2">
-            {portfolioData.map((p) => {
+            {portfolioData.filter((p) => !p.closed).map((p) => {
               const ind = portfolioIndicators[p.portfolioId] || {}
               const pl = (p.unrealizedPL || 0) + (p.realizedPL || 0)
               const n = p.holdings.filter((h) => h.units > 0).length
@@ -398,6 +398,27 @@ function RootScreen({ portfolioData, portfolioIndicators, currentIndicators, sta
               )
             })}
           </IonList>
+          {/* closed portfolios (everything sold): listed apart with their realized profit, which still counts in the totals */}
+          {portfolioData.some((p) => p.closed) && (<>
+            <IonListHeader className="!pl-1 mt-3"><IonLabel className="cf-group">Closed · everything sold</IonLabel></IonListHeader>
+            <IonList lines="full" className="cf-flat -mx-4">
+              {portfolioData.filter((p) => p.closed).map((p) => {
+                const r = Number(p.realizedPL) || 0
+                return (
+                  <IonItem key={p.portfolioId} button detail onClick={() => open({ p: p.portfolioId })}>
+                    <IonLabel className="!my-3">
+                      <h3 className="!text-[15px] !whitespace-normal !leading-snug text-[var(--ion-color-medium)]">{dn(p.portfolioName)}</h3>
+                      <p className="!whitespace-normal">{mv(p.ownerName, 'name')} · all sold</p>
+                    </IonLabel>
+                    <div slot="end" className="text-right tabular-nums">
+                      <div className={`text-[14px] font-semibold ${upCls(r)}`}>{r >= 0 ? '+' : ''}{formatINR(r)}</div>
+                      {p.grossBuys > 0 && <div className={`text-[12px] ${upCls(r)}`}>{pctTxt((r / p.grossBuys) * 100)}</div>}
+                    </div>
+                  </IonItem>
+                )
+              })}
+            </IonList>
+          </>)}
         </>)}
         {tab === 'activity' && <Activity txns={allFilteredTxns} onTxn={setTxn} />}
       </FadeIn>

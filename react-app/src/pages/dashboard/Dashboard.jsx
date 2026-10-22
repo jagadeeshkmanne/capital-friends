@@ -18,6 +18,7 @@ import { attributeFamilyGoals } from '../../utils/goalAttribution'
 import { useGoalsPlan } from '../../hooks/useGoalsPlan'
 import { withGoalExtras } from '../../utils/goalExtras'
 import { useBucketActions } from '../goals/useBucketActions'
+import { openPortfolios, isClosedPortfolio } from '../../utils/mfClosed'
 import { isBuyOpportunity, isStrongBuyOpportunity } from '../../utils/buyOpportunities'
 
 const STEADY_CATS = new Set(['Debt', 'Liquid', 'Gilt', 'Cash', 'Money Market', 'Overnight', 'Arbitrage'])
@@ -162,14 +163,18 @@ export default function Dashboard() {
   // ── Core data computation ──
   const data = useMemo(() => {
     // MF
-    const activeMFPortfolios = filterOwner((mfPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')
+    // closed portfolios (everything sold) are history: they stay on the Mutual Funds page, not in what is held today
+    const activeMFPortfolios = filterOwner(openPortfolios((mfPortfolios || []).filter((p) => p.status === 'Active'), mfHoldings), 'ownerId')
     const mfPortfolioIds = new Set(activeMFPortfolios.map((p) => p.portfolioId))
     const activeMFHoldings = (mfHoldings || []).filter((h) => mfPortfolioIds.has(h.portfolioId) && h.units > 0)
     // Your money in (same as the Mutual Funds page): purchases and SIPs minus withdrawals, per portfolio
     const mfInvested = activeMFPortfolios.reduce((s, p) => s + (Number(p.totalInvestment) || 0), 0)
       || activeMFHoldings.reduce((s, h) => s + (Number(h.investment) > 1 ? Number(h.investment) : Number(h.currentValue)), 0)
     const mfCurrentValue = activeMFHoldings.reduce((s, h) => s + (Number(h.currentValue) || 0), 0)
-    const mfPL = mfCurrentValue - mfInvested
+    // + the profit booked in closed portfolios (everything sold), so the P&L matches the Mutual Funds page
+    const mfClosedRealized = filterOwner((mfPortfolios || []).filter((p) => p.status === 'Active' && isClosedPortfolio(p, mfHoldings)), 'ownerId')
+      .reduce((s, p) => s + (Number(p.realizedPL) || 0), 0)
+    const mfPL = mfCurrentValue - mfInvested + mfClosedRealized
 
     // Stocks
     const activeStockPortfolios = filterOwner((stockPortfolios || []).filter((p) => p.status === 'Active'), 'ownerId')

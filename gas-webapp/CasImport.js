@@ -379,7 +379,10 @@ function casBuildPlan_(statement, data, mapping) {
       byPlatform = mine.filter(function (p) { var a = accountOf(p); return a && !['zerodha', 'groww', 'direct'].some(function (k) { return casAccountMatchesPlatform_(a, k); }); });
     }
     if (pinnedIds.length) g.suggestion = pinnedIds[0];
-    else if (!g.live) g.suggestion = 'skip'; // everything already sold: don't create or fill a portfolio unless asked
+    // everything already sold: still imported (its profit counts in the totals); the app lists it under Closed portfolios.
+    // An agent's own group gets its own portfolio, never mixed into another one.
+    // its own new portfolio: never mixed into a portfolio that is in use (that would change its money in and history)
+    else if (!g.live) g.suggestion = 'new';
     else if (byPlatform.length === 1) g.suggestion = byPlatform[0].portfolioId;
     else if (mine.length === 1) g.suggestion = mine[0].portfolioId;
     else g.suggestion = 'new';

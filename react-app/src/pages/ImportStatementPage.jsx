@@ -409,7 +409,7 @@ export default function ImportStatementPage() {
                         {g.accounts.filter((a) => !(a.match && g.accounts.filter((x) => x.match).length === 1)).map((a) => <option key={a.accountId} value={a.accountId}>Investment account: {a.name}</option>)}
                       </select>
                     )}
-                    {destOf(g) === 'skip' && !g.live && <p className="text-[11px] text-[var(--text-dim)]">Everything here is sold. Choose a portfolio only if you want its old profit / loss history.</p>}
+                    {!g.live && <p className="text-[11px] text-[var(--text-dim)]">{destOf(g) === 'skip' ? 'Everything here is sold. Import it to keep its profit or loss in your totals.' : 'Everything here is sold: imported for your profit history and shown under Closed portfolios on the Mutual Funds page.'}</p>}
                     {Object.keys(g.pinned || {}).length > 0 && <p className="text-[11px] text-sky-400">Imported before – those funds stay where they are.</p>}
                   </div>
                 ))}

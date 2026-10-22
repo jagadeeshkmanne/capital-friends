@@ -22,6 +22,7 @@
  *    dashboard, email report and everything else keep working unchanged.
  */
 import { getGoalAllocation, spendsOverYears } from '../data/glidePath'
+import { openPortfolios } from './mfClosed'
 import { needTodayN } from './goalPlan'
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
@@ -62,7 +63,7 @@ export function poolItems({ mfPortfolios, mfHoldings, stockPortfolios, stockHold
   const kids = new Set((kidNames || []).map(norm))
   const kidsWithGoal = new Set((kidGoalNames || []).map(norm)) // a child who has a goal of their own: their money counts, for that goal first
   const items = []
-  for (const p of (mfPortfolios || []).filter((x) => x.status !== 'Inactive')) {
+  for (const p of openPortfolios((mfPortfolios || []).filter((x) => x.status !== 'Inactive'), mfHoldings)) {   // closed (all sold): no money for goals
     const hs = (mfHoldings || []).filter((h) => h.portfolioId === p.portfolioId && Number(h.units) > 0)
     const value = hs.reduce((t, h) => t + (Number(h.currentValue) || 0), 0)
     const eq = value > 0 ? hs.reduce((t, h) => t + (Number(h.currentValue) || 0) * eqOf(h), 0) / value : 0

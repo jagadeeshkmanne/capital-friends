@@ -18,6 +18,7 @@ import MFSwitchForm from '../../components/forms/MFSwitchForm'
 import MFAllocationManager from '../../components/forms/MFAllocationManager'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
+import { isClosedPortfolio } from '../../utils/mfClosed'
 import FundAllocationForm from '../../components/forms/FundAllocationForm'
 import PageLoading from '../../components/PageLoading'
 import { isBuyOpportunity } from '../../utils/buyOpportunities'
@@ -271,6 +272,7 @@ export default function MutualFundsPage() {
   const isPhone = useIsPhone()
   const [subTab, setSubTab] = useState('holdings')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showClosed, setShowClosed] = useState(false)
   const [txnFundFilter, setTxnFundFilter] = useState('all')
   const [txnMenuOpen, setTxnMenuOpen] = useState(null) // transactionId of open menu
   const [breakdownOpen, setBreakdownOpen] = useState(true)
@@ -317,9 +319,19 @@ export default function MutualFundsPage() {
     return portfolios.map((p) => {
       const holdings = mfHoldings.filter((h) => h.portfolioId === p.portfolioId)
       const txns = (mfTransactions || []).filter((t) => t.portfolioId === p.portfolioId)
+      // a fund with no units that has transactions is sold (not "planned"): not counted, not listed under holdings
+      const traded = new Set(txns.map((t) => String(t.fundCode || '')))
+      const closed = isClosedPortfolio(p, mfHoldings, mfTransactions || [])
+      // only in a closed portfolio are its sold funds left out (an open portfolio shows them as before)
+      const sold = closed ? holdings.filter((h) => !(Number(h.units) > 0) && traded.has(String(h.fundCode || ''))) : []
+      // money put in (purchases and SIPs, no switches): the base for a closed portfolio's returns
+      const grossBuys = txns.reduce((s, t) => s + (t.type === 'BUY' && !/^(SWITCH|DIVIDEND)$/i.test(String(t.transactionType || '')) ? Number(t.totalAmount) || 0 : 0), 0)
       return {
         ...p, holdings, txns,
-        fundCount: holdings.length,
+        fundCount: holdings.length - sold.length,
+        soldCodes: new Set(sold.map((h) => String(h.fundCode || ''))),
+        closed,   // everything sold: kept for its profit history, listed apart
+        grossBuys,
       }
     })
   }, [portfolios, mfHoldings, mfTransactions])
@@ -350,20 +362,24 @@ export default function MutualFundsPage() {
   // Stats for selected view
   const stats = useMemo(() => {
     const source = selectedPortfolioId === 'all' ? portfolioData : portfolioData.filter((p) => p.portfolioId === selectedPortfolioId)
-    const invested = source.reduce((s, p) => s + p.totalInvestment, 0)
+    // closed portfolios (everything sold) add their realized profit, not their "money in": for them that is buys minus
+    // sells (often below zero), which would shrink the base of every %. Their % base is what they bought.
+    const onlyClosed = source.length > 0 && source.every((p) => p.closed)
+    const invested = onlyClosed ? source.reduce((s, p) => s + p.grossBuys, 0) : source.reduce((s, p) => s + (p.closed ? 0 : p.totalInvestment), 0)
+    const pctBase = onlyClosed ? invested : invested + source.reduce((s, p) => s + (p.closed ? p.grossBuys : 0), 0)
     const current = source.reduce((s, p) => s + p.currentValue, 0)
     const unrealizedPL = source.reduce((s, p) => s + p.unrealizedPL, 0)
     const realizedPL = source.reduce((s, p) => s + p.realizedPL, 0)
     const totalPL = unrealizedPL + realizedPL
-    const totalPLPct = invested > 0 ? (totalPL / invested) * 100 : 0
-    const unrealizedPLPct = invested > 0 ? (unrealizedPL / invested) * 100 : 0
-    const realizedPLPct = invested > 0 ? (realizedPL / invested) * 100 : 0
+    const totalPLPct = pctBase > 0 ? (totalPL / pctBase) * 100 : 0
+    const unrealizedPLPct = pctBase > 0 ? (unrealizedPL / pctBase) * 100 : 0
+    const realizedPLPct = pctBase > 0 ? (realizedPL / pctBase) * 100 : 0
     // Monthly SIP total from holdings
     const relevantHoldings = !mfHoldings ? [] : selectedPortfolioId === 'all'
       ? mfHoldings.filter((h) => source.some((p) => p.portfolioId === h.portfolioId))
       : mfHoldings.filter((h) => h.portfolioId === selectedPortfolioId)
     const monthlySIP = relevantHoldings.reduce((s, h) => s + (h.ongoingSIP || 0), 0)
-    const funds = new Set(relevantHoldings.map((h) => h.fundCode)).size
+    const funds = new Set(relevantHoldings.filter((h) => !(source.find((p) => p.portfolioId === h.portfolioId)?.soldCodes || new Set()).has(String(h.fundCode || ''))).map((h) => h.fundCode)).size
     const sipFunds = relevantHoldings.filter((h) => (h.ongoingSIP || 0) > 0).length
     // what the funds held today cost (includes profit booked earlier and put back in, e.g. via switches)
     const holdingsCost = relevantHoldings.filter((h) => (h.units || 0) > 0).reduce((s, h) => s + (Number(h.investment) || 0), 0)
@@ -697,9 +713,14 @@ export default function MutualFundsPage() {
   if (mfPortfolios === null || mfHoldings === null) return <PageLoading title="Loading mutual funds" cards={5} />
 
   const selectedPortfolio = portfolioData.find((p) => p.portfolioId === selectedPortfolioId)
+  // closed portfolios (everything sold) are listed apart, under "Closed portfolios"; they still count in the totals
+  const openData = portfolioData.filter((p) => !p.closed)
+  const closedData = portfolioData.filter((p) => p.closed)
+  const closedRealized = closedData.reduce((s, p) => s + (Number(p.realizedPL) || 0), 0)
+  const closedPct = (p) => (p.grossBuys > 0 ? ((Number(p.realizedPL) || 0) / p.grossBuys) * 100 : null)
 
   const dropdownLabel = selectedPortfolioId === 'all'
-    ? `All Portfolios (${portfolios.length})`
+    ? `All Portfolios (${openData.length})`
     : `${dn(selectedPortfolio?.portfolioName)} — ${mv(selectedPortfolio?.ownerName, 'name')}`
 
   // Handlers
@@ -1032,15 +1053,17 @@ export default function MutualFundsPage() {
                       onClick={() => { setSelectedPortfolioId('all'); setDropdownOpen(false); setSubTab('holdings') }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${selectedPortfolioId === 'all' ? 'bg-[var(--sidebar-active-bg)] text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
                     >
-                      All Portfolios ({portfolios.length})
+                      All Portfolios ({openData.length})
                     </button>
                     <div className="border-t border-[var(--border-light)]" />
-                    {portfolioData.map((p) => {
+                    {[...openData, ...closedData].map((p, i) => {
                       const plUp = p.totalPL >= 0
                       const ind = portfolioIndicators[p.portfolioId] || {}
+                      const cPct = p.closed ? closedPct(p) : null
                       return (
+                        <div key={p.portfolioId}>
+                        {i === openData.length && <p className="px-4 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] border-t border-[var(--border-light)]">Closed · everything sold</p>}
                         <button
-                          key={p.portfolioId}
                           onClick={() => { setSelectedPortfolioId(p.portfolioId); setDropdownOpen(false); setSubTab('holdings') }}
                           className={`w-full text-left px-4 py-2.5 transition-colors ${selectedPortfolioId === p.portfolioId ? 'bg-[var(--sidebar-active-bg)]' : 'hover:bg-[var(--bg-hover)]'}`}
                         >
@@ -1059,11 +1082,12 @@ export default function MutualFundsPage() {
                             <div className="text-right">
                               <p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{formatINR(p.currentValue)}</p>
                               <p className={`text-xs font-semibold tabular-nums ${plUp ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>
-                                {plUp ? '+' : ''}{p.totalPLPct.toFixed(1)}%
+                                {p.closed ? <>{plUp ? '+' : ''}{formatINR(p.realizedPL)}{cPct != null ? ` (${cPct >= 0 ? '+' : ''}${cPct.toFixed(1)}%)` : ''}</> : <>{plUp ? '+' : ''}{p.totalPLPct.toFixed(1)}%</>}
                               </p>
                             </div>
                           </div>
                         </button>
+                        </div>
                       )
                     })}
                   </div>
@@ -1246,7 +1270,7 @@ export default function MutualFundsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {portfolioData.map(p => {
+                      {openData.map(p => {
                         // Invested is net money in (buys − withdrawals), so current − invested is the TOTAL P&L.
                         // Unrealized = total − realized (the sheet's own column), same as the summary cards above.
                         const unrealPL = p.unrealizedPL ?? ((p.currentValue - p.totalInvestment) - (p.realizedPL || 0))
@@ -1308,7 +1332,7 @@ export default function MutualFundsPage() {
                 </div>
                 {/* Mobile cards */}
                 <div className="lg:hidden divide-y divide-[var(--row-divider)]">
-                  {portfolioData.map(p => {
+                  {openData.map(p => {
                     const unrealPL = p.currentValue - p.totalInvestment
                     const unrealUp = unrealPL >= 0
                     const totalPLUp = p.totalPL >= 0
@@ -1340,6 +1364,21 @@ export default function MutualFundsPage() {
                     )
                   })}
                 </div>
+                {/* closed portfolios (everything sold): one line, opens to the list; their profit stays in the totals above */}
+                {closedData.length > 0 && (
+                  <div className="border-t border-[var(--border-light)]">
+                    <button onClick={() => setShowClosed((o) => !o)} className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-xs hover:bg-[var(--bg-hover)] transition-colors">
+                      <span className="flex items-center gap-1.5 font-semibold text-[var(--text-secondary)]">{showClosed ? <ChevronDown size={13} /> : <ChevronRight size={13} />} Closed portfolios ({closedData.length}) <span className="font-normal text-[var(--text-dim)]">· everything sold</span></span>
+                      <span className={`tabular-nums font-semibold ${closedRealized >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>Realized {closedRealized >= 0 ? '+' : ''}{formatINR(closedRealized)}</span>
+                    </button>
+                    {showClosed && closedData.map((p) => { const up = (Number(p.realizedPL) || 0) >= 0, cPct = closedPct(p); return (
+                      <div key={p.portfolioId} role="button" tabIndex={0} onClick={() => { setSelectedPortfolioId(p.portfolioId); setSubTab('holdings') }}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-[var(--border-light)] text-xs cursor-pointer hover:bg-[var(--bg-hover)]">
+                        <span className="min-w-0 truncate text-[var(--text-secondary)]">{dn(p.portfolioName)} <span className="text-[var(--text-dim)]">· {mv(p.ownerName, 'name')}</span></span>
+                        <span className={`shrink-0 tabular-nums ${up ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{up ? '+' : ''}{formatINR(p.realizedPL)}{cPct != null ? ` (${cPct >= 0 ? '+' : ''}${cPct.toFixed(1)}%)` : ''}</span>
+                      </div>) })}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] py-12 flex flex-col items-center gap-3">
@@ -1646,7 +1685,7 @@ export default function MutualFundsPage() {
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                 }`}
               >
-                <Layers size={12} /> Holdings ({holdings.length})
+                <Layers size={12} /> Holdings ({selectedPortfolio ? selectedPortfolio.fundCount : holdings.length})
               </button>
               <button
                 onClick={() => setSubTab('transactions')}
@@ -1701,7 +1740,13 @@ export default function MutualFundsPage() {
                 <div className={selectedPortfolioId === 'all' ? 'space-y-4' : ''}>
                 {(selectedPortfolioId === 'all' ? holdingsByPortfolio : [{ portfolioId: selectedPortfolioId, holdings: enrichedHoldings }]).map((group) => {
                   const groupPortfolio = portfolioData.find((p) => p.portfolioId === group.portfolioId)
-                  const groupHoldings = group.holdings
+                  // sold funds (no units, with transactions) are history: not listed here (see Transactions), unlike planned funds
+                  const groupHoldings = group.holdings.filter((h) => !(groupPortfolio?.soldCodes || new Set()).has(String(h.fundCode || '')) || Number(h.units) > 0)
+                  if (!groupHoldings.length && groupPortfolio?.closed) return (
+                    <div key={group.portfolioId} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-center text-xs text-[var(--text-secondary)]">
+                      Everything in this portfolio is sold. Its buys and sells are under Transactions, and its realized profit still counts in your totals.
+                    </div>
+                  )
                   const groupPL = groupHoldings.reduce((s, h) => s + h.pl, 0)
                   const groupPLUp = groupPL >= 0
                   return (

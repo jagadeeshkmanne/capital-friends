@@ -574,6 +574,7 @@ function buildDashboardReportData() {
         ownerName: ownerName,
         platformBroker: ia ? ia.platformBroker : '',
         totalInvestment: parseFloat(p.totalInvestment) || 0,
+        initialInvestment: parseFloat(p.initialInvestment) || 0,
         currentValue: parseFloat(p.currentValue) || 0,
         rebalanceThreshold: parseFloat(p.rebalanceThreshold) || 0.05,
         unrealizedPL: parseFloat(p.unrealizedPL) || 0,
@@ -622,7 +623,9 @@ function buildDashboardReportData() {
     });
 
     // ── 5. Filter active items ──
-    const activeMFPortfolios = enrichedMFPortfolios.filter(function(p) { return p.status === 'Active'; });
+    // closed portfolios (everything sold, kept in the app for their profit history) are not in the email: it is about
+    // what is held today. Same rule as react-app/src/utils/mfClosed.js: change both together.
+    const activeMFPortfolios = enrichedMFPortfolios.filter(function(p) { return p.status === 'Active' && !mfClosed_(p, allMFHoldings); });
     const mfPortfolioIds = {};
     activeMFPortfolios.forEach(function(p) { mfPortfolioIds[p.portfolioId] = true; });
     const activeMFHoldings = allMFHoldings.filter(function(h) {
@@ -2514,3 +2517,15 @@ ${actionList}
 // ============================================================================
 // END OF EMAILREPORTS.GS
 // ============================================================================
+
+
+/** A closed mutual fund portfolio: no fund with units, no fund with a target, but a realized profit or loss. */
+function mfClosed_(p, holdings) {
+  var mine = (holdings || []).filter(function (h) { return h.portfolioId === p.portfolioId; });
+  if (!mine.length) return false;   // funds didn't load: never hide it
+  if (mine.some(function (h) { return (parseFloat(h.units) || 0) > 0 || (parseFloat(h.targetAllocationPct) || 0) > 0; })) return false;
+  if (Math.abs(parseFloat(p.realizedPL) || 0) < 1) return false;
+  var initial = parseFloat(p.initialInvestment) || 0;   // new portfolio with an Initial Investment, nothing bought yet
+  if (initial > 0 && Math.abs((parseFloat(p.totalInvestment) || 0) - initial) < 1) return false;
+  return true;
+}

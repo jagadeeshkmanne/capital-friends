@@ -1,4 +1,5 @@
 import { monthlyContribution } from './portfolioSip'
+import { isClosedPortfolio } from './mfClosed'
 /**
  * "To do this month" for the Goals page: one list of exact steps (withdraw / SIP / buy / sell), worked out
  * from the goals plan (buildGoalPlan, pool mode) and the one family plan (familyPlan). Nothing to enter:
@@ -20,12 +21,14 @@ const navOf = (h) => Number(h.currentNav) || ((Number(h.currentValue) || 0) / (N
 
 /** The portfolio a short goal should add money to: the MF portfolio it already uses most, else one owned by
  *  the goal's member, else the biggest included one. */
-function portfolioFor(p, { mfHoldings, poolItems }) {
+function portfolioFor(p, { mfHoldings, poolItems, mfPortfolios }) {
   const byP = {}
   for (const it of p.att?.items || []) if (it.kind === 'mf') byP[it.portfolioId] = (byP[it.portfolioId] || 0) + it.value
   const used = Object.entries(byP).sort((a, b) => b[1] - a[1])[0]
   if (used) return used[0]
-  const mf = (poolItems || []).filter((i) => i.type === 'MF' && i.included && (mfHoldings || []).some((h) => h.portfolioId === i.id))
+  // never a closed portfolio (everything sold): it would ask to buy back into sold funds. New ones with planned funds stay.
+  const mf = (poolItems || []).filter((i) => i.type === 'MF' && i.included && (mfHoldings || []).some((h) => h.portfolioId === i.id)
+    && !isClosedPortfolio((mfPortfolios || []).find((p) => p.portfolioId === i.id), mfHoldings))
   const who = String(p.goal.familyMemberName || '').trim().toLowerCase()
   const own = mf.filter((i) => who && String(i.owner || '').trim().toLowerCase() === who).sort((a, b) => b.value - a.value)[0]
   return (own || mf.sort((a, b) => b.value - a.value)[0])?.id || null
@@ -56,7 +59,7 @@ export function goalTodo({ plans, family, poolItems = [], mfHoldings = [], mfPor
     const lump = Math.round(-p.gap / 100) * 100
     const sip = Math.max(0, Math.ceil(((p.sipNeeded || 0) - (p.sip || 0)) / 100) * 100)
     extraSip += sip
-    const pid = portfolioFor(p, { mfHoldings, poolItems })
+    const pid = portfolioFor(p, { mfHoldings, poolItems, mfPortfolios })
     const hs = (mfHoldings || []).filter((h) => h.portfolioId === pid && !h.lumpsumRestricted)
     const att = { items: hs.map((h) => ({ kind: 'mf', portfolioId: pid, holding: h, value: Number(h.currentValue) || 1 })) }
     const buys = pid && lump > 0 ? splitSip({ att, amount: lump, mfHoldings: hs }) : []

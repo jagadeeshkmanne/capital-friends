@@ -3,6 +3,7 @@ import { useData } from '../../context/DataContext'
 import { useFamily } from '../../context/FamilyContext'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { FormField, FormInput, FormDateInput, FormSelect, FormActions } from '../Modal'
+import { openPortfolios } from '../../utils/mfClosed'
 
 export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, initial, dataOverride, onSave, onCancel }) {
   // dataOverride: optional sample data (Retirement Buckets demo). Existing callers pass nothing.
@@ -11,9 +12,10 @@ export default function MFRedeemForm({ portfolioId, fundCode: initialFundCode, i
   const { selectedMember } = useFamily()
 
   const activePortfolios = useMemo(() => {
-    const active = (mfPortfolios || []).filter((p) => p.status === 'Active')
+    // closed portfolios (everything sold) have nothing to redeem
+    const active = openPortfolios((mfPortfolios || []).filter((p) => p.status === 'Active'), mfHoldings)
     return selectedMember === 'all' || dataOverride ? active : active.filter((p) => p.ownerId === selectedMember)
-  }, [mfPortfolios, selectedMember, dataOverride])
+  }, [mfPortfolios, mfHoldings, selectedMember, dataOverride])
 
   // Resolve initial fund details from holdings
   const initialHolding = useMemo(() => {
