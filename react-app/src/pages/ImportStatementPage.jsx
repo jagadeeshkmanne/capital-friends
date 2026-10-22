@@ -166,7 +166,7 @@ export default function ImportStatementPage() {
       if (seq !== checkSeq.current) return // a newer check was started: ignore this older answer
       setPreview(p)
       const m = {}
-      Object.keys(nextMapping).forEach((k) => { if (k.startsWith('fund:')) m[k] = nextMapping[k] }) // funds the user skipped
+      Object.keys(nextMapping).forEach((k) => { if (k.startsWith('fund:') || k.startsWith('name:')) m[k] = nextMapping[k] }) // funds the user skipped, names typed for agents
       p.groups.forEach((g) => { m[g.key] = g.target })
       setMapping(m)
     } catch (e) { if (seq === checkSeq.current) setCheckErr(e.message) }
@@ -378,9 +378,21 @@ export default function ImportStatementPage() {
                 {groups.map((g) => (
                   <div key={g.key} className="rounded-lg border border-[var(--border-light)] p-3 space-y-2">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{g.memberName} · {g.platform.replace(/^Distributor\s+/, 'Agent ')}</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{g.memberName} · {g.agent ? g.agentName : g.platform}</p>
                       <p className="text-xs text-[var(--text-muted)] shrink-0">{g.live ? `${g.live} fund${g.live > 1 ? 's' : ''} · ${inr(g.value)}` : 'all sold'}</p>
                     </div>
+                    {/* an agent / platform we can't name: show its funds (people know those, not codes) and ask once */}
+                    {g.agent && (g.fundNames || []).length > 0 && <p className="text-[11px] text-[var(--text-dim)]">Bought through the same {String(g.agentWord || 'agent').toLowerCase()}: {g.fundNames.slice(0, 4).join(', ')}{g.fundNames.length > 4 ? ` and ${g.fundNames.length - 4} more` : ''}</p>}
+                    {g.agent && destOf(g) === 'new' && (
+                      <div>
+                        <p className="text-[11px] text-[var(--text-secondary)] mb-1">Who or which app did you buy these through? <span className="text-[var(--text-dim)]">(optional, asked once)</span></p>
+                        <input value={mapping['name:' + g.key] ?? ''} disabled={saving} maxLength={40}
+                          onChange={(e) => setMapping({ ...mapping, ['name:' + g.key]: e.target.value })}
+                          onBlur={(e) => { if ((preview?.groups || []).find((x) => x.key === g.key)?.agentName !== (e.target.value.trim() || undefined)) check({ ...mapping, ['name:' + g.key]: e.target.value }) }}
+                          placeholder={`e.g. FundzBazar, SBI branch, Ramesh (agent) · else "${g.agentWord || 'Agent'} ${g.agentNo || ''}"`.replace(' "', ' "').trim()}
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)]" />
+                      </div>
+                    )}
                     <select value={destOf(g)} onChange={(e) => changeGroup(g.key, e.target.value)} disabled={saving} className={selectCls}>
                       {g.options.filter((o) => o.mine).map((o) => <option key={o.portfolioId} value={o.portfolioId}>→ {o.name}</option>)}
                       <option value="new">→ New portfolio “{g.newName}”</option>

@@ -168,6 +168,8 @@ export function parseCamsCas(lines) {
       continue
     }
     if (!cur) continue
+    // the salesperson's EUIN ("PCASON/E320101" on purchase lines): the same EUIN under two agent codes is one agent
+    for (const em of l.matchAll(/\b[A-Z0-9-]{3,}\/(E\d{6})\b/g)) { cur.euins = cur.euins || {}; cur.euins[em[1]] = (cur.euins[em[1]] || 0) + 1 }
 
     const ob = /Opening Unit Balance:\s*([\d,.]+)/.exec(l)
     if (ob) { cur.opening = num(ob[1]); continue }
@@ -205,6 +207,8 @@ export function parseCamsCas(lines) {
   }
 
   function finish(f) {
+    f.euin = Object.entries(f.euins || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+    delete f.euins
     const sum = f.txns.reduce((s, t) => s + t.units, f.opening)
     f.unitsCheck = round3(sum)
     f.reconciled = Math.abs(sum - f.close) < 0.002

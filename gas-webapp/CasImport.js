@@ -137,6 +137,10 @@ function casShortName_(name, members) {
 function casPlatformLabel_(platform) {
   return String(platform || 'Unknown').replace(/^(Distributor|Adviser|Broker)\s+/, '');
 }
+/** A platform we can't name ourselves: an agent / distributor (ARN, or a fund house's agent or branch code), a broker
+ *  or adviser we don't know by code, or no code at all. The user names it once in step 2; codes are never shown. */
+function casIsAgent_(platform) { return /^(Distributor|Broker|Adviser)\s/.test(String(platform || '')) || !platform || platform === 'Unknown'; }
+function casAgentWord_(platform) { return /^Broker\s/.test(String(platform || '')) ? 'Broker' : /^Adviser\s/.test(String(platform || '')) ? 'Adviser' : 'Agent'; }
 function casUniq_(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
 function casPlatformKey_(platform) {
   var p = String(platform || '').toLowerCase();
@@ -336,14 +340,26 @@ function casBuildPlan_(statement, data, mapping) {
   }
 
   // ---- 3. groups: one person + one platform
-  var groups = {};
+  // One salesperson (EUIN) under two agent codes is one agent: their folios form one group (PCASON + MUMB8059 ->
+  // the platform of the first one seen).
+  var euinPlatform = {};
+  folios.forEach(function (f) {
+    if (!f._member || !f.euin || !casIsAgent_(f.platform)) return;
+    var k = f._member.memberId + '|' + f.euin;
+    if (!euinPlatform[k]) euinPlatform[k] = f.platform; else f.platform = euinPlatform[k];
+  });
+  var groups = {}, agentNo = {};
   folios.forEach(function (f) {
     if (!f._member) return;
     var key = f._member.memberId + '|' + (f.platform || 'Unknown');
     var g = groups[key];
     if (!g) {
-      g = groups[key] = { key: key, memberId: f._member.memberId, memberName: f._member.memberName, platform: f.platform || 'Unknown', platformCode: f.platformCode || '', demat: false, folios: 0, live: 0, value: 0, pinned: {}, options: [], suggestion: '', target: '' };
+      g = groups[key] = { key: key, memberId: f._member.memberId, memberName: f._member.memberName, platform: f.platform || 'Unknown', platformCode: f.platformCode || '', demat: false, folios: 0, live: 0, value: 0, pinned: {}, options: [], suggestion: '', target: '', agent: casIsAgent_(f.platform), fundNames: [] };
+      // agents are shown to the user by number and their funds, never by code: "Agent 1", "Agent 2"…
+      if (g.agent) { var w = casAgentWord_(f.platform), nk = g.memberId + '|' + w; agentNo[nk] = (agentNo[nk] || 0) + 1; g.agentNo = agentNo[nk]; g.agentWord = w; }
     }
+    var fn = f._code ? getBaseFundName(f._fundName || f.scheme) : '';
+    if (fn && f.close > 0 && g.fundNames.indexOf(fn) < 0) g.fundNames.push(fn);
     g.folios++;
     if (f.close > 0 && f._code) { g.live++; g.value += f.close * f._nav; } // unclaimed-money plans are not holdings
     if (f.demat) g.demat = true;
@@ -369,10 +385,18 @@ function casBuildPlan_(statement, data, mapping) {
     else g.suggestion = 'new';
     var chosen = mapping[key];
     g.target = chosen && (chosen === 'new' || chosen === 'skip' || (portfolioById[chosen] && portfolioById[chosen].status !== 'Inactive')) ? chosen : g.suggestion;
-    g.newName = casShortName_(g.memberName, members) + ' – ' + casPlatformLabel_(g.platform);
+    // an agent's name: what the user typed in step 2 (mapping['name:<group>']), else "Agent 1"; others by platform
+    var typed = String(mapping['name:' + key] || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    g.agentName = g.agent ? (typed || g.agentWord + ' ' + g.agentNo) : '';
+    g.newName = casShortName_(g.memberName, members) + ' – ' + (g.agent ? g.agentName : casPlatformLabel_(g.platform));
     g.value = Math.round(g.value);
     // accounts the person already has (used if a new portfolio is created)
-    g.accounts = data.accounts.filter(function (a) { return a.memberId === g.memberId && a.status !== 'Inactive'; }).map(function (a) { return { accountId: a.accountId, name: a.accountName, platform: a.platformBroker, match: casAccountMatchesPlatform_(a, g.platform) }; });
+    // (an agent with a typed name matches only an account of that name: "FundzBazar" never lands in another agent's account)
+    g.accounts = data.accounts.filter(function (a) { return a.memberId === g.memberId && a.status !== 'Inactive'; }).map(function (a) {
+      var hay = (String(a.platformBroker || '') + ' ' + String(a.accountName || '')).toLowerCase();
+      var match = g.agent && typed ? hay.indexOf(typed.toLowerCase()) >= 0 : casAccountMatchesPlatform_(a, g.platform);
+      return { accountId: a.accountId, name: a.accountName, platform: a.platformBroker, match: match };
+    });
     plan.groups.push(g);
   });
   // a new portfolio gets an investment account; a bank account is no longer needed (it is optional)
@@ -736,7 +760,7 @@ function casImportSave_(params) {
         var email = member.email || st.meta.email || Session.getActiveUser().getEmail();
         var res = addInvestmentAccount({
           accountName: g.newName, memberId: g.memberId, bankAccountId: bank ? bank.accountId : '',
-          accountType: g.demat ? 'Demat' : 'Mutual Fund', platformBroker: g.platform.replace(/^Distributor\s+/, 'Agent '),
+          accountType: g.demat ? 'Demat' : 'Mutual Fund', platformBroker: g.agent ? g.agentName : g.platform,
           accountClientId: '', registeredEmail: email, registeredPhone: member.mobile || ''
         });
         if (!res || !res.success) throw new Error('Could not create the investment account for ' + g.memberName + ': ' + (res && res.message));

@@ -70,7 +70,7 @@ export function statementForServer(parsed) {
     meta: parsed.meta,
     folios: parsed.folios.map((f) => ({
       folio: f.folio, pan: f.pan, holder: f.holder, isin: f.isin, scheme: f.scheme, amc: f.amc,
-      platformCode: f.platformCode, platform: f.platform, demat: f.demat,
+      platformCode: f.platformCode, platform: f.platform, demat: f.demat, euin: f.euin || '',
       opening: f.opening, close: f.close, nav: f.nav, navDate: f.navDate, cost: f.cost, mv: f.mv, reconciled: f.reconciled,
       txns: f.txns.map((t) => ({ date: t.date, desc: t.desc, amount: t.amount, units: t.units, stamp: t.stamp, tax: t.tax, kind: t.kind })),
     })),
