@@ -9,7 +9,8 @@ import {
   IonTabBar, IonTabButton, IonLabel, IonBadge, IonModal, IonList, IonListHeader, IonItem, IonRadioGroup, IonRadio,
   IonToggle, IonAvatar, IonNote, IonRefresher, IonRefresherContent,
 } from '@ionic/react'
-import { LayoutDashboard, Wallet, BarChart3, Target, Menu, ChevronLeft, Bell, TrendingDown, Scale, Settings, LogOut, Eye, Moon, X } from 'lucide-react'
+import { LayoutDashboard, Wallet, BarChart3, Target, Menu, ChevronLeft, Bell, TrendingDown, Scale, Settings, LogOut, Eye, Moon, X, CircleAlert, Lightbulb } from 'lucide-react'
+import { openFeedback } from '../components/FeedbackForm'
 import './ionic-setup'
 import { usePhoneBar } from '../components/native'
 import { mobileTitle, isTabPath } from '../components/Header'
@@ -187,6 +188,10 @@ function AccountSheet({ open, onClose, navigate }) {
           <IonItem><span slot="start" className="text-violet-400"><Eye size={20} /></span><IonToggle checked={masked} onIonChange={toggleMask}>Mask sensitive data</IonToggle></IonItem>
           <IonItem><span slot="start" className="text-violet-400"><Moon size={20} /></span><IonToggle checked={theme === 'dark'} onIonChange={toggle}>Dark mode</IonToggle></IonItem>
           <IonItem button detail onClick={() => go('/settings')}><span slot="start" className="text-violet-400"><Settings size={20} /></span><IonLabel>Settings</IonLabel></IonItem>
+        </IonList>
+        <IonList inset lines="inset" className="cf-inset">
+          <IonItem button detail onClick={() => { onClose(); setTimeout(() => openFeedback('issue'), 250) }}><span slot="start" className="text-rose-400"><CircleAlert size={20} /></span><IonLabel>Report an issue</IonLabel></IonItem>
+          <IonItem button detail onClick={() => { onClose(); setTimeout(() => openFeedback('feature'), 250) }}><span slot="start" className="text-amber-400"><Lightbulb size={20} /></span><IonLabel>Request a feature</IonLabel></IonItem>
         </IonList>
         <IonList inset lines="none" className="cf-inset">
           <IonItem button onClick={() => { onClose(); signOut() }}><span slot="start" className="text-rose-400"><LogOut size={20} /></span><IonLabel color="danger">Sign out</IonLabel></IonItem>

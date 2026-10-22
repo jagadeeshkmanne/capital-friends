@@ -36,13 +36,26 @@ const GROUPS = [
 
 const Icon = ({ I, c }) => <span slot="start" className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${c}22`, color: c }}><I size={19} /></span>
 
+// Help & feedback: placed above the App group so it is easy to find without scrolling to the very end
+function HelpGroup() {
+  return (
+    <>
+      <IonListHeader className="!pl-5"><IonLabel className="cf-group">Help &amp; feedback</IonLabel></IonListHeader>
+      <IonList inset lines="inset" className="cf-inset">
+        <IonItem button detail onClick={() => openFeedback('issue')}><Icon I={CircleAlert} c="#f87171" /><IonLabel><h3 className="!text-[15px] !font-semibold">Report an issue</h3><p>Something not working? Tell us</p></IonLabel></IonItem>
+        <IonItem button detail onClick={() => openFeedback('feature')}><Icon I={Lightbulb} c="#fbbf24" /><IonLabel><h3 className="!text-[15px] !font-semibold">Request a feature</h3><p>An idea to make it better</p></IonLabel></IonItem>
+      </IonList>
+    </>
+  )
+}
+
 export default function PhoneMore() {
   const navigate = useNavigate()
   const [donate, setDonate] = useState(false)
   return (
     <div className="-mx-4 pb-6">
-      {GROUPS.map(([title, items]) => (
-        <div key={title}>
+      {GROUPS.map(([title, items]) => (<div key={title}>{title === 'App' && <HelpGroup />}
+        <div>
           <IonListHeader className="!pl-5"><IonLabel className="cf-group">{title}</IonLabel></IonListHeader>
           <IonList inset lines="inset" className="cf-inset">
             {items.map(([label, sub, I, path, c, badge]) => (
@@ -54,12 +67,7 @@ export default function PhoneMore() {
             ))}
           </IonList>
         </div>
-      ))}
-      <IonListHeader className="!pl-5"><IonLabel className="cf-group">Help &amp; feedback</IonLabel></IonListHeader>
-      <IonList inset lines="inset" className="cf-inset">
-        <IonItem button detail onClick={() => openFeedback('issue')}><Icon I={CircleAlert} c="#f87171" /><IonLabel><h3 className="!text-[15px] !font-semibold">Report an issue</h3><p>Something not working? Tell us</p></IonLabel></IonItem>
-        <IonItem button detail onClick={() => openFeedback('feature')}><Icon I={Lightbulb} c="#fbbf24" /><IonLabel><h3 className="!text-[15px] !font-semibold">Request a feature</h3><p>An idea to make it better</p></IonLabel></IonItem>
-      </IonList>
+      </div>))}
       <IonListHeader className="!pl-5"><IonLabel className="cf-group">Capital Friends</IonLabel></IonListHeader>
       <IonList inset lines="inset" className="cf-inset">
         <IonItem button detail href={YOUTUBE_URL} target="_blank"><Icon I={Youtube} c="#ef4444" /><IonLabel><h3 className="!text-[15px] !font-semibold">YouTube</h3><p>How-to videos</p></IonLabel></IonItem>
