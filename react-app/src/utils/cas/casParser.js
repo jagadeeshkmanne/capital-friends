@@ -21,7 +21,8 @@ export function platformName(code) {
   if (/^ARN-/i.test(code)) return 'Distributor ' + code.toUpperCase()
   if (/^INA/i.test(code)) return 'Adviser ' + code.toUpperCase()
   if (/^INZ/i.test(code)) return 'Broker ' + code.toUpperCase()
-  return code
+  // other agent / branch codes the fund house prints (SBI11102, MUMB8059, PCASON…): their own group, named by the code
+  return 'Distributor ' + code.toUpperCase()
 }
 
 // ---------- PDF text -> lines ----------
@@ -149,13 +150,17 @@ export function parseCamsCas(lines) {
       const joined = block.join(' ')
       let isin = (/ISIN:\s*([A-Z0-9]+)/.exec(l) || [])[1] || ''
       if (isin.length < 12) { const nx = (/^([A-Z0-9]+)/.exec(block[1]) || [])[1] || ''; isin = (isin + nx).slice(0, 12) }
-      const adv = /Advisor:[\s\S]*?\b(INZ\d{9}|INA\d{9}|ARN-\d+|DIRECT)\b/i.exec(joined)
+      // the code inside "(Advisor: …)": ARN-9992 (also written ARN9992), a broker / adviser code, DIRECT, or a fund
+      // house's agent / branch code (SBI11102, MUMB8059, PCASON). It can wrap past "Registrar : CAMS" onto the next line.
+      const adv = /Advisor:\s*(?:Registrar\s*:\s*(?:CAMS|KFINTECH|KARVY)?\s*)?([A-Z0-9][A-Z0-9-]{2,24})\s*\)/i.exec(joined)
+        || /Advisor:[\s\S]*?\b(INZ\d{9}|INA\d{9}|ARN-?\d+|DIRECT)\b/i.exec(joined)
+      const advCode = adv ? adv[1].toUpperCase().replace(/^ARN-?(\d+)$/, 'ARN-$1') : null
       const before = head.split(/\s+-\s+ISIN/)[0]
       const demat = /Demat\)/i.test(before) && !/Non[\s-]*Demat/i.test(before)
       let scheme = before.replace(/^[A-Z0-9]+-/, '').replace(/\s*\((?:Non[\s-]*)?\s*-?Demat\)\s*$/i, '').replace(/\s*\(Non\s+-?Demat\)\s*$/i, '').trim()
       cur = {
         folio, pan, holder: holder || '', amc, isin, scheme,
-        platformCode: adv ? adv[1].toUpperCase() : (/Advisor/i.test(joined) ? null : 'DIRECT'),
+        platformCode: advCode || (/Advisor/i.test(joined) ? null : 'DIRECT'),
         demat: !!demat, opening: 0, close: null, cost: null, mv: null, nav: null, navDate: null, txns: [],
       }
       cur.platform = platformName(cur.platformCode)
