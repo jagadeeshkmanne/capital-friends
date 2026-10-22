@@ -319,9 +319,14 @@ function HoldingsCard({ count, stats, returns, onChart }) {
       </div>
       <Dash />
       <KV k="Total returns" v={`${signed(stats.totalPL)} (${pctTxt(stats.totalPLPct)})`} cls={upCls(stats.totalPL)} />
-      <KV k="Invested" v={formatINR(stats.invested)} />
+      {/* same numbers as the web stat cards: unrealised (still held) + realised (booked) = total */}
+      <KV k="Unrealised P&L" sub="on holdings" v={`${signed(stats.unrealizedPL || 0)} (${pctTxt(stats.unrealizedPLPct || 0)})`} cls={upCls(stats.unrealizedPL || 0)} />
+      <KV k="Realised P&L" sub="booked" v={signed(stats.realizedPL || 0)} cls={upCls(stats.realizedPL || 0)} />
+      <Dash />
+      <KV k="Your money in" v={formatINR(stats.invested)} />
+      {stats.holdingsCost > 0 && Math.abs(stats.holdingsCost - stats.invested) >= 1 && <KV k="Holdings cost" v={formatINR(stats.holdingsCost)} cls="text-[var(--ion-color-medium)]" />}
       <KV k="XIRR / CAGR" v={returns?.xirr == null && returns?.cagr == null ? <button type="button" onClick={() => navigate('/import')} className="text-[14px] font-semibold text-violet-400">Import CAS for XIRR ›</button> : `${returns?.xirr == null ? 'N/A' : `${(returns.xirr * 100).toFixed(2)}%`} / ${returns?.cagr == null ? 'N/A' : `${(returns.cagr * 100).toFixed(2)}%`}`} />
-      <KV k="Monthly SIP" v={formatINR(stats.monthlySIP)} />
+      <KV k="Monthly SIP" sub={stats.sipFunds > 0 ? `· ${stats.sipFunds} fund${stats.sipFunds > 1 ? 's' : ''}` : undefined} v={formatINR(stats.monthlySIP)} />
     </div>
   )
 }

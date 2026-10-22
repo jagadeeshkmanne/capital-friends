@@ -46,8 +46,8 @@ function SummaryCard({ count, s }) {
       <Dash />
       <KV k="Total returns" v={`${signed(s.totalPL)} (${pctTxt(s.totalPLPct)})`} cls={upCls(s.totalPL)} />
       <KV k="Invested" v={formatINR(s.invested)} />
-      <KV k="Unrealised" v={signed(s.unrealizedPL)} cls={upCls(s.unrealizedPL)} />
-      <KV k="Realised" v={signed(s.realizedPL)} cls={upCls(s.realizedPL)} />
+      <KV k="Unrealised P&L" v={`${signed(s.unrealizedPL)}${s.unrealizedPLPct != null ? ` (${pctTxt(s.unrealizedPLPct)})` : ''}`} cls={upCls(s.unrealizedPL)} />
+      <KV k="Realised P&L" v={signed(s.realizedPL)} cls={upCls(s.realizedPL)} />
     </div>
   )
 }
@@ -139,7 +139,7 @@ const sumOf = (list) => {
   const invested = list.reduce((t, p) => t + p.invested, 0), current = list.reduce((t, p) => t + p.current, 0)
   const unrealizedPL = list.reduce((t, p) => t + p.unrealizedPL, 0), realizedPL = list.reduce((t, p) => t + p.realizedPL, 0)
   const totalPL = unrealizedPL + realizedPL
-  return { invested, current, unrealizedPL, realizedPL, totalPL, totalPLPct: invested > 0 ? (totalPL / invested) * 100 : 0 }
+  return { invested, current, unrealizedPL, realizedPL, totalPL, totalPLPct: invested > 0 ? (totalPL / invested) * 100 : 0, unrealizedPLPct: invested > 0 ? (unrealizedPL / invested) * 100 : 0 }
 }
 
 export default function StocksPhone({ portfolioData, allHoldings, allTxns, setModal, mv, onDeleteTxn }) {
