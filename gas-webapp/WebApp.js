@@ -121,6 +121,7 @@ var FRESH_AFTER_WRITE_ = {
   'goal:mappings-update': { goalPortfolioMappings: 'getGoalPortfolioMappings' },
   'reminder:': { reminders: 'getAllReminders' },
   'settings:update': { settings: 'getAllSettings' },
+  'survey:': { settings: 'getAllSettings' },
   'income:': { otherInvestments: 'getAllInvestments', settings: 'getAllSettings' }
 };
 
@@ -483,6 +484,12 @@ function routeAction(action, params, userRecord) {
 
     case 'settings:update':
       return updateAllSettings(params);
+
+    case 'survey:found-us':   // how did you hear about us, once per family (FoundUs.js)
+      return saveFoundUs_(params, userRecord);
+
+    case 'feedback:send':     // report a bug / request a feature, sent with the user's Gmail (FoundUs.js)
+      return sendFeedback_(params, userRecord);
 
     // ── Master Data Refresh ──
     case 'data:refresh-master':

@@ -346,6 +346,8 @@ export const getSettings = () => callAPI('settings:list')
 export const applyIncome = () => callAPI('income:apply')
 export const markRefillDone = (data) => callAPI('income:refill-done', data)
 export const saveSettings = (data) => callAPI('settings:update', data)
+export const saveFoundUs = (data) => callAPI('survey:found-us', data)
+export const sendFeedback = (data) => callAPI('feedback:send', data)
 
 // Master Data Refresh
 export const refreshMasterData = () => callAPI('data:refresh-master')

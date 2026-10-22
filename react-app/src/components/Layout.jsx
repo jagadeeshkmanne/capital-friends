@@ -10,6 +10,7 @@ import BottomNav from './BottomNav'
 import MobileMenu from './MobileMenu'
 import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
+import FoundUsDialog from './FoundUsDialog'
 import DailyUpdatesBanner from './DailyUpdatesBanner'
 import GoalsReachBanner from './GoalsReachBanner'
 import { useData } from '../context/DataContext'
@@ -59,7 +60,7 @@ export default function Layout() {
   }
 
   // phones: Ionic app shell (native app bar, tab bar, sheets)
-  if (phone) return <Suspense fallback={<BrandedLoading />}><PhoneLayout /></Suspense>
+  if (phone) return <><Suspense fallback={<BrandedLoading />}><PhoneLayout /></Suspense><FoundUsDialog /></>
 
   return (
     <div className="cf-app flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">
@@ -142,6 +143,7 @@ export default function Layout() {
       )}
 
       <DonateDialog open={showDonate} onClose={() => setShowDonate(false)} />
+      <FoundUsDialog />
     </div>
   )
 }
