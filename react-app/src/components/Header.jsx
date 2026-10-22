@@ -1,6 +1,7 @@
 import { usePhoneBar } from './native'
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff, CircleAlert, Lightbulb } from 'lucide-react'
+import { openFeedback } from './FeedbackForm'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -535,6 +536,20 @@ export default function Header() {
 
                   {/* Settings + Sign out */}
                   <div className="border-t border-[var(--border-light)] py-1.5">
+                    <button
+                      onClick={() => { setDropdownOpen(false); openFeedback('issue') }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      <CircleAlert size={16} />
+                      <span className="text-sm font-medium">Report an issue</span>
+                    </button>
+                    <button
+                      onClick={() => { setDropdownOpen(false); openFeedback('feature') }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      <Lightbulb size={16} />
+                      <span className="text-sm font-medium">Request a feature</span>
+                    </button>
                     <Link
                       to="/settings"
                       onClick={() => setDropdownOpen(false)}

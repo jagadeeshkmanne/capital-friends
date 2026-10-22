@@ -6,7 +6,7 @@
  * project's Script Properties ("fu:<sheet id>") so the developer can count where families come from:
  * run foundUsReport() in the editor.
  *
- * The same dialog lets people report a bug or ask for a feature: sendFeedback_ below.
+ * Report an issue / request a feature (from anywhere in the app): sendFeedback_ below.
  */
 var FOUNDUS_OPTIONS_ = { google: 1, youtube: 1, friend: 1, whatsapp: 1, social: 1, linkedin: 1, article: 1, other: 1 };
 
@@ -31,14 +31,16 @@ function saveFoundUs_(params, userRecord) {
 }
 
 /**
- * Report a bug / request a feature from inside the app. Sent with the user's own Gmail (the gmail.send
- * permission the app already has for the daily email), so no mail server is needed and replying simply
- * answers them. A copy shows in their Sent folder. At most 5 a day per user.
+ * Report an issue / request a feature from inside the app (More tab, profile menu, footer, welcome question).
+ * Sent with the user's own Gmail (the gmail.send permission the app already has for the daily email), so no
+ * mail server is needed and replying simply answers them. A copy shows in their Sent folder. At most 5 a day
+ * per user. Attachments: up to 5 files, 7 MB together (images, video, PDF, CSV, Excel, text).
  */
 var DEV_EMAIL_ = 'capital.friends.dev@gmail.com';
+var FEEDBACK_TYPES_ = /^(image\/|video\/|application\/pdf$|text\/(csv|plain)$|application\/vnd\.ms-excel$|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet$)/;
 
 function sendFeedback_(params, userRecord) {
-  var kind = params && params.kind === 'feature' ? 'feature' : 'bug';
+  var feature = params && params.kind === 'feature';
   var text = String((params && params.message) || '').replace(/\r/g, '').trim().slice(0, 4000);
   if (text.length < 5) throw new Error('Please write a few words first');
   var email = (userRecord && userRecord.email) || Session.getActiveUser().getEmail();
@@ -46,21 +48,30 @@ function sendFeedback_(params, userRecord) {
   var cache = CacheService.getUserCache(), sent = Number(cache.get('feedback_sent') || 0);
   if (sent >= 5) throw new Error('You have sent 5 messages today. Please email ' + DEV_EMAIL_ + ' directly.');
 
+  // attachments: [{ name, type, data (base64) }]; older app versions sent one { screenshot }
+  var list = (params.attachments && params.attachments.length ? params.attachments : (params.screenshot ? [params.screenshot] : [])).slice(0, 5);
+  var blobs = [], bytes = 0;
+  list.forEach(function (a) {
+    if (!a || !a.data) return;
+    var type = String(a.type || '');
+    if (!FEEDBACK_TYPES_.test(type)) throw new Error((a.name || 'A file') + ': this file type cannot be attached');
+    var raw = Utilities.base64Decode(String(a.data));
+    bytes += raw.length;
+    if (bytes > 7 * 1024 * 1024) throw new Error('The files are too big together (max 7 MB)');
+    blobs.push(Utilities.newBlob(raw, type, String(a.name || 'file').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100)));
+  });
+
   var first = text.split('\n')[0].slice(0, 60);
-  var subject = (kind === 'bug' ? 'Bug report' : 'Feature request') + ' - Capital Friends: ' + first;
+  var subject = (feature ? 'Feature request' : 'Issue report') + ' - Capital Friends: ' + first;
   var body = text + '\n\n-- \nFrom: ' + (userRecord && userRecord.displayName ? userRecord.displayName + ' <' + email + '>' : email) +
     '\nPage: ' + String(params.page || '').slice(0, 200) +
     '\nDevice: ' + String(params.device || '').slice(0, 300) +
     '\nApp version: ' + String(params.version || '').slice(0, 40) +
+    (blobs.length ? '\nAttachments: ' + blobs.map(function (b) { return b.getName(); }).join(', ') : '') +
     '\nSent: ' + new Date().toISOString();
 
   var opts = { name: 'Capital Friends user', replyTo: email };
-  var shot = params.screenshot;
-  if (shot && shot.data && /^image\/(png|jpe?g|webp|gif)$/.test(String(shot.type || ''))) {
-    var bytes = Utilities.base64Decode(String(shot.data));
-    if (bytes.length > 3 * 1024 * 1024) throw new Error('The screenshot is too big (max 3 MB)');
-    opts.attachments = [Utilities.newBlob(bytes, shot.type, String(shot.name || 'screenshot').slice(0, 80))];
-  }
+  if (blobs.length) opts.attachments = blobs;
   GmailApp.sendEmail(DEV_EMAIL_, subject, body, opts);
   cache.put('feedback_sent', String(sent + 1), 24 * 3600);
   return { sent: true };

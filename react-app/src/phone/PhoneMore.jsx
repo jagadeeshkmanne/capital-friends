@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IonList, IonItem, IonLabel, IonListHeader, IonNote, IonBadge } from '@ionic/react'
 import './ionic-setup'
-import { Users, CreditCard, Briefcase, Shield, BarChart3, Package, Landmark, Bell, Zap, FileUp, Settings, Info, Heart, Youtube, Instagram, Lock, FileText, PieChart } from 'lucide-react'
+import { Users, CreditCard, Briefcase, Shield, BarChart3, Package, Landmark, Bell, Zap, FileUp, Settings, Info, Heart, Youtube, Instagram, Lock, FileText, PieChart, CircleAlert, Lightbulb } from 'lucide-react'
 import DonateDialog from '../components/DonateDialog'
+import { openFeedback } from '../components/FeedbackForm'
 import { YOUTUBE_URL, INSTAGRAM_URL } from '../components/FollowCard'
 
 const GROUPS = [
@@ -54,6 +55,11 @@ export default function PhoneMore() {
           </IonList>
         </div>
       ))}
+      <IonListHeader className="!pl-5"><IonLabel className="cf-group">Help &amp; feedback</IonLabel></IonListHeader>
+      <IonList inset lines="inset" className="cf-inset">
+        <IonItem button detail onClick={() => openFeedback('issue')}><Icon I={CircleAlert} c="#f87171" /><IonLabel><h3 className="!text-[15px] !font-semibold">Report an issue</h3><p>Something not working? Tell us</p></IonLabel></IonItem>
+        <IonItem button detail onClick={() => openFeedback('feature')}><Icon I={Lightbulb} c="#fbbf24" /><IonLabel><h3 className="!text-[15px] !font-semibold">Request a feature</h3><p>An idea to make it better</p></IonLabel></IonItem>
+      </IonList>
       <IonListHeader className="!pl-5"><IonLabel className="cf-group">Capital Friends</IonLabel></IonListHeader>
       <IonList inset lines="inset" className="cf-inset">
         <IonItem button detail href={YOUTUBE_URL} target="_blank"><Icon I={Youtube} c="#ef4444" /><IonLabel><h3 className="!text-[15px] !font-semibold">YouTube</h3><p>How-to videos</p></IonLabel></IonItem>

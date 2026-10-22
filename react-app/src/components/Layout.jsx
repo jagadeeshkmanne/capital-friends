@@ -11,6 +11,7 @@ import MobileMenu from './MobileMenu'
 import BrandedLoading from './BrandedLoading'
 import DonateDialog from './DonateDialog'
 import FoundUsDialog from './FoundUsDialog'
+import FeedbackHost, { openFeedback } from './FeedbackForm'
 import DailyUpdatesBanner from './DailyUpdatesBanner'
 import GoalsReachBanner from './GoalsReachBanner'
 import { useData } from '../context/DataContext'
@@ -60,7 +61,7 @@ export default function Layout() {
   }
 
   // phones: Ionic app shell (native app bar, tab bar, sheets)
-  if (phone) return <><Suspense fallback={<BrandedLoading />}><PhoneLayout /></Suspense><FoundUsDialog /></>
+  if (phone) return <><Suspense fallback={<BrandedLoading />}><PhoneLayout /></Suspense><FoundUsDialog /><FeedbackHost /></>
 
   return (
     <div className="cf-app flex flex-col h-dvh bg-[var(--bg-base)] overflow-hidden">
@@ -99,6 +100,8 @@ export default function Layout() {
             </div>
             {/* Links */}
             <div className="flex items-center gap-3">
+              <button onClick={() => openFeedback('issue')} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors">Report an issue</button>
+              <button onClick={() => openFeedback('feature')} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors">Request a feature</button>
               <Link to="/privacy" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Privacy</Link>
               <Link to="/terms" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors no-underline">Terms</Link>
               <button onClick={() => { setShowDonate(true); dismissBanner() }}
@@ -144,6 +147,7 @@ export default function Layout() {
 
       <DonateDialog open={showDonate} onClose={() => setShowDonate(false)} />
       <FoundUsDialog />
+      <FeedbackHost />
     </div>
   )
 }
