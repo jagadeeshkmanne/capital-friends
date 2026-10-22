@@ -28,20 +28,38 @@ const LATER_KEY = 'cf_foundus_later'
 let answered = false   // answered in this page load: never ask again, even before the settings come back
 
 export default function FoundUsDialog() {
-  const { loading, healthCheckCompleted, settings, settingsAt } = useData()
+  const { loading, healthCheckCompleted, settings, settingsAt, settling } = useData()
   const { pathname } = useLocation()
   const [show, setShow] = useState(false)
-  const ready = !loading && healthCheckCompleted === true && settingsAt > 0 && settings && !settings.FoundUsVia && !BUSY.test(pathname)
+  const ready = !loading && healthCheckCompleted === true && settingsAt > 0 && settings && !settings.FoundUsVia && !settling && !BUSY.test(pathname)
 
+  // ask only when the screen has been calm for 2.5 s: no pop-up or sheet open (an import form, a confirm, the menu)
   useEffect(() => {
     if (show || !ready || answered) return
-    try { if (sessionStorage.getItem(LATER_KEY) === '1') return } catch { /* ignore */ }
-    const t = setTimeout(() => setShow(true), 2500)   // let the page settle first
-    return () => clearTimeout(t)
+    let calm = 0
+    const t = setInterval(() => {
+      try { if (sessionStorage.getItem(LATER_KEY) === '1') { clearInterval(t); return } } catch { /* ignore */ }
+      if (popupOpen()) { calm = 0; return }
+      calm += 500
+      if (calm >= 2500) { clearInterval(t); setShow(true) }
+    }, 500)
+    return () => clearInterval(t)
   }, [ready, show])
 
   if (!show) return null
   return createPortal(<Dialog onDone={() => setShow(false)} />, document.body)
+}
+
+// Is any dialog, sheet or menu open right now? App pop-ups are full-screen fixed layers (z-40 and up) or Ionic overlays on phones.
+function popupOpen() {
+  if (document.querySelector('ion-modal:not(.overlay-hidden), ion-alert:not(.overlay-hidden), ion-loading:not(.overlay-hidden), ion-action-sheet:not(.overlay-hidden), ion-popover:not(.overlay-hidden)')) return true
+  for (const el of document.querySelectorAll('.fixed.inset-0, [role="dialog"], [aria-modal="true"]')) {
+    if (el.closest('.cfq-ov') || !el.getClientRects().length) continue
+    const cs = getComputedStyle(el)
+    if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0' || cs.pointerEvents === 'none') continue   // closed menus stay in the page, faded out
+    if (el.matches('[role="dialog"], [aria-modal="true"]') || (parseInt(cs.zIndex, 10) || 0) >= 40) return true
+  }
+  return false
 }
 
 function Dialog({ onDone }) {
