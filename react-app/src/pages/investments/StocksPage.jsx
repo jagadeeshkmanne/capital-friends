@@ -4,9 +4,10 @@ import { useIsPhone } from '../../components/native'
 const StocksPhone = lazy(() => import('./StocksPhone'))
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus, Pencil, TrendingUp, TrendingDown, BarChart3, List, Layers, ChevronDown, MoreVertical, Trash2,
-  RefreshCw, X, Check, Loader2, Upload, FileText, FileSpreadsheet
+  RefreshCw, X, Check, Loader2, Upload, FileSpreadsheet
 } from 'lucide-react'
 import { formatINR } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -25,6 +26,7 @@ import PageLoading from '../../components/PageLoading'
 import * as api from '../../services/api'
 
 export default function StocksPage() {
+  const navigate = useNavigate()
   const { selectedMember } = useFamily()
   const {
     stockPortfolios, stockHoldings, stockTransactions,
@@ -226,13 +228,10 @@ export default function StocksPage() {
       {importMenu && (<>
         <div className="fixed inset-0 z-40" onClick={() => setImportMenu(false)} />
         <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl py-1">
-          <button onClick={() => { setImportMenu(false); setModal({ importFile: selectedPortfolioId !== 'all' ? selectedPortfolioId : '' }) }} className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] flex gap-2.5">
+          {/* every import (trade files, CDSL / NSDL statement, holdings file, template) is on the Import stocks page */}
+          <button onClick={() => { setImportMenu(false); navigate('/investments/stocks/import-trades') }} className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] flex gap-2.5">
             <FileSpreadsheet size={15} className="text-emerald-400 shrink-0 mt-0.5" />
-            <span><span className="block text-xs font-semibold text-[var(--text-primary)]">Broker file (Excel / CSV)</span><span className="block text-xs text-[var(--text-dim)]">Zerodha, Groww… holdings, or our template (India + US)</span></span>
-          </button>
-          <button onClick={() => { setImportMenu(false); setModal({ importDemat: true }) }} className="w-full text-left px-3 py-2.5 hover:bg-[var(--bg-hover)] flex gap-2.5">
-            <FileText size={15} className="text-sky-400 shrink-0 mt-0.5" />
-            <span><span className="block text-xs font-semibold text-[var(--text-primary)]">CDSL / NSDL statement (PDF)</span><span className="block text-xs text-[var(--text-dim)]">All demat accounts of a PAN; makes the portfolios for you</span></span>
+            <span><span className="block text-xs font-semibold text-[var(--text-primary)]">Import stocks</span><span className="block text-xs text-[var(--text-dim)]">Groww, Zerodha, ICICI Direct, CDSL / NSDL statement, holdings file or template</span></span>
           </button>
           {(stockPortfolios || []).length > 0 && (<>
             <div className="my-1 border-t border-[var(--border-light)]" />

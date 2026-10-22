@@ -2,6 +2,7 @@
 //   Holdings | Portfolios | Activity tabs, one summary card, flat rows (tap the numbers to switch Returns / Current),
 //   a portfolio opens its own screen; Buy / Sell / Import / New portfolio from the + menu.
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import '../../phone/ionic-setup'
 import { IonSegment, IonSegmentButton, IonLabel, IonList, IonItem, IonButton, IonActionSheet, IonListHeader, IonRippleEffect } from '@ionic/react'
 import { Plus, MoreVertical, ArrowDownLeft, ArrowUpRight, Eye, EyeOff, BarChart3 } from 'lucide-react'
@@ -142,6 +143,9 @@ const sumOf = (list) => {
 }
 
 export default function StocksPhone({ portfolioData, allHoldings, allTxns, setModal, mv, onDeleteTxn }) {
+  // every import (trade files, CDSL / NSDL statement, holdings file, template) is on the Import stocks page
+  const navigate = useNavigate()
+  const goImport = () => navigate('/investments/stocks/import-trades')
   const [open, setOpen] = useState(null) // portfolioId
   const [tab, setTab] = useState('portfolios')
   const [add, setAdd] = useState(false)
@@ -155,8 +159,7 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
   const sheets = (
     <>
       <IonActionSheet isOpen={add} onDidDismiss={() => setAdd(false)} header="Stocks" buttons={[
-        { text: 'Import from CDSL / NSDL statement', handler: () => setModal({ importDemat: true }) },
-        { text: 'Import from Excel / CSV', handler: () => setModal({ importFile: open || '' }) },
+        { text: 'Import stocks', handler: goImport },
         { text: 'Buy (record a purchase)', handler: () => setModal({ buy: open || (portfolioData[0]?.portfolioId) }) },
         { text: 'Sell (record a sale)', handler: () => setModal({ sell: open || (portfolioData[0]?.portfolioId) }) },
         { text: 'New portfolio', handler: () => setModal('addPortfolio') },
@@ -175,8 +178,8 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
       <div className="flex flex-col items-center gap-3 px-6 pt-20 text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-500/15 text-violet-400"><BarChart3 size={30} /></span>
         <p className="text-[17px] font-semibold">No stock portfolio yet</p>
-        <p className="text-[14px] text-[var(--ion-color-medium)]">Import your CDSL / NSDL statement, or make a portfolio and add your shares.</p>
-        <IonButton onClick={() => setModal({ importDemat: true })} className="mt-2">Import statement</IonButton>
+        <p className="text-[14px] text-[var(--ion-color-medium)]">Import your broker's trade history or your CDSL / NSDL statement, or make a portfolio and add your shares.</p>
+        <IonButton onClick={goImport} className="mt-2">Import stocks</IonButton>
         <IonButton fill="clear" onClick={() => setModal('addPortfolio')}>New portfolio</IonButton>
         {sheets}
       </div>
@@ -220,6 +223,7 @@ export default function StocksPhone({ portfolioData, allHoldings, allTxns, setMo
 }
 
 function PortfolioScreen({ p, back, setModal, mv, onTxn, sheets }) {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('holdings')
   const [menu, setMenu] = useState(false)
   const right = useMemo(() => <IonButton className="cf-icon-btn" onClick={() => setMenu(true)} aria-label="More"><MoreVertical size={22} /></IonButton>, [])
@@ -235,8 +239,7 @@ function PortfolioScreen({ p, back, setModal, mv, onTxn, sheets }) {
         </FadeIn>
       </div>
       <IonActionSheet isOpen={menu} onDidDismiss={() => setMenu(false)} header={p.portfolioName} buttons={[
-        { text: 'Import from CDSL / NSDL statement', handler: () => setModal({ importDemat: true }) },
-        { text: 'Import from Excel / CSV', handler: () => setModal({ importFile: p.portfolioId }) },
+        { text: 'Import stocks', handler: () => navigate('/investments/stocks/import-trades') },
         { text: 'Edit portfolio', handler: () => setModal({ editPortfolio: p }) },
         { text: 'Cancel', role: 'cancel' },
       ]} />
