@@ -67,8 +67,6 @@ function replay(hist) {
 }
 
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
-const Card = ({ children, className = '' }) => <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 ${className}`}>{children}</div>
-const Sel = ({ value, onChange, children }) => <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm text-[var(--text-primary)]">{children}</select>
 
 export default function FundRulePage() {
   const { isAdmin } = useAuth()
@@ -101,98 +99,92 @@ export default function FundRulePage() {
   }, [R, holdings, cfg.fund, cfg.gold, cfg.liq])
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
-  const names = { fund: 'Index fund', gold: 'Gold fund', liq: 'Liquid fund' }
-  const opt = (sel) => [<option key="" value="">— choose —</option>, ...holdings.map((h) => <option key={h.schemeCode} value={h.schemeCode}>{h.fundName}</option>)]
+  const names = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid fund' }
+  const colors = { fund: 'bg-sky-400', gold: 'bg-amber-400', liq: 'bg-slate-400' }
+  const opt = holdings.map((h) => <option key={h.schemeCode} value={h.schemeCode}>{h.fundName}</option>)
+  const TH = 'py-2 px-4 text-left text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider whitespace-nowrap'
+  const TD = 'py-2 px-4 text-sm text-[var(--text-secondary)]'
+  const Sel = ({ value, onChange, children }) => <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2.5 py-1.5 text-sm text-[var(--text-primary)]">{children}</select>
+  const byKey = plan ? Object.fromEntries(plan.rows.map((r) => [r.k, r])) : {}
 
   return (
-    <div className="max-w-5xl mx-auto p-4 space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Fund rule · what to hold now</h1>
-          <p className="text-sm text-[var(--text-muted)]">One index fund (Nifty Midcap 150 Momentum 50) and gold, with a liquid fund as the waiting room. The rule reads the fund's own price history and says how to split the money. Information, not advice; you place any order yourself. The same rule runs with pretend money as <Link to="/admin/paper" className="underline">book G</Link>.</p>
+    <div className="space-y-4">
+      {/* header, like the paper page */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-base font-bold text-[var(--text-primary)]">Fund rule <span className="text-xs font-medium text-[var(--text-dim)]">· index fund + gold · one satellite portfolio</span></h2>
+        <div className="flex items-center gap-2 text-xs">
+          {R && <span className="px-2.5 py-1 rounded-lg font-semibold bg-sky-500/10 text-sky-300">Hold {split(R.target)}</span>}
+          <span className="text-[var(--text-dim)]">{R ? `Prices to ${day(R.asOf)}` : hist === null ? 'No price history' : 'Loading…'}</span>
+          <Link to="/admin/paper" className="px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Book G (paper)</Link>
         </div>
-        {R && <p className="text-xs text-[var(--text-dim)]">Prices up to {day(R.asOf)}</p>}
       </div>
+      {hist === null && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-400">Could not load the fund's price history (api.mfapi.in). Try another fund below.</div>}
 
-      {hist === undefined && <p className="text-sm text-[var(--text-dim)]">Loading NAV history…</p>}
-      {hist === null && <p className="text-sm text-[var(--accent-rose)]">Could not load enough NAV history for this fund (api.mfapi.in). Try another signal fund below.</p>}
+      {R && (<>
+        {/* the three sleeves */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {['fund', 'gold', 'liq'].map((k) => { const r = byKey[k], w = R.target[k]; return (
+            <div key={k} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 min-w-0">
+              <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[k]}`} /><span className="text-xs font-semibold text-[var(--text-primary)]">{names[k]}</span>
+                {r && cfg[k] && <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold ${r.move ? (r.diff > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]') : 'bg-[var(--bg-inset)] text-[var(--text-dim)]'}`}>{r.move ? (r.diff > 0 ? 'BUY ' : 'SELL ') + inr(Math.abs(r.diff)) : 'OK'}</span>}</div>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--text-primary)]">{Math.round(w * 100)}%</p>
+              <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className={`h-full rounded-full ${colors[k]}`} style={{ width: `${Math.round(w * 100)}%` }} /></div>
+              <p className="text-[11px] text-[var(--text-dim)] mt-1.5 truncate">{r && plan.total > 0 ? `Now ${inr(r.cur)} (${Math.round(r.curPct * 100)}%) · target ${inr(r.tgt)}` : k === 'liq' ? 'Waiting room while a guard is on' : k === 'gold' ? 'Never more than 60%' : 'Nifty Midcap 150 Momentum 50'}</p>
+            </div>) })}
+        </div>
 
-      {R && (
-        <Card>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-lg font-bold text-[var(--text-primary)]">Hold now: {split(R.target)}</p>
-            <p className="text-xs text-[var(--text-dim)]">The rule decides on Fridays (week's last price) and at month-end. Check this page on Monday mornings.</p>
+        {/* why, in plain words */}
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Why this split</h3>
+            <span className="text-xs text-[var(--text-dim)]">decided on the week's last price and the month's last price · check on Monday mornings</span>
           </div>
-          <ol className="mt-3 space-y-1.5 text-sm text-[var(--text-secondary)] list-decimal pl-5">
-            <li><b className="text-[var(--text-primary)]">Last 12 months:</b> the fund {R.r12 < 0 ? 'fell' : 'rose'} {pct(Math.abs(R.r12))} → trend is {R.e === RULE.eLo ? 'weak, so the base share in the fund is 20%' : R.e === RULE.eHi ? 'strong, so the base share in the fund is 80%' : 'normal, so the base share in the fund is 50%'}.</li>
-            <li><b className="text-[var(--text-primary)]">Last few weeks:</b> the fund is {pct(Math.abs(R.gap), 1)} {R.gap < 0 ? 'below' : 'above'} its 50-day average → {R.x < 1 ? 'that is a weak market, so half of the fund money is parked in gold' : R.up ? 'it is rising well, so one step more goes into the fund' : 'nothing special, the base share stays'}.</li>
-            <li><b className="text-[var(--text-primary)]">Sharp fall?</b> the fund is {pct(Math.abs(R.fgap), 1)} {R.fgap < 0 ? 'below' : 'above'} its 20-day average → {R.fast ? 'yes, a sharp fall: all fund money waits in the liquid fund until it recovers' : 'no sharp fall, nothing moves to liquid for this'}.</li>
-            <li><b className="text-[var(--text-primary)]">Gold limit:</b> gold is never more than 60% → {R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `the limit is hit, so ${Math.round(R.target.liq * 100)}% waits in the liquid fund instead` : 'not hit, the rest is in gold'}.</li>
-          </ol>
-        </Card>
-      )}
+          <div className="px-4 py-3 grid gap-2 sm:grid-cols-2 text-sm text-[var(--text-secondary)]">
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">12 months</span><br />The fund {R.r12 < 0 ? 'fell' : 'rose'} {pct(Math.abs(R.r12))} → {R.e === RULE.eLo ? 'weak, base share 20%' : R.e === RULE.eHi ? 'strong, base share 80%' : 'normal, base share 50%'}.</p>
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Recent weeks</span><br />{pct(Math.abs(R.gap))} {R.gap < 0 ? 'below' : 'above'} its 50-day average → {R.x < 1 ? 'weak market: half the fund money parked in gold' : R.up ? 'rising well: one step more in the fund' : 'nothing special'}.</p>
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Sharp fall?</span><br />{pct(Math.abs(R.fgap))} {R.fgap < 0 ? 'below' : 'above'} its 20-day average → {R.fast ? 'yes: all fund money waits in liquid until it recovers' : 'no'}.</p>
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Gold limit</span><br />{R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `Gold would be over 60%, so ${Math.round(R.target.liq * 100)}% waits in liquid instead` : 'Under 60%, not applied'}.</p>
+          </div>
+        </div>
+      </>)}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Which fund's prices the rule watches</p>
-          <Sel value={cfg.signal} onChange={(v) => set('signal', Number(v))}>{SIGNAL_FUNDS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</Sel>
-          <p className="text-xs text-[var(--text-dim)] mt-2">Any Nifty Midcap 150 Momentum 50 index fund works; they all track the same index. Tata has the longest price history.</p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Your satellite portfolio (the rule looks only at this one)</p>
-          <Sel value={cfg.portfolioId} onChange={(v) => { set('portfolioId', v); set('fund', ''); set('gold', ''); set('liq', '') }}>
-            <option value="">— choose a mutual-fund portfolio —</option>
-            {portfolios.map((p) => <option key={p.portfolioId} value={p.portfolioId}>{String(p.portfolioName || '').replace(/^PFL-/, '')}</option>)}
-          </Sel>
-          {cfg.portfolioId && (
-            <div className="mt-3 grid gap-2">
-              {['fund', 'gold', 'liq'].map((k) => (
-                <label key={k} className="text-xs text-[var(--text-muted)]">{names[k]}<Sel value={cfg[k]} onChange={(v) => set(k, v)}>{opt(k)}</Sel></label>
-              ))}
-              {!holdings.length && <p className="text-xs text-[var(--text-dim)]">This portfolio holds no funds yet. Add the index fund, a gold fund and a liquid fund to it (an import or a manual entry), then choose them here.</p>}
-            </div>
-          )}
-        </Card>
+      {/* settings */}
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-[var(--border-light)]"><h3 className="text-sm font-bold text-[var(--text-primary)]">Set-up</h3></div>
+        <div className="px-4 py-3 grid gap-3 md:grid-cols-2">
+          <label className="text-xs text-[var(--text-muted)]">Fund whose prices the rule watches
+            <Sel value={cfg.signal} onChange={(v) => set('signal', Number(v))}>{SIGNAL_FUNDS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</Sel></label>
+          <label className="text-xs text-[var(--text-muted)]">Satellite portfolio (the only one the rule looks at)
+            <Sel value={cfg.portfolioId} onChange={(v) => { set('portfolioId', v); set('fund', ''); set('gold', ''); set('liq', '') }}>
+              <option value="">— choose —</option>
+              {portfolios.map((p) => <option key={p.portfolioId} value={p.portfolioId}>{String(p.portfolioName || '').replace(/^PFL-/, '')}</option>)}
+            </Sel></label>
+          {cfg.portfolioId && holdings.length > 0 && ['fund', 'gold', 'liq'].map((k) => (
+            <label key={k} className="text-xs text-[var(--text-muted)]">{names[k]} in that portfolio<Sel value={cfg[k]} onChange={(v) => set(k, v)}><option value="">— choose —</option>{opt}</Sel></label>
+          ))}
+          {cfg.portfolioId && !holdings.length && <p className="text-xs text-[var(--text-dim)] md:col-span-2">This portfolio holds no funds yet. Add the index fund, a gold fund and a liquid fund to it, then pick them here.</p>}
+        </div>
       </div>
 
       {R && plan && cfg.portfolioId && plan.total > 0 && (
-        <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">What to do in the satellite · {inr(plan.total)} in the three funds</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-xs text-[var(--text-muted)] uppercase tracking-wider"><th className="text-left py-1 pr-3">Sleeve</th><th className="text-right py-1 px-3">Now</th><th className="text-right py-1 px-3">Share</th><th className="text-right py-1 px-3">Target</th><th className="text-right py-1 pl-3">Change</th></tr></thead>
-              <tbody>
-                {plan.rows.map((r) => (
-                  <tr key={r.k} className="border-t border-[var(--border)]">
-                    <td className="py-1.5 pr-3 text-[var(--text-primary)]">{names[r.k]}{!cfg[r.k] && <span className="text-[var(--text-dim)]"> (not chosen)</span>}</td>
-                    <td className="py-1.5 px-3 text-right tabular-nums">{inr(r.cur)}</td>
-                    <td className="py-1.5 px-3 text-right tabular-nums">{(r.curPct * 100).toFixed(0)}%</td>
-                    <td className="py-1.5 px-3 text-right tabular-nums">{inr(r.tgt)} <span className="text-[var(--text-dim)]">({Math.round(R.target[r.k] * 100)}%)</span></td>
-                    <td className={`py-1.5 pl-3 text-right tabular-nums font-semibold ${r.move ? (r.diff > 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]') : 'text-[var(--text-dim)]'}`}>{r.move ? (r.diff > 0 ? 'buy ' : 'sell ') + inr(Math.abs(r.diff)) : 'no change'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-sm mt-3 text-[var(--text-secondary)]">
-            {plan.moves.length === 0 ? 'Every sleeve is within 5% of its target — nothing to do.' :
-              'Switches: ' + plan.moves.filter((r) => r.diff < 0).map((r) => `sell ${inr(-r.diff)} of the ${names[r.k].toLowerCase()}`).concat(plan.moves.filter((r) => r.diff > 0).map((r) => `buy ${inr(r.diff)} of the ${names[r.k].toLowerCase()}`)).join('; ') + '. A switch order between funds of the same house settles in a day or two; otherwise redeem, then invest.'}
-          </p>
-          <p className="text-xs text-[var(--text-dim)] mt-2">Values are the app's current values (last NAV). Exit loads and tax on the sold sleeve are yours to check; the back-test counts tax, not exit loads.</p>
-        </Card>
+        <div className={`rounded-xl border px-4 py-2.5 text-sm font-semibold ${plan.moves.length ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}`}>
+          {plan.moves.length === 0 ? 'Nothing to do — every fund is within 5% of its target.' :
+            'To do: ' + plan.moves.filter((r) => r.diff < 0).map((r) => `sell ${inr(-r.diff)} of the ${names[r.k].toLowerCase()}`).concat(plan.moves.filter((r) => r.diff > 0).map((r) => `buy ${inr(r.diff)} of the ${names[r.k].toLowerCase()}`)).join(', ') + '.'}
+          <span className="block text-xs font-normal text-[var(--text-dim)] mt-0.5">Values are the app's current values. Information, not advice; exit loads and tax are yours to check.</span>
+        </div>
       )}
 
       {R && (
-        <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">What changed, and when (last few switches)</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-xs text-[var(--text-muted)] uppercase tracking-wider"><th className="text-left py-1 pr-3">From</th><th className="text-left py-1 px-3">What happened</th><th className="text-left py-1 pl-3">Hold</th></tr></thead>
-              <tbody>{R.log.map((l) => <tr key={l.date} className="border-t border-[var(--border)]"><td className="py-1.5 pr-3 tabular-nums whitespace-nowrap">{day(l.date)}</td><td className="py-1.5 px-3 text-[var(--text-secondary)] whitespace-normal">{l.why}</td><td className="py-1.5 pl-3 whitespace-nowrap text-[var(--text-primary)]">{split(l.target)}</td></tr>)}</tbody>
-            </table>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">What changed, and when</h3>
+            <span className="text-xs text-[var(--text-dim)]">last {R.log.length} switches · back-test 2010–26: ~24% a year, worst fall 17% (holding the fund: 21%, −39%)</span>
           </div>
-          <p className="text-xs text-[var(--text-dim)] mt-2">Why these rules: in the back-test (2010–2026, after tax) this gave about 24% a year with a worst fall of 17%, against 21% a year with a 39% fall for just holding the fund. Past results do not repeat; plan with 16–18% a year.</p>
-        </Card>
+          <div className="overflow-x-auto"><table className="w-full">
+            <thead><tr className="border-b border-[var(--border-light)]"><th className={TH}>From</th><th className={TH}>What happened</th><th className={TH}>Hold</th></tr></thead>
+            <tbody>{R.log.map((l) => <tr key={l.date} className="border-b border-[var(--border)] last:border-0"><td className={`${TD} whitespace-nowrap tabular-nums`}>{day(l.date)}</td><td className={TD}>{l.why}</td><td className={`${TD} whitespace-nowrap text-[var(--text-primary)] font-semibold`}>{split(l.target)}</td></tr>)}</tbody>
+          </table></div>
+        </div>
       )}
     </div>
   )
