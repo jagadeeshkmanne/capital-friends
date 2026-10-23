@@ -45,22 +45,22 @@ function replay(hist) {
     const d = dates[i], p = dates[i - 1], why = []
     if (S.e == null || d.slice(0, 7) !== p.slice(0, 7)) {              // new month: trend from the previous month's last NAV
       S.r12 = nav[i - 1] / nav[i - 1 - RULE.look] - 1; const e = trendE(S.r12)
-      if (S.e != null && e !== S.e) why.push(`12-month return ${pct(S.r12)} → fund share ${e * 100}%`)
+      if (S.e != null && e !== S.e) why.push(`Over the last 12 months the fund ${S.r12 < 0 ? 'fell' : 'rose'} ${pct(Math.abs(S.r12))}, so the base share in the fund is now ${e * 100}%`)
       S.e = e
     }
     if (S.gap == null || isoWeek(d) !== isoWeek(p)) {                    // new week: guards from last week's last NAV
       S.gap = nav[i - 1] / mean(i - 1, RULE.k) - 1; let x = S.x; const up = S.gap > RULE.band
       if (S.gap < -RULE.band) x = 1 - RULE.cut; else if (S.gap > RULE.band) x = 1
-      if (x !== S.x) why.push(`vs 50-day avg ${pct(S.gap)} → guard ${x < 1 ? 'ON (fund sleeve halved)' : 'off'}`)
-      if (up !== S.up && x === 1) why.push(`vs 50-day avg ${pct(S.gap)} → ${up ? 'one notch up' : 'back to the monthly share'}`)
+      if (x !== S.x) why.push(x < 1 ? `The fund dropped ${pct(Math.abs(S.gap))} below its 50-day average: half the fund money moved to gold` : `The fund is back ${pct(S.gap)} above its 50-day average: the fund money comes back`)
+      if (up !== S.up && x === 1) why.push(up ? `The fund is ${pct(S.gap)} above its 50-day average (rising well): one step more in the fund` : `The fund is only ${pct(S.gap)} vs its 50-day average: back to the base share`)
       S.x = x; S.up = up
       S.fgap = nav[i - 1] / mean(i - 1, RULE.fastK) - 1; let fast = S.fast
       if (S.fgap < -RULE.fastBand) fast = true; else if (S.fgap > 0) fast = false
-      if (fast !== S.fast) why.push(`vs 20-day avg ${pct(S.fgap)} → crash guard ${fast ? 'ON (fund sleeve to liquid)' : 'off'}`)
+      if (fast !== S.fast) why.push(fast ? `Sharp fall: the fund is ${pct(Math.abs(S.fgap))} below its 20-day average, so all fund money waits in the liquid fund` : `The sharp fall is over (fund back above its 20-day average): fund money goes back in`)
       S.fast = fast
     }
     const t = targets(S.e, S.x, S.up, S.fast)
-    if (!same(t, S.target)) log.push({ date: d, why: why.join('; ') || 'start', target: t })
+    if (!same(t, S.target)) log.push({ date: d, why: why.join('. ') || 'Start of the history', target: t })
     S.target = t
   }
   return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice(-16).reverse(), days: n }
@@ -69,7 +69,6 @@ function replay(hist) {
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
 const Card = ({ children, className = '' }) => <div className={`rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 ${className}`}>{children}</div>
 const Sel = ({ value, onChange, children }) => <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm text-[var(--text-primary)]">{children}</select>
-const Tag = ({ on, children }) => <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${on ? 'bg-amber-500/15 text-amber-400' : 'bg-[var(--bg-primary)] text-[var(--text-muted)]'}`}>{children}</span>
 
 export default function FundRulePage() {
   const { isAdmin } = useAuth()
@@ -109,10 +108,10 @@ export default function FundRulePage() {
     <div className="max-w-5xl mx-auto p-4 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Fund rule · satellite portfolio</h1>
-          <p className="text-sm text-[var(--text-muted)]">Index fund + gold, switched by the index fund's own trend. The rule's output for one portfolio of yours — information, not advice; you place any order yourself. Paper record: <Link to="/admin/paper" className="underline">book G</Link>.</p>
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">Fund rule · what to hold now</h1>
+          <p className="text-sm text-[var(--text-muted)]">One index fund (Nifty Midcap 150 Momentum 50) and gold, with a liquid fund as the waiting room. The rule reads the fund's own price history and says how to split the money. Information, not advice; you place any order yourself. The same rule runs with pretend money as <Link to="/admin/paper" className="underline">book G</Link>.</p>
         </div>
-        {R && <p className="text-xs text-[var(--text-dim)]">NAVs to {day(R.asOf)} · {R.days} days of history</p>}
+        {R && <p className="text-xs text-[var(--text-dim)]">Prices up to {day(R.asOf)}</p>}
       </div>
 
       {hist === undefined && <p className="text-sm text-[var(--text-dim)]">Loading NAV history…</p>}
@@ -121,26 +120,26 @@ export default function FundRulePage() {
       {R && (
         <Card>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-lg font-bold text-[var(--text-primary)]">Today's target: {split(R.target)}</p>
-            <p className="text-xs text-[var(--text-dim)]">decided at the last month-end / week-end NAV; the next check is the coming week's last NAV</p>
+            <p className="text-lg font-bold text-[var(--text-primary)]">Hold now: {split(R.target)}</p>
+            <p className="text-xs text-[var(--text-dim)]">The rule decides on Fridays (week's last price) and at month-end. Check this page on Monday mornings.</p>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Tag on={R.e !== RULE.eMid}>Trend {R.e === RULE.eLo ? 'weak' : R.e === RULE.eHi ? 'strong' : 'normal'} · 12-month return {pct(R.r12)} → fund share {R.e * 100}%</Tag>
-            <Tag on={R.x < 1}>{R.x < 1 ? 'Guard ON: fund sleeve halved' : R.up ? 'One notch up: index above its average' : 'Guard off'} · vs 50-day avg {pct(R.gap, 2)}</Tag>
-            <Tag on={R.fast}>{R.fast ? 'Crash guard ON: fund sleeve in liquid' : 'Crash guard off'} · vs 20-day avg {pct(R.fgap, 2)}</Tag>
-            <Tag on={R.target.gold >= RULE.goldCap - 1e-9}>Gold max 60%</Tag>
-          </div>
+          <ol className="mt-3 space-y-1.5 text-sm text-[var(--text-secondary)] list-decimal pl-5">
+            <li><b className="text-[var(--text-primary)]">Last 12 months:</b> the fund {R.r12 < 0 ? 'fell' : 'rose'} {pct(Math.abs(R.r12))} → trend is {R.e === RULE.eLo ? 'weak, so the base share in the fund is 20%' : R.e === RULE.eHi ? 'strong, so the base share in the fund is 80%' : 'normal, so the base share in the fund is 50%'}.</li>
+            <li><b className="text-[var(--text-primary)]">Last few weeks:</b> the fund is {pct(Math.abs(R.gap), 1)} {R.gap < 0 ? 'below' : 'above'} its 50-day average → {R.x < 1 ? 'that is a weak market, so half of the fund money is parked in gold' : R.up ? 'it is rising well, so one step more goes into the fund' : 'nothing special, the base share stays'}.</li>
+            <li><b className="text-[var(--text-primary)]">Sharp fall?</b> the fund is {pct(Math.abs(R.fgap), 1)} {R.fgap < 0 ? 'below' : 'above'} its 20-day average → {R.fast ? 'yes, a sharp fall: all fund money waits in the liquid fund until it recovers' : 'no sharp fall, nothing moves to liquid for this'}.</li>
+            <li><b className="text-[var(--text-primary)]">Gold limit:</b> gold is never more than 60% → {R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `the limit is hit, so ${Math.round(R.target.liq * 100)}% waits in the liquid fund instead` : 'not hit, the rest is in gold'}.</li>
+          </ol>
         </Card>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Signal fund (whose NAV history drives the rule)</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Which fund's prices the rule watches</p>
           <Sel value={cfg.signal} onChange={(v) => set('signal', Number(v))}>{SIGNAL_FUNDS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</Sel>
-          <p className="text-xs text-[var(--text-dim)] mt-2">Any Nifty Midcap 150 Momentum 50 index fund works; Tata has the longest history (Oct 2022). The rule needs 12 months plus 50 days of NAVs.</p>
+          <p className="text-xs text-[var(--text-dim)] mt-2">Any Nifty Midcap 150 Momentum 50 index fund works; they all track the same index. Tata has the longest price history.</p>
         </Card>
         <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Satellite portfolio (the only one the rule touches)</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Your satellite portfolio (the rule looks only at this one)</p>
           <Sel value={cfg.portfolioId} onChange={(v) => { set('portfolioId', v); set('fund', ''); set('gold', ''); set('liq', '') }}>
             <option value="">— choose a mutual-fund portfolio —</option>
             {portfolios.map((p) => <option key={p.portfolioId} value={p.portfolioId}>{String(p.portfolioName || '').replace(/^PFL-/, '')}</option>)}
@@ -158,7 +157,7 @@ export default function FundRulePage() {
 
       {R && plan && cfg.portfolioId && plan.total > 0 && (
         <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Satellite today · {inr(plan.total)} in the three sleeves</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">What to do in the satellite · {inr(plan.total)} in the three funds</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-xs text-[var(--text-muted)] uppercase tracking-wider"><th className="text-left py-1 pr-3">Sleeve</th><th className="text-right py-1 px-3">Now</th><th className="text-right py-1 px-3">Share</th><th className="text-right py-1 px-3">Target</th><th className="text-right py-1 pl-3">Change</th></tr></thead>
@@ -185,14 +184,14 @@ export default function FundRulePage() {
 
       {R && (
         <Card>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Recent changes of the target (from the NAV history)</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">What changed, and when (last few switches)</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="text-xs text-[var(--text-muted)] uppercase tracking-wider"><th className="text-left py-1 pr-3">From</th><th className="text-left py-1 px-3">Why</th><th className="text-left py-1 pl-3">Target</th></tr></thead>
-              <tbody>{R.log.map((l) => <tr key={l.date} className="border-t border-[var(--border)]"><td className="py-1.5 pr-3 tabular-nums whitespace-nowrap">{day(l.date)}</td><td className="py-1.5 px-3 text-[var(--text-secondary)]">{l.why}</td><td className="py-1.5 pl-3 whitespace-nowrap text-[var(--text-primary)]">{split(l.target)}</td></tr>)}</tbody>
+              <thead><tr className="text-xs text-[var(--text-muted)] uppercase tracking-wider"><th className="text-left py-1 pr-3">From</th><th className="text-left py-1 px-3">What happened</th><th className="text-left py-1 pl-3">Hold</th></tr></thead>
+              <tbody>{R.log.map((l) => <tr key={l.date} className="border-t border-[var(--border)]"><td className="py-1.5 pr-3 tabular-nums whitespace-nowrap">{day(l.date)}</td><td className="py-1.5 px-3 text-[var(--text-secondary)] whitespace-normal">{l.why}</td><td className="py-1.5 pl-3 whitespace-nowrap text-[var(--text-primary)]">{split(l.target)}</td></tr>)}</tbody>
             </table>
           </div>
-          <p className="text-xs text-[var(--text-dim)] mt-2">Back-test after tax (index level less 0.3% a year, gold = Gold BeES): Jul 2015–Sep 2026 23.5% a year, worst fall −17%; Jan 2010–Sep 2026 24.4% / −17%; holding the fund alone 18–21% with −39% falls. Past results do not repeat; plan with 16–18%.</p>
+          <p className="text-xs text-[var(--text-dim)] mt-2">Why these rules: in the back-test (2010–2026, after tax) this gave about 24% a year with a worst fall of 17%, against 21% a year with a 39% fall for just holding the fund. Past results do not repeat; plan with 16–18% a year.</p>
         </Card>
       )}
     </div>
