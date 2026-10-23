@@ -189,7 +189,7 @@ export default function PaperBookPage() {
     })
     // stocks sorted by the chosen column (default momentum rank, strongest first); gold and liquid always at the bottom
     const grp = (h) => (h.row[0] === 'GOLDBEES' ? 1 : h.row[0] === 'LIQUIDCASE' ? 2 : 0)
-    const key = { rank: (h) => h.row[7] ?? 999, pnl: (h) => -(h.pnlPct ?? -1e9), today: (h) => -(h.todayPct ?? -1e9),
+    const key = { rank: (h) => h.row[7] ?? 999, pnl: (h) => -(h.pnlAmt ?? -1e9), pnlPct: (h) => -(h.pnlPct ?? -1e9), today: (h) => -(h.todayPct ?? -1e9),
       value: (h) => -h.value, stock: (h) => h.row[0] }[sort.k]
     hold.sort((x, y) => grp(x) - grp(y) || (sort.k === 'stock' ? key(x).localeCompare(key(y)) : key(x) - key(y)) * sort.d)
     const liveNav = hold.reduce((a, h) => a + h.value, 0)
@@ -333,7 +333,7 @@ export default function PaperBookPage() {
                   <SortTh k="rank" sort={sort} setSort={setSort} cls="text-right w-12" title="Momentum rank today (sold at the next rebalance if below 40)">Rank</SortTh>
                   <SortTh k="stock" sort={sort} setSort={setSort} cls="text-left">Stock</SortTh><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Avg</th>
                   <th className={`${TH} text-right`}>Price</th><SortTh k="today" sort={sort} setSort={setSort} cls="text-right">Today</SortTh>
-                  <SortTh k="value" sort={sort} setSort={setSort} cls="text-right">Value</SortTh><SortTh k="pnl" sort={sort} setSort={setSort} cls="text-right" title="Sorts by % (fair across bigger and smaller holdings)">P&amp;L</SortTh>
+                  <SortTh k="value" sort={sort} setSort={setSort} cls="text-right">Value</SortTh><SortTh k="pnl" sort={sort} setSort={setSort} cls="text-right" title="Sorts by rupee gain or loss (▲ biggest gain first, ▼ biggest loss first); click % to sort by percent">P&amp;L</SortTh><SortTh k="pnlPct" sort={sort} setSort={setSort} cls="text-right" title="Sorts by % gain or loss">%</SortTh>
                   <th className={`${TH} text-left`}>Weight</th>
                 </tr>
               </thead>
@@ -355,7 +355,7 @@ export default function PaperBookPage() {
                         {todayPct == null ? '—' : pct(todayPct)}
                       </td>
                       <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(value)}</td>
-                      <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pnlAmt == null ? '—' : <>{sgn(pnlAmt)}{inr(Math.abs(pnlAmt))} <span className="text-xs font-medium opacity-80">· {pct(pnl)}</span></>}</td>
+                      <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pnlAmt == null ? '—' : <>{sgn(pnlAmt)}{inr(Math.abs(pnlAmt))}</>}</td><td className={`${TD} text-right ${tone(pnl)}`}>{pnl == null ? '—' : pct(pnl)}</td>
                       <td className={`${TD} text-left`}>
                         <div className="flex items-center gap-2">
                           <div className="w-16 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden">
