@@ -32,6 +32,7 @@ import TermsAndConditions from './pages/TermsAndConditions'
 const ImportStatementPage = lazy(() => import('./pages/ImportStatementPage'))
 const PaperBookPage = lazy(() => import('./pages/PaperBookPage'))
 const FoundUsAdminPage = lazy(() => import('./pages/FoundUsAdminPage'))
+const FundRulePage = lazy(() => import('./pages/FundRulePage'))
 // Import stocks (beta): every stock file in one page, open to every signed-in user
 const StockTradesImportPage = lazy(() => import('./pages/investments/StockTradesImportPage'))
 
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="import" element={<Suspense fallback={null}><ImportStatementPage /></Suspense>} />
           <Route path="admin/paper" element={<Suspense fallback={null}><PaperBookPage /></Suspense>} />
           <Route path="admin/found-us" element={<Suspense fallback={null}><FoundUsAdminPage /></Suspense>} />
+          <Route path="admin/fund-rule" element={<Suspense fallback={null}><FundRulePage /></Suspense>} />
 
           {/* More (mobile) */}
           <Route path="more" element={<MorePage />} />
