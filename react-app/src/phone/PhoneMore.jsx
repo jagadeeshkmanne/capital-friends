@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IonList, IonItem, IonLabel, IonListHeader, IonNote, IonBadge } from '@ionic/react'
 import './ionic-setup'
-import { Users, CreditCard, Briefcase, Shield, BarChart3, Package, Landmark, Bell, Zap, FileUp, Settings, Info, Heart, Youtube, Instagram, Lock, FileText, PieChart, CircleAlert, Lightbulb } from 'lucide-react'
+import { Users, CreditCard, Briefcase, Shield, BarChart3, Package, Landmark, Bell, Zap, FileUp, Settings, Info, Heart, Youtube, Instagram, Lock, FileText, PieChart, CircleAlert, Lightbulb, Scale, FlaskConical, Compass } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import DonateDialog from '../components/DonateDialog'
 import { openFeedback } from '../components/FeedbackForm'
 import { YOUTUBE_URL, INSTAGRAM_URL } from '../components/FollowCard'
@@ -36,6 +37,26 @@ const GROUPS = [
 
 const Icon = ({ I, c }) => <span slot="start" className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${c}22`, color: c }}><I size={19} /></span>
 
+// Admin (only the admin email) or Research (emails the admin shared the fund rule and paper books with); same links
+// as the profile menu on a laptop. Shown first so it is found without scrolling.
+function ResearchGroup() {
+  const navigate = useNavigate()
+  const { isAdmin, isResearch } = useAuth()
+  if (!isResearch) return null
+  const items = [['Fund rule', 'Index fund + gold rule', Scale, '/admin/fund-rule', '#38bdf8'], ['Paper books', 'Momentum paper trading', FlaskConical, '/admin/paper', '#a78bfa']]
+  if (isAdmin) items.push(['Found us', 'How families heard about the app', Compass, '/admin/found-us', '#34d399'])
+  return (
+    <>
+      <IonListHeader className="!pl-5"><IonLabel className="cf-group">{isAdmin ? 'Admin · only you' : 'Research · shared with you'}</IonLabel></IonListHeader>
+      <IonList inset lines="inset" className="cf-inset">
+        {items.map(([label, sub, I, path, c]) => (
+          <IonItem key={label} button detail onClick={() => navigate(path)}><Icon I={I} c={c} /><IonLabel><h3 className="!text-[15px] !font-semibold">{label}</h3><p>{sub}</p></IonLabel></IonItem>
+        ))}
+      </IonList>
+    </>
+  )
+}
+
 // Help & feedback: placed above the App group so it is easy to find without scrolling to the very end
 function HelpGroup() {
   return (
@@ -54,6 +75,7 @@ export default function PhoneMore() {
   const [donate, setDonate] = useState(false)
   return (
     <div className="-mx-4 pb-6">
+      <ResearchGroup />
       {GROUPS.map(([title, items]) => (<div key={title}>{title === 'App' && <HelpGroup />}
         <div>
           <IonListHeader className="!pl-5"><IonLabel className="cf-group">{title}</IonLabel></IonListHeader>
