@@ -11,7 +11,7 @@ var FUND_RULE = {
   signalCode: 150738,          // Tata Nifty Midcap 150 Momentum 50 Index Fund - Direct - Growth (longest NAV history)
   lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02, cut: 0.5, notch: { '0.5': 0.8, '0.8': 1 },
   fastK: 20, fastBand: 0.04, goldCap: 0.6, look: 248,
-  hour: 7                      // daily trigger hour (script time zone); AMFI's NAV for a day is out the previous evening
+  hour: 9                      // daily trigger hour (script time zone): AMFI's NAV for a day is out by ~11 pm; checked 7:27 am next day it was there, 9 am leaves a margin
 };
 
 function fundRuleTrendE_(r) { return r < FUND_RULE.lo ? FUND_RULE.eLo : r > FUND_RULE.hi ? FUND_RULE.eHi : FUND_RULE.eMid; }
@@ -104,5 +104,5 @@ function runFundRuleNow() {
 function setupFundRuleTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'fundRuleDailyCheck') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('fundRuleDailyCheck').timeBased().atHour(FUND_RULE.hour).everyDays(1).create();
-  Logger.log('Fund rule: daily trigger set for ' + FUND_RULE.hour + ':00; first email comes at the first run.');
+  Logger.log('Fund rule: daily trigger set for ' + FUND_RULE.hour + ':00 (a late NAV is simply picked up the next morning); first email comes at the first run.');
 }
