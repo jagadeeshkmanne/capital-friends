@@ -43,7 +43,7 @@ function replay(hist) {
   const dates = hist.times.map(iso), nav = hist.navs, n = nav.length
   const mean = (i, k) => { let s = 0; for (let j = i - k + 1; j <= i; j++) s += nav[j]; return s / k }
   const S = { e: null, x: 1, up: false, fast: false, r12: null, gap: null, fgap: null, target: null }
-  const log = []
+  const log = [], series = []
   for (let i = RULE.look + 5; i < n; i++) {
     const d = dates[i], p = dates[i - 1], why = []
     if (S.e == null || d.slice(0, 7) !== p.slice(0, 7)) {              // new month: trend from the previous month's last NAV
@@ -64,12 +64,73 @@ function replay(hist) {
     }
     const t = targets(S.e, S.x, S.up, S.fast)
     if (!same(t, S.target)) log.push({ date: d, why: why.join('. ') || 'Start of the history', target: t })
-    S.target = t
+    S.target = t; series.push([d, nav[i], t.fund])
   }
-  return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice(-16).reverse(), days: n }
+  return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice().reverse(), series: series.slice(-260), days: n }
 }
 
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
+
+/** Last 12 months: the fund's price with the share held in the fund underneath, then each switch as a card. */
+function History({ R, colors }) {
+  const [all, setAll] = useState(false)
+  const pts = R.series; const n = pts.length
+  const W = 960, H = 220, L = 8, Rm = 72, T = 10, B = 24, bandH = 44   // bottom band = fund share 0–100%
+  const navs = pts.map((p) => p[1]); const lo = Math.min(...navs), hi = Math.max(...navs), pad = (hi - lo) * 0.06 || 1
+  const X = (i) => L + ((W - L - Rm) * i) / Math.max(1, n - 1)
+  const Y = (v) => T + (H - T - B - bandH - 8) * (1 - (v - (lo - pad)) / (hi + pad - (lo - pad)))
+  const YB = (f) => H - B - f * bandH
+  const line = pts.map((p, i) => `${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')
+  // fund share as a step area
+  let band = `${X(0).toFixed(1)},${YB(0).toFixed(1)}`
+  pts.forEach((p, i) => { if (i > 0) band += ` ${X(i).toFixed(1)},${YB(pts[i - 1][2]).toFixed(1)}`; band += ` ${X(i).toFixed(1)},${YB(p[2]).toFixed(1)}` })
+  band += ` ${X(n - 1).toFixed(1)},${YB(0).toFixed(1)}`
+  const idx = Object.fromEntries(pts.map((p, i) => [p[0], i]))
+  const marks = R.log.filter((l) => l.date in idx)
+  const chg = n > 1 ? (navs[n - 1] / navs[0] - 1) * 100 : 0
+  const shown = all ? R.log : R.log.slice(0, 6)
+  const Bar = ({ t }) => (
+    <div className="flex h-2 w-full rounded-full overflow-hidden bg-[var(--bg-inset)]">
+      {['fund', 'gold', 'liq'].map((k) => t[k] > 0.001 && <div key={k} className={colors[k]} style={{ width: `${t[k] * 100}%` }} />)}
+    </div>)
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Last 12 months</h3>
+        <span className="text-xs text-[var(--text-dim)]">fund price {pct(chg / 100)} · {R.log.filter((l) => l.date >= pts[0][0]).length} switches · the blue band below the line is the share held in the fund</span>
+      </div>
+      <div className="px-4 pt-3">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Fund price and the share held in the fund">
+          {[hi, lo].map((v) => <g key={v}><line x1={L} x2={W - Rm} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeDasharray="3 4" /><text x={W - Rm + 6} y={Y(v) + 4} fontSize="11" fill="var(--text-dim)">₹{v.toFixed(2)}</text></g>)}
+          <polyline points={line} fill="none" strokeWidth="2" strokeLinejoin="round" className={chg >= 0 ? 'stroke-emerald-400' : 'stroke-rose-400'} />
+          <polygon points={band} className="fill-sky-400/30" />
+          <line x1={L} x2={W - Rm} y1={YB(0)} y2={YB(0)} stroke="var(--border)" />
+          {[1, 0.5].map((f) => <g key={f}><line x1={L} x2={W - Rm} y1={YB(f)} y2={YB(f)} stroke="var(--border)" strokeDasharray="2 4" /><text x={W - Rm + 6} y={YB(f) + 4} fontSize="11" fill="var(--text-dim)">{f * 100}% fund</text></g>)}
+          {marks.map((l) => <g key={l.date}><line x1={X(idx[l.date])} x2={X(idx[l.date])} y1={T} y2={YB(0)} stroke="var(--text-dim)" strokeDasharray="2 3" opacity="0.6" /><circle cx={X(idx[l.date])} cy={YB(l.target.fund)} r="3.5" className="fill-sky-400" /></g>)}
+          <text x={L} y={H - 7} fontSize="11" fill="var(--text-dim)">{day(pts[0][0])}</text>
+          <text x={W - Rm} y={H - 7} fontSize="11" fill="var(--text-dim)" textAnchor="end">{day(pts[n - 1][0])}</text>
+        </svg>
+      </div>
+      <div className="px-4 py-3 border-t border-[var(--border-light)]">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-2">Switches, newest first</p>
+        <div className="grid gap-2 md:grid-cols-2">
+          {shown.map((l) => (
+            <div key={l.date} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3.5 py-2.5">
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <span className="text-xs font-semibold tabular-nums text-[var(--text-primary)]">{day(l.date)}</span>
+                <span className="text-xs tabular-nums text-[var(--text-secondary)]">{split(l.target)}</span>
+              </div>
+              <Bar t={l.target} />
+              <p className="text-xs text-[var(--text-muted)] mt-1.5">{l.why}</p>
+            </div>
+          ))}
+        </div>
+        {R.log.length > 6 && <button onClick={() => setAll(!all)} className="mt-3 text-xs font-semibold text-sky-300 hover:text-sky-200">{all ? 'Show fewer' : `Show all ${R.log.length} switches`}</button>}
+        <p className="text-[11px] text-[var(--text-dim)] mt-3">Back-test 2010–2026, after tax: about 24% a year with a worst fall of 17%; holding the fund alone 21% with a 39% fall. Past results do not repeat; plan with 16–18% a year.</p>
+      </div>
+    </div>
+  )
+}
 
 export default function FundRulePage() {
   const { isAdmin } = useAuth()
@@ -155,19 +216,23 @@ export default function FundRulePage() {
             </div>) })}
         </div>
 
-        {/* why, in plain words */}
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Why this split</h3>
-            <span className="text-xs text-[var(--text-dim)]">decided on the week's last price and the month's last price · check on Monday mornings</span>
-          </div>
-          <div className="px-4 py-3 grid gap-2 sm:grid-cols-2 text-sm text-[var(--text-secondary)]">
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">12 months</span><br />The fund {R.r12 < 0 ? 'fell' : 'rose'} {ap(R.r12)} → {R.e === RULE.eLo ? 'weak, base share 20%' : R.e === RULE.eHi ? 'strong, base share 80%' : 'normal, base share 50%'}.</p>
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Recent weeks</span><br />{ap(R.gap)} {R.gap < 0 ? 'below' : 'above'} its 50-day average → {R.x < 1 ? 'weak market: half the fund money parked in gold' : R.up ? 'rising well: one step more in the fund' : 'nothing special'}.</p>
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Sharp fall?</span><br />{ap(R.fgap)} {R.fgap < 0 ? 'below' : 'above'} its 20-day average → {R.fast ? 'yes: all fund money waits in liquid until it recovers' : 'no'}.</p>
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Gold limit</span><br />{R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `Gold would be over 60%, so ${Math.round(R.target.liq * 100)}% waits in liquid instead` : 'Under 60%, not applied'}.</p>
-          </div>
+        {/* why: four checks */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            ['12 months', R.r12 >= RULE.hi ? 'strong' : R.r12 < RULE.lo ? 'weak' : 'normal', `The fund ${R.r12 < 0 ? 'fell' : 'rose'} ${ap(R.r12)} in a year`, R.e === RULE.eLo ? 'Base share 20%' : R.e === RULE.eHi ? 'Base share 80%' : 'Base share 50%', R.e === RULE.eMid ? 'ok' : R.e === RULE.eLo ? 'warn' : 'good'],
+            ['Recent weeks', R.x < 1 ? 'guard on' : R.up ? 'notch up' : 'quiet', `${ap(R.gap)} ${R.gap < 0 ? 'below' : 'above'} the 50-day average`, R.x < 1 ? 'Half the fund money parked in gold' : R.up ? 'One step more in the fund' : 'Base share stays', R.x < 1 ? 'warn' : R.up ? 'good' : 'ok'],
+            ['Sharp fall', R.fast ? 'yes' : 'no', `${ap(R.fgap)} ${R.fgap < 0 ? 'below' : 'above'} the 20-day average`, R.fast ? 'All fund money waits in liquid' : 'Nothing moved to liquid for this', R.fast ? 'bad' : 'ok'],
+            ['Gold limit', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? 'hit' : 'not hit', 'Gold is never more than 60%', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `${Math.round(R.target.liq * 100)}% waits in liquid instead` : 'All the rest is in gold', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? 'warn' : 'ok'],
+          ].map(([t, state, l1, l2, tone]) => (
+            <div key={t} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 min-w-0">
+              <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t}</p>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${tone === 'good' ? 'bg-emerald-500/15 text-emerald-400' : tone === 'warn' ? 'bg-amber-500/15 text-amber-400' : tone === 'bad' ? 'bg-rose-500/15 text-[var(--accent-rose)]' : 'bg-[var(--bg-inset)] text-[var(--text-muted)]'}`}>{state}</span></div>
+              <p className="mt-1.5 text-sm text-[var(--text-primary)]">{l1}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">{l2}</p>
+            </div>
+          ))}
         </div>
+        <p className="text-xs text-[var(--text-dim)] -mt-1">Decided on the week's last price (Friday) and the month's last price. Check on Monday mornings, or wait for the email.</p>
       </>)}
 
       {/* settings */}
@@ -205,18 +270,7 @@ export default function FundRulePage() {
         </div>
       )}
 
-      {R && (
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">What changed, and when</h3>
-            <span className="text-xs text-[var(--text-dim)]">last {R.log.length} switches · back-test 2010–26: ~24% a year, worst fall 17% (holding the fund: 21%, −39%)</span>
-          </div>
-          <div className="overflow-x-auto"><table className="w-full">
-            <thead><tr className="border-b border-[var(--border-light)]"><th className={TH}>From</th><th className={TH}>What happened</th><th className={TH}>Hold</th></tr></thead>
-            <tbody>{R.log.map((l) => <tr key={l.date} className="border-b border-[var(--border)] last:border-0"><td className={`${TD} whitespace-nowrap tabular-nums`}>{day(l.date)}</td><td className={TD}>{l.why}</td><td className={`${TD} whitespace-nowrap text-[var(--text-primary)] font-semibold`}>{split(l.target)}</td></tr>)}</tbody>
-          </table></div>
-        </div>
-      )}
+      {R && <History R={R} colors={colors} />}
     </div>
   )
 }
