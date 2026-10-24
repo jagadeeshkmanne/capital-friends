@@ -84,20 +84,21 @@ function paperBook(R, G, Lq, start, amount) {
   const px = R.full.filter((r) => r[0] >= start).map((r) => { g = G.get(r[0]) ?? g; l = Lq.get(r[0]) ?? l; return { d: r[0], p: { fund: r[1], gold: g, liq: l }, t: { fund: r[2], gold: r[3], liq: r[4] } } }).filter((x) => x.p.gold && x.p.liq)
   if (!px.length) return null
   const K = ['fund', 'gold', 'liq'], lots = { fund: [], gold: [], liq: [] }   // lot = [units, cost, date]
+  const realised = { fund: 0, gold: 0, liq: 0 }, taxK = { fund: 0, gold: 0, liq: 0 }, bought = { fund: 0, gold: 0, liq: 0 }, sold = { fund: 0, gold: 0, liq: 0 }
   let cash = amount, taxPaid = 0, last = null
   const switches = [], hist = []
   const val = (k, p) => lots[k].reduce((a, x) => a + x[0] * p[k], 0)
   const total = (p) => cash + K.reduce((a, k) => a + val(k, p), 0)
   const taxOn = (k, gain, bought, d) => (gain > 0 ? gain * TAX[k][(new Date(d) - new Date(bought)) / 864e5 >= 365 ? 1 : 0] : 0)
   const sell = (k, amt, p, d) => {
-    let left = amt, tax = 0
+    let left = amt, tax = 0, gain = 0
     while (left > 1e-6 && lots[k].length) {
       const lot = lots[k][0], v = lot[0] * p[k], take = Math.min(v, left), q = take / p[k], cost = lot[1] * (q / lot[0])
-      tax += taxOn(k, take - cost, lot[2], d); lot[0] -= q; lot[1] -= cost; if (lot[0] < 1e-9) lots[k].shift(); left -= take
+      tax += taxOn(k, take - cost, lot[2], d); gain += take - cost; lot[0] -= q; lot[1] -= cost; if (lot[0] < 1e-9) lots[k].shift(); left -= take
     }
-    cash += amt - left - tax; taxPaid += tax; return { amt: amt - left, tax }
+    cash += amt - left - tax; taxPaid += tax; taxK[k] += tax; realised[k] += gain; sold[k] += amt - left; return { amt: amt - left, tax }
   }
-  const buy = (k, amt, p, d) => { const a = Math.min(amt, cash); if (a <= 1) return 0; lots[k].push([a / p[k], a, d]); cash -= a; return a }
+  const buy = (k, amt, p, d) => { const a = Math.min(amt, cash); if (a <= 1) return 0; lots[k].push([a / p[k], a, d]); cash -= a; bought[k] += a; return a }
   px.forEach((x, i) => {
     const { d, p, t } = x
     if (i === 0 || !same(t, last)) {                      // open the book, or a switch is due: bring each sleeve to its target
@@ -111,16 +112,19 @@ function paperBook(R, G, Lq, start, amount) {
   })
   const p = px[px.length - 1].p, value = total(p)
   const taxDue = K.reduce((a, k) => a + lots[k].reduce((b, lot) => b + taxOn(k, lot[0] * p[k] - lot[1], lot[2], px[px.length - 1].d), 0), 0)
-  const sleeves = K.map((k) => { const u = lots[k].reduce((a, x) => a + x[0], 0), c = lots[k].reduce((a, x) => a + x[1], 0), v = u * p[k]; return { k, units: u, cost: c, nav: p[k], value: v, w: v / value, target: last[k] } })
+  const sleeves = K.map((k) => { const u = lots[k].reduce((a, x) => a + x[0], 0), c = lots[k].reduce((a, x) => a + x[1], 0), v = u * p[k]
+    const hi = px.reduce((m, x) => Math.max(m, x.p[k]), 0)
+    return { k, units: u, cost: c, nav: p[k], value: v, w: v / value, target: last[k], pl: v - c, realised: realised[k], tax: taxK[k], bought: bought[k], sold: sold[k], high: hi, below: p[k] / hi - 1 } })
   let pk = 0, dd = 0; hist.forEach(([, v]) => { pk = Math.max(pk, v); dd = Math.min(dd, v / pk - 1) })
   const yrs = (new Date(px[px.length - 1].d) - new Date(px[0].d)) / 365.25 / 864e5
   const held = (k) => (p[k] / px[0].p[k] - 1)   // the same money left in one fund from day one, before tax
-  return { from: px[0].d, asOf: px[px.length - 1].d, days: px.length, value, cash, taxPaid, taxDue, after: value - taxDue, ret: value / amount - 1,
+  const cost = K.reduce((a, k) => a + lots[k].reduce((b, x) => b + x[1], 0), 0)
+  return { from: px[0].d, asOf: px[px.length - 1].d, days: px.length, value, cash, cost, unrealised: value - cash - cost, realised: K.reduce((a, k) => a + realised[k], 0), taxPaid, taxDue, after: value - taxDue, ret: value / amount - 1,
     cagr: yrs >= 0.9 ? Math.pow(value / amount, 1 / yrs) - 1 : null, dd, fund: held('fund'), gold: held('gold'), sleeves, switches: switches.slice().reverse(), hist }
 }
 
-/** Paper tab: the book's value, holdings and every switch with its amounts. */
-function PaperBook({ R, goldCode, liqCode }) {
+/** Paper tab: the book's value, holdings (laid out like the app's fund tables) and every switch with its amounts. */
+function PaperBook({ R, goldCode, liqCode, fundNames }) {
   const [hs, setHs] = useState(null)
   const [all, setAll] = useState(false)
   useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
@@ -130,14 +134,17 @@ function PaperBook({ R, goldCode, liqCode }) {
     const G = look(goldCode), Lq = look(liqCode)
     return G && Lq ? paperBook(R, G, Lq, PAPER.start, PAPER.amount) : null
   }, [hs, R, goldCode, liqCode])
-  const names = { fund: 'Index fund', gold: 'Gold fund', liq: 'Liquid fund' }
+  const roles = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid' }
   const colors = { fund: 'bg-sky-400', gold: 'bg-amber-400', liq: 'bg-slate-400' }
   const tone = (v) => (v >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')
+  const signed = (v) => (v >= 0 ? '+' : '−') + inr(Math.abs(v))
+  const TH = 'py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider', SUB = 'text-xs font-medium text-[var(--text-dim)] normal-case tracking-normal'
   const tile = (l, v, sub, cls = 'text-[var(--text-primary)]') => (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{l}</p><p className={`mt-1 text-lg font-bold tabular-nums ${cls}`}>{v}</p>{sub && <p className="text-[11px] text-[var(--text-dim)]">{sub}</p>}</div>)
+    <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{l}</p><p className={`mt-0.5 text-base font-bold tabular-nums ${cls}`}>{v}</p>{sub && <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{sub}</p>}</div>)
   if (!hs) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">Loading gold and liquid fund prices…</div>
   if (!B) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">The paper book starts on {day(PAPER.start)}; it appears once that day's prices are published.</div>
   const shown = all ? B.switches : B.switches.slice(0, 6)
+  const totalPL = B.unrealised + B.realised - B.taxPaid
   return (
     <div className="space-y-4">
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
@@ -145,20 +152,47 @@ function PaperBook({ R, goldCode, liqCode }) {
           <h3 className="text-sm font-bold text-[var(--text-primary)]">Paper book · {inr(PAPER.amount)} following the rule</h3>
           <span className="text-xs text-[var(--text-dim)]">from {day(B.from)} · {B.days} price days · to {day(B.asOf)}</span>
         </div>
-        <div className="px-4 py-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {tile('Worth now', inr(B.value), `${inr(B.after)} after tax if sold today`)}
-          {tile('Return', pct(B.ret), B.cagr != null ? `${pct(B.cagr)} a year` : 'a year: needs about a year', tone(B.ret))}
-          {tile('Same money left in the fund', pct(B.fund), 'Midcap 150 Momentum 50, no switching', tone(B.fund))}
-          {tile('Worst fall of the book', `${(B.dd * 100).toFixed(1)}%`, `gold alone: ${pct(B.gold)}`, 'text-[var(--accent-rose)]')}
+        {/* summary, like a portfolio row */}
+        <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3 border-b border-[var(--border-light)]">
+          {tile('Money in', inr(PAPER.amount), `on ${day(B.from)}`)}
+          {tile('Current', inr(B.value), `${inr(B.after)} after tax if sold`)}
+          {tile('Unrealized P&L', signed(B.unrealised), 'on what is held now', tone(B.unrealised))}
+          {tile('Realized P&L', signed(B.realised), B.taxPaid > 0.5 ? `tax paid ${inr(B.taxPaid)}` : 'from switches, before tax', tone(B.realised))}
+          {tile('Total P&L', signed(totalPL), `${pct(B.ret)}${B.cagr != null ? ` · ${pct(B.cagr)} a year` : ''}`, tone(totalPL))}
+          {tile('Worst fall', `${(B.dd * 100).toFixed(1)}%`, `fund held ${pct(B.fund)} · gold ${pct(B.gold)}`, 'text-[var(--accent-rose)]')}
         </div>
-        <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {B.sleeves.map((s) => (
-            <div key={s.k} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0">
-              <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[s.k]}`} /><span className="text-xs font-semibold text-[var(--text-primary)]">{names[s.k]}</span><span className="ml-auto text-xs tabular-nums text-[var(--text-muted)]">target {Math.round(s.target * 100)}%</span></div>
-              <p className="mt-1 text-lg font-bold tabular-nums text-[var(--text-primary)]">{inr(s.value)} <span className="text-xs font-semibold text-[var(--text-dim)]">{Math.round(s.w * 100)}%</span></p>
-              <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{s.units > 0 ? `${s.units.toFixed(3)} units · avg ₹${(s.cost / s.units).toFixed(2)} · now ₹${s.nav.toFixed(2)} · ${pct(s.value / s.cost - 1)}` : 'nothing held'}</p>
-            </div>
-          ))}
+        {/* holdings, like the fund table of a portfolio */}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px]">
+            <thead>
+              <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
+                <th className={`${TH} text-left`}>Fund Name</th>
+                <th className={`${TH} text-right`}>Units</th>
+                <th className={`${TH} text-right`}><div>NAV</div><div className={SUB}>Current / Avg</div></th>
+                <th className={`${TH} text-center px-2`}><div>High since start</div><div className={SUB}>Below high</div></th>
+                <th className={`${TH} text-right`}><div>Allocation %</div><div className={SUB}>Current / Target</div></th>
+                <th className={`${TH} text-right`}><div>Amount</div><div className={SUB}>Current / Cost</div></th>
+                <th className={`${TH} text-right`}><div>P&L</div><div className={SUB}>on Holdings</div></th>
+                <th className={`${TH} text-right`}><div>Realized</div><div className={SUB}>after tax</div></th>
+              </tr>
+            </thead>
+            <tbody>
+              {B.sleeves.map((s) => { const plPct = s.cost > 0 ? s.pl / s.cost : 0, net = s.realised - s.tax; return (
+                <tr key={s.k} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors">
+                  <td className="py-3 px-3 max-w-[260px]">
+                    <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full shrink-0 ${colors[s.k]}`} /><span className="text-xs leading-tight text-[var(--text-secondary)]">{fundNames[s.k]}</span></div>
+                    <p className="text-xs text-[var(--text-dim)] mt-0.5 pl-3.5">{roles[s.k]} · bought {inr(s.bought)}{s.sold > 0.5 ? ` · sold ${inr(s.sold)}` : ''}</p>
+                  </td>
+                  <td className="py-3 px-3 text-right text-xs text-[var(--text-secondary)] tabular-nums">{s.units > 0.0005 ? s.units.toFixed(3) : '—'}</td>
+                  <td className="py-3 px-3 text-right"><p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">₹{s.nav.toFixed(2)}</p><p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">{s.units > 0.0005 ? `₹${(s.cost / s.units).toFixed(2)}` : '—'}</p></td>
+                  <td className="py-3 px-2 text-center"><p className="text-xs text-[var(--text-secondary)] tabular-nums">₹{s.high.toFixed(2)}</p><p className={`text-xs tabular-nums mt-0.5 ${s.below < -0.001 ? 'text-[var(--accent-rose)]' : 'text-emerald-400'}`}>{s.below < -0.001 ? `${(s.below * 100).toFixed(1)}%` : 'at high'}</p></td>
+                  <td className="py-3 px-3 text-right"><p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{(s.w * 100).toFixed(1)}%</p><p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">{Math.round(s.target * 100)}%</p></td>
+                  <td className="py-3 px-3 text-right"><p className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{inr(s.value)}</p><p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">{inr(s.cost)}</p></td>
+                  <td className="py-3 px-3 text-right"><p className={`text-xs font-semibold tabular-nums ${tone(s.pl)}`}>{s.cost > 0 ? signed(s.pl) : '—'}</p><p className={`text-xs tabular-nums mt-0.5 ${tone(s.pl)}`}>{s.cost > 0 ? pct(plPct) : ''}</p></td>
+                  <td className="py-3 px-3 text-right"><p className={`text-xs font-semibold tabular-nums ${s.sold > 0.5 ? tone(net) : 'text-[var(--text-dim)]'}`}>{s.sold > 0.5 ? signed(net) : '—'}</p>{s.tax > 0.5 && <p className="text-xs text-[var(--text-dim)] tabular-nums mt-0.5">tax {inr(s.tax)}</p>}</td>
+                </tr>) })}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -517,7 +551,10 @@ export default function FundRulePage() {
       </div>}
 
       {R && tab === 'paper' && (<>
-        <PaperBook R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} />
+        <PaperBook R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} fundNames={{
+          fund: SIGNAL_FUNDS.find(([c]) => c === Number(cfg.signal))?.[1] || 'Nifty Midcap 150 Momentum 50 index fund',
+          gold: (cfg.gold && holdings.find((h) => String(h.schemeCode) === String(cfg.gold))?.fundName) || 'Nippon India Gold Savings Fund (Direct)',
+          liq: (cfg.liq && holdings.find((h) => String(h.schemeCode) === String(cfg.liq))?.fundName) || 'Tata Liquid Fund (Direct)' }} />
         <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />
       </>)}
 
