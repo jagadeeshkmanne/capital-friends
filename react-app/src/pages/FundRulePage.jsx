@@ -22,6 +22,10 @@ const RULE = { lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02
 const SIGNAL_FUNDS = [[150738, 'Tata Nifty Midcap 150 Momentum 50 Index Fund (Direct)'], [150902, 'Edelweiss Nifty Midcap150 Momentum 50 Index Fund (Direct)'], [152916, 'Kotak Nifty Midcap 150 Momentum 50 Index Fund (Direct)']]
 const LS = 'cf-fund-rule'
 const DEFAULT_GOLD = 118663, DEFAULT_LIQ = 119861, MIDCAP150 = 147622   // Nippon India Gold Savings, Tata Liquid, Motilal Oswal Nifty Midcap 150 Index (direct, growth)
+// Paper book inside the app: ₹10 lakh follows the rule from the day book G opened, rebuilt from the NAV history on every visit
+// (no stored state, no daily job: a switch due on a Monday is in the book as soon as Monday's NAVs are published).
+const PAPER = { start: '2026-10-23', amount: 1000000 }
+const TAX = { fund: [0.20, 0.125], gold: [0.30, 0.125], liq: [0.30, 0.30] }   // [held < 1 year, held >= 1 year], as in fund.py
 
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
 const ap = (v, d = 1) => (v == null ? '—' : (Math.abs(v) * 100).toFixed(d) + '%')   // size of a move, no sign
@@ -72,6 +76,117 @@ function replay(hist) {
 }
 
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
+
+/** The paper book: `amount` follows the rule's targets from `start`, FIFO lots, a sleeve traded only when > 5% off target,
+ *  tax on realised gains paid from the book (fund.py's rates). G / Lq = date -> NAV maps of the gold and liquid funds. */
+function paperBook(R, G, Lq, start, amount) {
+  let g = null, l = null
+  const px = R.full.filter((r) => r[0] >= start).map((r) => { g = G.get(r[0]) ?? g; l = Lq.get(r[0]) ?? l; return { d: r[0], p: { fund: r[1], gold: g, liq: l }, t: { fund: r[2], gold: r[3], liq: r[4] } } }).filter((x) => x.p.gold && x.p.liq)
+  if (!px.length) return null
+  const K = ['fund', 'gold', 'liq'], lots = { fund: [], gold: [], liq: [] }   // lot = [units, cost, date]
+  let cash = amount, taxPaid = 0, last = null
+  const switches = [], hist = []
+  const val = (k, p) => lots[k].reduce((a, x) => a + x[0] * p[k], 0)
+  const total = (p) => cash + K.reduce((a, k) => a + val(k, p), 0)
+  const taxOn = (k, gain, bought, d) => (gain > 0 ? gain * TAX[k][(new Date(d) - new Date(bought)) / 864e5 >= 365 ? 1 : 0] : 0)
+  const sell = (k, amt, p, d) => {
+    let left = amt, tax = 0
+    while (left > 1e-6 && lots[k].length) {
+      const lot = lots[k][0], v = lot[0] * p[k], take = Math.min(v, left), q = take / p[k], cost = lot[1] * (q / lot[0])
+      tax += taxOn(k, take - cost, lot[2], d); lot[0] -= q; lot[1] -= cost; if (lot[0] < 1e-9) lots[k].shift(); left -= take
+    }
+    cash += amt - left - tax; taxPaid += tax; return { amt: amt - left, tax }
+  }
+  const buy = (k, amt, p, d) => { const a = Math.min(amt, cash); if (a <= 1) return 0; lots[k].push([a / p[k], a, d]); cash -= a; return a }
+  px.forEach((x, i) => {
+    const { d, p, t } = x
+    if (i === 0 || !same(t, last)) {                      // open the book, or a switch is due: bring each sleeve to its target
+      const tot = total(p), moves = []
+      K.forEach((k) => { const cur = val(k, p), tgt = tot * t[k]; if (cur > tgt * (1 + RULE.tradeBand) && cur - tgt > 1) { const s = sell(k, cur - tgt, p, d); moves.push({ k, side: 'sell', amt: s.amt, tax: s.tax, nav: p[k] }) } })
+      K.forEach((k) => { const cur = val(k, p), tgt = tot * t[k]; if (cur < tgt * (1 - RULE.tradeBand) && tgt - cur > 1) { const a = buy(k, tgt - cur, p, d); if (a) moves.push({ k, side: 'buy', amt: a, nav: p[k] }) } })
+      switches.push({ date: d, from: last, to: t, moves })
+      last = t
+    }
+    hist.push([d, total(p)])
+  })
+  const p = px[px.length - 1].p, value = total(p)
+  const taxDue = K.reduce((a, k) => a + lots[k].reduce((b, lot) => b + taxOn(k, lot[0] * p[k] - lot[1], lot[2], px[px.length - 1].d), 0), 0)
+  const sleeves = K.map((k) => { const u = lots[k].reduce((a, x) => a + x[0], 0), c = lots[k].reduce((a, x) => a + x[1], 0), v = u * p[k]; return { k, units: u, cost: c, nav: p[k], value: v, w: v / value, target: last[k] } })
+  let pk = 0, dd = 0; hist.forEach(([, v]) => { pk = Math.max(pk, v); dd = Math.min(dd, v / pk - 1) })
+  const yrs = (new Date(px[px.length - 1].d) - new Date(px[0].d)) / 365.25 / 864e5
+  const held = (k) => (p[k] / px[0].p[k] - 1)   // the same money left in one fund from day one, before tax
+  return { from: px[0].d, asOf: px[px.length - 1].d, days: px.length, value, cash, taxPaid, taxDue, after: value - taxDue, ret: value / amount - 1,
+    cagr: yrs >= 0.9 ? Math.pow(value / amount, 1 / yrs) - 1 : null, dd, fund: held('fund'), gold: held('gold'), sleeves, switches: switches.slice().reverse(), hist }
+}
+
+/** Paper tab: the book's value, holdings and every switch with its amounts. */
+function PaperBook({ R, goldCode, liqCode }) {
+  const [hs, setHs] = useState(null)
+  const [all, setAll] = useState(false)
+  useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
+  const B = useMemo(() => {
+    if (!hs) return null
+    const look = (code) => { const h = hs.get(String(code)); return h ? new Map(h.times.map((t, i) => [iso(t), h.navs[i]])) : null }
+    const G = look(goldCode), Lq = look(liqCode)
+    return G && Lq ? paperBook(R, G, Lq, PAPER.start, PAPER.amount) : null
+  }, [hs, R, goldCode, liqCode])
+  const names = { fund: 'Index fund', gold: 'Gold fund', liq: 'Liquid fund' }
+  const colors = { fund: 'bg-sky-400', gold: 'bg-amber-400', liq: 'bg-slate-400' }
+  const tone = (v) => (v >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')
+  const tile = (l, v, sub, cls = 'text-[var(--text-primary)]') => (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{l}</p><p className={`mt-1 text-lg font-bold tabular-nums ${cls}`}>{v}</p>{sub && <p className="text-[11px] text-[var(--text-dim)]">{sub}</p>}</div>)
+  if (!hs) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">Loading gold and liquid fund prices…</div>
+  if (!B) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">The paper book starts on {day(PAPER.start)}; it appears once that day's prices are published.</div>
+  const shown = all ? B.switches : B.switches.slice(0, 6)
+  return (
+    <div className="space-y-4">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Paper book · {inr(PAPER.amount)} following the rule</h3>
+          <span className="text-xs text-[var(--text-dim)]">from {day(B.from)} · {B.days} price days · to {day(B.asOf)}</span>
+        </div>
+        <div className="px-4 py-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {tile('Worth now', inr(B.value), `${inr(B.after)} after tax if sold today`)}
+          {tile('Return', pct(B.ret), B.cagr != null ? `${pct(B.cagr)} a year` : 'a year: needs about a year', tone(B.ret))}
+          {tile('Same money left in the fund', pct(B.fund), 'Midcap 150 Momentum 50, no switching', tone(B.fund))}
+          {tile('Worst fall of the book', `${(B.dd * 100).toFixed(1)}%`, `gold alone: ${pct(B.gold)}`, 'text-[var(--accent-rose)]')}
+        </div>
+        <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {B.sleeves.map((s) => (
+            <div key={s.k} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0">
+              <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[s.k]}`} /><span className="text-xs font-semibold text-[var(--text-primary)]">{names[s.k]}</span><span className="ml-auto text-xs tabular-nums text-[var(--text-muted)]">target {Math.round(s.target * 100)}%</span></div>
+              <p className="mt-1 text-lg font-bold tabular-nums text-[var(--text-primary)]">{inr(s.value)} <span className="text-xs font-semibold text-[var(--text-dim)]">{Math.round(s.w * 100)}%</span></p>
+              <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{s.units > 0 ? `${s.units.toFixed(3)} units · avg ₹${(s.cost / s.units).toFixed(2)} · now ₹${s.nav.toFixed(2)} · ${pct(s.value / s.cost - 1)}` : 'nothing held'}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Switches done by the book</h3>
+          <span className="text-xs text-[var(--text-dim)]">{B.switches.length} so far · tax paid {inr(B.taxPaid)}</span>
+        </div>
+        <div className="divide-y divide-[var(--border-light)]">
+          {shown.map((s) => (
+            <div key={s.date} className="px-4 py-2.5">
+              <div className="flex items-baseline gap-3 flex-wrap text-sm">
+                <span className="w-24 shrink-0 text-xs text-[var(--text-dim)] tabular-nums">{day(s.date)}</span>
+                <span className="font-semibold text-[var(--text-primary)]">{s.from ? <><span className="text-[var(--text-muted)] font-normal">{split(s.from)}</span> → {split(s.to)}</> : `Opened at ${split(s.to)}`}</span>
+              </div>
+              <div className="mt-1 pl-[6.75rem] flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-[var(--text-muted)] tabular-nums">
+                {s.moves.map((m, i) => <span key={i}><span className={m.side === 'sell' ? 'text-[var(--accent-rose)] font-semibold' : 'text-emerald-400 font-semibold'}>{m.side === 'sell' ? 'Sold' : 'Bought'}</span> {inr(m.amt)} {names[m.k].toLowerCase()} at ₹{m.nav.toFixed(2)}{m.tax > 0.5 ? ` (tax ${inr(m.tax)})` : ''}</span>)}
+                {!s.moves.length && <span>no sleeve was more than 5% off its target, so nothing was traded</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+        {B.switches.length > 6 && <button onClick={() => setAll(!all)} className="w-full px-4 py-2 text-xs font-semibold text-sky-300 border-t border-[var(--border-light)]">{all ? 'Show fewer' : `Show all ${B.switches.length}`}</button>}
+        <p className="px-4 py-2.5 text-[11px] text-[var(--text-dim)] border-t border-[var(--border-light)]">Rebuilt from the published NAVs every time this page opens, so it needs no daily job: a switch decided on a Friday's price is done at the next trading day's NAV, the moment that NAV is published. Real fund prices (the funds chosen in Set-up, else Tata Midcap 150 Momentum 50, Nippon India Gold Savings and Tata Liquid); exit loads ignored; tax at the rates used in the back-test. Paper record, information only.</p>
+      </div>
+    </div>
+  )
+}
 
 /** Last 12 months: the fund's price with the share held in the fund underneath, then each switch as a card. */
 function History({ R, colors }) {
@@ -143,6 +258,7 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
   const [start, setStart] = useState(() => (defaultStart && defaultStart > first ? defaultStart : peak))   // default: from the peak (the hard test); from your first investment once the satellite exists
   const yearAgo = R.full.filter((r) => r[0] <= new Date(new Date(R.asOf) - 365 * 864e5).toISOString().slice(0, 10)).slice(-1)[0]?.[0] || first
   const presets = [['Since start', first, 'From the first day the rule could decide'], [`Fund's peak (${day(peak).replace(/ \d{4}$/, '')} ${peak.slice(0, 4)})`, peak, 'From the fund\'s highest price: how the rule handled the fall after it'], ['1 year', yearAgo, 'Last 12 months']]
+  if (PAPER.start > first && PAPER.start <= R.asOf) presets.push(['Paper book', PAPER.start, 'From the day the paper book opened'])
   if (defaultStart && defaultStart > first) presets.push(['Since my first investment', defaultStart, 'From the first transaction in the satellite'])
   useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode), String(MIDCAP150)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
   const sim = useMemo(() => {
@@ -238,7 +354,7 @@ function RealReturns({ real }) {
         {tile('Gain', (real.gain >= 0 ? '+' : '−') + inr(Math.abs(real.gain)), `${real.gain >= 0 ? '+' : ''}${((real.gain / real.invested) * 100).toFixed(1)}% on what you put in`, tone)}
         {tile('Return a year (XIRR)', real.xirr == null ? '—' : `${real.xirr >= 0 ? '+' : ''}${real.xirr.toFixed(1)}%`, real.xirr == null ? 'needs at least a month' : 'money-weighted, before tax', real.xirr == null ? 'text-[var(--text-primary)]' : real.xirr >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')}
       </div>
-      <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Compare with the "Since my first investment" line in the ₹100 card above: that is what the rule would have done with ₹100 from the same day; this is what your money actually did, switches, timing and all.</p>
+      <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Compare with the "Since my first investment" line of the ₹100 card on the Paper tab: that is what the rule would have done with ₹100 from the same day; this is what your money actually did, switches, timing and all.</p>
     </div>
   )
 }
@@ -275,6 +391,8 @@ export default function FundRulePage() {
   const [saving, setSaving] = useState(false)
   const [cfg, setCfg] = useState(() => { try { return { signal: 150738, portfolioId: '', fund: '', gold: '', liq: '', ...JSON.parse(localStorage.getItem(LS) || '{}') } } catch { return { signal: 150738, portfolioId: '', fund: '', gold: '', liq: '' } } })
   const [hist, setHist] = useState(undefined)
+  const [tab, setTabState] = useState(() => { try { return localStorage.getItem(LS + '-tab') === 'paper' ? 'paper' : 'live' } catch { return 'live' } })
+  const setTab = (t) => { setTabState(t); try { localStorage.setItem(LS + '-tab', t) } catch { /* ignore */ } }
   const set = (k, v) => setCfg((c) => { const n = { ...c, [k]: v }; try { localStorage.setItem(LS, JSON.stringify(n)) } catch { /* ignore */ } return n })
 
   useEffect(() => { if (!isResearch) return; setHist(undefined); getNavHistory(cfg.signal).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)) }, [isAdmin, cfg.signal])
@@ -390,8 +508,21 @@ export default function FundRulePage() {
 
       {!isAdmin && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-2.5 text-xs text-[var(--text-muted)]">Shared with you as a learning record: a mechanical rule and its paper books, run by Jagadeesh for his own money. Information, not a recommendation; nothing here is personal advice.</div>}
 
+      {/* Live = the real satellite, Paper = ₹10 lakh following the rule on its own */}
+      {R && <div className="flex items-center gap-3 flex-wrap">
+        <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-0.5 text-xs font-semibold">
+          {[['live', 'Live · satellite'], ['paper', 'Paper · ₹10 lakh']].map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-md transition-colors ${tab === k ? 'bg-sky-500/20 text-sky-300' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{l}</button>)}
+        </div>
+        <span className="text-xs text-[var(--text-dim)]">{tab === 'live' ? 'Your real portfolio and the switches it needs' : `The rule running on paper money since ${day(PAPER.start)}, switches done automatically`}</span>
+      </div>}
+
+      {R && tab === 'paper' && (<>
+        <PaperBook R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} />
+        <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />
+      </>)}
+
       {/* settings (admin) */}
-      {isAdmin && <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      {tab === 'live' && isAdmin && <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="px-4 py-2.5 border-b border-[var(--border-light)]"><h3 className="text-sm font-bold text-[var(--text-primary)]">Set-up</h3></div>
         <div className="px-4 py-3 grid gap-3 md:grid-cols-2">
           <label className="text-xs text-[var(--text-muted)]">Fund whose prices the rule watches
@@ -408,7 +539,7 @@ export default function FundRulePage() {
         </div>
       </div>}
 
-      {isAdmin && R && cfg.portfolioId && holdings.length > 0 && cfg.fund && cfg.gold && cfg.liq && (
+      {tab === 'live' && isAdmin && R && cfg.portfolioId && holdings.length > 0 && cfg.fund && cfg.gold && cfg.liq && (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Rebalance the satellite</h3>
@@ -425,9 +556,8 @@ export default function FundRulePage() {
         </div>
       )}
 
-      {R && <History R={R} colors={colors} />}
-      {R && <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />}
-      {isAdmin && R && cfg.portfolioId && real && <RealReturns real={real} />}
+      {tab === 'live' && R && <History R={R} colors={colors} />}
+      {tab === 'live' && isAdmin && R && cfg.portfolioId && real && <RealReturns real={real} />}
       {isAdmin && <Viewers />}
     </div>
   )
