@@ -22,6 +22,7 @@ const SIGNAL_FUNDS = [[150738, 'Tata Nifty Midcap 150 Momentum 50 Index Fund (Di
 const LS = 'cf-fund-rule'
 
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
+const ap = (v, d = 1) => (v == null ? '—' : (Math.abs(v) * 100).toFixed(d) + '%')   // size of a move, no sign
 const pct = (v, d = 1) => (v == null ? '—' : (v > 0 ? '+' : '') + (v * 100).toFixed(d) + '%')
 const day = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
 const iso = (t) => new Date(t * 1000).toISOString().slice(0, 10)
@@ -47,18 +48,18 @@ function replay(hist) {
     const d = dates[i], p = dates[i - 1], why = []
     if (S.e == null || d.slice(0, 7) !== p.slice(0, 7)) {              // new month: trend from the previous month's last NAV
       S.r12 = nav[i - 1] / nav[i - 1 - RULE.look] - 1; const e = trendE(S.r12)
-      if (S.e != null && e !== S.e) why.push(`Over the last 12 months the fund ${S.r12 < 0 ? 'fell' : 'rose'} ${pct(Math.abs(S.r12))}, so the base share in the fund is now ${e * 100}%`)
+      if (S.e != null && e !== S.e) why.push(`Over the last 12 months the fund ${S.r12 < 0 ? 'fell' : 'rose'} ${ap(S.r12)}, so the base share in the fund is now ${e * 100}%`)
       S.e = e
     }
     if (S.gap == null || isoWeek(d) !== isoWeek(p)) {                    // new week: guards from last week's last NAV
       S.gap = nav[i - 1] / mean(i - 1, RULE.k) - 1; let x = S.x; const up = S.gap > RULE.band
       if (S.gap < -RULE.band) x = 1 - RULE.cut; else if (S.gap > RULE.band) x = 1
-      if (x !== S.x) why.push(x < 1 ? `The fund dropped ${pct(Math.abs(S.gap))} below its 50-day average: half the fund money moved to gold` : `The fund is back ${pct(S.gap)} above its 50-day average: the fund money comes back`)
+      if (x !== S.x) why.push(x < 1 ? `The fund dropped ${ap(S.gap)} below its 50-day average: half the fund money moved to gold` : `The fund is back ${pct(S.gap)} above its 50-day average: the fund money comes back`)
       if (up !== S.up && x === 1) why.push(up ? `The fund is ${pct(S.gap)} above its 50-day average (rising well): one step more in the fund` : `The fund is only ${pct(S.gap)} vs its 50-day average: back to the base share`)
       S.x = x; S.up = up
       S.fgap = nav[i - 1] / mean(i - 1, RULE.fastK) - 1; let fast = S.fast
       if (S.fgap < -RULE.fastBand) fast = true; else if (S.fgap > 0) fast = false
-      if (fast !== S.fast) why.push(fast ? `Sharp fall: the fund is ${pct(Math.abs(S.fgap))} below its 20-day average, so all fund money waits in the liquid fund` : `The sharp fall is over (fund back above its 20-day average): fund money goes back in`)
+      if (fast !== S.fast) why.push(fast ? `Sharp fall: the fund is ${ap(S.fgap)} below its 20-day average, so all fund money waits in the liquid fund` : `The sharp fall is over (fund back above its 20-day average): fund money goes back in`)
       S.fast = fast
     }
     const t = targets(S.e, S.x, S.up, S.fast)
@@ -161,9 +162,9 @@ export default function FundRulePage() {
             <span className="text-xs text-[var(--text-dim)]">decided on the week's last price and the month's last price · check on Monday mornings</span>
           </div>
           <div className="px-4 py-3 grid gap-2 sm:grid-cols-2 text-sm text-[var(--text-secondary)]">
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">12 months</span><br />The fund {R.r12 < 0 ? 'fell' : 'rose'} {pct(Math.abs(R.r12))} → {R.e === RULE.eLo ? 'weak, base share 20%' : R.e === RULE.eHi ? 'strong, base share 80%' : 'normal, base share 50%'}.</p>
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Recent weeks</span><br />{pct(Math.abs(R.gap))} {R.gap < 0 ? 'below' : 'above'} its 50-day average → {R.x < 1 ? 'weak market: half the fund money parked in gold' : R.up ? 'rising well: one step more in the fund' : 'nothing special'}.</p>
-            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Sharp fall?</span><br />{pct(Math.abs(R.fgap))} {R.fgap < 0 ? 'below' : 'above'} its 20-day average → {R.fast ? 'yes: all fund money waits in liquid until it recovers' : 'no'}.</p>
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">12 months</span><br />The fund {R.r12 < 0 ? 'fell' : 'rose'} {ap(R.r12)} → {R.e === RULE.eLo ? 'weak, base share 20%' : R.e === RULE.eHi ? 'strong, base share 80%' : 'normal, base share 50%'}.</p>
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Recent weeks</span><br />{ap(R.gap)} {R.gap < 0 ? 'below' : 'above'} its 50-day average → {R.x < 1 ? 'weak market: half the fund money parked in gold' : R.up ? 'rising well: one step more in the fund' : 'nothing special'}.</p>
+            <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Sharp fall?</span><br />{ap(R.fgap)} {R.fgap < 0 ? 'below' : 'above'} its 20-day average → {R.fast ? 'yes: all fund money waits in liquid until it recovers' : 'no'}.</p>
             <p><span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Gold limit</span><br />{R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `Gold would be over 60%, so ${Math.round(R.target.liq * 100)}% waits in liquid instead` : 'Under 60%, not applied'}.</p>
           </div>
         </div>
