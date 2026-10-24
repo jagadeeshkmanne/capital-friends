@@ -546,10 +546,10 @@ export default function FundRulePage() {
 
       {/* three clean tabs: Live = the real satellite, Paper = ₹10 lakh following the rule, Rule = the signal, history and back-test */}
       {R && <div>
-        <div className="border-b border-[var(--border)] flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div role="tablist" className="grid grid-cols-3 gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] p-1">
           {[['live', Wallet, 'Live', 'my satellite'], ['paper', FlaskConical, 'Paper', '₹10 lakh on paper'], ['rule', BookOpen, 'Rule', 'signals & back-test']].map(([k, Icon, t, sub]) => { const on = tab === k; return (
-            <button key={k} onClick={() => setTab(k)} aria-pressed={on} className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 -mb-px border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${on ? 'border-sky-400 text-sky-300' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-              <Icon size={14} />{t}<span className={`max-sm:hidden text-xs font-normal ${on ? 'text-sky-300/70' : 'text-[var(--text-dim)]'}`}>· {sub}</span>
+            <button key={k} role="tab" aria-selected={on} onClick={() => setTab(k)} className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-2 text-sm font-semibold transition-all ${on ? 'bg-sky-500 text-white shadow-md' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}>
+              <Icon size={15} />{t}<span className={`max-md:hidden text-xs font-normal ${on ? 'text-white/80' : 'text-[var(--text-dim)]'}`}>· {sub}</span>
             </button>) })}
         </div>
         <p className="mt-2 text-xs text-[var(--text-dim)]">{tab === 'live' ? 'Your real portfolio: what it should hold, what to do now, and its real result.' : tab === 'paper' ? `₹10 lakh following the rule by itself since ${day(PAPER.start)} — every switch done at the NAV, nothing to run.` : 'Why the rule says what it says today, every switch it made, and the 2010–2026 back-test.'}</p>
