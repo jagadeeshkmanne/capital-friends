@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import MFRebalanceDialog from '../components/forms/MFRebalanceDialog'
-import { getNavHistory } from '../utils/navHistory'
+import { getNavHistory, getNavHistories } from '../utils/navHistory'
 
 // Hidden admin page (/admin/fund-rule): the index-fund + gold rule (paper book G) applied to ONE real mutual-fund portfolio,
 // the "satellite". Reads daily NAVs from api.mfapi.in (same source as the fund charts), replays the rule up to the last NAV
@@ -20,6 +20,7 @@ const RULE = { lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02
   fastK: 20, fastBand: 0.04, goldCap: 0.6, tradeBand: 0.05, look: 248 }
 const SIGNAL_FUNDS = [[150738, 'Tata Nifty Midcap 150 Momentum 50 Index Fund (Direct)'], [150902, 'Edelweiss Nifty Midcap150 Momentum 50 Index Fund (Direct)'], [152916, 'Kotak Nifty Midcap 150 Momentum 50 Index Fund (Direct)']]
 const LS = 'cf-fund-rule'
+const DEFAULT_GOLD = 118663, DEFAULT_LIQ = 119861, NIFTY = 120716   // Nippon India Gold Savings, Tata Liquid, UTI Nifty 50 Index (direct, growth)
 
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
 const ap = (v, d = 1) => (v == null ? '—' : (Math.abs(v) * 100).toFixed(d) + '%')   // size of a move, no sign
@@ -64,9 +65,9 @@ function replay(hist) {
     }
     const t = targets(S.e, S.x, S.up, S.fast)
     if (!same(t, S.target)) log.push({ date: d, why: why.join('. ') || 'Start of the history', target: t })
-    S.target = t; series.push([d, nav[i], t.fund])
+    S.target = t; series.push([d, nav[i], t.fund, t.gold, t.liq])
   }
-  return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice().reverse(), series: series.slice(-260), days: n }
+  return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice().reverse(), series: series.slice(-260), full: series, days: n }
 }
 
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
@@ -132,9 +133,87 @@ function History({ R, colors }) {
   )
 }
 
+/** ₹100 invested from a chosen date: the rule (fund / gold / liquid switched as the rule said, re-split when the target changes)
+ *  against the fund alone, a fixed 60/40 fund/gold, gold alone and a Nifty 50 index fund. Before tax and exit loads. */
+function Growth({ R, goldCode, liqCode, defaultStart }) {
+  const [hs, setHs] = useState(null)
+  const first = R.full[0][0]
+  const [start, setStart] = useState(() => (defaultStart && defaultStart > first ? defaultStart : first))
+  useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode), String(NIFTY)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
+  const sim = useMemo(() => {
+    if (!hs) return null
+    const look = (code) => { const h = hs.get(String(code)); if (!h) return null; const m = new Map(h.times.map((t, i) => [iso(t), h.navs[i]])); return m }
+    const G = look(goldCode), Lq = look(liqCode), N = look(NIFTY)
+    if (!G || !Lq) return null
+    const rows = R.full.filter((r) => r[0] >= start)
+    if (rows.length < 5) return null
+    // forward-fill the other NAVs on the fund's dates
+    let g = null, l = null, nf = null; const px = rows.map((r) => { g = G.get(r[0]) ?? g; l = Lq.get(r[0]) ?? l; nf = N?.get(r[0]) ?? nf; return { d: r[0], f: r[1], g, l, n: nf, t: { fund: r[2], gold: r[3], liq: r[4] } } }).filter((p) => p.g && p.l)
+    if (px.length < 5) return null
+    const run = (targetAt) => {   // units of each sleeve; re-split to the target whenever the target changes
+      let u = null, last = null; const out = []
+      px.forEach((p, i) => {
+        const t = targetAt(p, i); const v = u ? u.f * p.f + u.g * p.g + u.l * p.l : 100
+        if (!u || t.fund !== last.fund || t.gold !== last.gold) { u = { f: (v * t.fund) / p.f, g: (v * t.gold) / p.g, l: (v * t.liq) / p.l }; last = t }
+        out.push(v)
+      })
+      return out
+    }
+    const rule = run((p) => p.t)
+    const fund = run(() => ({ fund: 1, gold: 0, liq: 0 }))
+    const gold = run(() => ({ fund: 0, gold: 1, liq: 0 }))
+    let mon = null; const mix = run((p) => { if (p.d.slice(0, 7) !== mon) { mon = p.d.slice(0, 7); return { fund: 0.6, gold: 0.4, liq: 0 } } return { fund: 0.6000001, gold: 0.3999999, liq: 0 } })   // 60/40 re-split monthly
+    const nifty = px[0].n ? px.map((p) => (100 * p.n) / px[0].n) : null
+    const yrs = (new Date(px[px.length - 1].d) - new Date(px[0].d)) / 365.25 / 864e5
+    const cagr = (a) => (yrs >= 0.9 ? ((a[a.length - 1] / 100) ** (1 / yrs) - 1) * 100 : null)
+    const dd = (a) => { let pk = 0, m = 0; a.forEach((v) => { pk = Math.max(pk, v); m = Math.min(m, v / pk - 1) }); return m * 100 }
+    const L = [['Rule', rule, 'stroke-sky-400', 'text-sky-300'], ['Fund alone', fund, 'stroke-rose-400', 'text-rose-300'], ['60/40 fixed', mix, 'stroke-violet-400', 'text-violet-300'], ['Gold alone', gold, 'stroke-amber-400', 'text-amber-300']]
+    if (nifty) L.push(['Nifty 50 fund', nifty, 'stroke-slate-400', 'text-slate-300'])
+    return { dates: px.map((p) => p.d), lines: L.map(([nm, a, sc, tc]) => ({ nm, a, sc, tc, end: a[a.length - 1], cagr: cagr(a), dd: dd(a) })), yrs }
+  }, [hs, R, start, goldCode, liqCode])
+  const W = 960, H = 240, L = 8, Rm = 64, T = 10, B = 24
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">₹100 invested</h3>
+        <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">from
+          <input type="date" value={start} min={first} max={R.asOf} onChange={(e) => e.target.value && setStart(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1 text-xs text-[var(--text-primary)]" />
+          {sim && <span className="text-[var(--text-dim)]">· {sim.yrs.toFixed(1)} years</span>}
+        </label>
+      </div>
+      {!hs && <p className="px-4 py-6 text-sm text-[var(--text-dim)]">Loading gold and liquid fund prices…</p>}
+      {hs && !sim && <p className="px-4 py-6 text-sm text-[var(--text-dim)]">Not enough price history from that date (the rule needs the fund's first year for its signals; pick a date from {day(first)}).</p>}
+      {sim && (() => {
+        const all = sim.lines.flatMap((l) => l.a); const lo = Math.min(...all) * 0.98, hi = Math.max(...all) * 1.02; const n = sim.dates.length
+        const X = (i) => L + ((W - L - Rm) * i) / (n - 1), Y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo))
+        return (<>
+          <div className="px-4 pt-3">
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Growth of 100 rupees">
+              {[100, Math.round(hi / 10) * 10].map((v) => v > lo && v < hi && <g key={v}><line x1={L} x2={W - Rm} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeDasharray="3 4" /><text x={W - Rm + 6} y={Y(v) + 4} fontSize="11" fill="var(--text-dim)">₹{v}</text></g>)}
+              {sim.lines.slice().reverse().map((l) => <polyline key={l.nm} points={l.a.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')} fill="none" strokeWidth={l.nm === 'Rule' ? 2.6 : 1.6} strokeLinejoin="round" className={l.sc} opacity={l.nm === 'Rule' ? 1 : 0.85} />)}
+              <text x={L} y={H - 7} fontSize="11" fill="var(--text-dim)">{day(sim.dates[0])}</text>
+              <text x={W - Rm} y={H - 7} fontSize="11" fill="var(--text-dim)" textAnchor="end">{day(sim.dates[n - 1])}</text>
+            </svg>
+          </div>
+          <div className="px-4 py-3 border-t border-[var(--border-light)] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {sim.lines.map((l) => (
+              <div key={l.nm} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0">
+                <p className={`text-xs font-semibold ${l.tc}`}>{l.nm}</p>
+                <p className="mt-1 text-lg font-bold tabular-nums text-[var(--text-primary)]">₹{l.end.toFixed(1)}</p>
+                <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{l.cagr != null ? `${l.cagr >= 0 ? '+' : ''}${l.cagr.toFixed(1)}% a year · ` : ''}worst fall {l.dd.toFixed(0)}%</p>
+              </div>
+            ))}
+          </div>
+          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Before tax and exit loads, from real fund prices (gold = Nippon India Gold Savings, liquid = Tata Liquid, or your satellite's funds once chosen). The rule's signals need the fund's first year, so the earliest start is {day(first)}. Short windows say little; the back-test behind the rule covers 2010–2026.</p>
+        </>)
+      })()}
+    </div>
+  )
+}
+
 export default function FundRulePage() {
   const { isAdmin } = useAuth()
-  const { mfPortfolios, mfHoldings, updateHoldingAllocations } = useData()
+  const { mfPortfolios, mfHoldings, mfTransactions, updateHoldingAllocations } = useData()
   const { showToast } = useToast()
   const [saving, setSaving] = useState(false)
   const [cfg, setCfg] = useState(() => { try { return { signal: 150738, portfolioId: '', fund: '', gold: '', liq: '', ...JSON.parse(localStorage.getItem(LS) || '{}') } } catch { return { signal: 150738, portfolioId: '', fund: '', gold: '', liq: '' } } })
@@ -180,6 +259,8 @@ export default function FundRulePage() {
     catch (e) { showToast(e.message || 'Could not save targets', 'error') }
     finally { setSaving(false) }
   }
+
+  const firstTxn = useMemo(() => { const ds = (mfTransactions || []).filter((t) => t.portfolioId === cfg.portfolioId).map((t) => String(t.date || t.transactionDate || '').slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)); return ds.length ? ds.sort()[0] : null }, [mfTransactions, cfg.portfolioId])
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   const names = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid fund' }
@@ -271,6 +352,7 @@ export default function FundRulePage() {
       )}
 
       {R && <History R={R} colors={colors} />}
+      {R && <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />}
     </div>
   )
 }
