@@ -139,8 +139,8 @@ function History({ R, colors }) {
 function Growth({ R, goldCode, liqCode, defaultStart }) {
   const [hs, setHs] = useState(null)
   const first = R.full[0][0]
-  const [start, setStart] = useState(() => (defaultStart && defaultStart > first ? defaultStart : first))
   const peak = R.full.reduce((b, r) => (r[1] > b[1] ? r : b), R.full[0])[0]                       // the fund's highest price so far
+  const [start, setStart] = useState(() => (defaultStart && defaultStart > first ? defaultStart : peak))   // default: from the peak (the hard test); from your first investment once the satellite exists
   const yearAgo = R.full.filter((r) => r[0] <= new Date(new Date(R.asOf) - 365 * 864e5).toISOString().slice(0, 10)).slice(-1)[0]?.[0] || first
   const presets = [['Since start', first, 'From the first day the rule could decide'], [`Fund's peak (${day(peak).replace(/ \d{4}$/, '')} ${peak.slice(0, 4)})`, peak, 'From the fund\'s highest price: how the rule handled the fall after it'], ['1 year', yearAgo, 'Last 12 months']]
   if (defaultStart && defaultStart > first) presets.push(['Since my first investment', defaultStart, 'From the first transaction in the satellite'])
@@ -180,7 +180,7 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
   return (
     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
       <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-sm font-bold text-[var(--text-primary)]">₹100 invested</h3>
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">₹100 invested {start === peak ? <span className="text-xs font-medium text-[var(--text-dim)]">· at the fund's peak, {day(peak)} — the hard test</span> : null}</h3>
         <div className="flex items-center gap-1.5 text-xs flex-wrap">
           {presets.map(([l, d, title]) => <button key={l} title={title} onClick={() => setStart(d)} className={`px-2 py-1 rounded-lg border font-semibold ${start === d ? 'bg-sky-500/20 border-sky-500/40 text-sky-300' : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{l}</button>)}
           <input type="date" value={start} min={first} max={R.asOf} onChange={(e) => e.target.value && setStart(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1 text-xs text-[var(--text-primary)]" />
