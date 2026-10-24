@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { useToast } from '../context/ToastContext'
+import MFRebalanceDialog from '../components/forms/MFRebalanceDialog'
 import { getNavHistory } from '../utils/navHistory'
 
 // Hidden admin page (/admin/fund-rule): the index-fund + gold rule (paper book G) applied to ONE real mutual-fund portfolio,
@@ -70,7 +72,9 @@ const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode
 
 export default function FundRulePage() {
   const { isAdmin } = useAuth()
-  const { mfPortfolios, mfHoldings } = useData()
+  const { mfPortfolios, mfHoldings, updateHoldingAllocations } = useData()
+  const { showToast } = useToast()
+  const [saving, setSaving] = useState(false)
   const [cfg, setCfg] = useState(() => { try { return { signal: 150738, portfolioId: '', fund: '', gold: '', liq: '', ...JSON.parse(localStorage.getItem(LS) || '{}') } } catch { return { signal: 150738, portfolioId: '', fund: '', gold: '', liq: '' } } })
   const [hist, setHist] = useState(undefined)
   const set = (k, v) => setCfg((c) => { const n = { ...c, [k]: v }; try { localStorage.setItem(LS, JSON.stringify(n)) } catch { /* ignore */ } return n })
@@ -97,6 +101,23 @@ export default function FundRulePage() {
     })
     return { total, rows, moves: rows.filter((r) => r.move) }
   }, [R, holdings, cfg.fund, cfg.gold, cfg.liq])
+
+  // the rule's split as the satellite's target % (the app's own rebalance dialog then does buy/sell, lumpsum and SIP maths)
+  const alloc = useMemo(() => {
+    if (!R || !cfg.portfolioId) return null
+    const pc = { [cfg.fund]: Math.round(R.target.fund * 100), [cfg.gold]: Math.round(R.target.gold * 100), [cfg.liq]: Math.round(R.target.liq * 100) }
+    delete pc['']; const sum = Object.values(pc).reduce((a, b) => a + b, 0)
+    if (sum !== 100 && cfg.gold in pc) pc[cfg.gold] += 100 - sum
+    return holdings.map((h) => ({ schemeCode: h.schemeCode, fundName: h.fundName, targetAllocationPct: pc[String(h.schemeCode)] ?? 0 }))
+  }, [R, cfg, holdings])
+  const synced = alloc && alloc.length > 0 && alloc.every((a) => Math.abs(Number(holdings.find((h) => String(h.schemeCode) === String(a.schemeCode))?.targetAllocationPct || 0) - a.targetAllocationPct) < 0.5)
+  const saveTargets = async () => {
+    if (!alloc) return
+    setSaving(true)
+    try { await updateHoldingAllocations(cfg.portfolioId, alloc); showToast('Satellite targets set to the rule\'s split') }
+    catch (e) { showToast(e.message || 'Could not save targets', 'error') }
+    finally { setSaving(false) }
+  }
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   const names = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid fund' }
@@ -166,11 +187,20 @@ export default function FundRulePage() {
         </div>
       </div>
 
-      {R && plan && cfg.portfolioId && plan.total > 0 && (
-        <div className={`rounded-xl border px-4 py-2.5 text-sm font-semibold ${plan.moves.length ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}`}>
-          {plan.moves.length === 0 ? 'Nothing to do — every fund is within 5% of its target.' :
-            'To do: ' + plan.moves.filter((r) => r.diff < 0).map((r) => `sell ${inr(-r.diff)} of the ${names[r.k].toLowerCase()}`).concat(plan.moves.filter((r) => r.diff > 0).map((r) => `buy ${inr(r.diff)} of the ${names[r.k].toLowerCase()}`)).join(', ') + '.'}
-          <span className="block text-xs font-normal text-[var(--text-dim)] mt-0.5">Values are the app's current values. Information, not advice; exit loads and tax are yours to check.</span>
+      {R && cfg.portfolioId && holdings.length > 0 && cfg.fund && cfg.gold && cfg.liq && (
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Rebalance the satellite</h3>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`px-2.5 py-1 rounded-lg font-semibold ${synced ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>{synced ? 'Targets match the rule' : 'Targets differ from the rule'}</span>
+              {!synced && <button onClick={saveTargets} disabled={saving} className="px-2.5 py-1 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 font-semibold disabled:opacity-50">{saving ? 'Saving…' : `Set targets to ${split(R.target)}`}</button>}
+            </div>
+          </div>
+          <div className="px-4 py-3">
+            {synced ? <MFRebalanceDialog filterPortfolioId={cfg.portfolioId} /> :
+              <p className="text-sm text-[var(--text-muted)]">Press the button to write the rule's split into this portfolio's target %. The app's usual rebalance tool then shows what to buy and sell, how to split a lumpsum, and how to set SIPs — exactly as for your other portfolios.</p>}
+            <p className="text-xs text-[var(--text-dim)] mt-2">Values are the app's current values. Information, not advice; you place the orders, and exit loads and tax are yours to check.</p>
+          </div>
         </div>
       )}
 
