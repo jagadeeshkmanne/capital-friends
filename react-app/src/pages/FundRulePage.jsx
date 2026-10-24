@@ -145,6 +145,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
   if (!B) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">The paper book starts on {day(PAPER.start)}; it appears once that day's prices are published.</div>
   const shown = all ? B.switches : B.switches.slice(0, 6)
   const totalPL = B.unrealised + B.realised - B.taxPaid
+  const why = new Map(R.log.map((l) => [l.date, l.why]))
   return (
     <div className="space-y-4">
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
@@ -212,6 +213,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
                 {s.moves.map((m, i) => <span key={i}><span className={m.side === 'sell' ? 'text-[var(--accent-rose)] font-semibold' : 'text-emerald-400 font-semibold'}>{m.side === 'sell' ? 'Sold' : 'Bought'}</span> {inr(m.amt)} {roles[m.k].toLowerCase()} at ₹{m.nav.toFixed(2)}{m.tax > 0.5 ? ` (tax ${inr(m.tax)})` : ''}</span>)}
                 {!s.moves.length && <span>no sleeve was more than 5% off its target, so nothing was traded</span>}
               </div>
+              {s.from && why.get(s.date) && <p className="mt-1 pl-[6.75rem] text-xs text-[var(--text-dim)]">{why.get(s.date)}</p>}
             </div>
           ))}
         </div>
@@ -223,7 +225,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
 }
 
 /** Last 12 months: the fund's price with the share held in the fund underneath, then each switch as a card. */
-function History({ R, colors }) {
+function History({ R, colors, cards = true }) {
   const [all, setAll] = useState(false)
   const pts = R.series; const n = pts.length
   const W = 960, H = 220, L = 8, Rm = 72, T = 10, B = 24, bandH = 44   // bottom band = fund share 0–100%
@@ -262,7 +264,7 @@ function History({ R, colors }) {
           <text x={W - Rm} y={H - 7} fontSize="11" fill="var(--text-dim)" textAnchor="end">{day(pts[n - 1][0])}</text>
         </svg>
       </div>
-      <div className="px-4 py-3 border-t border-[var(--border-light)]">
+      {cards && <div className="px-4 py-3 border-t border-[var(--border-light)]">
         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-2">Switches, newest first</p>
         <div className="grid gap-2 md:grid-cols-2">
           {shown.map((l) => (
@@ -278,7 +280,7 @@ function History({ R, colors }) {
         </div>
         {R.log.length > 6 && <button onClick={() => setAll(!all)} className="mt-3 text-xs font-semibold text-sky-300 hover:text-sky-200">{all ? 'Show fewer' : `Show all ${R.log.length} switches`}</button>}
         <p className="text-[11px] text-[var(--text-dim)] mt-3">Back-test 2010–2026, after tax: about 24% a year with a worst fall of 17%; holding the fund alone 21% with a 39% fall. Past results do not repeat; plan with 16–18% a year.</p>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -555,6 +557,7 @@ export default function FundRulePage() {
           fund: SIGNAL_FUNDS.find(([c]) => c === Number(cfg.signal))?.[1] || 'Nifty Midcap 150 Momentum 50 index fund',
           gold: (cfg.gold && holdings.find((h) => String(h.schemeCode) === String(cfg.gold))?.fundName) || 'Nippon India Gold Savings Fund (Direct)',
           liq: (cfg.liq && holdings.find((h) => String(h.schemeCode) === String(cfg.liq))?.fundName) || 'Tata Liquid Fund (Direct)' }} />
+        <History R={R} colors={colors} cards={false} />
         <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />
       </>)}
 
@@ -593,7 +596,30 @@ export default function FundRulePage() {
         </div>
       )}
 
-      {tab === 'live' && R && <History R={R} colors={colors} />}
+      {tab === 'live' && R && (
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">What to do now</h3>
+            <span className="text-xs text-[var(--text-dim)]">{R.log[0] ? `Rule last changed ${day(R.log[0].date)}` : ''} · next check: Monday, on Friday's NAV (and the first trading day of the month)</span>
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            {R.log[0] && <p className="text-xs text-[var(--text-muted)]">{R.log[0].why}.</p>}
+            {!cfg.portfolioId || !(plan?.total > 0) ? (
+              <p className="text-sm text-[var(--text-dim)]">{isAdmin ? 'Choose the satellite portfolio and its three funds in Set-up to see the amounts.' : 'The rule says: hold ' + split(R.target) + '.'}</p>
+            ) : plan.moves.length === 0 ? (
+              <p className="text-sm font-semibold text-emerald-400">Nothing to do — the satellite is within 5% of the rule's split ({split(R.target)}).</p>
+            ) : plan.moves.map((r) => { const h = holdings.find((x) => String(x.schemeCode) === String(cfg[r.k])); const nav = Number(h?.currentNav) || 0; return (
+              <div key={r.k} className="flex items-baseline gap-3 flex-wrap text-sm">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.diff > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>{r.diff > 0 ? 'BUY' : 'SELL'}</span>
+                <span className="font-semibold text-[var(--text-primary)] tabular-nums">{inr(Math.abs(r.diff))}</span>
+                <span className="text-[var(--text-secondary)] min-w-0 truncate">{h?.fundName || names[r.k]}</span>
+                {nav > 0 && <span className="text-xs text-[var(--text-dim)] tabular-nums">≈ {(Math.abs(r.diff) / nav).toFixed(2)} units at ₹{nav.toFixed(2)}</span>}
+                <span className="text-xs text-[var(--text-dim)] tabular-nums">now {inr(r.cur)} → target {inr(r.tgt)}</span>
+              </div>) })}
+            <p className="text-[11px] text-[var(--text-dim)]">Sell first, buy when the money arrives (1–3 working days). Units are at the last NAV; the order fills at the next NAV. Rule output, not advice.</p>
+          </div>
+        </div>
+      )}
       {tab === 'live' && isAdmin && R && cfg.portfolioId && real && <RealReturns real={real} />}
       {isAdmin && <Viewers />}
     </div>
