@@ -139,6 +139,10 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
   const [hs, setHs] = useState(null)
   const first = R.full[0][0]
   const [start, setStart] = useState(() => (defaultStart && defaultStart > first ? defaultStart : first))
+  const peak = R.full.reduce((b, r) => (r[1] > b[1] ? r : b), R.full[0])[0]                       // the fund's highest price so far
+  const yearAgo = R.full.filter((r) => r[0] <= new Date(new Date(R.asOf) - 365 * 864e5).toISOString().slice(0, 10)).slice(-1)[0]?.[0] || first
+  const presets = [['Since start', first, 'From the first day the rule could decide'], [`Fund's peak (${day(peak).replace(/ \d{4}$/, '')} ${peak.slice(0, 4)})`, peak, 'From the fund\'s highest price: how the rule handled the fall after it'], ['1 year', yearAgo, 'Last 12 months']]
+  if (defaultStart && defaultStart > first) presets.push(['Since my first investment', defaultStart, 'From the first transaction in the satellite'])
   useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode), String(NIFTY)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
   const sim = useMemo(() => {
     if (!hs) return null
@@ -176,10 +180,11 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
       <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-sm font-bold text-[var(--text-primary)]">₹100 invested</h3>
-        <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">from
+        <div className="flex items-center gap-1.5 text-xs flex-wrap">
+          {presets.map(([l, d, title]) => <button key={l} title={title} onClick={() => setStart(d)} className={`px-2 py-1 rounded-lg border font-semibold ${start === d ? 'bg-sky-500/20 border-sky-500/40 text-sky-300' : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{l}</button>)}
           <input type="date" value={start} min={first} max={R.asOf} onChange={(e) => e.target.value && setStart(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1 text-xs text-[var(--text-primary)]" />
-          {sim && <span className="text-[var(--text-dim)]">· {sim.yrs.toFixed(1)} years</span>}
-        </label>
+          {sim && <span className="text-[var(--text-dim)]">· {sim.yrs.toFixed(1)} yrs</span>}
+        </div>
       </div>
       {!hs && <p className="px-4 py-6 text-sm text-[var(--text-dim)]">Loading gold and liquid fund prices…</p>}
       {hs && !sim && <p className="px-4 py-6 text-sm text-[var(--text-dim)]">Not enough price history from that date (the rule needs the fund's first year for its signals; pick a date from {day(first)}).</p>}
@@ -207,6 +212,28 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
           <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Before tax and exit loads, from real fund prices (gold = Nippon India Gold Savings, liquid = Tata Liquid, or your satellite's funds once chosen). The rule's signals need the fund's first year, so the earliest start is {day(first)}. Short windows say little; the back-test behind the rule covers 2010–2026.</p>
         </>)
       })()}
+    </div>
+  )
+}
+
+/** The satellite's own numbers from its transactions: what you actually put in and what it is worth. */
+function RealReturns({ real }) {
+  const tone = real.gain >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
+  const tile = (l, v, sub, cls = 'text-[var(--text-primary)]') => (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{l}</p><p className={`mt-1 text-lg font-bold tabular-nums ${cls}`}>{v}</p>{sub && <p className="text-[11px] text-[var(--text-dim)]">{sub}</p>}</div>)
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">My satellite · real result</h3>
+        <span className="text-xs text-[var(--text-dim)]">since {day(real.since)} · {Math.round(real.days)} days · from your own transactions and today's values</span>
+      </div>
+      <div className="px-4 py-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {tile('Put in', inr(real.invested), real.redeemed ? `${inr(real.redeemed)} taken out` : null)}
+        {tile('Worth now', inr(real.value))}
+        {tile('Gain', (real.gain >= 0 ? '+' : '−') + inr(Math.abs(real.gain)), `${real.gain >= 0 ? '+' : ''}${((real.gain / real.invested) * 100).toFixed(1)}% on what you put in`, tone)}
+        {tile('Return a year (XIRR)', real.xirr == null ? '—' : `${real.xirr >= 0 ? '+' : ''}${real.xirr.toFixed(1)}%`, real.xirr == null ? 'needs at least a month' : 'money-weighted, before tax', real.xirr == null ? 'text-[var(--text-primary)]' : real.xirr >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')}
+      </div>
+      <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Compare with the "Since my first investment" line in the ₹100 card above: that is what the rule would have done with ₹100 from the same day; this is what your money actually did, switches, timing and all.</p>
     </div>
   )
 }
@@ -261,6 +288,21 @@ export default function FundRulePage() {
   }
 
   const firstTxn = useMemo(() => { const ds = (mfTransactions || []).filter((t) => t.portfolioId === cfg.portfolioId).map((t) => String(t.date || t.transactionDate || '').slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)); return ds.length ? ds.sort()[0] : null }, [mfTransactions, cfg.portfolioId])
+
+  // the satellite's real result: invested, value, gain, XIRR from its own transactions (the real number the ₹100 chart cannot know)
+  const real = useMemo(() => {
+    if (!cfg.portfolioId) return null
+    const tx = (mfTransactions || []).filter((t) => t.portfolioId === cfg.portfolioId && /^\d{4}-\d{2}-\d{2}/.test(String(t.date || '')))
+    const value = holdings.reduce((a, h) => a + (Number(h.currentValue) || 0), 0)
+    if (!tx.length || !(value > 0)) return null
+    const flows = tx.map((t) => ({ d: new Date(String(t.date).slice(0, 10)), v: (String(t.type).toUpperCase() === 'SELL' ? 1 : -1) * Math.abs(Number(t.totalAmount || t.amount) || 0) })).filter((f) => f.v)
+    const invested = -flows.filter((f) => f.v < 0).reduce((a, f) => a + f.v, 0), redeemed = flows.filter((f) => f.v > 0).reduce((a, f) => a + f.v, 0)
+    const end = new Date(); const all = [...flows, { d: end, v: value }]; const t0 = all.reduce((m, f) => (f.d < m ? f.d : m), end)
+    const npv = (r) => all.reduce((a, f) => a + f.v / Math.pow(1 + r, (f.d - t0) / 365.25 / 864e5), 0)
+    let lo = -0.99, hi = 5; for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (npv(m) > 0) lo = m; else hi = m }
+    const days = (end - t0) / 864e5
+    return { invested, redeemed, value, gain: value + redeemed - invested, xirr: days > 30 ? ((lo + hi) / 2) * 100 : null, since: t0.toISOString().slice(0, 10), days }
+  }, [mfTransactions, holdings, cfg.portfolioId])
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   const names = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid fund' }
@@ -353,6 +395,7 @@ export default function FundRulePage() {
 
       {R && <History R={R} colors={colors} />}
       {R && <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />}
+      {R && cfg.portfolioId && real && <RealReturns real={real} />}
     </div>
   )
 }
