@@ -50,7 +50,7 @@ export default function MobileMenu() {
   const [donate, setDonate] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
   const { theme, toggle } = useTheme()
   const { masked, toggleMask } = useMask()
   const pushed = useRef(false)
@@ -98,7 +98,7 @@ export default function MobileMenu() {
         </div>
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2">
-          {GROUPS.map((g) => (
+          {(isAdmin ? [...GROUPS, { t: 'Admin · only you', items: [{ label: 'Fund rule', icon: Settings, path: '/admin/fund-rule', desc: 'Index fund + gold, satellite' }, { label: 'Paper books', icon: BarChart3, path: '/admin/paper', desc: 'Momentum paper trading' }, { label: 'Found us', icon: Info, path: '/admin/found-us' }] }] : GROUPS).map((g) => (
             <div key={g.t} className="pb-1">
               <p className="px-5 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{g.t}</p>
               {g.items.map((it) => {

@@ -1,6 +1,6 @@
 import { usePhoneBar } from './native'
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff, CircleAlert, Lightbulb } from 'lucide-react'
+import { Sun, Moon, Users, ChevronDown, Check, LogOut, ChevronRight, ChevronLeft, Bell, TrendingDown, Scale, X, Settings as SettingsIcon, Eye, EyeOff, CircleAlert, Lightbulb, ShieldCheck } from 'lucide-react'
 import { openFeedback } from './FeedbackForm'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
@@ -145,7 +145,7 @@ const TAB_PATHS = ['/dashboard', '/investments/mutual-funds', '/investments/stoc
 const TITLES = [
   ['/dashboard', 'Home'], ['/investments/mutual-funds', 'Mutual Funds'], ['/investments/stocks', 'Stocks'], ['/investments/other', 'Other Investments'],
   ['/accounts/bank', 'Bank Accounts'], ['/accounts/investment', 'Investment Accounts'], ['/goals', 'Goals'], ['/more', 'More'], ['/family', 'Family'],
-  ['/insurance', 'Insurance'], ['/liabilities', 'Liabilities'], ['/reminders', 'Reminders'], ['/settings', 'Settings'], ['/investments/funds', 'All Funds'], ['/reports', 'Reports'], ['/retirement-buckets', 'Retirement Buckets'], ['/import', 'Import Statement'],
+  ['/insurance', 'Insurance'], ['/liabilities', 'Liabilities'], ['/reminders', 'Reminders'], ['/settings', 'Settings'], ['/investments/funds', 'All Funds'], ['/reports', 'Reports'], ['/retirement-buckets', 'Retirement Buckets'], ['/import', 'Import Statement'], ['/admin/paper', 'Paper books'], ['/admin/fund-rule', 'Fund rule'], ['/admin/found-us', 'Found us'],
   ['/health-check', 'Health Check'], ['/about', 'About'],
 ]
 export function mobileTitle(pathname) {
@@ -158,7 +158,7 @@ export default function Header() {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
   const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, assetAllocations } = useData()
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
   const { masked, toggleMask, mv } = useMask()
 
   const navigate = useNavigate()
@@ -558,6 +558,18 @@ export default function Header() {
                       <SettingsIcon size={16} />
                       <span className="text-sm font-medium">Settings</span>
                     </Link>
+                    {isAdmin && (
+                      <div className="border-t border-[var(--border)] mt-1 pt-1">
+                        <p className="px-4 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex items-center gap-1.5"><ShieldCheck size={11} /> Admin · only you</p>
+                        {[['/admin/fund-rule', 'Fund rule'], ['/admin/paper', 'Paper books'], ['/admin/found-us', 'Found us']].map(([p, l]) => (
+                          <Link key={p} to={p} onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+                            <span className="w-4 text-center text-[10px] font-bold text-sky-400">A</span>
+                            <span className="text-sm font-medium">{l}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                     {user && (
                       <div className="px-4 py-1.5">
                         <p className="text-xs text-[var(--text-muted)] truncate">{mv(user.email, 'email')}</p>
