@@ -89,7 +89,8 @@ function fundRuleDailyCheck() {
     ' | vs 20-day avg ' + fundRulePct_(S.fgap) + (S.fast ? ' crash guard ON' : '') + '\n\n' +
     'Open capitalfriends.in/admin/fund-rule for the switch amounts of the satellite portfolio. ' +
     'Rule output for your own portfolio - information, not advice. Paper book G follows the same rule.';
-  MailApp.sendEmail({ to: email, subject: '[Capital Friends] Fund rule: now ' + split, body: body });
+  var subject = (last ? '🔔 ACTION ' : '✅ STARTED ') + 'Fund rule: ' + (last ? 'switch to ' : 'now ') + split + ' (' + S.asOf + ')';
+  MailApp.sendEmail({ to: email, subject: subject, body: body });
   Logger.log('Fund rule email sent: ' + split);
 }
 
