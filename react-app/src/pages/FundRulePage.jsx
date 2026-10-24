@@ -205,8 +205,12 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
             {sim.lines.map((l) => (
               <div key={l.nm} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0">
                 <p className={`text-xs font-semibold ${l.tc}`}>{l.nm}</p>
-                <p className="mt-1 text-lg font-bold tabular-nums text-[var(--text-primary)]">₹{l.end.toFixed(1)} <span className={`text-sm font-semibold ${l.end >= 100 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{l.end >= 100 ? '+' : ''}{(l.end - 100).toFixed(1)}%</span></p>
-                <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{l.cagr != null ? `${l.cagr >= 0 ? '+' : ''}${l.cagr.toFixed(1)}% a year · ` : ''}worst fall {l.dd.toFixed(0)}%</p>
+                <p className={`mt-1 text-2xl font-bold tabular-nums ${l.end >= 100 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{l.end >= 100 ? '+' : ''}{(l.end - 100).toFixed(1)}%</p>
+                <div className="mt-1 flex items-baseline justify-between gap-2 text-xs tabular-nums">
+                  <span className="text-[var(--text-secondary)]">{l.cagr != null ? `${l.cagr >= 0 ? '+' : ''}${l.cagr.toFixed(1)}% a year` : '—'}</span>
+                  <span className="font-semibold text-[var(--accent-rose)]">fall {l.dd.toFixed(0)}%</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-dim)] tabular-nums">₹100 → ₹{l.end.toFixed(1)}</p>
               </div>
             ))}
           </div>
