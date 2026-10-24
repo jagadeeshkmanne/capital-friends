@@ -209,7 +209,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
                 <span className="font-semibold text-[var(--text-primary)]">{s.from ? <><span className="text-[var(--text-muted)] font-normal">{split(s.from)}</span> → {split(s.to)}</> : `Opened at ${split(s.to)}`}</span>
               </div>
               <div className="mt-1 pl-[6.75rem] flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-[var(--text-muted)] tabular-nums">
-                {s.moves.map((m, i) => <span key={i}><span className={m.side === 'sell' ? 'text-[var(--accent-rose)] font-semibold' : 'text-emerald-400 font-semibold'}>{m.side === 'sell' ? 'Sold' : 'Bought'}</span> {inr(m.amt)} {names[m.k].toLowerCase()} at ₹{m.nav.toFixed(2)}{m.tax > 0.5 ? ` (tax ${inr(m.tax)})` : ''}</span>)}
+                {s.moves.map((m, i) => <span key={i}><span className={m.side === 'sell' ? 'text-[var(--accent-rose)] font-semibold' : 'text-emerald-400 font-semibold'}>{m.side === 'sell' ? 'Sold' : 'Bought'}</span> {inr(m.amt)} {roles[m.k].toLowerCase()} at ₹{m.nav.toFixed(2)}{m.tax > 0.5 ? ` (tax ${inr(m.tax)})` : ''}</span>)}
                 {!s.moves.length && <span>no sleeve was more than 5% off its target, so nothing was traded</span>}
               </div>
             </div>
