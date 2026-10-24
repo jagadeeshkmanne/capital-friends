@@ -113,7 +113,7 @@ function paperBook(R, G, Lq, start, amount) {
   const p = px[px.length - 1].p, value = total(p)
   const taxDue = K.reduce((a, k) => a + lots[k].reduce((b, lot) => b + taxOn(k, lot[0] * p[k] - lot[1], lot[2], px[px.length - 1].d), 0), 0)
   const sleeves = K.map((k) => { const u = lots[k].reduce((a, x) => a + x[0], 0), c = lots[k].reduce((a, x) => a + x[1], 0), v = u * p[k]
-    const hi = px.reduce((m, x) => Math.max(m, x.p[k]), 0)
+    const hi = k === 'fund' ? R.full.reduce((m, r) => Math.max(m, r[1]), 0) : Math.max(...(k === 'gold' ? G : Lq).values())   // all-time high, like the fund tables
     return { k, units: u, cost: c, nav: p[k], value: v, w: v / value, target: last[k], pl: v - c, realised: realised[k], tax: taxK[k], bought: bought[k], sold: sold[k], high: hi, below: p[k] / hi - 1 } })
   let pk = 0, dd = 0; hist.forEach(([, v]) => { pk = Math.max(pk, v); dd = Math.min(dd, v / pk - 1) })
   const yrs = (new Date(px[px.length - 1].d) - new Date(px[0].d)) / 365.25 / 864e5
@@ -169,7 +169,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
                 <th className={`${TH} text-left`}>Fund Name</th>
                 <th className={`${TH} text-right`}>Units</th>
                 <th className={`${TH} text-right`}><div>NAV</div><div className={SUB}>Current / Avg</div></th>
-                <th className={`${TH} text-center px-2`}><div>High since start</div><div className={SUB}>Below high</div></th>
+                <th className={`${TH} text-center px-2`}><div>All-time high</div><div className={SUB}>Below high</div></th>
                 <th className={`${TH} text-right`}><div>Allocation %</div><div className={SUB}>Current / Target</div></th>
                 <th className={`${TH} text-right`}><div>Amount</div><div className={SUB}>Current / Cost</div></th>
                 <th className={`${TH} text-right`}><div>P&L</div><div className={SUB}>on Holdings</div></th>
