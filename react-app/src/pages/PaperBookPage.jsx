@@ -121,7 +121,7 @@ function Mini({ label, value, sub, tone: t, title }) {
 
 /** Which stocks the three books share, and why B / C left some out (latest rebalance). */
 export default function PaperBookPage() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, isResearch } = useAuth()
   const [data, setData] = useState(undefined)
   const [err, setErr] = useState('')
   const [book, setBook] = useState('A')
@@ -154,9 +154,9 @@ export default function PaperBookPage() {
   }
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isResearch) return
     getPaperBook().then((d) => { setData(d || null); if (d) loadLive(d) }).catch((e) => setErr(e.message || 'Could not load'))
-  }, [isAdmin])
+  }, [isResearch])
 
   // auto-refresh live prices every 60 s while the market is open and the tab is visible
   useEffect(() => {
@@ -203,7 +203,7 @@ export default function PaperBookPage() {
       held: new Set(hold.map((h) => h.row[0])), maxW: Math.max(1, ...hold.filter(isStock).map((h) => h.row[6])) }
   }, [b, live, sort])
 
-  if (!isAdmin) return <Navigate to="/dashboard" replace />
+  if (!isResearch) return <Navigate to="/dashboard" replace />
   if (err) return <p className="text-sm text-[var(--accent-rose)] p-4">{err}</p>
   if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
   if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>

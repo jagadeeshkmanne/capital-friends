@@ -156,6 +156,7 @@ export function AuthProvider({ children }) {
         name: me.name || profile.name,
         role: me.role,
         isAdmin: !!me.isAdmin,
+        isResearch: !!me.isResearch,
         picture: profile.picture || '',
       })
     } catch (err) {
@@ -192,6 +193,7 @@ export function AuthProvider({ children }) {
         name: me.name || profile.name,
         role: me.role,
         isAdmin: !!me.isAdmin,
+        isResearch: !!me.isResearch,
         picture: profile.picture || '',
       })
     } catch {
@@ -331,6 +333,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
     isOwner: user?.role === 'owner',
     isAdmin: !!user?.isAdmin,
+    isResearch: !!user?.isAdmin || !!user?.isResearch,
     signIn,
     signOut,
   }

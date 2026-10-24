@@ -193,16 +193,25 @@ function routeAction(action, params, userRecord) {
         role: userRecord.role,
         spreadsheetId: userRecord.spreadsheetId,
         isNew: !!userRecord.isNew,
-        isAdmin: Session.getActiveUser().getEmail() === CONFIG.adminEmail
+        isAdmin: Session.getActiveUser().getEmail() === CONFIG.adminEmail,
+        isResearch: isResearchViewer_()     // may open the research pages (fund rule, paper books) read-only
       };
 
-    case 'admin:paper-live':   // hidden admin page: live prices (Yahoo Finance) for the paper holdings and top-40 charts
-      if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
+    case 'admin:paper-live':   // research page: live prices (Yahoo Finance) for the paper holdings and top-40 charts
+      if (!isResearchViewer_()) throw new Error('Not available');
       return getPaperLive_(params.symbols || []);
 
-    case 'admin:paper-book':   // hidden admin page: private paper-trading book (admin email only)
-      if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
+    case 'admin:paper-book':   // research page: the paper-trading books (admin + the research viewers)
+      if (!isResearchViewer_()) throw new Error('Not available');
       return getPaperBook_();
+
+    case 'admin:research-viewers':   // admin only: who else may open the research pages (comma-separated emails in a script property)
+      if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
+      if (Array.isArray(params.set)) {
+        var clean = params.set.map(function (e) { return String(e || '').trim().toLowerCase(); }).filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
+        PropertiesService.getScriptProperties().setProperty('RESEARCH_VIEWERS', clean.join(','));
+      }
+      return { viewers: researchViewers_() };
 
     case 'admin:found-us':     // hidden admin page: where families heard about the app (FoundUs.js)
       if (Session.getActiveUser().getEmail() !== CONFIG.adminEmail) throw new Error('Not available');
@@ -1207,4 +1216,15 @@ function installTriggersPage_(expected) {
     log('Trigger popup error: ' + err.toString());
     return HtmlService.createHtmlOutput(box('Could not install', '#f87171', '<p style="color:#94a3b8">' + esc(err.message) + '</p><p style="color:#64748b;font-size:13px">Try again from Settings. If it keeps failing, write to capital.friends.dev@gmail.com.</p>'));
   }
+}
+
+
+// ── Research pages (fund rule, paper books): the admin plus an allow-list of emails kept in the script property RESEARCH_VIEWERS ──
+function researchViewers_() {
+  var raw = PropertiesService.getScriptProperties().getProperty('RESEARCH_VIEWERS') || '';
+  return raw.split(',').map(function (e) { return e.trim().toLowerCase(); }).filter(String);
+}
+function isResearchViewer_() {
+  var email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
+  return !!email && (email === String(CONFIG.adminEmail).toLowerCase() || researchViewers_().indexOf(email) >= 0);
 }

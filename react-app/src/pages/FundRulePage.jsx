@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import MFRebalanceDialog from '../components/forms/MFRebalanceDialog'
 import { getNavHistory, getNavHistories } from '../utils/navHistory'
+import { getResearchViewers, setResearchViewers } from '../services/api'
 
 // Hidden admin page (/admin/fund-rule): the index-fund + gold rule (paper book G) applied to ONE real mutual-fund portfolio,
 // the "satellite". Reads daily NAVs from api.mfapi.in (same source as the fund charts), replays the rule up to the last NAV
@@ -20,7 +21,7 @@ const RULE = { lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02
   fastK: 20, fastBand: 0.04, goldCap: 0.6, tradeBand: 0.05, look: 248 }
 const SIGNAL_FUNDS = [[150738, 'Tata Nifty Midcap 150 Momentum 50 Index Fund (Direct)'], [150902, 'Edelweiss Nifty Midcap150 Momentum 50 Index Fund (Direct)'], [152916, 'Kotak Nifty Midcap 150 Momentum 50 Index Fund (Direct)']]
 const LS = 'cf-fund-rule'
-const DEFAULT_GOLD = 118663, DEFAULT_LIQ = 119861, NIFTY = 120716   // Nippon India Gold Savings, Tata Liquid, UTI Nifty 50 Index (direct, growth)
+const DEFAULT_GOLD = 118663, DEFAULT_LIQ = 119861, MIDCAP150 = 147622   // Nippon India Gold Savings, Tata Liquid, Motilal Oswal Nifty Midcap 150 Index (direct, growth)
 
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
 const ap = (v, d = 1) => (v == null ? '—' : (Math.abs(v) * 100).toFixed(d) + '%')   // size of a move, no sign
@@ -143,11 +144,11 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
   const yearAgo = R.full.filter((r) => r[0] <= new Date(new Date(R.asOf) - 365 * 864e5).toISOString().slice(0, 10)).slice(-1)[0]?.[0] || first
   const presets = [['Since start', first, 'From the first day the rule could decide'], [`Fund's peak (${day(peak).replace(/ \d{4}$/, '')} ${peak.slice(0, 4)})`, peak, 'From the fund\'s highest price: how the rule handled the fall after it'], ['1 year', yearAgo, 'Last 12 months']]
   if (defaultStart && defaultStart > first) presets.push(['Since my first investment', defaultStart, 'From the first transaction in the satellite'])
-  useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode), String(NIFTY)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
+  useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode), String(MIDCAP150)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
   const sim = useMemo(() => {
     if (!hs) return null
     const look = (code) => { const h = hs.get(String(code)); if (!h) return null; const m = new Map(h.times.map((t, i) => [iso(t), h.navs[i]])); return m }
-    const G = look(goldCode), Lq = look(liqCode), N = look(NIFTY)
+    const G = look(goldCode), Lq = look(liqCode), N = look(MIDCAP150)
     if (!G || !Lq) return null
     const rows = R.full.filter((r) => r[0] >= start)
     if (rows.length < 5) return null
@@ -166,13 +167,13 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
     const rule = run((p) => p.t)
     const fund = run(() => ({ fund: 1, gold: 0, liq: 0 }))
     const gold = run(() => ({ fund: 0, gold: 1, liq: 0 }))
-    let mon = null; const mix = run((p) => { if (p.d.slice(0, 7) !== mon) { mon = p.d.slice(0, 7); return { fund: 0.6, gold: 0.4, liq: 0 } } return { fund: 0.6000001, gold: 0.3999999, liq: 0 } })   // 60/40 re-split monthly
-    const nifty = px[0].n ? px.map((p) => (100 * p.n) / px[0].n) : null
+    const mid = px[0].n ? px.map((p) => (100 * p.n) / px[0].n) : null   // plain Midcap 150 index fund, for the "did momentum + the rule add anything" question
     const yrs = (new Date(px[px.length - 1].d) - new Date(px[0].d)) / 365.25 / 864e5
     const cagr = (a) => (yrs >= 0.9 ? ((a[a.length - 1] / 100) ** (1 / yrs) - 1) * 100 : null)
     const dd = (a) => { let pk = 0, m = 0; a.forEach((v) => { pk = Math.max(pk, v); m = Math.min(m, v / pk - 1) }); return m * 100 }
-    const L = [['Rule', rule, 'stroke-sky-400', 'text-sky-300'], ['Fund alone', fund, 'stroke-rose-400', 'text-rose-300'], ['60/40 fixed', mix, 'stroke-violet-400', 'text-violet-300'], ['Gold alone', gold, 'stroke-amber-400', 'text-amber-300']]
-    if (nifty) L.push(['Nifty 50 fund', nifty, 'stroke-slate-400', 'text-slate-300'])
+    const L = [['The rule', rule, 'stroke-sky-400', 'text-sky-300'], ['Midcap 150 Momentum 50 fund', fund, 'stroke-rose-400', 'text-rose-300']]
+    if (mid) L.push(['Midcap 150 index fund', mid, 'stroke-violet-400', 'text-violet-300'])
+    L.push(['Gold', gold, 'stroke-amber-400', 'text-amber-300'])
     return { dates: px.map((p) => p.d), lines: L.map(([nm, a, sc, tc]) => ({ nm, a, sc, tc, end: a[a.length - 1], cagr: cagr(a), dd: dd(a) })), yrs }
   }, [hs, R, start, goldCode, liqCode])
   const W = 960, H = 240, L = 8, Rm = 64, T = 10, B = 24
@@ -195,21 +196,21 @@ function Growth({ R, goldCode, liqCode, defaultStart }) {
           <div className="px-4 pt-3">
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Growth of 100 rupees">
               {[100, Math.round(hi / 10) * 10].map((v) => v > lo && v < hi && <g key={v}><line x1={L} x2={W - Rm} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeDasharray="3 4" /><text x={W - Rm + 6} y={Y(v) + 4} fontSize="11" fill="var(--text-dim)">₹{v}</text></g>)}
-              {sim.lines.slice().reverse().map((l) => <polyline key={l.nm} points={l.a.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')} fill="none" strokeWidth={l.nm === 'Rule' ? 2.6 : 1.6} strokeLinejoin="round" className={l.sc} opacity={l.nm === 'Rule' ? 1 : 0.85} />)}
+              {sim.lines.slice().reverse().map((l) => <polyline key={l.nm} points={l.a.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')} fill="none" strokeWidth={l.nm === 'The rule' ? 2.6 : 1.6} strokeLinejoin="round" className={l.sc} opacity={l.nm === 'The rule' ? 1 : 0.85} />)}
               <text x={L} y={H - 7} fontSize="11" fill="var(--text-dim)">{day(sim.dates[0])}</text>
               <text x={W - Rm} y={H - 7} fontSize="11" fill="var(--text-dim)" textAnchor="end">{day(sim.dates[n - 1])}</text>
             </svg>
           </div>
-          <div className="px-4 py-3 border-t border-[var(--border-light)] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="px-4 py-3 border-t border-[var(--border-light)] grid grid-cols-2 lg:grid-cols-4 gap-3">
             {sim.lines.map((l) => (
               <div key={l.nm} className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2.5 min-w-0">
                 <p className={`text-xs font-semibold ${l.tc}`}>{l.nm}</p>
-                <p className="mt-1 text-lg font-bold tabular-nums text-[var(--text-primary)]">₹{l.end.toFixed(1)}</p>
+                <p className="mt-1 text-lg font-bold tabular-nums text-[var(--text-primary)]">₹{l.end.toFixed(1)} <span className={`text-sm font-semibold ${l.end >= 100 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}`}>{l.end >= 100 ? '+' : ''}{(l.end - 100).toFixed(1)}%</span></p>
                 <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{l.cagr != null ? `${l.cagr >= 0 ? '+' : ''}${l.cagr.toFixed(1)}% a year · ` : ''}worst fall {l.dd.toFixed(0)}%</p>
               </div>
             ))}
           </div>
-          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Before tax and exit loads, from real fund prices (gold = Nippon India Gold Savings, liquid = Tata Liquid, or your satellite's funds once chosen). The rule's signals need the fund's first year, so the earliest start is {day(first)}. Short windows say little; the back-test behind the rule covers 2010–2026.</p>
+          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Before tax and exit loads, from real fund prices (Tata Midcap 150 Momentum 50, Motilal Oswal Midcap 150, Nippon India Gold Savings, Tata Liquid — or your satellite's funds once chosen). The rule's signals need the fund's first year, so the earliest start is {day(first)}. Short windows say little; the back-test behind the rule covers 2010–2026.</p>
         </>)
       })()}
     </div>
@@ -238,8 +239,33 @@ function RealReturns({ real }) {
   )
 }
 
+/** Admin: the emails that may open the fund-rule and paper-books pages (read-only). Kept on the server. */
+function Viewers() {
+  const { showToast } = useToast()
+  const [list, setList] = useState(null); const [text, setText] = useState(''); const [busy, setBusy] = useState(false)
+  useEffect(() => { getResearchViewers().then((r) => { setList(r.viewers || []); setText((r.viewers || []).join('\n')) }).catch(() => setList([])) }, [])
+  const save = async () => {
+    setBusy(true)
+    try { const r = await setResearchViewers(text.split(/[\s,;]+/).filter(Boolean)); setList(r.viewers || []); setText((r.viewers || []).join('\n')); showToast('Viewers saved') }
+    catch (e) { showToast(e.message || 'Could not save', 'error') } finally { setBusy(false) }
+  }
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Who else can see these pages</h3>
+        <span className="text-xs text-[var(--text-dim)]">{list ? `${list.length} viewer${list.length === 1 ? '' : 's'}` : 'loading…'} · they get Fund rule + Paper books, read-only; Found us stays yours</span>
+      </div>
+      <div className="px-4 py-3 grid gap-2 md:grid-cols-[1fr_auto] items-start">
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="one email per line" className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2.5 py-1.5 text-sm text-[var(--text-primary)]" />
+        <button onClick={save} disabled={busy || list == null} className="px-3 py-1.5 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 text-xs font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save viewers'}</button>
+      </div>
+      <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">They must sign in to Capital Friends with that Google account; the pages then appear under a "Research · shared with you" menu. Their own portfolios are never shown here.</p>
+    </div>
+  )
+}
+
 export default function FundRulePage() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, isResearch } = useAuth()
   const { mfPortfolios, mfHoldings, mfTransactions, updateHoldingAllocations } = useData()
   const { showToast } = useToast()
   const [saving, setSaving] = useState(false)
@@ -247,7 +273,7 @@ export default function FundRulePage() {
   const [hist, setHist] = useState(undefined)
   const set = (k, v) => setCfg((c) => { const n = { ...c, [k]: v }; try { localStorage.setItem(LS, JSON.stringify(n)) } catch { /* ignore */ } return n })
 
-  useEffect(() => { if (!isAdmin) return; setHist(undefined); getNavHistory(cfg.signal).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)) }, [isAdmin, cfg.signal])
+  useEffect(() => { if (!isResearch) return; setHist(undefined); getNavHistory(cfg.signal).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)) }, [isAdmin, cfg.signal])
   const R = useMemo(() => (hist ? replay(hist) : null), [hist])
 
   const portfolios = (mfPortfolios || []).filter((p) => p.status !== 'Inactive')
@@ -304,7 +330,7 @@ export default function FundRulePage() {
     return { invested, redeemed, value, gain: value + redeemed - invested, xirr: days > 30 ? ((lo + hi) / 2) * 100 : null, since: t0.toISOString().slice(0, 10), days }
   }, [mfTransactions, holdings, cfg.portfolioId])
 
-  if (!isAdmin) return <Navigate to="/dashboard" replace />
+  if (!isResearch) return <Navigate to="/dashboard" replace />
   const names = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid fund' }
   const colors = { fund: 'bg-sky-400', gold: 'bg-amber-400', liq: 'bg-slate-400' }
   const opt = holdings.map((h) => <option key={h.schemeCode} value={h.schemeCode}>{h.fundName}</option>)
@@ -358,8 +384,10 @@ export default function FundRulePage() {
         <p className="text-xs text-[var(--text-dim)] -mt-1">Decided on the week's last price (Friday) and the month's last price. Check on Monday mornings, or wait for the email.</p>
       </>)}
 
-      {/* settings */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      {!isAdmin && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-2.5 text-xs text-[var(--text-muted)]">Shared with you as a learning record: a mechanical rule and its paper books, run by Jagadeesh for his own money. Information, not a recommendation; nothing here is personal advice.</div>}
+
+      {/* settings (admin) */}
+      {isAdmin && <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="px-4 py-2.5 border-b border-[var(--border-light)]"><h3 className="text-sm font-bold text-[var(--text-primary)]">Set-up</h3></div>
         <div className="px-4 py-3 grid gap-3 md:grid-cols-2">
           <label className="text-xs text-[var(--text-muted)]">Fund whose prices the rule watches
@@ -374,9 +402,9 @@ export default function FundRulePage() {
           ))}
           {cfg.portfolioId && !holdings.length && <p className="text-xs text-[var(--text-dim)] md:col-span-2">This portfolio holds no funds yet. Add the index fund, a gold fund and a liquid fund to it, then pick them here.</p>}
         </div>
-      </div>
+      </div>}
 
-      {R && cfg.portfolioId && holdings.length > 0 && cfg.fund && cfg.gold && cfg.liq && (
+      {isAdmin && R && cfg.portfolioId && holdings.length > 0 && cfg.fund && cfg.gold && cfg.liq && (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Rebalance the satellite</h3>
@@ -395,7 +423,8 @@ export default function FundRulePage() {
 
       {R && <History R={R} colors={colors} />}
       {R && <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />}
-      {R && cfg.portfolioId && real && <RealReturns real={real} />}
+      {isAdmin && R && cfg.portfolioId && real && <RealReturns real={real} />}
+      {isAdmin && <Viewers />}
     </div>
   )
 }

@@ -377,6 +377,8 @@ export const getMarketData = () => callAPI('data:market')
 export const getPaperBook = () => callAPI('admin:paper-book')
 export const getPaperLive = (symbols) => callAPI('admin:paper-live', { symbols })
 export const getFoundUsStats = () => callAPI('admin:found-us')
+export const getResearchViewers = () => callAPI('admin:research-viewers')
+export const setResearchViewers = (emails) => callAPI('admin:research-viewers', { set: emails })
 
 // Statement import (beta, only for accounts in the server's IMPORT_BETA_EMAILS list)
 export const importEnabled = () => callAPI('import:enabled')

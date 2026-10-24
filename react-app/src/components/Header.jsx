@@ -158,7 +158,7 @@ export default function Header() {
   const { theme, toggle } = useTheme()
   const { selectedMember, setSelectedMember, familyMembers } = useFamily()
   const { mfPortfolios, mfHoldings, stockPortfolios, stockHoldings, otherInvList, liabilityList, assetAllocations } = useData()
-  const { user, signOut, isAdmin } = useAuth()
+  const { user, signOut, isAdmin, isResearch } = useAuth()
   const { masked, toggleMask, mv } = useMask()
 
   const navigate = useNavigate()
@@ -558,13 +558,13 @@ export default function Header() {
                       <SettingsIcon size={16} />
                       <span className="text-sm font-medium">Settings</span>
                     </Link>
-                    {isAdmin && (
+                    {isResearch && (
                       <div className="border-t border-[var(--border)] mt-1 pt-1">
-                        <p className="px-4 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex items-center gap-1.5"><ShieldCheck size={11} /> Admin · only you</p>
-                        {[['/admin/fund-rule', 'Fund rule'], ['/admin/paper', 'Paper books'], ['/admin/found-us', 'Found us']].map(([p, l]) => (
+                        <p className="px-4 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex items-center gap-1.5"><ShieldCheck size={11} /> {isAdmin ? 'Admin · only you' : 'Research · shared with you'}</p>
+                        {(isAdmin ? [['/admin/fund-rule', 'Fund rule'], ['/admin/paper', 'Paper books'], ['/admin/found-us', 'Found us']] : [['/admin/fund-rule', 'Fund rule'], ['/admin/paper', 'Paper books']]).map(([p, l]) => (
                           <Link key={p} to={p} onClick={() => setDropdownOpen(false)}
                             className="w-full flex items-center gap-3 px-4 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-                            <span className="w-4 text-center text-[10px] font-bold text-sky-400">A</span>
+                            <span className="w-4 text-center text-[10px] font-bold text-sky-400">{isAdmin ? 'A' : 'R'}</span>
                             <span className="text-sm font-medium">{l}</span>
                           </Link>
                         ))}
