@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, lazy, Suspense } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { FileUp, Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
+import { FileUp, Plus, Minus, Pencil, TrendingUp, TrendingDown, Wallet, List, Layers, ChevronDown, ChevronRight, ArrowLeft, ArrowDownCircle, Repeat2, FolderInput, Settings2, MoreVertical, Trash2, Filter, PieChart as PieChartIcon, Lock, LockOpen, IndianRupee, Repeat, Scale } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatINR, splitFundName } from '../../data/familyData'
 import { useFamily } from '../../context/FamilyContext'
@@ -15,6 +15,7 @@ import MFPortfolioForm from '../../components/forms/MFPortfolioForm'
 import MFInvestForm from '../../components/forms/MFInvestForm'
 import MFRedeemForm from '../../components/forms/MFRedeemForm'
 import MFSwitchForm from '../../components/forms/MFSwitchForm'
+import MFMoveFundsDialog from '../../components/forms/MFMoveFundsDialog'
 import MFAllocationManager from '../../components/forms/MFAllocationManager'
 import MFRebalanceDialog from '../../components/forms/MFRebalanceDialog'
 import MFBuyOpportunities from '../../components/forms/MFBuyOpportunities'
@@ -940,6 +941,10 @@ export default function MutualFundsPage() {
         />
       </Modal>
 
+      <Modal open={!!modal?.moveFunds} onClose={() => setModal(null)} title="Move funds to another portfolio">
+        {modal?.moveFunds && <MFMoveFundsDialog portfolioId={modal.moveFunds} onDone={(to) => { setModal(null); setSelectedPortfolioId(to) }} onCancel={() => setModal(null)} />}
+      </Modal>
+
       <Modal open={!!modal?.allocations} onClose={() => setModal(null)} title="Manage Portfolio Allocation" wide>
         {modal?.allocations && (
           <MFAllocationManager
@@ -1728,6 +1733,13 @@ export default function MutualFundsPage() {
                 className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${holdings.length === 0 ? 'border-[var(--border)] text-[var(--text-dim)] cursor-not-allowed opacity-50 bg-[var(--bg-card)]' : 'text-amber-400 hover:text-amber-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}
               >
                 <Repeat2 size={12} /> Switch
+              </button>
+              <button
+                onClick={() => setModal({ moveFunds: selectedPortfolioId })}
+                title="Move funds from this portfolio to another one"
+                className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] border border-[var(--border)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+              >
+                <FolderInput size={12} /> Move
               </button>
             </div>
           </div>

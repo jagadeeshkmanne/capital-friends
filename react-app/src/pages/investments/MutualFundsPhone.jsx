@@ -477,6 +477,7 @@ function PortfolioScreen({ p, back, open, stats, returns, enrichedHoldings, allF
         { text: 'Record an investment', handler: () => setModal({ invest: p.portfolioId }) },
         { text: 'Record a redemption', handler: () => setModal({ redeem: p.portfolioId }) },
         { text: 'Record a switch', handler: () => setModal({ switchFunds: p.portfolioId }) },
+        { text: 'Move funds to another portfolio', handler: () => setModal({ moveFunds: p.portfolioId }) },
         { text: 'Target split', handler: () => setModal({ allocations: p.portfolioId }) },
         { text: 'Rebalance', handler: () => setModal({ rebalance: p.portfolioId }) },
         { text: 'Edit portfolio', handler: () => setModal({ editPortfolio: p }) },
