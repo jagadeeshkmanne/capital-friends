@@ -25,7 +25,8 @@ const LS = 'cf-fund-rule'
 const DEFAULT_GOLD = 118663, DEFAULT_LIQ = 119861, MIDCAP150 = 147622   // Nippon India Gold Savings, Tata Liquid, Motilal Oswal Nifty Midcap 150 Index (direct, growth)
 // Paper book inside the app: ₹10 lakh follows the rule from the day book G opened, rebuilt from the NAV history on every visit
 // (no stored state, no daily job: a switch due on a Monday is in the book as soon as Monday's NAVs are published).
-const PAPER = { start: '2026-10-23', amount: 1000000 }
+const PAPER = { start: '2026-10-23', amount: 1000000, fund: 152916, gold: 119781, liq: 119766,   // one fund house, so every move is a switch order
+  names: { fund: 'Kotak Nifty Midcap 150 Momentum 50 Index Fund (Direct)', gold: 'Kotak Gold Fund (Direct)', liq: 'Kotak Liquid Fund (Direct)' } }
 const TAX = { fund: [0.20, 0.125], gold: [0.30, 0.125], liq: [0.30, 0.30] }   // [held < 1 year, held >= 1 year], as in fund.py
 
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
@@ -80,9 +81,9 @@ const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode
 
 /** The paper book: `amount` follows the rule's targets from `start`, FIFO lots, a sleeve traded only when > 5% off target,
  *  tax on realised gains paid from the book (fund.py's rates). G / Lq = date -> NAV maps of the gold and liquid funds. */
-function paperBook(R, G, Lq, start, amount) {
-  let g = null, l = null
-  const px = R.full.filter((r) => r[0] >= start).map((r) => { g = G.get(r[0]) ?? g; l = Lq.get(r[0]) ?? l; return { d: r[0], p: { fund: r[1], gold: g, liq: l }, t: { fund: r[2], gold: r[3], liq: r[4] } } }).filter((x) => x.p.gold && x.p.liq)
+function paperBook(R, F, G, Lq, start, amount) {
+  let f = null, g = null, l = null   // targets come from the signal fund's replay (R); prices from the funds actually held (F, G, Lq)
+  const px = R.full.filter((r) => r[0] >= start).map((r) => { f = F.get(r[0]) ?? f; g = G.get(r[0]) ?? g; l = Lq.get(r[0]) ?? l; return { d: r[0], p: { fund: f, gold: g, liq: l }, t: { fund: r[2], gold: r[3], liq: r[4] } } }).filter((x) => x.p.fund && x.p.gold && x.p.liq)
   if (!px.length) return null
   const K = ['fund', 'gold', 'liq'], lots = { fund: [], gold: [], liq: [] }   // lot = [units, cost, date]
   const realised = { fund: 0, gold: 0, liq: 0 }, taxK = { fund: 0, gold: 0, liq: 0 }, bought = { fund: 0, gold: 0, liq: 0 }, sold = { fund: 0, gold: 0, liq: 0 }
@@ -114,7 +115,7 @@ function paperBook(R, G, Lq, start, amount) {
   const p = px[px.length - 1].p, value = total(p)
   const taxDue = K.reduce((a, k) => a + lots[k].reduce((b, lot) => b + taxOn(k, lot[0] * p[k] - lot[1], lot[2], px[px.length - 1].d), 0), 0)
   const sleeves = K.map((k) => { const u = lots[k].reduce((a, x) => a + x[0], 0), c = lots[k].reduce((a, x) => a + x[1], 0), v = u * p[k]
-    const hi = k === 'fund' ? R.full.reduce((m, r) => Math.max(m, r[1]), 0) : Math.max(...(k === 'gold' ? G : Lq).values())   // all-time high, like the fund tables
+    const hi = Math.max(...(k === 'fund' ? F : k === 'gold' ? G : Lq).values())   // all-time high, like the fund tables
     return { k, units: u, cost: c, nav: p[k], value: v, w: v / value, target: last[k], pl: v - c, realised: realised[k], tax: taxK[k], bought: bought[k], sold: sold[k], high: hi, below: p[k] / hi - 1 } })
   let pk = 0, dd = 0; hist.forEach(([, v]) => { pk = Math.max(pk, v); dd = Math.min(dd, v / pk - 1) })
   const yrs = (new Date(px[px.length - 1].d) - new Date(px[0].d)) / 365.25 / 864e5
@@ -125,16 +126,17 @@ function paperBook(R, G, Lq, start, amount) {
 }
 
 /** Paper tab: the book's value, holdings (laid out like the app's fund tables) and every switch with its amounts. */
-function PaperBook({ R, goldCode, liqCode, fundNames }) {
+function PaperBook({ R }) {
   const [hs, setHs] = useState(null)
   const [all, setAll] = useState(false)
-  useEffect(() => { let on = true; getNavHistories([String(goldCode), String(liqCode)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [goldCode, liqCode])
+  const fundNames = PAPER.names
+  useEffect(() => { let on = true; getNavHistories([String(PAPER.fund), String(PAPER.gold), String(PAPER.liq)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [])
   const B = useMemo(() => {
     if (!hs) return null
     const look = (code) => { const h = hs.get(String(code)); return h ? new Map(h.times.map((t, i) => [iso(t), h.navs[i]])) : null }
-    const G = look(goldCode), Lq = look(liqCode)
-    return G && Lq ? paperBook(R, G, Lq, PAPER.start, PAPER.amount) : null
-  }, [hs, R, goldCode, liqCode])
+    const F = look(PAPER.fund), G = look(PAPER.gold), Lq = look(PAPER.liq)
+    return F && G && Lq ? paperBook(R, F, G, Lq, PAPER.start, PAPER.amount) : null
+  }, [hs, R])
   const roles = { fund: 'Index fund', gold: 'Gold', liq: 'Liquid' }
   const colors = { fund: 'bg-sky-400', gold: 'bg-amber-400', liq: 'bg-slate-400' }
   const tone = (v) => (v >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]')
@@ -142,7 +144,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
   const TH = 'py-2 px-3 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider', SUB = 'text-xs font-medium text-[var(--text-dim)] normal-case tracking-normal'
   const tile = (l, v, sub, cls = 'text-[var(--text-primary)]') => (
     <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{l}</p><p className={`mt-0.5 text-base font-bold tabular-nums ${cls}`}>{v}</p>{sub && <p className="text-[11px] text-[var(--text-dim)] tabular-nums">{sub}</p>}</div>)
-  if (!hs) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">Loading gold and liquid fund prices…</div>
+  if (!hs) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">Loading the Kotak funds' prices…</div>
   if (!B) return <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-6 text-sm text-[var(--text-dim)]">The paper book starts on {day(PAPER.start)}; it appears once that day's prices are published.</div>
   const shown = all ? B.switches : B.switches.slice(0, 6)
   const totalPL = B.unrealised + B.realised - B.taxPaid
@@ -219,7 +221,7 @@ function PaperBook({ R, goldCode, liqCode, fundNames }) {
           ))}
         </div>
         {B.switches.length > 6 && <button onClick={() => setAll(!all)} className="w-full px-4 py-2 text-xs font-semibold text-sky-300 border-t border-[var(--border-light)]">{all ? 'Show fewer' : `Show all ${B.switches.length}`}</button>}
-        <p className="px-4 py-2.5 text-[11px] text-[var(--text-dim)] border-t border-[var(--border-light)]">Rebuilt from the published NAVs every time this page opens, so it needs no daily job: a switch decided on a Friday's price is done at the next trading day's NAV, the moment that NAV is published. Real fund prices (the funds chosen in Set-up, else Tata Midcap 150 Momentum 50, Nippon India Gold Savings and Tata Liquid); exit loads ignored; tax at the rates used in the back-test. Paper record, information only.</p>
+        <p className="px-4 py-2.5 text-[11px] text-[var(--text-dim)] border-t border-[var(--border-light)]">Rebuilt from the published NAVs every time this page opens, so it needs no daily job: a switch decided on a Friday's price is done at the next trading day's NAV, the moment that NAV is published. Signals from the Tata fund (longest history); the book holds the Kotak funds, all in one fund house so every move is a single switch order; no exit load on the Kotak index fund; tax at the rates used in the back-test. Paper record, information only.</p>
       </div>
     </div>
   )
@@ -375,6 +377,34 @@ function Growth({ R, goldCode, liqCode, defaultStart, fixed, title, note }) {
   )
 }
 
+/** New money: how a lumpsum today, or each SIP instalment, is split by the current target. */
+function NewMoney({ R, names }) {
+  const [lump, setLump] = useState(1000000)
+  const [sip, setSip] = useState(25000)
+  const K = ['fund', 'gold', 'liq']
+  const colors = { fund: 'bg-sky-400', gold: 'bg-amber-400', liq: 'bg-slate-400' }
+  const field = (label, v, set) => (
+    <label className="text-xs text-[var(--text-muted)] flex-1 min-w-[140px]">{label}
+      <div className="mt-1 flex items-center rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2.5"><span className="text-sm text-[var(--text-dim)]">₹</span>
+        <input type="number" min="0" step="1000" value={v} onChange={(e) => set(Math.max(0, Number(e.target.value) || 0))} className="w-full bg-transparent py-1.5 pl-1 text-sm text-[var(--text-primary)] tabular-nums outline-none" /></div>
+    </label>)
+  const row = (k, a) => (
+    <div key={k} className="flex items-center gap-2 text-sm min-w-0"><span className={`w-2 h-2 rounded-full shrink-0 ${colors[k]}`} /><span className="text-[var(--text-secondary)] truncate flex-1">{names[k]}</span><span className="font-semibold tabular-nums text-[var(--text-primary)] shrink-0">{inr(a * R.target[k])}</span><span className="text-xs text-[var(--text-dim)] tabular-nums w-9 text-right shrink-0">{Math.round(R.target[k] * 100)}%</span></div>)
+  return (
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">Investing new money</h3>
+        <span className="text-xs text-[var(--text-dim)]">split by today's target · {split(R.target)}</span>
+      </div>
+      <div className="px-4 py-3 grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">{field('Lumpsum today', lump, setLump)}<div className="space-y-1.5 pt-1">{K.map((k) => row(k, lump))}</div></div>
+        <div className="space-y-2">{field('Monthly SIP', sip, setSip)}<div className="space-y-1.5 pt-1">{K.map((k) => row(k, sip))}</div></div>
+      </div>
+      <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Any new money, a lumpsum or each SIP instalment, goes in at the current split. When the rule changes, the next switch brings the whole portfolio to the new split, so a SIP need not be re-split every time; change it when you get the switch email. Once the satellite portfolio exists, the Rebalance card below does the same maths with your actual holdings.</p>
+    </div>
+  )
+}
+
 /** The satellite's own numbers from its transactions: what you actually put in and what it is worth. */
 function RealReturns({ real }) {
   const tone = real.gain >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'
@@ -515,32 +545,35 @@ export default function FundRulePage() {
       {!isAdmin && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-inset)] px-4 py-2.5 text-xs text-[var(--text-muted)]">Shared with you as a learning record: a mechanical rule and its paper books, run by Jagadeesh for his own money. Information, not a recommendation; nothing here is personal advice.</div>}
 
       {/* three clean tabs: Live = the real satellite, Paper = ₹10 lakh following the rule, Rule = the signal, history and back-test */}
-      {R && <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        {[
-          ['live', Wallet, 'Live', 'My satellite', 'Your real portfolio and what to do now'],
-          ['paper', FlaskConical, 'Paper', '₹10 lakh on paper', `Follows every switch by itself since ${day(PAPER.start)}`],
-          ['rule', BookOpen, 'Rule', 'Signals & back-test', 'Why it says what it says, its history, 2010–2026'],
-        ].map(([k, Icon, t, sub, long]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} aria-pressed={on} className={`relative text-left rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 min-w-0 transition-colors ${on ? 'border-sky-500/50 bg-sky-500/10' : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]'}`}>
-            {on && <span className="absolute left-3 right-3 top-0 h-0.5 rounded-b bg-sky-400" />}
-            <div className="flex items-center gap-2"><Icon size={15} className={on ? 'text-sky-300' : 'text-[var(--text-dim)]'} /><span className={`text-sm font-bold ${on ? 'text-sky-300' : 'text-[var(--text-primary)]'}`}>{t}</span></div>
-            <p className={`mt-0.5 text-xs truncate ${on ? 'text-[var(--text-secondary)]' : 'text-[var(--text-dim)]'}`}>{sub}</p>
-            <p className="mt-0.5 text-[11px] text-[var(--text-dim)] truncate max-sm:hidden">{long}</p>
-          </button>) })}
+      {R && <div>
+        <div className="border-b border-[var(--border)] flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {[['live', Wallet, 'Live', 'my satellite'], ['paper', FlaskConical, 'Paper', '₹10 lakh on paper'], ['rule', BookOpen, 'Rule', 'signals & back-test']].map(([k, Icon, t, sub]) => { const on = tab === k; return (
+            <button key={k} onClick={() => setTab(k)} aria-pressed={on} className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 -mb-px border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${on ? 'border-sky-400 text-sky-300' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+              <Icon size={14} />{t}<span className={`max-sm:hidden text-xs font-normal ${on ? 'text-sky-300/70' : 'text-[var(--text-dim)]'}`}>· {sub}</span>
+            </button>) })}
+        </div>
+        <p className="mt-2 text-xs text-[var(--text-dim)]">{tab === 'live' ? 'Your real portfolio: what it should hold, what to do now, and its real result.' : tab === 'paper' ? `₹10 lakh following the rule by itself since ${day(PAPER.start)} — every switch done at the NAV, nothing to run.` : 'Why the rule says what it says today, every switch it made, and the 2010–2026 back-test.'}</p>
       </div>}
 
       {/* LIVE */}
       {R && tab === 'live' && (<>
-        {/* the three sleeves */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {['fund', 'gold', 'liq'].map((k) => { const r = byKey[k], w = R.target[k]; return (
-            <div key={k} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 min-w-0">
-              <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[k]}`} /><span className="text-xs font-semibold text-[var(--text-primary)]">{names[k]}</span>
-                {r && cfg[k] && <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold ${r.move ? (r.diff > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]') : 'bg-[var(--bg-inset)] text-[var(--text-dim)]'}`}>{r.move ? (r.diff > 0 ? 'BUY ' : 'SELL ') + inr(Math.abs(r.diff)) : 'OK'}</span>}</div>
-              <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--text-primary)]">{Math.round(w * 100)}%</p>
-              <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-inset)] overflow-hidden"><div className={`h-full rounded-full ${colors[k]}`} style={{ width: `${Math.round(w * 100)}%` }} /></div>
-              <p className="text-[11px] text-[var(--text-dim)] mt-1.5 truncate">{r && plan.total > 0 ? `Now ${inr(r.cur)} (${Math.round(r.curPct * 100)}%) · target ${inr(r.tgt)}` : k === 'liq' ? 'Waiting room while a guard is on' : k === 'gold' ? 'Never more than 60%' : 'Nifty Midcap 150 Momentum 50'}</p>
-            </div>) })}
+        {/* the target today, one compact card */}
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Target today</p>
+            <p className="text-xs text-[var(--text-dim)]">{plan?.total > 0 ? `satellite ${inr(plan.total)}` : isAdmin ? 'choose the satellite in Set-up to see amounts' : ''}</p>
+          </div>
+          <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-[var(--bg-inset)]">{['fund', 'gold', 'liq'].map((k) => <div key={k} className={colors[k]} style={{ width: `${R.target[k] * 100}%` }} />)}</div>
+          <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+            {['fund', 'gold', 'liq'].map((k) => { const r = byKey[k], has = r && cfg[k] && plan.total > 0; return (
+              <div key={k} className="flex items-center gap-2 text-sm min-w-0">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${colors[k]}`} />
+                <span className="text-[var(--text-secondary)] truncate">{names[k]}</span>
+                <span className="font-bold tabular-nums text-[var(--text-primary)]">{Math.round(R.target[k] * 100)}%</span>
+                {has && <span className="text-xs text-[var(--text-dim)] tabular-nums">now {Math.round(r.curPct * 100)}%</span>}
+                {has && r.move && <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold ${r.diff > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>{(r.diff > 0 ? 'BUY ' : 'SELL ') + inr(Math.abs(r.diff))}</span>}
+              </div>) })}
+          </div>
         </div>
       {(() => { const last = R.log[0]; const ready = cfg.portfolioId && plan?.total > 0; const due = ready && plan.moves.length > 0; return (
         <div className={`rounded-xl border overflow-hidden ${due ? 'border-amber-500/40 bg-amber-500/5' : 'border-[var(--border)] bg-[var(--bg-card)]'}`}>
@@ -565,17 +598,15 @@ export default function FundRulePage() {
             {due && <p className="text-[11px] text-[var(--text-dim)]">Sell first, buy when the money arrives (1–3 working days). Units are at the last NAV; the order fills at the next NAV. The email tells you the same day the rule changes. Rule output, not advice.</p>}
           </div>
         </div>) })()}
+        <NewMoney R={R} names={{ fund: (cfg.fund && holdings.find((h) => String(h.schemeCode) === String(cfg.fund))?.fundName) || PAPER.names.fund, gold: (cfg.gold && holdings.find((h) => String(h.schemeCode) === String(cfg.gold))?.fundName) || PAPER.names.gold, liq: (cfg.liq && holdings.find((h) => String(h.schemeCode) === String(cfg.liq))?.fundName) || PAPER.names.liq }} />
         {isAdmin && cfg.portfolioId && real && <RealReturns real={real} />}
         {firstTxn && <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} fixed={firstTxn} title="₹100 since my first investment" note="What the rule would have done with ₹100 from the day the satellite got its first transaction, next to the funds held alone." />}
       </>)}
 
       {/* PAPER */}
       {R && tab === 'paper' && (<>
-        <PaperBook R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} fundNames={{
-          fund: SIGNAL_FUNDS.find(([c]) => c === Number(cfg.signal))?.[1] || 'Nifty Midcap 150 Momentum 50 index fund',
-          gold: (cfg.gold && holdings.find((h) => String(h.schemeCode) === String(cfg.gold))?.fundName) || 'Nippon India Gold Savings Fund (Direct)',
-          liq: (cfg.liq && holdings.find((h) => String(h.schemeCode) === String(cfg.liq))?.fundName) || 'Tata Liquid Fund (Direct)' }} />
-        <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} fixed={PAPER.start} title="₹100 since the paper book started" note="The rule's ₹100 from the paper book's first day, next to the funds held alone." />
+        <PaperBook R={R} />
+        <Growth R={R} goldCode={PAPER.gold} liqCode={PAPER.liq} fixed={PAPER.start} title="₹100 since the paper book started" note="The rule's ₹100 from the paper book's first day, next to the funds held alone (fund line from the signal fund's price)." />
       </>)}
 
       {/* RULE */}
