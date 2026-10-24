@@ -34,7 +34,6 @@ export default function FoundUsAdminPage() {
 
   const total = data?.total || 0, families = data?.families
   const max = rows.length ? rows[0].n : 1
-  const withDetail = list.filter((r) => r.detail)
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -83,22 +82,28 @@ export default function FoundUsAdminPage() {
 
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="text-sm font-bold text-[var(--text-primary)]">What they wrote{filter ? ` · ${BY_KEY[filter]?.label || filter}` : ''}</h2>
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">Who answered{filter ? ` · ${BY_KEY[filter]?.label || filter}` : ''}</h2>
             {filter && <button onClick={() => setFilter('')} className="text-xs font-semibold text-violet-400">Show all</button>}
           </div>
-          {!withDetail.length && <p className="text-sm text-[var(--text-dim)] py-3 text-center">Nothing written yet. YouTube, Friend or family and Other ask for a detail.</p>}
+          {!list.length && <p className="text-sm text-[var(--text-dim)] py-3 text-center">No answers yet.</p>}
           <div className="divide-y divide-[var(--border-light)]">
-            {withDetail.map((r, i) => (
-              <div key={i} className="flex items-baseline gap-3 py-2 text-sm">
-                <span className="w-24 shrink-0 text-xs text-[var(--text-dim)] tabular-nums">{fmtDate(r.date)}</span>
-                <span className="w-28 shrink-0 text-xs font-semibold text-[var(--text-muted)] truncate">{BY_KEY[r.via]?.label || r.via}</span>
-                <span className="min-w-0 text-[var(--text-primary)] break-words">{r.detail}</span>
+            {list.map((r, i) => (
+              <div key={i} className="py-2 text-sm">
+                <div className="flex items-baseline gap-3">
+                  <span className="w-24 shrink-0 text-xs text-[var(--text-dim)] tabular-nums">{fmtDate(r.date)}</span>
+                  <span className="w-28 shrink-0 text-xs font-semibold text-[var(--text-muted)] truncate">{BY_KEY[r.via]?.label || r.via}</span>
+                  <span className="min-w-0 flex-1 truncate text-[var(--text-primary)]" title={r.who}>
+                    {r.name ? <>{r.name} <span className="text-xs text-[var(--text-dim)]">{r.who}</span></> : (r.who || <span className="text-[var(--text-dim)]">unknown family</span>)}
+                    {r.who && !r.answered && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">family{r.members > 1 ? ` · ${r.members} members` : ''}</span>}
+                  </span>
+                </div>
+                {r.detail && <p className="mt-0.5 pl-[7.5rem] text-[var(--text-muted)] break-words">“{r.detail}”</p>}
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-xs text-[var(--text-dim)]">Counts start from the day the welcome question went live. Bug reports and feature requests arrive by email at capital.friends.dev@gmail.com.</p>
+        <p className="text-xs text-[var(--text-dim)]">Counts start from the day the welcome question went live. Answers given before this update are known by family only (the first member is shown); from now on the person who answered is recorded. Bug reports and feature requests arrive by email at capital.friends.dev@gmail.com.</p>
       </>)}
     </div>
   )

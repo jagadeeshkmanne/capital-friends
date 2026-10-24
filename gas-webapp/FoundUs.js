@@ -25,7 +25,9 @@ function saveFoundUs_(params, userRecord) {
   updateSetting('FoundUsAt', at);
   try {
     var id = userRecord && userRecord.spreadsheetId;
-    if (id) PropertiesService.getScriptProperties().setProperty('fu:' + id, [via, at.slice(0, 10), detail.slice(0, 60)].join('|'));
+    var who = String((userRecord && userRecord.email) || Session.getActiveUser().getEmail() || '').toLowerCase();
+    // via|date|detail|email — the detail never contains '|' (replaced), so the last field is the person who answered
+    if (id) PropertiesService.getScriptProperties().setProperty('fu:' + id, [via, at.slice(0, 10), detail.slice(0, 60).replace(/\|/g, '/'), who].join('|'));
   } catch (e) { log('saveFoundUs_ count failed (ignored): ' + e.message); }
   return { via: via };
 }
@@ -81,12 +83,25 @@ function sendFeedback_(params, userRecord) {
 function foundUsStats_() {
   var all = PropertiesService.getScriptProperties().getProperties();
   var counts = {}, list = [], total = 0;
+  // who belongs to which family sheet (from the user registry), owner first
+  var members = {};
+  Object.keys(all).forEach(function (k) {
+    if (k.indexOf('user:') !== 0) return;
+    var r; try { r = JSON.parse(all[k]); } catch (e) { return; }
+    if (!r || !r.spreadsheetId) return;
+    (members[r.spreadsheetId] = members[r.spreadsheetId] || []).push({ email: k.slice(5), name: r.displayName || '', owner: r.role === 'owner', created: r.createdDate || '' });
+  });
+  Object.keys(members).forEach(function (id) { members[id].sort(function (a, b) { return (b.owner - a.owner) || (a.created < b.created ? -1 : 1); }); });
   Object.keys(all).forEach(function (k) {
     if (k.indexOf('fu:') !== 0) return;
-    var p = String(all[k]).split('|'), via = p[0];
+    var p = String(all[k]).split('|'), via = p[0], who = '';
+    if (p.length > 3 && /@/.test(p[p.length - 1])) who = p.pop();   // newer records end with the answering email
+    var fam = members[k.slice(3)] || [], first = fam[0] || null;
+    var person = who ? (fam.filter(function (m) { return m.email === who; })[0] || { email: who, name: '' }) : first;
     total++;
     counts[via] = (counts[via] || 0) + 1;
-    list.push({ date: p[1] || '', via: via, detail: p.slice(2).join('|') });
+    list.push({ date: p[1] || '', via: via, detail: p.slice(2).join('|'),
+      who: person ? person.email : '', name: person ? person.name : '', answered: !!who, members: fam.length });
   });
   list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
   var families = null;
