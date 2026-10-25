@@ -9,13 +9,13 @@
  */
 var FUND_RULE = {
   signalCode: 150738,          // Tata Nifty Midcap 150 Momentum 50 Index Fund - Direct - Growth (longest NAV history)
-  lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02, cut: 0.5, notch: { '0.5': 0.8, '0.8': 1 },
+  lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02, cut: 0.5, notch: { '0.5': 0.8, '0.8': 1 }, fundMax: 0.8,   // never above 80% in the fund (24 Oct 2026)
   fastK: 20, fastBand: 0.04, goldCap: 0.6, look: 248,
   hour: 9                      // daily trigger hour (script time zone): AMFI's NAV for a day is out by ~11 pm; checked 7:27 am next day it was there, 9 am leaves a margin
 };
 
 function fundRuleTrendE_(r) { return r < FUND_RULE.lo ? FUND_RULE.eLo : r > FUND_RULE.hi ? FUND_RULE.eHi : FUND_RULE.eMid; }
-function fundRuleShare_(e, x, up) { return x < 1 ? e * x : up ? (FUND_RULE.notch[String(e)] || e) : e; }
+function fundRuleShare_(e, x, up) { return Math.min(FUND_RULE.fundMax, x < 1 ? e * x : up ? (FUND_RULE.notch[String(e)] || e) : e); }
 function fundRuleTargets_(e, x, up, fast) {
   var fs = fundRuleShare_(e, x, up);
   var w = fast ? { fund: 0, gold: 1 - fs, liq: fs } : { fund: fs, gold: 1 - fs, liq: 0 };
@@ -71,9 +71,28 @@ function fundRuleReplay_(h) {
   return S;
 }
 
-/** Daily trigger: email the owner only when the target split changed since the last check (or on the first run). */
+/** A switch due at the next NAV is known before that NAV is out: when the last NAV closed its week (Friday's NAV, seen on the
+ * weekend or on Monday morning) or its month (seen on the 1st). Only when the last NAV is from the previous weekday or later,
+ * so a late NAV is never taken for the week's last one. Returns the replay with that next day added (S.due = the day), else the plain replay. */
+function fundRuleWithNext_(h, now) {
+  var S = fundRuleReplay_(h);
+  var add = function (d, k) { var x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10); };
+  var wd = function (d) { return new Date(d + 'T00:00:00Z').getUTCDay(); };
+  var today = Utilities.formatDate(now || new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var prev = add(today, -1); while (wd(prev) === 0 || wd(prev) === 6) prev = add(prev, -1);
+  var next = wd(today) === 6 ? add(today, 2) : wd(today) === 0 ? add(today, 1) : today;
+  if (S.asOf >= next) { next = add(S.asOf, 1); while (wd(next) === 0 || wd(next) === 6) next = add(next, 1); }   // today's NAV is already in
+  if (S.asOf < prev || (fundRuleIsoWeek_(next) === fundRuleIsoWeek_(S.asOf) && next.slice(0, 7) === S.asOf.slice(0, 7))) return S;
+  var P = fundRuleReplay_({ dates: h.dates.concat([next]), navs: h.navs.concat([h.navs[h.navs.length - 1]]) });
+  if (P.changed !== next) return S;
+  P.asOf = S.asOf; P.nav = S.nav; P.due = next;
+  return P;
+}
+
+/** Daily trigger: email the owner only when the target split changed since the last check (or on the first run).
+ *  A switch is emailed as soon as it is known (S.due: the NAV day it applies to), e.g. on Saturday for Monday's NAV. */
 function fundRuleDailyCheck() {
-  var S = fundRuleReplay_(fundRuleNavs_());
+  var S = fundRuleWithNext_(fundRuleNavs_());
   var props = PropertiesService.getScriptProperties();
   var last = JSON.parse(props.getProperty('FUND_RULE_LAST') || 'null');
   var split = fundRuleSplit_(S.target);
@@ -83,21 +102,22 @@ function fundRuleDailyCheck() {
   var email = Session.getEffectiveUser().getEmail();
   var body = 'Fund rule (index fund + gold) - the target split changed.\n\n' +
     'New target: ' + split + '\n' + (last ? 'Was: ' + last.split + '\n' : '') +
+    (S.due ? 'Applies at the ' + S.due + ' NAV (decided on the ' + S.asOf + ' NAV): place the switch before that day\'s cut-off.\n' : '') +
     'Why (' + (S.changed || S.asOf) + '): ' + S.why + '\n\n' +
     'State at the ' + S.asOf + ' NAV: trend ' + (S.e === FUND_RULE.eLo ? 'weak' : S.e === FUND_RULE.eHi ? 'strong' : 'normal') +
     ' (12-month return ' + fundRulePct_(S.r12) + ') | vs 50-day avg ' + fundRulePct_(S.gap) + (S.x < 1 ? ' guard ON' : S.up ? ' notch up' : '') +
     ' | vs 20-day avg ' + fundRulePct_(S.fgap) + (S.fast ? ' crash guard ON' : '') + '\n\n' +
     'Open capitalfriends.in/admin/fund-rule for the switch amounts of the satellite portfolio. ' +
     'Rule output for your own portfolio - information, not advice. Paper book G follows the same rule.';
-  var subject = (last ? '🔔 ACTION ' : '✅ STARTED ') + 'Fund rule: ' + (last ? 'switch to ' : 'now ') + split + ' (' + S.asOf + ')';
+  var subject = (last ? '🔔 ACTION ' : '✅ STARTED ') + 'Fund rule: ' + (last ? 'switch to ' : 'now ') + split + ' (' + (S.due ? 'at the ' + S.due + ' NAV' : S.asOf) + ')';
   MailApp.sendEmail({ to: email, subject: subject, body: body });
   Logger.log('Fund rule email sent: ' + split);
 }
 
 /** Prints today's state without emailing or saving. */
 function runFundRuleNow() {
-  var S = fundRuleReplay_(fundRuleNavs_());
-  Logger.log(JSON.stringify({ asOf: S.asOf, target: fundRuleSplit_(S.target), changedOn: S.changed, why: S.why, r12: S.r12, gap50: S.gap, gap20: S.fgap }));
+  var S = fundRuleWithNext_(fundRuleNavs_());
+  Logger.log(JSON.stringify({ asOf: S.asOf, target: fundRuleSplit_(S.target), changedOn: S.changed, due: S.due || null, why: S.why, r12: S.r12, gap50: S.gap, gap20: S.fgap }));
 }
 
 /** One-time: a daily trigger for fundRuleDailyCheck (replaces an existing one). */

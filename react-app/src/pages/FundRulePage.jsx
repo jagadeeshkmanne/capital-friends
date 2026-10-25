@@ -12,13 +12,15 @@ import { getResearchViewers, setResearchViewers } from '../services/api'
 // the "satellite". Reads daily NAVs from api.mfapi.in (same source as the fund charts), replays the rule up to the last NAV
 // and shows today's target split and the switches that would bring the satellite to it. Information, not advice.
 //
-// The rule (same as fund.py, back-test after tax Jan 2010 - Sep 2026: 24.4% a year, worst fall -17%):
+// The rule (same as fund.py; back-test after tax Jan 2010 - Sep 2026, switching at the NAV after the signal as this page does:
+//  with the fund share capped at 80% (24 Oct 2026) 20.6% a year, worst fall -16.8%; without the cap 21.7% / -20%; holding the
+//  fund alone 20.9% / -39%. Switching at the signal day's own NAV (old figure): 24.4% / -17%):
 //  monthly (at the month's last NAV): index fund's 12-month return < 0 -> 20% fund, > +20% -> 80%, else 50%; rest gold
 //  weekly (at the week's last NAV), vs the 50-day average: 2% below -> fund sleeve halved into gold (until 2% above);
-//    2% above -> one notch up (50 -> 80, 80 -> 100); in between -> the monthly share
+//    2% above -> one notch up (50 -> 80); in between -> the monthly share; never more than 80% in the fund
 //  crash guard, vs the 20-day average: 4% below -> the whole fund sleeve into the liquid fund until back above the average
 //  gold never above 60%: the excess waits in the liquid fund. A sleeve is moved only when > 5% off its target.
-const RULE = { lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02, cut: 0.5, notch: { 0.5: 0.8, 0.8: 1 },
+const RULE = { lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02, cut: 0.5, notch: { 0.5: 0.8, 0.8: 1 }, fundMax: 0.8,
   fastK: 20, fastBand: 0.04, goldCap: 0.6, tradeBand: 0.05, look: 248 }
 const SIGNAL_FUNDS = [[150738, 'Tata Nifty Midcap 150 Momentum 50 Index Fund (Direct)'], [150902, 'Edelweiss Nifty Midcap150 Momentum 50 Index Fund (Direct)'], [152916, 'Kotak Nifty Midcap 150 Momentum 50 Index Fund (Direct)']]
 const LS = 'cf-fund-rule'
@@ -36,7 +38,7 @@ const day = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { 
 const iso = (t) => new Date(t * 1000).toISOString().slice(0, 10)
 const isoWeek = (d) => { const x = new Date(d + 'T00:00:00Z'); const n = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - n + 3); const y = x.getUTCFullYear(); const j4 = new Date(Date.UTC(y, 0, 4)); return y + '-' + Math.round(1 + ((x - j4) / 864e5 - 3 + ((j4.getUTCDay() + 6) % 7)) / 7) }
 const trendE = (r) => (r < RULE.lo ? RULE.eLo : r > RULE.hi ? RULE.eHi : RULE.eMid)
-const fundShare = (e, x, up) => (x < 1 ? e * x : up ? (RULE.notch[e] ?? e) : e)
+const fundShare = (e, x, up) => Math.min(RULE.fundMax, x < 1 ? e * x : up ? (RULE.notch[e] ?? e) : e)   // never above 80% (fund.py fund_max)
 function targets(e, x, up, fast) {
   const fs = fundShare(e, x, up)
   const w = fast ? { fund: 0, gold: 1 - fs, liq: fs } : { fund: fs, gold: 1 - fs, liq: 0 }
@@ -75,6 +77,21 @@ function replay(hist) {
     S.target = t; series.push([d, nav[i], t.fund, t.gold, t.liq])
   }
   return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice().reverse(), series: series.slice(-260), full: series, days: n }
+}
+
+/** A switch due at the next NAV is known before that NAV is out: when the last NAV closed its week (Friday's NAV, seen on the
+ *  weekend or on Monday morning) or its month (seen on the 1st). Only when the last NAV is from the previous weekday or later,
+ *  so a late NAV is never taken for the week's last one. Returns { date, target, why } of that switch, or null. */
+function nextDue(hist, R) {
+  const add = (d, k) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10) }
+  const wd = (d) => new Date(d + 'T00:00:00Z').getUTCDay()
+  const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)   // date in India
+  let prev = add(today, -1); while (wd(prev) === 0 || wd(prev) === 6) prev = add(prev, -1)
+  let next = wd(today) === 6 ? add(today, 2) : wd(today) === 0 ? add(today, 1) : today
+  if (R.asOf >= next) { next = add(R.asOf, 1); while (wd(next) === 0 || wd(next) === 6) next = add(next, 1) }   // today's NAV is already in
+  if (R.asOf < prev || (isoWeek(next) === isoWeek(R.asOf) && next.slice(0, 7) === R.asOf.slice(0, 7))) return null
+  const P = replay({ times: [...hist.times, Date.parse(next + 'T00:00:00Z') / 1000], navs: [...hist.navs, hist.navs[hist.navs.length - 1]] })
+  return same(P.target, R.target) ? null : { date: next, target: P.target, why: P.log[0]?.why || '' }
 }
 
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
@@ -282,7 +299,7 @@ function History({ R, colors, cards = true }) {
           ))}
         </div>
         {R.log.length > 6 && <button onClick={() => setAll(!all)} className="mt-3 text-xs font-semibold text-sky-300 hover:text-sky-200">{all ? 'Show fewer' : `Show all ${R.log.length} switches`}</button>}
-        <p className="text-[11px] text-[var(--text-dim)] mt-3">Back-test 2010–2026, after tax: about 24% a year with a worst fall of 17%; holding the fund alone 21% with a 39% fall. Past results do not repeat; plan with 16–18% a year.</p>
+        <p className="text-[11px] text-[var(--text-dim)] mt-3">Back-test 2010–2026, after tax, switching at the NAV after the signal (as here), never more than 80% in the fund: about 21% a year with a worst fall of 17%; holding the fund alone about 21% with a 39% fall. The rule's gain is the much smaller fall. Past results do not repeat; plan with 16–18% a year.</p>
       </div>}
     </div>
   )
@@ -396,9 +413,9 @@ function NewMoney({ R, names }) {
         <h3 className="text-sm font-bold text-[var(--text-primary)]">Investing new money</h3>
         <span className="text-xs text-[var(--text-dim)]">split by today's target · {split(R.target)}</span>
       </div>
-      <div className="px-4 py-3 grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">{field('Lumpsum today', lump, setLump)}<div className="space-y-1.5 pt-1">{K.map((k) => row(k, lump))}</div></div>
-        <div className="space-y-2">{field('Monthly SIP', sip, setSip)}<div className="space-y-1.5 pt-1">{K.map((k) => row(k, sip))}</div></div>
+      <div className="px-4 py-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-2 min-w-0">{field('Lumpsum today', lump, setLump)}<div className="space-y-1.5 pt-1">{K.map((k) => row(k, lump))}</div></div>
+        <div className="space-y-2 min-w-0">{field('Monthly SIP', sip, setSip)}<div className="space-y-1.5 pt-1">{K.map((k) => row(k, sip))}</div></div>
       </div>
       <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Any new money, a lumpsum or each SIP instalment, goes in at the current split. When the rule changes, the next switch brings the whole portfolio to the new split, so a SIP need not be re-split every time; change it when you get the switch email. Once the satellite portfolio exists, the Rebalance card below does the same maths with your actual holdings.</p>
     </div>
@@ -465,6 +482,8 @@ export default function FundRulePage() {
 
   useEffect(() => { if (!isResearch) return; setHist(undefined); getNavHistory(cfg.signal).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)) }, [isAdmin, cfg.signal])
   const R = useMemo(() => (hist ? replay(hist) : null), [hist])
+  const N = useMemo(() => (hist && R ? nextDue(hist, R) : null), [hist, R])   // a switch due at the next NAV, already known
+  const RL = useMemo(() => (R && N ? { ...R, target: N.target } : R), [R, N])  // Live works to that target from now
 
   const portfolios = (mfPortfolios || []).filter((p) => p.status !== 'Inactive')
   const holdings = useMemo(() => (mfHoldings || []).filter((h) => h.portfolioId === cfg.portfolioId && Number(h.units) > 0.0005), [mfHoldings, cfg.portfolioId])
@@ -474,26 +493,26 @@ export default function FundRulePage() {
   }, [holdings])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const plan = useMemo(() => {
-    if (!R) return null
+    if (!RL) return null
     const val = (code) => holdings.filter((h) => String(h.schemeCode) === String(code)).reduce((a, h) => a + (Number(h.currentValue) || 0), 0)
     const cur = { fund: val(cfg.fund), gold: val(cfg.gold), liq: val(cfg.liq) }
     const total = cur.fund + cur.gold + cur.liq
     const rows = ['fund', 'gold', 'liq'].map((k) => {
-      const tgt = total * R.target[k], diff = tgt - cur[k]
+      const tgt = total * RL.target[k], diff = tgt - cur[k]
       const move = Math.abs(diff) > Math.max(500, RULE.tradeBand * tgt)
       return { k, cur: cur[k], curPct: total ? cur[k] / total : 0, tgt, diff, move }
     })
     return { total, rows, moves: rows.filter((r) => r.move) }
-  }, [R, holdings, cfg.fund, cfg.gold, cfg.liq])
+  }, [RL, holdings, cfg.fund, cfg.gold, cfg.liq])
 
   // the rule's split as the satellite's target % (the app's own rebalance dialog then does buy/sell, lumpsum and SIP maths)
   const alloc = useMemo(() => {
-    if (!R || !cfg.portfolioId) return null
-    const pc = { [cfg.fund]: Math.round(R.target.fund * 100), [cfg.gold]: Math.round(R.target.gold * 100), [cfg.liq]: Math.round(R.target.liq * 100) }
+    if (!RL || !cfg.portfolioId) return null
+    const pc = { [cfg.fund]: Math.round(RL.target.fund * 100), [cfg.gold]: Math.round(RL.target.gold * 100), [cfg.liq]: Math.round(RL.target.liq * 100) }
     delete pc['']; const sum = Object.values(pc).reduce((a, b) => a + b, 0)
     if (sum !== 100 && cfg.gold in pc) pc[cfg.gold] += 100 - sum
     return holdings.map((h) => ({ schemeCode: h.schemeCode, fundName: h.fundName, targetAllocationPct: pc[String(h.schemeCode)] ?? 0 }))
-  }, [R, cfg, holdings])
+  }, [RL, cfg, holdings])
   const synced = alloc && alloc.length > 0 && alloc.every((a) => Math.abs(Number(holdings.find((h) => String(h.schemeCode) === String(a.schemeCode))?.targetAllocationPct || 0) - a.targetAllocationPct) < 0.5)
   const saveTargets = async () => {
     if (!alloc) return
@@ -535,7 +554,8 @@ export default function FundRulePage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-base font-bold text-[var(--text-primary)]">Fund rule <span className="text-xs font-medium text-[var(--text-dim)]">· index fund + gold · one satellite portfolio</span></h2>
         <div className="flex items-center gap-2 text-xs">
-          {R && <span className="px-2.5 py-1 rounded-lg font-semibold bg-sky-500/10 text-sky-300">Hold {split(R.target)}</span>}
+          {R && (N ? <span className="px-2.5 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-400">Switch at the {day(N.date).replace(/ \d{4}$/, '')} NAV to {split(N.target)}</span>
+            : <span className="px-2.5 py-1 rounded-lg font-semibold bg-sky-500/10 text-sky-300">Hold {split(R.target)}</span>)}
           <span className="text-[var(--text-dim)]">{R ? `Prices to ${day(R.asOf)}` : hist === null ? 'No price history' : 'Loading…'}</span>
           <Link to="/admin/paper" className="px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Book G (paper)</Link>
         </div>
@@ -560,16 +580,16 @@ export default function FundRulePage() {
         {/* the target today, one compact card */}
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] px-4 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Target today</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{N ? `Target from the ${day(N.date)} NAV` : 'Target today'}</p>
             <p className="text-xs text-[var(--text-dim)]">{plan?.total > 0 ? `satellite ${inr(plan.total)}` : isAdmin ? 'choose the satellite in Set-up to see amounts' : ''}</p>
           </div>
-          <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-[var(--bg-inset)]">{['fund', 'gold', 'liq'].map((k) => <div key={k} className={colors[k]} style={{ width: `${R.target[k] * 100}%` }} />)}</div>
+          <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-[var(--bg-inset)]">{['fund', 'gold', 'liq'].map((k) => <div key={k} className={colors[k]} style={{ width: `${RL.target[k] * 100}%` }} />)}</div>
           <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1.5">
             {['fund', 'gold', 'liq'].map((k) => { const r = byKey[k], has = r && cfg[k] && plan.total > 0; return (
               <div key={k} className="flex items-center gap-2 text-sm min-w-0">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${colors[k]}`} />
                 <span className="text-[var(--text-secondary)] truncate">{names[k]}</span>
-                <span className="font-bold tabular-nums text-[var(--text-primary)]">{Math.round(R.target[k] * 100)}%</span>
+                <span className="font-bold tabular-nums text-[var(--text-primary)]">{Math.round(RL.target[k] * 100)}%</span>
                 {has && <span className="text-xs text-[var(--text-dim)] tabular-nums">now {Math.round(r.curPct * 100)}%</span>}
                 {has && r.move && <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold ${r.diff > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>{(r.diff > 0 ? 'BUY ' : 'SELL ') + inr(Math.abs(r.diff))}</span>}
               </div>) })}
@@ -582,11 +602,12 @@ export default function FundRulePage() {
             <span className="text-xs text-[var(--text-dim)]">next check Monday, on Friday's NAV · and the first trading day of the month</span>
           </div>
           <div className="px-4 py-3 space-y-2">
-            {last && <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-[var(--text-secondary)]">Rule changed on {day(last.date)} to {split(last.target)}:</span> {last.why}.</p>}
+            {N ? <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">Rule changes at the {day(N.date)} NAV to {split(N.target)}:</span> {N.why}. Decided on the {day(R.asOf)} NAV, so the switch can be placed before that day's cut-off.</p>
+              : last && <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-[var(--text-secondary)]">Rule changed on {day(last.date)} to {split(last.target)}:</span> {last.why}.</p>}
             {!ready ? (
-              <p className="text-sm text-[var(--text-dim)]">{isAdmin ? 'Choose the satellite portfolio and its three funds in Set-up; the buy and sell amounts appear here whenever the rule changes.' : 'The rule says: hold ' + split(R.target) + '.'}</p>
+              <p className="text-sm text-[var(--text-dim)]">{isAdmin ? 'Choose the satellite portfolio and its three funds in Set-up; the buy and sell amounts appear here whenever the rule changes.' : 'The rule says: hold ' + split(RL.target) + (N ? ` from the ${day(N.date)} NAV` : '') + '.'}</p>
             ) : !due ? (
-              <p className="text-sm font-semibold text-emerald-400">The satellite already follows the rule ({split(R.target)}, within 5%). Nothing to do until the rule changes.</p>
+              <p className="text-sm font-semibold text-emerald-400">The satellite already follows the rule ({split(RL.target)}, within 5%). Nothing to do until the rule changes.</p>
             ) : plan.moves.map((r) => { const h = holdings.find((x) => String(x.schemeCode) === String(cfg[r.k])); const nav = Number(h?.currentNav) || 0; return (
               <div key={r.k} className="flex items-baseline gap-3 flex-wrap text-sm">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.diff > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-[var(--accent-rose)]'}`}>{r.diff > 0 ? 'BUY' : 'SELL'}</span>
@@ -598,7 +619,7 @@ export default function FundRulePage() {
             {due && <p className="text-[11px] text-[var(--text-dim)]">Sell first, buy when the money arrives (1–3 working days). Units are at the last NAV; the order fills at the next NAV. The email tells you the same day the rule changes. Rule output, not advice.</p>}
           </div>
         </div>) })()}
-        <NewMoney R={R} names={{ fund: (cfg.fund && holdings.find((h) => String(h.schemeCode) === String(cfg.fund))?.fundName) || PAPER.names.fund, gold: (cfg.gold && holdings.find((h) => String(h.schemeCode) === String(cfg.gold))?.fundName) || PAPER.names.gold, liq: (cfg.liq && holdings.find((h) => String(h.schemeCode) === String(cfg.liq))?.fundName) || PAPER.names.liq }} />
+        <NewMoney R={RL} names={{ fund: (cfg.fund && holdings.find((h) => String(h.schemeCode) === String(cfg.fund))?.fundName) || PAPER.names.fund, gold: (cfg.gold && holdings.find((h) => String(h.schemeCode) === String(cfg.gold))?.fundName) || PAPER.names.gold, liq: (cfg.liq && holdings.find((h) => String(h.schemeCode) === String(cfg.liq))?.fundName) || PAPER.names.liq }} />
         {isAdmin && cfg.portfolioId && real && <RealReturns real={real} />}
         {firstTxn && <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} fixed={firstTxn} title="₹100 since my first investment" note="What the rule would have done with ₹100 from the day the satellite got its first transaction, next to the funds held alone." />}
       </>)}
@@ -615,7 +636,7 @@ export default function FundRulePage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             ['12 months', R.r12 >= RULE.hi ? 'strong' : R.r12 < RULE.lo ? 'weak' : 'normal', `The fund ${R.r12 < 0 ? 'fell' : 'rose'} ${ap(R.r12)} in a year`, R.e === RULE.eLo ? 'Base share 20%' : R.e === RULE.eHi ? 'Base share 80%' : 'Base share 50%', R.e === RULE.eMid ? 'ok' : R.e === RULE.eLo ? 'warn' : 'good'],
-            ['Recent weeks', R.x < 1 ? 'guard on' : R.up ? 'notch up' : 'quiet', `${ap(R.gap)} ${R.gap < 0 ? 'below' : 'above'} the 50-day average`, R.x < 1 ? 'Half the fund money parked in gold' : R.up ? 'One step more in the fund' : 'Base share stays', R.x < 1 ? 'warn' : R.up ? 'good' : 'ok'],
+            ['Recent weeks', R.x < 1 ? 'guard on' : R.up ? 'notch up' : 'quiet', `${ap(R.gap)} ${R.gap < 0 ? 'below' : 'above'} the 50-day average`, R.x < 1 ? 'Half the fund money parked in gold' : R.up ? (R.e >= RULE.fundMax ? 'Already at the 80% maximum' : 'One step more in the fund') : 'Base share stays', R.x < 1 ? 'warn' : R.up ? 'good' : 'ok'],
             ['Sharp fall', R.fast ? 'yes' : 'no', `${ap(R.fgap)} ${R.fgap < 0 ? 'below' : 'above'} the 20-day average`, R.fast ? 'All fund money waits in liquid' : 'Nothing moved to liquid for this', R.fast ? 'bad' : 'ok'],
             ['Gold limit', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? 'hit' : 'not hit', 'Gold is never more than 60%', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `${Math.round(R.target.liq * 100)}% waits in liquid instead` : 'All the rest is in gold', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? 'warn' : 'ok'],
           ].map(([t, state, l1, l2, tone]) => (
