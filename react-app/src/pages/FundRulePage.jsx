@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext'
 import MFRebalanceDialog from '../components/forms/MFRebalanceDialog'
 import { getNavHistory, getNavHistories } from '../utils/navHistory'
 import { getResearchViewers, setResearchViewers } from '../services/api'
+import { RULE, ap, pct, day, iso, targets, same, split, replay, nextDue, checks } from '../utils/fundRule'
 
 // Hidden admin page (/admin/fund-rule): the index-fund + gold rule (paper book G) applied to ONE real mutual-fund portfolio,
 // the "satellite". Reads daily NAVs from api.mfapi.in (same source as the fund charts), replays the rule up to the last NAV
@@ -20,8 +21,6 @@ import { getResearchViewers, setResearchViewers } from '../services/api'
 //    2% above -> one notch up (50 -> 80); in between -> the monthly share; never more than 80% in the fund
 //  crash guard, vs the 20-day average: 4% below -> the whole fund sleeve into the liquid fund until back above the average
 //  gold never above 60%: the excess waits in the liquid fund. A sleeve is moved only when > 5% off its target.
-const RULE = { lo: 0, hi: 0.20, eLo: 0.2, eMid: 0.5, eHi: 0.8, k: 50, band: 0.02, cut: 0.5, notch: { 0.5: 0.8, 0.8: 1 }, fundMax: 0.8,
-  fastK: 20, fastBand: 0.04, goldCap: 0.6, tradeBand: 0.05, look: 248 }
 const SIGNAL_FUNDS = [[150738, 'Tata Nifty Midcap 150 Momentum 50 Index Fund (Direct)'], [150902, 'Edelweiss Nifty Midcap150 Momentum 50 Index Fund (Direct)'], [152916, 'Kotak Nifty Midcap 150 Momentum 50 Index Fund (Direct)']]
 const LS = 'cf-fund-rule'
 const DEFAULT_GOLD = 118663, DEFAULT_LIQ = 119861, MIDCAP150 = 147622   // Nippon India Gold Savings, Tata Liquid, Motilal Oswal Nifty Midcap 150 Index (direct, growth)
@@ -32,67 +31,6 @@ const PAPER = { start: '2026-10-23', amount: 1000000, fund: 152916, gold: 119781
 const TAX = { fund: [0.20, 0.125], gold: [0.30, 0.125], liq: [0.30, 0.30] }   // [held < 1 year, held >= 1 year], as in fund.py
 
 const inr = (v) => (v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN'))
-const ap = (v, d = 1) => (v == null ? '—' : (Math.abs(v) * 100).toFixed(d) + '%')   // size of a move, no sign
-const pct = (v, d = 1) => (v == null ? '—' : (v > 0 ? '+' : '') + (v * 100).toFixed(d) + '%')
-const day = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
-const iso = (t) => new Date(t * 1000).toISOString().slice(0, 10)
-const isoWeek = (d) => { const x = new Date(d + 'T00:00:00Z'); const n = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - n + 3); const y = x.getUTCFullYear(); const j4 = new Date(Date.UTC(y, 0, 4)); return y + '-' + Math.round(1 + ((x - j4) / 864e5 - 3 + ((j4.getUTCDay() + 6) % 7)) / 7) }
-const trendE = (r) => (r < RULE.lo ? RULE.eLo : r > RULE.hi ? RULE.eHi : RULE.eMid)
-const fundShare = (e, x, up) => Math.min(RULE.fundMax, x < 1 ? e * x : up ? (RULE.notch[e] ?? e) : e)   // never above 80% (fund.py fund_max)
-function targets(e, x, up, fast) {
-  const fs = fundShare(e, x, up)
-  const w = fast ? { fund: 0, gold: 1 - fs, liq: fs } : { fund: fs, gold: 1 - fs, liq: 0 }
-  if (w.gold > RULE.goldCap) { w.liq += w.gold - RULE.goldCap; w.gold = RULE.goldCap }
-  return w
-}
-const same = (a, b) => a && b && Math.abs(a.fund - b.fund) < 1e-9 && Math.abs(a.gold - b.gold) < 1e-9
-const split = (w) => `${Math.round(w.fund * 100)}% fund / ${Math.round(w.gold * 100)}% gold${w.liq > 0.001 ? ` / ${Math.round(w.liq * 100)}% liquid` : ''}`
-
-/** Replay the rule over the NAV history exactly as fund.py does (decide at the month's / week's last NAV, act at the next). */
-function replay(hist) {
-  const dates = hist.times.map(iso), nav = hist.navs, n = nav.length
-  const mean = (i, k) => { let s = 0; for (let j = i - k + 1; j <= i; j++) s += nav[j]; return s / k }
-  const S = { e: null, x: 1, up: false, fast: false, r12: null, gap: null, fgap: null, target: null }
-  const log = [], series = []
-  for (let i = RULE.look + 5; i < n; i++) {
-    const d = dates[i], p = dates[i - 1], why = []
-    if (S.e == null || d.slice(0, 7) !== p.slice(0, 7)) {              // new month: trend from the previous month's last NAV
-      S.r12 = nav[i - 1] / nav[i - 1 - RULE.look] - 1; const e = trendE(S.r12)
-      if (S.e != null && e !== S.e) why.push(`Over the last 12 months the fund ${S.r12 < 0 ? 'fell' : 'rose'} ${ap(S.r12)}, so the base share in the fund is now ${e * 100}%`)
-      S.e = e
-    }
-    if (S.gap == null || isoWeek(d) !== isoWeek(p)) {                    // new week: guards from last week's last NAV
-      S.gap = nav[i - 1] / mean(i - 1, RULE.k) - 1; let x = S.x; const up = S.gap > RULE.band
-      if (S.gap < -RULE.band) x = 1 - RULE.cut; else if (S.gap > RULE.band) x = 1
-      if (x !== S.x) why.push(x < 1 ? `The fund dropped ${ap(S.gap)} below its 50-day average: half the fund money moved to gold` : `The fund is back ${pct(S.gap)} above its 50-day average: the fund money comes back`)
-      if (up !== S.up && x === 1) why.push(up ? `The fund is ${pct(S.gap)} above its 50-day average (rising well): one step more in the fund` : `The fund is only ${pct(S.gap)} vs its 50-day average: back to the base share`)
-      S.x = x; S.up = up
-      S.fgap = nav[i - 1] / mean(i - 1, RULE.fastK) - 1; let fast = S.fast
-      if (S.fgap < -RULE.fastBand) fast = true; else if (S.fgap > 0) fast = false
-      if (fast !== S.fast) why.push(fast ? `Sharp fall: the fund is ${ap(S.fgap)} below its 20-day average, so all fund money waits in the liquid fund` : `The sharp fall is over (fund back above its 20-day average): fund money goes back in`)
-      S.fast = fast
-    }
-    const t = targets(S.e, S.x, S.up, S.fast)
-    if (!same(t, S.target)) log.push({ date: d, why: why.join('. ') || 'Start of the history', target: t })
-    S.target = t; series.push([d, nav[i], t.fund, t.gold, t.liq])
-  }
-  return { ...S, asOf: dates[n - 1], nav: nav[n - 1], log: log.slice().reverse(), series: series.slice(-260), full: series, days: n }
-}
-
-/** A switch due at the next NAV is known before that NAV is out: when the last NAV closed its week (Friday's NAV, seen on the
- *  weekend or on Monday morning) or its month (seen on the 1st). Only when the last NAV is from the previous weekday or later,
- *  so a late NAV is never taken for the week's last one. Returns { date, target, why } of that switch, or null. */
-function nextDue(hist, R) {
-  const add = (d, k) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10) }
-  const wd = (d) => new Date(d + 'T00:00:00Z').getUTCDay()
-  const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)   // date in India
-  let prev = add(today, -1); while (wd(prev) === 0 || wd(prev) === 6) prev = add(prev, -1)
-  let next = wd(today) === 6 ? add(today, 2) : wd(today) === 0 ? add(today, 1) : today
-  if (R.asOf >= next) { next = add(R.asOf, 1); while (wd(next) === 0 || wd(next) === 6) next = add(next, 1) }   // today's NAV is already in
-  if (R.asOf < prev || (isoWeek(next) === isoWeek(R.asOf) && next.slice(0, 7) === R.asOf.slice(0, 7))) return null
-  const P = replay({ times: [...hist.times, Date.parse(next + 'T00:00:00Z') / 1000], navs: [...hist.navs, hist.navs[hist.navs.length - 1]] })
-  return same(P.target, R.target) ? null : { date: next, target: P.target, why: P.log[0]?.why || '' }
-}
 
 const detect = (hs, re) => hs.find((h) => re.test(h.fundName || ''))?.schemeCode || ''
 
@@ -458,7 +396,7 @@ function Viewers() {
     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
       <div className="px-4 py-2.5 border-b border-[var(--border-light)] flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-sm font-bold text-[var(--text-primary)]">Who else can see these pages</h3>
-        <span className="text-xs text-[var(--text-dim)]">{list ? `${list.length} viewer${list.length === 1 ? '' : 's'}` : 'loading…'} · they get Fund rule + Paper books, read-only; Found us stays yours</span>
+        <span className="text-xs text-[var(--text-dim)]">{list ? `${list.length} viewer${list.length === 1 ? '' : 's'}` : 'loading…'} · they get Fund rule + Stock rule, read-only; Found us stays yours</span>
       </div>
       <div className="px-4 py-3 grid gap-2 md:grid-cols-[1fr_auto] items-start">
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="one email per line" className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] px-2.5 py-1.5 text-sm text-[var(--text-primary)]" />
@@ -484,6 +422,7 @@ export default function FundRulePage() {
   const R = useMemo(() => (hist ? replay(hist) : null), [hist])
   const N = useMemo(() => (hist && R ? nextDue(hist, R) : null), [hist, R])   // a switch due at the next NAV, already known
   const RL = useMemo(() => (R && N ? { ...R, target: N.target } : R), [R, N])  // Live works to that target from now
+  const C = R ? checks(R, N) : null   // the Rule tab's four checks (the newer ones when a switch is due)
 
   const portfolios = (mfPortfolios || []).filter((p) => p.status !== 'Inactive')
   const holdings = useMemo(() => (mfHoldings || []).filter((h) => h.portfolioId === cfg.portfolioId && Number(h.units) > 0.0005), [mfHoldings, cfg.portfolioId])
@@ -557,7 +496,7 @@ export default function FundRulePage() {
           {R && (N ? <span className="px-2.5 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-400">Switch at the {day(N.date).replace(/ \d{4}$/, '')} NAV to {split(N.target)}</span>
             : <span className="px-2.5 py-1 rounded-lg font-semibold bg-sky-500/10 text-sky-300">Hold {split(R.target)}</span>)}
           <span className="text-[var(--text-dim)]">{R ? `Prices to ${day(R.asOf)}` : hist === null ? 'No price history' : 'Loading…'}</span>
-          <Link to="/admin/paper" className="px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Book G (paper)</Link>
+          <Link to="/admin/paper" className="px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Stock rule (H)</Link>
         </div>
       </div>
       {hist === null && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-400">Could not load the fund's price history (api.mfapi.in). Try another fund below.</div>}
@@ -635,20 +574,20 @@ export default function FundRulePage() {
         {/* why: four checks */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            ['12 months', R.r12 >= RULE.hi ? 'strong' : R.r12 < RULE.lo ? 'weak' : 'normal', `The fund ${R.r12 < 0 ? 'fell' : 'rose'} ${ap(R.r12)} in a year`, R.e === RULE.eLo ? 'Base share 20%' : R.e === RULE.eHi ? 'Base share 80%' : 'Base share 50%', R.e === RULE.eMid ? 'ok' : R.e === RULE.eLo ? 'warn' : 'good'],
-            ['Recent weeks', R.x < 1 ? 'guard on' : R.up ? 'notch up' : 'quiet', `${ap(R.gap)} ${R.gap < 0 ? 'below' : 'above'} the 50-day average`, R.x < 1 ? 'Half the fund money parked in gold' : R.up ? (R.e >= RULE.fundMax ? 'Already at the 80% maximum' : 'One step more in the fund') : 'Base share stays', R.x < 1 ? 'warn' : R.up ? 'good' : 'ok'],
-            ['Sharp fall', R.fast ? 'yes' : 'no', `${ap(R.fgap)} ${R.fgap < 0 ? 'below' : 'above'} the 20-day average`, R.fast ? 'All fund money waits in liquid' : 'Nothing moved to liquid for this', R.fast ? 'bad' : 'ok'],
-            ['Gold limit', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? 'hit' : 'not hit', 'Gold is never more than 60%', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? `${Math.round(R.target.liq * 100)}% waits in liquid instead` : 'All the rest is in gold', R.target.gold >= RULE.goldCap - 1e-9 && R.target.liq > 0.001 ? 'warn' : 'ok'],
+            ['12 months', C.r12 >= RULE.hi ? 'strong' : C.r12 < RULE.lo ? 'weak' : 'normal', `The fund ${C.r12 < 0 ? 'fell' : 'rose'} ${ap(C.r12)} in a year`, C.e === RULE.eLo ? 'Base share 20%' : C.e === RULE.eHi ? 'Base share 80%' : 'Base share 50%', C.e === RULE.eMid ? 'ok' : C.e === RULE.eLo ? 'warn' : 'good'],
+            ['Recent weeks', C.x < 1 ? 'guard on' : C.up ? 'notch up' : 'quiet', `${ap(C.gap)} ${C.gap < 0 ? 'below' : 'above'} the 50-day average`, C.x < 1 ? 'Half the fund money parked in gold' : C.up ? (C.e >= RULE.fundMax ? 'Already at the 80% maximum' : 'One step more in the fund') : 'Base share stays', C.x < 1 ? 'warn' : C.up ? 'good' : 'ok'],
+            ['Sharp fall', C.fast ? 'yes' : 'no', `${ap(C.fgap)} ${C.fgap < 0 ? 'below' : 'above'} the 20-day average`, C.fast ? 'All fund money waits in liquid' : 'Nothing moved to liquid for this', C.fast ? 'bad' : 'ok'],
+            ['Gold limit', C.goldOver > 0.001 ? 'hit' : 'not hit', 'Gold is never more than 60%', C.goldOver > 0.001 ? `${Math.round(C.goldOver * 100)}% waits in liquid instead` : 'All the rest is in gold', C.goldOver > 0.001 ? 'warn' : 'ok'],
           ].map(([t, state, l1, l2, tone]) => (
             <div key={t} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 min-w-0">
               <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t}</p>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${tone === 'good' ? 'bg-emerald-500/15 text-emerald-400' : tone === 'warn' ? 'bg-amber-500/15 text-amber-400' : tone === 'bad' ? 'bg-rose-500/15 text-[var(--accent-rose)]' : 'bg-[var(--bg-inset)] text-[var(--text-muted)]'}`}>{state}</span></div>
+                <span className={`shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${tone === 'good' ? 'bg-emerald-500/15 text-emerald-400' : tone === 'warn' ? 'bg-amber-500/15 text-amber-400' : tone === 'bad' ? 'bg-rose-500/15 text-[var(--accent-rose)]' : 'bg-[var(--bg-inset)] text-[var(--text-muted)]'}`}>{state}</span></div>
               <p className="mt-1.5 text-sm text-[var(--text-primary)]">{l1}</p>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">{l2}</p>
             </div>
           ))}
         </div>
-        <p className="text-xs text-[var(--text-dim)] -mt-1">Decided on the week's last price (Friday) and the month's last price. Check on Monday mornings, or wait for the email.</p>
+        <p className="text-xs text-[var(--text-dim)] -mt-1">{N ? `Checks from the ${day(R.asOf)} NAV; the switch is at the ${day(N.date)} NAV. ` : ''}Decided on the week's last price (Friday) and the month's last price. Check on Monday mornings, or wait for the email.</p>
         <History R={R} colors={colors} />
         <Growth R={R} goldCode={cfg.gold || DEFAULT_GOLD} liqCode={cfg.liq || DEFAULT_LIQ} defaultStart={firstTxn} />
       </>)}

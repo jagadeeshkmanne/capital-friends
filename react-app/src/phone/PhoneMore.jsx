@@ -37,13 +37,13 @@ const GROUPS = [
 
 const Icon = ({ I, c }) => <span slot="start" className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${c}22`, color: c }}><I size={19} /></span>
 
-// Admin (only the admin email) or Research (emails the admin shared the fund rule and paper books with); same links
+// Admin (only the admin email) or Research (emails the admin shared the fund rule and stock rule with); same links
 // as the profile menu on a laptop. Shown first so it is found without scrolling.
 function ResearchGroup() {
   const navigate = useNavigate()
   const { isAdmin, isResearch } = useAuth()
   if (!isResearch) return null
-  const items = [['Fund rule', 'Index fund + gold rule', Scale, '/admin/fund-rule', '#38bdf8'], ['Paper books', 'Momentum paper trading', FlaskConical, '/admin/paper', '#a78bfa']]
+  const items = [['Fund rule', 'Index fund + gold rule', Scale, '/admin/fund-rule', '#38bdf8'], ['Stock rule', '15 momentum stocks + gold rule', FlaskConical, '/admin/paper', '#a3e635']]
   if (isAdmin) items.push(['Found us', 'How families heard about the app', Compass, '/admin/found-us', '#34d399'])
   return (
     <>

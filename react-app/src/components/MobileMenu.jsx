@@ -98,7 +98,7 @@ export default function MobileMenu() {
         </div>
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2">
-          {(isResearch ? [...GROUPS, { t: isAdmin ? 'Admin · only you' : 'Research · shared with you', items: [{ label: 'Fund rule', icon: Settings, path: '/admin/fund-rule', desc: 'Index fund + gold' }, { label: 'Paper books', icon: BarChart3, path: '/admin/paper', desc: 'Momentum paper trading' }].concat(isAdmin ? [{ label: 'Found us', icon: Info, path: '/admin/found-us' }] : []) }] : GROUPS).map((g) => (
+          {(isResearch ? [...GROUPS, { t: isAdmin ? 'Admin · only you' : 'Research · shared with you', items: [{ label: 'Fund rule', icon: Settings, path: '/admin/fund-rule', desc: 'Index fund + gold' }, { label: 'Stock rule', icon: BarChart3, path: '/admin/paper', desc: '15 momentum stocks + gold' }].concat(isAdmin ? [{ label: 'Found us', icon: Info, path: '/admin/found-us' }] : []) }] : GROUPS).map((g) => (
             <div key={g.t} className="pb-1">
               <p className="px-5 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{g.t}</p>
               {g.items.map((it) => {
