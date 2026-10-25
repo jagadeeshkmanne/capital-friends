@@ -90,9 +90,9 @@ function BigChart({ data, sym, livePrice, onClose }) {
     </Modal>, document.body)
 }
 
-const BOOK_DOT = { A: 'bg-emerald-400', B: 'bg-violet-400', C: 'bg-blue-400', D: 'bg-amber-400', E: 'bg-pink-400', F: 'bg-cyan-400' }
-const BOOK_RING = { A: 'ring-emerald-400 border-emerald-400', B: 'ring-violet-400 border-violet-400', C: 'ring-blue-400 border-blue-400', D: 'ring-amber-400 border-amber-400', E: 'ring-pink-400 border-pink-400', F: 'ring-cyan-400 border-cyan-400' }
-const BOOK_NAME = { A: 'Momentum', B: 'Momentum + Safety', C: 'Momentum + Quality', D: 'Top 10 Common', E: 'Momentum · Top 1000', F: 'Fresh momentum · 1000' }
+const BOOK_DOT = { A: 'bg-emerald-400', B: 'bg-violet-400', C: 'bg-blue-400', D: 'bg-amber-400', E: 'bg-pink-400', F: 'bg-cyan-400', H: 'bg-lime-400' }
+const BOOK_RING = { A: 'ring-emerald-400 border-emerald-400', B: 'ring-violet-400 border-violet-400', C: 'ring-blue-400 border-blue-400', D: 'ring-amber-400 border-amber-400', E: 'ring-pink-400 border-pink-400', F: 'ring-cyan-400 border-cyan-400', H: 'ring-lime-400 border-lime-400' }
+const BOOK_NAME = { A: 'Momentum', B: 'Momentum + Safety', C: 'Momentum + Quality', D: 'Top 10 Common', E: 'Momentum · Top 1000', F: 'Fresh momentum · 1000', H: "Momentum 15 · G's rule" }
 // value of a book at live prices (falls back to the last close for anything without a live price)
 const liveValue = (b, lp) => (b?.holdings || []).reduce((a, [s, q, , px, val]) => a + (s === 'LIQUIDCASE' ? val : q * (lp?.[s]?.price ?? px)), 0)
 const sgn = (v) => (v == null ? '' : v >= 0 ? '+' : '−')
@@ -207,7 +207,7 @@ export default function PaperBookPage() {
   if (err) return <p className="text-sm text-[var(--accent-rose)] p-4">{err}</p>
   if (data === undefined) return <p className="text-sm text-[var(--text-dim)] p-4">Loading…</p>
   if (!data) return <p className="text-sm text-[var(--text-dim)] p-4">No paper-book snapshot yet. It appears after the next scheduled run.</p>
-  if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The four paper books (A Momentum, B Momentum + Safety, C Momentum + Quality, D Top 10 Common) open together on ${day(data.start_on)}.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
+  if (!view) return <p className="text-sm text-[var(--text-dim)] p-4">{data.start_on ? `The paper books open on ${day(data.start_on)}.` : 'No paper-book snapshot yet. It appears after the next scheduled run.'}</p>
 
   const half = b.x < 1
   const tot = Math.max(1, view.liveNav)
@@ -225,16 +225,24 @@ export default function PaperBookPage() {
   }
   const vsMix = (x, v) => { const m = mixNow(x); return m ? (v / m - 1) * 100 : null }
   const mixLabel = (x) => `${Math.round((1 - (x.mix_gold ?? 0.35)) * 100)}/${Math.round((x.mix_gold ?? 0.35) * 100)} mix`
-  // best strategy so far: highest return since the start at live prices
-  const perf = keys.map((k) => { const x = data.books[k], v = liveValue(x, live?.prices); return { k, ret: x.invested ? (v / x.invested - 1) * 100 : 0 } }).sort((p1, p2) => p2.ret - p1.ret)
-  const lead = perf.length > 1 ? perf[0] : null
-  const close = lead && perf[0].ret - perf[1].ret < 0.05   // under 0.05 points apart: practically level
+  // best strategy so far: return at live prices, counted from the same day for every book (the latest start; H opened
+  // two days after F, so F's first two days are left out of this comparison)
+  const common = keys.map((k) => data.books[k].start || '').sort().pop() || ''
+  const sameStart = keys.every((k) => (data.books[k].start || '') === common)
+  const unitAt = (x, d) => (x.unit_nav || []).reduce((v, [dd, n]) => (dd <= d ? n : v), null)
+  const retFrom = (x, v) => {
+    const u = x.unit_nav || [], last = u.length ? u[u.length - 1][1] : null, base = sameStart ? null : unitAt(x, common)
+    return last && base && x.nav ? ((last / base) * (v / x.nav) - 1) * 100 : x.invested ? (v / x.invested - 1) * 100 : 0
+  }
+  const perf = keys.map((k) => { const x = data.books[k], v = liveValue(x, live?.prices); return { k, ret: retFrom(x, v) } }).sort((p1, p2) => p2.ret - p1.ret)
+  const lead = perf.length > 1 && perf[0].ret - perf[1].ret >= 0.05 ? perf[0] : null   // under 0.05 points apart: level
   // plain words for the market comparison: ahead / behind the Nifty 500 by x%
   const vsTone = (d) => (d == null || Math.abs(d) < 0.05 ? 'text-[var(--text-muted)]' : tone(d))
   // the BOOK compared with the Nifty 500 since the start: beating = book did better than the market
   const vsWord = (d) => (d == null ? '—' : Math.abs(d) < 0.05 ? 'Same as Nifty 500' : d > 0 ? `Beating Nifty 500 by ${Math.abs(d).toFixed(1)}%` : `Trailing Nifty 500 by ${Math.abs(d).toFixed(1)}%`)
   const days = b.start ? Math.max(0, Math.round((Date.now() - new Date(b.start + 'T00:00:00+05:30').getTime()) / 86400e3)) : 0
-  const nRet = nLive && nBase && b.bench ? (benchNow(b) / b.invested - 1) * 100 : null
+  const cb = data.books[keys.find((k) => (data.books[k].start || '') === common)] || b   // Nifty 500 from the same day
+  const nRet = nLive && nBase && cb.bench ? (benchNow(cb) / cb.invested - 1) * 100 : null
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
@@ -242,9 +250,15 @@ export default function PaperBookPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-base font-bold text-[var(--text-primary)]">Paper books <span className="text-xs font-medium text-[var(--text-dim)]">· ₹10 lakh each · started {day(b.start)}</span></h2>
         <div className="flex items-center gap-2 text-xs">
-          <span className={`px-2.5 py-1 rounded-lg font-semibold ${half ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-            {half ? 'Half-cut on · stocks 50%' : 'Fully invested'}
-          </span>
+          {b.split ? (
+            <span className="px-2.5 py-1 rounded-lg font-semibold bg-lime-500/10 text-lime-400" title="H's money split comes from the fund rule (G): 12-month trend, weekly 50-day guard, 20-day crash guard">
+              G's rule · stocks {Math.round(b.split.FUND * 100)} / gold {Math.round(b.split.GOLD * 100)} / liquid {Math.round(b.split.LIQ * 100)}%
+            </span>
+          ) : (
+            <span className={`px-2.5 py-1 rounded-lg font-semibold ${half ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+              {half ? 'Half-cut on · stocks 50%' : 'Fully invested'}
+            </span>
+          )}
           {open && live && <span className="flex items-center gap-1.5 text-emerald-400 font-semibold"><span className="relative flex w-2 h-2"><span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" /><span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-400" /></span>Live</span>}
           <span className="text-[var(--text-dim)]">{liveAt ? `${open ? 'Updated' : 'Last price'} ${liveAt}${open ? ' · every minute' : ''}` : `Closing prices ${day(data.updated)}`}</span>
           <button onClick={() => loadLive(data)} disabled={liveBusy} title="Refresh live prices"
@@ -262,19 +276,20 @@ export default function PaperBookPage() {
 
       {/* best strategy so far */}
       <div className="flex items-center gap-2 flex-wrap rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-sm">
-        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Best so far</span>
-        {lead ? <>
-          <span className={`w-2 h-2 rounded-full ${BOOK_DOT[lead.k] || 'bg-slate-400'}`} />
-          <span className="font-bold text-[var(--text-primary)]">{lead.k} · {BOOK_NAME[lead.k] || lead.k}</span>
-          <span className={`font-semibold tabular-nums ${tone(lead.ret)}`}>{pct(lead.ret)}</span>
-          {close && <span className="text-xs text-[var(--text-dim)]">(just ahead of {perf[1].k})</span>}
-          <span className="w-full sm:w-auto text-xs text-[var(--text-dim)] tabular-nums">{perf.map((x) => `${x.k} ${pct(x.ret)}`).join(' > ')}{nRet != null ? ` · Nifty 500 ${pct(nRet)}` : ''}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">Best so far{sameStart ? '' : ` · since ${day(common)}`}</span>
+        {perf.length > 1 ? <>
+          {lead ? <>
+            <span className={`w-2 h-2 rounded-full ${BOOK_DOT[lead.k] || 'bg-slate-400'}`} />
+            <span className="font-bold text-[var(--text-primary)]">{lead.k} · {BOOK_NAME[lead.k] || lead.k}</span>
+            <span className={`font-semibold tabular-nums ${tone(lead.ret)}`}>{pct(lead.ret)}</span>
+          </> : <span className="font-semibold text-[var(--text-muted)]">Level so far</span>}
+          <span className="w-full sm:w-auto text-xs text-[var(--text-dim)] tabular-nums">{perf.map((x) => `${x.k} ${pct(Math.abs(x.ret) < 0.05 ? 0 : x.ret)}`).join(lead ? ' > ' : ' · ')}{nRet != null ? ` · Nifty 500 ${pct(nRet)}` : ''}</span>
         </> : <span className="text-[var(--text-muted)]">—</span>}
         <span className="ml-auto text-xs text-[var(--text-dim)]">Day {days + 1} · judge after about 3 months</span>
       </div>
 
-      {/* the four books: tap one to see its numbers and holdings */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" role="tablist">
+      {/* the books: tap one to see its numbers and holdings */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3" role="tablist">
         {(() => {
           const inv = keys.reduce((a, k) => a + data.books[k].invested, 0), val = keys.reduce((a, k) => a + liveValue(data.books[k], live?.prices), 0), g = val - inv
           return (
@@ -350,10 +365,7 @@ export default function PaperBookPage() {
                       <td className={`${TD} text-right`}>{num(q)}</td>
                       <td className={`${TD} text-right`}>{num(avg)}</td>
                       <td className={`${TD} text-right transition-colors duration-700 ${flash[s] === 'up' ? 'bg-emerald-500/20 text-emerald-300' : flash[s] === 'down' ? 'bg-rose-500/20 text-rose-300' : ''}`}>{num(price)}</td>
-                      <td className={`${TD} text-right ${tone(todayPct)}`} title={todayPct != null && todayPct <= -8 && !g && !lq ? 'Big fall: if it closes 10%+ down on heavy volume, B, C and D sell it at the next open' : undefined}>
-                        {todayPct != null && todayPct <= -8 && !g && !lq && <span className="mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-400">WATCH</span>}
-                        {todayPct == null ? '—' : pct(todayPct)}
-                      </td>
+                      <td className={`${TD} text-right ${tone(todayPct)}`}>{todayPct == null ? '—' : pct(todayPct)}</td>
                       <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(value)}</td>
                       <td className={`${TD} text-right font-semibold ${tone(pnl)}`}>{pnlAmt == null ? '—' : <>{sgn(pnlAmt)}{inr(Math.abs(pnlAmt))}</>}</td><td className={`${TD} text-right ${tone(pnl)}`}>{pnl == null ? '—' : pct(pnl)}</td>
                       <td className={`${TD} text-left`}>
@@ -373,7 +385,7 @@ export default function PaperBookPage() {
         </div>
 
       </div>
-      <p className="text-xs text-[var(--text-dim)]">Tap a stock for its chart · paper trading only · information, not advice</p>
+      <p className="text-xs text-[var(--text-dim)]">Tap a stock for its chart · paper trading only · information, not advice · books A to F were retired on 24 Oct 2026 (final values on the Momentum Paper Books page); H holds its own 15 stocks, at most 70% of the book</p>
       {chartSym && <BigChart data={data} sym={chartSym} livePrice={livePx(chartSym)} onClose={() => setChartSym(null)} />}
     </div>
   )
