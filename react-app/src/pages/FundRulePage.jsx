@@ -85,7 +85,7 @@ function PaperBook({ R }) {
   const [hs, setHs] = useState(null)
   const [all, setAll] = useState(false)
   const fundNames = PAPER.names
-  useEffect(() => { let on = true; getNavHistories([String(PAPER.fund), String(PAPER.gold), String(PAPER.liq)]).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [])
+  useEffect(() => { let on = true; getNavHistories([String(PAPER.fund), String(PAPER.gold), String(PAPER.liq)], 6, { fresh: true }).then((m) => { if (on) setHs(m) }); return () => { on = false } }, [])
   const B = useMemo(() => {
     if (!hs) return null
     const look = (code) => { const h = hs.get(String(code)); return h ? new Map(h.times.map((t, i) => [iso(t), h.navs[i]])) : null }
@@ -418,7 +418,7 @@ export default function FundRulePage() {
   const setTab = (t) => { setTabState(t); try { localStorage.setItem(LS + '-tab', t) } catch { /* ignore */ } }
   const set = (k, v) => setCfg((c) => { const n = { ...c, [k]: v }; try { localStorage.setItem(LS, JSON.stringify(n)) } catch { /* ignore */ } return n })
 
-  useEffect(() => { if (!isResearch) return; setHist(undefined); getNavHistory(cfg.signal).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)) }, [isAdmin, cfg.signal])
+  useEffect(() => { if (!isResearch) return; setHist(undefined); getNavHistory(cfg.signal, { fresh: true }).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)) }, [isAdmin, cfg.signal])
   const R = useMemo(() => (hist ? replay(hist) : null), [hist])
   const N = useMemo(() => (hist && R ? nextDue(hist, R) : null), [hist, R])   // a switch due at the next NAV, already known
   const RL = useMemo(() => (R && N ? { ...R, target: N.target } : R), [R, N])  // Live works to that target from now
@@ -493,7 +493,7 @@ export default function FundRulePage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-base font-bold text-[var(--text-primary)]">Fund rule <span className="text-xs font-medium text-[var(--text-dim)]">· index fund + gold · one satellite portfolio</span></h2>
         <div className="flex items-center gap-2 text-xs">
-          {R && (N ? <span className="px-2.5 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-400">Switch at the {day(N.date).replace(/ \d{4}$/, '')} NAV to {split(N.target)}</span>
+          {R && (N ? <span className="px-2.5 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-400">{N.past ? 'Switched' : 'Switch'} at the {day(N.date).replace(/ \d{4}$/, '')} NAV to {split(N.target)}</span>
             : <span className="px-2.5 py-1 rounded-lg font-semibold bg-sky-500/10 text-sky-300">Hold {split(R.target)}</span>)}
           <span className="text-[var(--text-dim)]">{R ? `Prices to ${day(R.asOf)}` : hist === null ? 'No price history' : 'Loading…'}</span>
           <Link to="/admin/paper" className="px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Stock rule (H)</Link>
@@ -541,7 +541,7 @@ export default function FundRulePage() {
             <span className="text-xs text-[var(--text-dim)]">next check Monday, on Friday's NAV · and the first trading day of the month</span>
           </div>
           <div className="px-4 py-3 space-y-2">
-            {N ? <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">Rule changes at the {day(N.date)} NAV to {split(N.target)}:</span> {N.why}. Decided on the {day(R.asOf)} NAV, so the switch can be placed before that day's cut-off.</p>
+            {N ? <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">Rule {N.past ? 'changed' : 'changes'} at the {day(N.date)} NAV to {split(N.target)}:</span> {N.why}. Decided on the {day(R.asOf)} NAV{N.past ? `; this page catches up once the ${day(N.date)} NAV is in.` : ", so the switch can be placed before that day's cut-off."}</p>
               : last && <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-[var(--text-secondary)]">Rule changed on {day(last.date)} to {split(last.target)}:</span> {last.why}.</p>}
             {!ready ? (
               <p className="text-sm text-[var(--text-dim)]">{isAdmin ? 'Choose the satellite portfolio and its three funds in Set-up; the buy and sell amounts appear here whenever the rule changes.' : 'The rule says: hold ' + split(RL.target) + (N ? ` from the ${day(N.date)} NAV` : '') + '.'}</p>

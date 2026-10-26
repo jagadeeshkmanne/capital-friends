@@ -197,7 +197,7 @@ export default function PaperBookPage() {
   useEffect(() => {
     if (!isResearch) return
     getPaperBook().then((d) => { setData(d || null); if (d) loadLive(d) }).catch((e) => setErr(e.message || 'Could not load'))
-    getNavHistory(signalCode()).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)).catch(() => setHist(null))
+    getNavHistory(signalCode(), { fresh: true }).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)).catch(() => setHist(null))
   }, [isResearch])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // auto-refresh live prices every 60 s while the market is open and the tab is visible
@@ -288,7 +288,7 @@ export default function PaperBookPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-base font-bold text-[var(--text-primary)]">Stock rule <span className="text-xs font-medium text-[var(--text-dim)]">· 15 momentum stocks + gold · book H</span></h2>
         <div className="flex items-center gap-2 text-xs flex-wrap">
-          {N ? <span className="px-2.5 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-400">Switch at the {short(N.date)} close to {stocksSplit(N.target)}</span>
+          {N ? <span className="px-2.5 py-1 rounded-lg font-semibold bg-amber-500/10 text-amber-400">{N.past ? 'Switched' : 'Switch'} at the {short(N.date)} close to {stocksSplit(N.target)}</span>
             : <span className="px-2.5 py-1 rounded-lg font-semibold bg-lime-500/10 text-lime-400">Hold {stocksSplit(now)}</span>}
           <span className="text-[var(--text-dim)]">{R ? `Signal to ${day(R.asOf)}` : hist === undefined ? 'Loading the signal…' : `Book split at ${day(data.updated)}`}</span>
           <Link to="/admin/fund-rule" className="px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Fund rule (G)</Link>
@@ -324,11 +324,11 @@ export default function PaperBookPage() {
 
         <div className={`rounded-xl border overflow-hidden ${N ? 'border-amber-500/40 bg-amber-500/5' : 'border-[var(--border)] bg-[var(--bg-card)]'}`}>
           <div className={HEAD}>
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">{N ? `Action: switch at the ${day(N.date)} close` : 'No action'}</h3>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">{N ? (N.past ? `Switched at the ${day(N.date)} close` : `Action: switch at the ${day(N.date)} close`) : 'No action'}</h3>
             <span className="text-xs text-[var(--text-dim)]">checks: Friday's close (switch on Monday) · new picks {day(data.next_rebalance)}</span>
           </div>
           <div className="px-4 py-3 space-y-2">
-            {N ? <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">From the {day(N.date)} close: {stocksSplit(N.target)}.</span> {N.why}. Decided on the {day(R.asOf)} close, so the trades can go in near that day's close (about 3:20 pm).</p>
+            {N ? <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">From the {day(N.date)} close: {stocksSplit(N.target)}.</span> {N.why}. Decided on the {day(R.asOf)} close{N.past ? `, done at the ${day(N.date)} close; this page catches up once that day's prices are in. Trades not placed yet can still go in now.` : ", so the trades can go in near that day's close (about 3:20 pm)."}</p>
               : last && <p className="text-xs text-[var(--text-muted)]"><span className="font-semibold text-[var(--text-secondary)]">Since {day(last.date)}: {stocksSplit(last.target)}.</span> {last.why}.</p>}
             {N ? moves.map((m) => { const [side, what, amt] = moveText(m); return (
               <div key={m.k} className="flex items-baseline gap-3 flex-wrap text-sm">
@@ -360,6 +360,12 @@ export default function PaperBookPage() {
 
       {/* PAPER */}
       {tab === 'paper' && (<>
+        {(() => {   // a switch the rule has made (today's close or earlier) that this book has not recorded yet: it records each close the next morning
+          const sw = N ? { date: N.date, target: N.target } : last ? { date: last.date, target: last.target } : null
+          const todayIN = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)
+          if (!sw || !(sw.date > (data.updated || '')) || sw.date > todayIN) return null
+          return <p className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-2.5 text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">{sw.date === todayIN ? "Switch at today's close" : `Switched at the ${day(sw.date)} close`} to {stocksSplit(sw.target)}.</span> This book records it in the morning update after that close (about 8 am); until then it shows the holdings from before the switch.</p>
+        })()}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Mini label="Value" value={inr(view.liveNav)} sub={`${sgn(g0)}${inr(Math.abs(g0))} · ${pct2(b.invested ? (g0 / b.invested) * 100 : 0)}`} tone={toneZ(g0)} />
           <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct2(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? toneZ(view.today) : ''} />

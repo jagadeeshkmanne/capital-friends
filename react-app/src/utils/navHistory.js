@@ -23,13 +23,22 @@ async function idbPut(rec) {
   try { const d = await db(); d.transaction(STORE, 'readwrite').objectStore(STORE).put(rec) } catch { /* ignore */ }
 }
 const today = () => new Date().toISOString().slice(0, 10)
+const lastWeekday = () => {   // the weekday before today, in India
+  const x = new Date(Date.now() + 5.5 * 3600e3); x.setUTCHours(0, 0, 0, 0)
+  do { x.setUTCDate(x.getUTCDate() - 1) } while (x.getUTCDay() === 0 || x.getUTCDay() === 6)
+  return x.toISOString().slice(0, 10)
+}
+const lastNavDay = (h) => (h?.times?.length ? new Date(h.times[h.times.length - 1] * 1000).toISOString().slice(0, 10) : '')
 
-/** { times: [UTC day seconds ascending], navs: [number] } or null */
-export async function getNavHistory(code) {
+/** { times: [UTC day seconds ascending], navs: [number] } or null.
+ *  fresh: also fetch again (at most every 2 hours) while the cached prices miss the last weekday's NAV, for pages that act
+ *  on the newest NAV (Fund rule, Stock rule): Monday's NAV shows up the next morning instead of a day later. */
+export async function getNavHistory(code, { fresh = false } = {}) {
   code = String(code || '').trim()
   if (!/^\d+$/.test(code) || Number(code) >= 900000000) return null // SIF codes: no history on mfapi.in
   const cached = await idbGet(code)
-  if (cached && cached.day === today()) return cached
+  const stale = fresh && cached && lastNavDay(cached) < lastWeekday() && Date.now() - (cached.at || 0) > 2 * 3600e3
+  if (cached && cached.day === today() && !stale) return cached
   try {
     const r = await fetch(`https://api.mfapi.in/mf/${code}`)
     if (!r.ok) throw new Error('HTTP ' + r.status)
@@ -38,7 +47,7 @@ export async function getNavHistory(code) {
       const [dd, mm, yy] = String(x.date).split('-').map(Number)
       return [Date.UTC(yy, mm - 1, dd) / 1000, parseFloat(x.nav)]
     }).filter((x) => x[0] && x[1] > 0).sort((a, b) => a[0] - b[0])
-    const rec = { code, day: today(), times: rows.map((x) => x[0]), navs: rows.map((x) => x[1]) }
+    const rec = { code, day: today(), at: Date.now(), times: rows.map((x) => x[0]), navs: rows.map((x) => x[1]) }
     if (rec.times.length) idbPut(rec)
     return rec
   } catch {
@@ -47,14 +56,14 @@ export async function getNavHistory(code) {
 }
 
 /** Load many codes, a few at a time. Returns Map(code -> history). */
-export async function getNavHistories(codes, concurrency = 6) {
+export async function getNavHistories(codes, concurrency = 6, opts = {}) {
   const list = [...new Set((codes || []).map(String))]
   const out = new Map()
   let i = 0
   async function worker() {
     while (i < list.length) {
       const c = list[i++]
-      const h = await getNavHistory(c)
+      const h = await getNavHistory(c, opts)
       if (h) out.set(c, h)
     }
   }

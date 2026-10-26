@@ -57,18 +57,17 @@ export function replay(hist, cap = RULE.fundMax, W = WORDS) {
 }
 
 /** A switch due at the next NAV is known before that NAV is out: when the last NAV closed its week (Friday's NAV, seen on the
- *  weekend or on Monday morning) or its month (seen on the 1st). Only when the last NAV is from the previous weekday or later,
- *  so a late NAV is never taken for the week's last one. Returns { date, target, why } of that switch, or null. */
+ *  weekend or on Monday) or its month (seen on the 1st). The next NAV is the weekday after the last one we have; when that day
+ *  has already passed (Tuesday early morning, Monday's NAV not in yet) the switch still shows, with past = true, instead of
+ *  the old split. Returns { date, target, why, S (the checks that make it), past } of that switch, or null. */
 export function nextDue(hist, R, cap = RULE.fundMax, W = WORDS) {
   const add = (d, k) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10) }
   const wd = (d) => new Date(d + 'T00:00:00Z').getUTCDay()
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)   // date in India
-  let prev = add(today, -1); while (wd(prev) === 0 || wd(prev) === 6) prev = add(prev, -1)
-  let next = wd(today) === 6 ? add(today, 2) : wd(today) === 0 ? add(today, 1) : today
-  if (R.asOf >= next) { next = add(R.asOf, 1); while (wd(next) === 0 || wd(next) === 6) next = add(next, 1) }   // today's NAV is already in
-  if (R.asOf < prev || (isoWeek(next) === isoWeek(R.asOf) && next.slice(0, 7) === R.asOf.slice(0, 7))) return null
+  let next = add(R.asOf, 1); while (wd(next) === 0 || wd(next) === 6) next = add(next, 1)
+  if (isoWeek(next) === isoWeek(R.asOf) && next.slice(0, 7) === R.asOf.slice(0, 7)) return null   // no week / month check at that NAV
   const P = replay({ times: [...hist.times, Date.parse(next + 'T00:00:00Z') / 1000], navs: [...hist.navs, hist.navs[hist.navs.length - 1]] }, cap, W)
-  return same(P.target, R.target) ? null : { date: next, target: P.target, why: P.log[0]?.why || '', S: P }
+  return same(P.target, R.target) ? null : { date: next, target: P.target, why: P.log[0]?.why || '', S: P, past: next < today }
 }
 
 /** The four checks to show: the replay's, or when a switch is due, the newer checks that make it (so the cards agree with the

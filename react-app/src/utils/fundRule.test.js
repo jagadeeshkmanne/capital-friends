@@ -41,6 +41,17 @@ describe('fund rule (G and H)', () => {
     expect(C.fgap).toBeLessThan(-0.04)
   })
 
+  it('Tuesday early morning, Monday\'s NAV not in yet: the Monday switch still shows, marked past', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-26T22:46:00Z'))   // Tue 27 Oct, 4:16 am in India
+    const h = history(), R = replay(h, 0.7, WORDS_STOCKS)                      // NAVs to Fri 23 Oct only
+    const N = nextDue(h, R, 0.7, WORDS_STOCKS)
+    expect(N.date).toBe('2026-10-26')
+    expect(N.past).toBe(true)
+    expect(N.target.fund).toBe(0)
+    vi.setSystemTime(new Date('2026-10-24T04:30:00Z'))                         // the same on Saturday: not past
+    expect(nextDue(h, R, 0.7, WORDS_STOCKS).past).toBe(false)
+  })
+
   it('mid-week with nothing due: the checks are the replay\'s own', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-22T04:30:00Z'))   // Thu 22 Oct
     const h = history(), n = h.times.findIndex((t) => t >= Date.parse('2026-10-22T00:00:00Z') / 1000)
