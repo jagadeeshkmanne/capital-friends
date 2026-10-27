@@ -127,12 +127,13 @@ function SortTh({ k, sort, setSort, cls, title, children }) {
   )
 }
 
-function Mini({ label, value, sub, tone: t, title }) {
+function Mini({ label, value, sub, tone: t, title, note }) {
   return (
     <div className={`${CARD} px-4 py-3 min-w-0`} title={title}>
       <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1 truncate">{label}</p>
       <p className={`text-sm font-semibold tabular-nums truncate ${t || 'text-[var(--text-primary)]'}`}>{value}</p>
       {sub && <p className={`text-xs font-semibold tabular-nums mt-0.5 truncate ${t || 'text-[var(--text-dim)]'}`}>{sub}</p>}
+      {note && <div className="mt-1.5 pt-1.5 border-t border-[var(--border)] text-[11px] tabular-nums text-[var(--text-dim)] space-y-0.5">{note}</div>}
     </div>
   )
 }
@@ -283,6 +284,10 @@ export default function PaperBookPage() {
   const vsN = b.bench ? (view.liveNav / benchNow - 1) * 100 : null
   const vsWord = (d) => (d == null ? '—' : Math.abs(d) < 0.05 ? 'Same as Nifty 500' : d > 0 ? `Ahead by ${Math.abs(d).toFixed(1)}%` : `Behind by ${Math.abs(d).toFixed(1)}%`)
   const gain = view.liveNav - b.invested, g0 = Math.abs(gain) < 1 ? 0 : gain   // under ₹1 is rounding, shown as 0
+  // unrealised = what the stocks and gold still held are up or down on their cost; realised = the rest of the gain
+  // (sales already made, plus the liquid fund's interest)
+  const unreal = view.hold.reduce((a, h) => a + (h.pnlAmt || 0), 0), real = g0 - unreal
+  const rz = (v) => (Math.abs(v) < 1 ? '₹0' : `${sgn(v)}${inr(Math.abs(v))}`)
   const days = b.start ? Math.max(0, Math.round((Date.now() - new Date(b.start + 'T00:00:00+05:30').getTime()) / 86400e3)) : 0
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
   const trades = [...(b.trades || [])].reverse()
@@ -372,7 +377,9 @@ export default function PaperBookPage() {
           return <p className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-2.5 text-xs text-[var(--text-muted)]"><span className="font-semibold text-amber-400">{sw.date === todayIN ? "Switch at today's close" : `Switched at the ${day(sw.date)} close`} to {stocksSplit(sw.target)}.</span> This book records it in the morning update after that close (about 8 am); until then it shows the holdings from before the switch.</p>
         })()}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Mini label="Value" value={inr(view.liveNav)} sub={`${sgn(g0)}${inr(Math.abs(g0))} · ${pct2(b.invested ? (g0 / b.invested) * 100 : 0)}`} tone={toneZ(g0)} />
+          <Mini label="Value" value={inr(view.liveNav)} sub={`${sgn(g0)}${inr(Math.abs(g0))} · ${pct2(b.invested ? (g0 / b.invested) * 100 : 0)}`} tone={toneZ(g0)}
+            title="Gain since the book started. Realised: sales already made plus the liquid fund's interest. Unrealised: stocks and gold still held, against their cost."
+            note={<><p>Since {day(b.start).replace(/ \d{4}$/, '')}:</p><p className="flex justify-between gap-2"><span>Realised</span><span className={toneZ(real)}>{rz(real)}</span></p><p className="flex justify-between gap-2"><span>Unrealised</span><span className={toneZ(unreal)}>{rz(unreal)}</span></p></>} />
           <Mini label="Today" value={live && view.anyFresh ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? (view.anyFresh ? pct2(view.todayPct) : 'no trades yet today') : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live && view.anyFresh ? toneZ(view.today) : ''} />
           <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={vsWord(vsN)} sub={b.bench ? `Nifty: ${lakhs(benchNow)}` : ''} tone={vsN == null || Math.abs(vsN) < 0.05 ? 'text-[var(--text-muted)]' : tone(vsN)}
             title="Book value now against the same ₹10 lakh put in the Nifty 500 on the start day" />
@@ -437,7 +444,7 @@ export default function PaperBookPage() {
         {trades.length > 0 && <div className={`${CARD} overflow-hidden`}>
           <div className={HEAD}>
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Trades <span className="text-xs font-medium text-[var(--text-dim)]">· newest first</span></h3>
-            <span className="text-xs text-[var(--text-dim)]">{trades.length} recent · at the close, 0.2% costs</span>
+            <span className="text-xs text-[var(--text-dim)]">{trades.length} recent · at the close · {b.costs > 0 ? `costs ${inr(b.costs)} so far` : 'trading costs not counted'}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
