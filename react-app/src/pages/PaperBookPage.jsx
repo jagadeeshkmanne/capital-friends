@@ -219,17 +219,22 @@ export default function PaperBookPage() {
   const view = useMemo(() => {
     if (!b) return null
     const lp = live?.prices || {}
+    const todayIN = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)
+    // a quote counts for "today" only if it traded today: before 9:15 am (and on holidays / weekends) the feed still shows the
+    // last session's price against the close before it, which is yesterday's move, already in the book's value
+    const fresh = (L) => !!(L && L.time && new Date(L.time * 1000 + 5.5 * 3600e3).toISOString().slice(0, 10) === todayIN)
     const hold = (b.holdings || []).map((h) => {
       const [s, q, , px, val] = h
       const L = s === 'LIQUIDCASE' ? null : lp[s]
       const price = L ? L.price : px
       // bought today (opening or rebalance day): today's change counts from the buy price, not yesterday's close
       const boughtToday = h[8] && h[8] === new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)
-      const prev = boughtToday && h[2] ? h[2] : L && L.prev ? L.prev : price
+      const tdy = fresh(L)
+      const prev = boughtToday && h[2] ? h[2] : tdy && L.prev ? L.prev : price
       const value = s === 'LIQUIDCASE' ? val : q * price
       const pnlAmt = h[2] && s !== 'LIQUIDCASE' ? q * (price - h[2]) : null
       return { row: h, price, value, pnlAmt, pnlPct: h[2] && s !== 'LIQUIDCASE' ? (price / h[2] - 1) * 100 : null,
-        today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: L && prev ? (price / prev - 1) * 100 : null }
+        today: s === 'LIQUIDCASE' ? 0 : q * (price - prev), todayPct: tdy && prev ? (price / prev - 1) * 100 : null, fresh: tdy }
     })
     // stocks sorted by the chosen column (default momentum rank, strongest first); gold and liquid always at the bottom
     const grp = (h) => (h.row[0] === 'GOLDBEES' ? 1 : h.row[0] === 'LIQUIDCASE' ? 2 : 0)
@@ -242,7 +247,7 @@ export default function PaperBookPage() {
     const stocks = hold.filter((h) => isStock(h.row[0])).reduce((a, h) => a + h.value, 0)
     const liquid = Math.max(0, liveNav - gold - stocks)
     const nStocks = hold.filter((h) => isStock(h.row[0])).length
-    return { hold, gold, stocks, liquid, nStocks, liveNav, today, todayPct: liveNav - today > 0 ? (today / (liveNav - today)) * 100 : 0,
+    return { hold, gold, stocks, liquid, nStocks, liveNav, today, anyFresh: hold.some((h) => h.fresh), todayPct: liveNav - today > 0 ? (today / (liveNav - today)) * 100 : 0,
       held: new Set(hold.map((h) => h.row[0])), maxW: Math.max(1, ...hold.filter((h) => isStock(h.row[0])).map((h) => h.row[6])) }
   }, [b, live, sort])
 
@@ -368,7 +373,7 @@ export default function PaperBookPage() {
         })()}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Mini label="Value" value={inr(view.liveNav)} sub={`${sgn(g0)}${inr(Math.abs(g0))} · ${pct2(b.invested ? (g0 / b.invested) * 100 : 0)}`} tone={toneZ(g0)} />
-          <Mini label="Today" value={live ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? pct2(view.todayPct) : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live ? toneZ(view.today) : ''} />
+          <Mini label="Today" value={live && view.anyFresh ? `${sgn(view.today)}${inr(Math.abs(view.today))}` : '—'} sub={live ? (view.anyFresh ? pct2(view.todayPct) : 'no trades yet today') : liveBusy ? 'loading…' : `no live prices${liveErr ? ': ' + liveErr : ''}`} tone={live && view.anyFresh ? toneZ(view.today) : ''} />
           <Mini label={`vs Nifty 500${nLive && nBase ? ' · live' : ''}`} value={vsWord(vsN)} sub={b.bench ? `Nifty: ${lakhs(benchNow)}` : ''} tone={vsN == null || Math.abs(vsN) < 0.05 ? 'text-[var(--text-muted)]' : tone(vsN)}
             title="Book value now against the same ₹10 lakh put in the Nifty 500 on the start day" />
           <Mini label="Split now" value={`${Math.round((view.stocks / tot) * 100)} / ${Math.round((view.gold / tot) * 100)} / ${Math.round((view.liquid / tot) * 100)}%`} sub="stocks / gold / liquid" />
