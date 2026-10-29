@@ -7,6 +7,8 @@ import ResearchViewers from '../components/ResearchViewers'
 import { useAuth } from '../context/AuthContext'
 import { getPaperBook, getPaperLive } from '../services/api'
 import { getNavHistory } from '../utils/navHistory'
+import { outcomes, lastAndAllSales } from '../utils/tradeOutcome'
+import SalesCheck, { pc as salePct, saleTone, saleWord } from '../components/SalesCheck'
 import { RULE, WORDS_STOCKS, replay, nextDue, checks, split, ap, day } from '../utils/fundRule'
 
 // Hidden admin page (/admin/paper): the STOCK rule, book H. 15 momentum stocks from the 1000 most-traded NSE stocks, with the
@@ -157,6 +159,17 @@ function SplitBar({ w, amount }) {
   )
 }
 
+/** Trades table: how the price moved after the trade, to now or to the next opposite trade (utils/tradeOutcome). */
+function Since({ o, sell }) {
+  if (!o || o.pct == null) return <span className="text-[var(--text-dim)]">—</span>
+  return (<>
+    <span className={sell ? saleTone(o.pct) : toneZ(o.pct * 100)}>{salePct(o.pct)}</span>
+    {sell && saleWord(o.pct) && <span className={`ml-1 text-[10px] font-semibold ${saleTone(o.pct)}`}>{saleWord(o.pct)}</span>}
+    {o.endDate && <span className="ml-1 text-[10px] text-[var(--text-dim)]">to {short(o.endDate)}</span>}
+  </>)
+}
+const sinceTitle = (o, sell) => (!o || o.pct == null ? '' : o.endDate ? `${sell ? 'Bought back' : 'Sold'} on ${short(o.endDate)} at ₹${num(o.end)}` : `Price now ₹${num(o.end)}`)
+
 export default function PaperBookPage() {
   const { isAdmin, isResearch } = useAuth()
   const [data, setData] = useState(undefined)
@@ -175,8 +188,18 @@ export default function PaperBookPage() {
   const [open, setOpen] = useState(marketOpen())
   const [allTrades, setAllTrades] = useState(false)
   const [allSw, setAllSw] = useState(false)
+  const [extra, setExtra] = useState({})   // prices of stocks sold earlier that the live list no longer has (fetched once a visit)
   const lastPx = useRef({})
   const livePx = (s) => live?.prices?.[s]?.price
+  // stocks sold and not bought back since, outside the live list (holdings + this month's picks): their price once a visit,
+  // for the trades' Since column (only the live list refreshes every minute)
+  const loadSold = (d) => {
+    const bk = d?.books?.H, tr = bk?.trades || []
+    const listed = new Set([...(bk?.holdings || []).map((h) => h[0]), ...(bk?.target || []).map((t) => t[0])])
+    const openSells = tr.filter((t, i) => t[1] === 'SELL' && isStock(t[2]) && !listed.has(t[2]) && !tr.slice(i + 1).some((u) => u[2] === t[2] && u[1] === 'BUY')).map((t) => t[2])
+    const syms = [...new Set(openSells)].slice(-40)
+    if (syms.length) getPaperLive(syms).then((r) => setExtra(r?.prices || {})).catch(() => { /* the column falls back to the last close */ })
+  }
 
   const loadLive = (d) => {
     const b = d?.books?.H
@@ -198,7 +221,7 @@ export default function PaperBookPage() {
 
   useEffect(() => {
     if (!isResearch) return
-    getPaperBook().then((d) => { setData(d || null); if (d) loadLive(d) }).catch((e) => setErr(e.message || 'Could not load'))
+    getPaperBook().then((d) => { setData(d || null); if (d) { loadLive(d); loadSold(d) } }).catch((e) => setErr(e.message || 'Could not load'))
     getNavHistory(signalCode(), { fresh: true }).then((h) => setHist(h && h.times?.length > RULE.look + 60 ? h : null)).catch(() => setHist(null))
   }, [isResearch])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -292,6 +315,12 @@ export default function PaperBookPage() {
   const days = b.start ? Math.max(0, Math.round((Date.now() - new Date(b.start + 'T00:00:00+05:30').getTime()) / 86400e3)) : 0
   const liveAt = live?.at ? new Date(live.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null
   const trades = [...(b.trades || [])].reverse()
+  // how each trade turned out, to judge the rule: the price now (live where the page has it), or the next opposite trade's price
+  const pxNow = (s) => (s === 'LIQUIDCASE' ? null : livePx(s) ?? extra[s]?.price ?? lastClose(data, s) ?? (b.holdings || []).find((h) => h[0] === s)?.[3] ?? null)
+  const outsOld = outcomes((b.trades || []).map((t) => ({ key: t[2], side: t[1] === 'BUY' ? 'buy' : 'sell', date: t[0], price: t[4], qty: t[3] })), pxNow)
+  const outs = [...outsOld].reverse()   // newest first, like trades
+  const sales = lastAndAllSales(outsOld.filter((o) => isStock(o.key)))
+  const nS = (n) => `${n} stock${n === 1 ? '' : 's'}`
 
   return (
     <div className="space-y-4">
@@ -445,13 +474,16 @@ export default function PaperBookPage() {
         {trades.length > 0 && <div className={`${CARD} overflow-hidden`}>
           <div className={HEAD}>
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Trades <span className="text-xs font-medium text-[var(--text-dim)]">· newest first</span></h3>
-            <span className="text-xs text-[var(--text-dim)]">{trades.length} recent · at the close · {b.costs > 0 ? `costs ${inr(b.costs)} so far` : 'trading costs not counted'}</span>
+            <span className="text-xs text-[var(--text-dim)]">{trades.length} so far · at the close · {b.costs > 0 ? `costs ${inr(b.costs)} so far` : 'trading costs not counted'}</span>
           </div>
+          {sales.all && <SalesCheck items={sales.all.from === sales.all.to ? [{ label: `Since the ${short(sales.all.to)} sale (${nS(sales.all.n)})`, s: sales.all }]
+            : [{ label: `Since the last sale, ${short(sales.last.to)} (${nS(sales.last.n)})`, s: sales.last }, { label: `All sales since ${short(sales.all.from)} (${nS(sales.all.n)})`, s: sales.all }]}
+            note="Each sale against the price now, or its buy-back price once bought back: red, the price rose after we sold (a gain missed); green, it fell (a loss saved)." />}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
                 <th className={`${TH} text-left`}>Date</th><th className={`${TH} text-left`}>Trade</th><th className={`${TH} text-left`}>Stock</th>
-                <th className={`${TH} ${PH} text-right`}>Qty</th><th className={`${TH} ${PH} text-right`}>Price</th><th className={`${TH} text-right`}>Amount</th><th className={`${TH} ${PH} text-left`}>Why</th>
+                <th className={`${TH} ${PH} text-right`}>Qty</th><th className={`${TH} ${PH} text-right`}>Price</th><th className={`${TH} text-right`}>Amount</th><th className={`${TH} ${PH} text-right`} title="The price now against this trade's price; once a sale is bought back (or a buy sold), up to that trade's price">Since</th><th className={`${TH} ${PH} text-left`}>Why</th>
               </tr></thead>
               <tbody>
                 {trades.slice(0, allTrades ? trades.length : 10).map((t, i) => (
@@ -461,7 +493,8 @@ export default function PaperBookPage() {
                     <td className={`${TD} text-left font-semibold text-[var(--text-primary)]`}>{t[2]}</td>
                     <td className={`${TDS} ${PH} text-right`}>{num(t[3])}</td>
                     <td className={`${TDS} ${PH} text-right`}>{num(t[4])}</td>
-                    <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(t[5])}</td>
+                    <td className={`${TD} text-right text-[var(--text-primary)]`}>{inr(t[5])}<div className="sm:hidden text-[11px]" title={sinceTitle(outs[i], t[1] === 'SELL')}><Since o={outs[i]} sell={t[1] === 'SELL'} /></div></td>
+                    <td className={`${TD} ${PH} text-right`} title={sinceTitle(outs[i], t[1] === 'SELL')}><Since o={outs[i]} sell={t[1] === 'SELL'} /></td>
                     <td className={`${TD} ${PH} text-left text-xs text-[var(--text-dim)]`}>{t[6]}</td>
                   </tr>))}
               </tbody>

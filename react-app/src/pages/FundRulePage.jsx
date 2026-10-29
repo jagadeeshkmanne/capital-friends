@@ -6,6 +6,8 @@ import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import MFRebalanceDialog from '../components/forms/MFRebalanceDialog'
 import { getNavHistory, getNavHistories } from '../utils/navHistory'
+import { outcomes, lastAndAllSales } from '../utils/tradeOutcome'
+import SalesCheck, { pc as salePct, saleTone, saleWord } from '../components/SalesCheck'
 import ResearchViewers from '../components/ResearchViewers'
 import { RULE, ap, pct, day, iso, targets, same, split, replay, nextDue, checks } from '../utils/fundRule'
 
@@ -104,6 +106,12 @@ function PaperBook({ R }) {
   const shown = all ? B.switches : B.switches.slice(0, 6)
   const totalPL = B.unrealised + B.realised - B.taxPaid
   const why = new Map(R.log.map((l) => [l.date, l.why]))
+  // how each move turned out, to judge the rule: the NAV now, or the next opposite move's NAV (liquid left out: it only accrues)
+  const navNow = (k) => B.sleeves.find((x) => x.k === k)?.nav ?? null
+  const outs = outcomes(B.switches.slice().reverse().flatMap((s) => s.moves.filter((m) => m.k !== 'liq').map((m) => ({ key: m.k, side: m.side, date: s.date, price: m.nav, qty: m.amt / m.nav, m }))), navNow)
+  const since = new Map(outs.map((o) => [o.m, o]))
+  const fundSales = lastAndAllSales(outs.filter((o) => o.key === 'fund'))
+  const sd = (d) => day(d).replace(/ \d{4}$/, '')
   return (
     <div className="space-y-4">
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
@@ -160,6 +168,9 @@ function PaperBook({ R }) {
           <h3 className="text-sm font-bold text-[var(--text-primary)]">Switches done by the book</h3>
           <span className="text-xs text-[var(--text-dim)]">{B.switches.length} so far · tax paid {inr(B.taxPaid)}</span>
         </div>
+        {fundSales.all && <SalesCheck items={fundSales.all.from === fundSales.all.to ? [{ label: `Index fund since the ${sd(fundSales.all.to)} sale`, s: fundSales.all }]
+          : [{ label: `Index fund since the last sale, ${sd(fundSales.last.to)}`, s: fundSales.last }, { label: `All index-fund sales since ${sd(fundSales.all.from)}`, s: fundSales.all }]}
+          note={`Each sale against the ${sd(B.asOf)} NAV, or the NAV it was bought back at: red, the fund rose after we sold (a gain missed); green, it fell (a loss saved).`} />}
         <div className="divide-y divide-[var(--border-light)]">
           {shown.map((s) => (
             <div key={s.date} className="px-4 py-2.5">
@@ -168,7 +179,7 @@ function PaperBook({ R }) {
                 <span className="font-semibold text-[var(--text-primary)]">{s.from ? <><span className="text-[var(--text-muted)] font-normal">{split(s.from)}</span> → {split(s.to)}</> : `Opened at ${split(s.to)}`}</span>
               </div>
               <div className="mt-1 pl-[6.75rem] flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-[var(--text-muted)] tabular-nums">
-                {s.moves.map((m, i) => <span key={i}><span className={m.side === 'sell' ? 'text-[var(--accent-rose)] font-semibold' : 'text-emerald-400 font-semibold'}>{m.side === 'sell' ? 'Sold' : 'Bought'}</span> {inr(m.amt)} {roles[m.k].toLowerCase()} at ₹{m.nav.toFixed(2)}{m.tax > 0.5 ? ` (tax ${inr(m.tax)})` : ''}</span>)}
+                {s.moves.map((m, i) => <span key={i}><span className={m.side === 'sell' ? 'text-[var(--accent-rose)] font-semibold' : 'text-emerald-400 font-semibold'}>{m.side === 'sell' ? 'Sold' : 'Bought'}</span> {inr(m.amt)} {roles[m.k].toLowerCase()} at ₹{m.nav.toFixed(2)}{m.tax > 0.5 ? ` (tax ${inr(m.tax)})` : ''}{(() => { const o = since.get(m); if (!o || o.pct == null) return null; const sell = m.side === 'sell'; return <span className={sell ? saleTone(o.pct) : o.pct >= 0 ? 'text-emerald-400' : 'text-[var(--accent-rose)]'}>{` · ${o.endDate ? (sell ? 'to buy-back' : 'to sale') : 'since'} ${salePct(o.pct)}`}{sell && saleWord(o.pct) ? ` ${saleWord(o.pct)} ${inr(Math.abs(o.amt))}` : ''}</span> })()}</span>)}
                 {!s.moves.length && <span>no sleeve was more than 5% off its target, so nothing was traded</span>}
               </div>
               {s.from && why.get(s.date) && <p className="mt-1 pl-[6.75rem] text-xs text-[var(--text-dim)]">{why.get(s.date)}</p>}
