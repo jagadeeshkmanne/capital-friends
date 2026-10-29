@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Navigate, Link } from 'react-router-dom'
 import { RefreshCw, Target, FlaskConical, BookOpen } from 'lucide-react'
 import Modal from '../components/Modal'
+import ResearchViewers from '../components/ResearchViewers'
 import { useAuth } from '../context/AuthContext'
 import { getPaperBook, getPaperLive } from '../services/api'
 import { getNavHistory } from '../utils/navHistory'
@@ -542,6 +543,7 @@ export default function PaperBookPage() {
         </div>}
       </>)}
 
+      {isAdmin && <ResearchViewers />}
       {chartSym && <BigChart data={data} sym={chartSym} livePrice={livePx(chartSym)} onClose={() => setChartSym(null)} />}
     </div>
   )

@@ -82,4 +82,67 @@ describe('CDSL / NSDL statement shares', () => {
     expect(r.accounts).toHaveLength(1)
     expect(r.accounts[0].holdings).toHaveLength(2)
   })
+  // made-up statement in the 2026 NSDL CAS layout: English and Hindi glued on one line, the PAN masked, the ISIN on
+  // its own line with the name and numbers below it and the stock symbol under those (a long name wraps around them)
+  const NSDL26 = [
+    'In the Single Name ofएकमात्र नाम में',
+    'TEST PERSON [ABXXXXXX1C]',
+    'ALPHA BROKING LIMITED',
+    'NSDL Demat AccountNSDL डीमैट खाता   5   57,100.00',
+    'DP ID:IN300000 Client ID:11112222',
+    'Totalकुल   57,100.00',
+    'NSDL Demat AccountNSDL डीमैट खाता   ACCOUNT HOLDERखाता धारक',
+    'ALPHA BROKING LIMITED   TEST PERSON (PAN: [ABXXXXXX1C])',
+    'DP ID : IN300000 Client ID: 11112222',
+    'Equities (E)इक्विटी (E)',
+    'Equity Sharesइक्विटी शेयर',
+    'ISINISIN   अंकित मूल्य (₹',
+    'INE040A01034',
+    'HDFC BANK LIMITED   1.00   10   1,650.00   16,500.00',
+    'HDFCBANK.NSE',
+    'INE335Y01020   INDIAN RAILWAY CATERING AND TOURISM',
+    '2.00   20   700.00   14,000.00',
+    'IRCTC.NSE   CORPORATION LIMITED',
+    'INE0FS801015   MOTHERSON SUMI WIRING INDIA LIMITED   50',
+    '1.00   40.00   2,000.00',
+    'MSUMI.NSE   of which blocked   1',
+    'INE752P01024',
+    'TRADING   FUTURE RETAIL LIMITED   2.00   100   2.00   200.00',
+    'SUSPENDED',
+    'INE009A01021',
+    'INFOSYS LIMITED   5.00   16   1,525.00   24,400.00',
+    'INFY.NSE',
+    'Sub TotalSub Total   57,100.00',
+    'Preference Shares (P)प्रेफरेंस शेयर (P)',
+    'INE494B04019   TVS MOTOR COMPANY LIMITED',
+    '10.00   0   10.55   0.00',
+    'Sub TotalSub Total   0.00',
+    'Totalकुल   57,100.00',
+  ]
+  it('reads the 2026 NSDL layout: bilingual headings, masked PAN, wrapped names, symbol and suspended lines', () => {
+    const r = parseDematCas(NSDL26)
+    expect(r.holder).toBe('TEST PERSON')
+    expect(r.pan).toBe('')   // masked: never kept as the PAN
+    expect(r.accounts.map((a) => [a.depository, a.broker, a.dpId, a.clientId])).toEqual([['NSDL', 'ALPHA BROKING LIMITED', 'IN300000', '11112222']])
+    expect(r.accounts[0].holdings.map((h) => [h.isin, h.name, h.qty, h.value, h.symbol || '', h.flag])).toEqual([
+      ['INE040A01034', 'HDFC BANK LIMITED', 10, 16500, 'HDFCBANK', ''],
+      ['INE335Y01020', 'INDIAN RAILWAY CATERING AND TOURISM CORPORATION LIMITED', 20, 14000, 'IRCTC', ''],
+      ['INE0FS801015', 'MOTHERSON SUMI WIRING INDIA LIMITED', 50, 2000, 'MSUMI', ''],
+      ['INE752P01024', 'FUTURE RETAIL LIMITED', 100, 200, '', 'suspended'],
+      ['INE009A01021', 'INFOSYS LIMITED', 16, 24400, 'INFY', ''],
+    ])
+  })
+  it('a CDSL account first listed on the summary page gets its broker from the "DP Name" line', () => {
+    const r = parseDematCas([
+      'TEST PERSON ( PAN :ABCDE1234F )',
+      'CDSL Demat Account   1   9,385.00',
+      'DP Id: 12000000 Client Id :11112222',
+      'DP Name :DP का नाम:ALPHA BROKING LIMITEDALPHA BROKING LIMITED   BO ID :BO ID:12000000111122221200000011112222',
+      'HOLDING STATEMENT AS ON 31-08-2026',
+      'INE776C01039   EQUITY SHARES OF RE. 1/-   100.000   --   --   --   100.000   93.8500   9,385.00',
+    ])
+    expect(r.accounts).toHaveLength(1)
+    expect(r.accounts[0]).toMatchObject({ broker: 'ALPHA BROKING LIMITED', dpId: '12000000', clientId: '11112222' })
+    expect(r.accounts[0].holdings).toHaveLength(1)
+  })
 })

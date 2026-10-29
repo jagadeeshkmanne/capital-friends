@@ -26,6 +26,7 @@ function whyNot(r) {
   if (r.fund) return 'mutual fund — use the Mutual Funds import'
   if (r.flag === 'liquidation') return 'company under liquidation (marked ** in the statement) — no market price'
   if (r.flag === 'notTraded') return 'not traded for over a year (marked !! — valued at face value) — no market price'
+  if (r.flag === 'suspended') return 'trading suspended (says the statement) — no market price'
   if (r.flag === 'rights') return 'rights entitlement — temporary, not a share yet'
   return 'not in the stock list (suspended or delisted?)'
 }
@@ -67,7 +68,8 @@ export default function ImportDematForm({ onCancel, initialFile }) {
       setDate(isoFromDmy(res.asOf) || new Date().toISOString().slice(0, 10))
       setAccts(res.accounts.filter((a) => a.holdings.length).map((a) => {
         const rows = a.holdings.map((h, k) => {
-          const stock = idx.byIsin.get(h.isin) || null
+          // by ISIN; else by the NSE symbol an NSDL statement prints under it (when the list has another ISIN for it)
+          const stock = idx.byIsin.get(h.isin) || (h.exchange === 'NSE' && h.symbol ? idx.bySym.get(String(h.symbol).toUpperCase()) : null) || null
           const fund = !stock && h.isin.startsWith('INF')
           return { key: k, ...h, stock, fund, include: !!stock, unlisted: !stock && !fund && h.flag !== 'rights', avgPrice: String(h.price) }
         })
