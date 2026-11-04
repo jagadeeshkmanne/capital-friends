@@ -1,5 +1,5 @@
 // Home on phones (Ionic, Groww-style): net worth, quick actions, action items, where the money is, goals,
-// signals, top funds, reminders. Same numbers as the desktop Dashboard (it passes everything in).
+// signals, top gainers and losers, reminders. Same numbers as the desktop Dashboard (it passes everything in).
 import { useState } from 'react'
 import '../../phone/ionic-setup'
 import { IonCard, IonCardContent, IonList, IonItem, IonLabel, IonListHeader, IonNote, IonButton, IonRippleEffect } from '@ionic/react'
@@ -9,6 +9,25 @@ import { formatINR } from '../../data/familyData'
 
 const TONE = { critical: ['#fb7185', AlertCircle], warning: ['#f59e0b', AlertTriangle], info: ['#60a5fa', Info] }
 const pct1 = (v) => (v < 1 ? v.toFixed(1) : v.toFixed(0))
+
+/** One fund list on Home (Top gainers or Top losers): name, portfolios, value now and return. Nothing when empty. */
+function FundGroup({ label, funds, mt }) {
+  if (!funds?.length) return null
+  return (
+    <>
+      <IonListHeader className="!pl-5"><IonLabel className="cf-group">{label}</IonLabel></IonListHeader>
+      <IonList inset lines="inset" className="cf-inset !mt-0">
+        {funds.map((f) => (
+          <IonItem key={f.fundName}>
+            <span slot="start" className={`flex h-9 w-9 items-center justify-center rounded-xl ${f.pl >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{f.pl >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}</span>
+            <IonLabel><h3 className="!text-[15px] !font-semibold">{f.fundName}</h3><p>{f.portfolios.map((p) => mt(p)).join(', ')}</p></IonLabel>
+            <div slot="end" className="text-right tabular-nums"><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(f.currentValue)}</div><div className={`text-[12px] font-semibold ${f.pl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{f.pl >= 0 ? '+' : ''}{f.plPct.toFixed(1)}%</div></div>
+          </IonItem>
+        ))}
+      </IonList>
+    </>
+  )
+}
 
 export default function DashboardPhone({ data, actionItems, upcomingReminders, goalCards, goalTodos, navigate, mt, onRebalance, onBuyOpp }) {
   const [all, setAll] = useState(false)
@@ -159,21 +178,9 @@ export default function DashboardPhone({ data, actionItems, upcomingReminders, g
         </>
       )}
 
-      {/* top funds */}
-      {data.topGainers.length > 0 && (
-        <>
-          <IonListHeader className="!pl-5"><IonLabel className="cf-group">Top funds</IonLabel></IonListHeader>
-          <IonList inset lines="inset" className="cf-inset !mt-0">
-            {[...data.topGainers, ...data.topLosers].map((f) => (
-              <IonItem key={f.fundName}>
-                <span slot="start" className={`flex h-9 w-9 items-center justify-center rounded-xl ${f.pl >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{f.pl >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}</span>
-                <IonLabel><h3 className="!text-[15px] !font-semibold">{f.fundName}</h3><p>{f.portfolios.join(', ')}</p></IonLabel>
-                <div slot="end" className="text-right tabular-nums"><div className="text-[15px] font-semibold text-[var(--ion-text-color)]">{formatINR(f.currentValue)}</div><div className={`text-[12px] font-semibold ${f.pl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{f.pl >= 0 ? '+' : ''}{f.plPct.toFixed(1)}%</div></div>
-              </IonItem>
-            ))}
-          </IonList>
-        </>
-      )}
+      {/* funds up 5% or more and funds down 5% or more, as two lists like the laptop's Fund performance */}
+      <FundGroup label="Top gainers" funds={data.topGainers} mt={mt} />
+      <FundGroup label="Top losers" funds={data.topLosers} mt={mt} />
 
       {/* portfolios: best and weakest returns (the laptop's Portfolio performance) */}
       {data.portfolioLeaderboard?.length > 0 && (
