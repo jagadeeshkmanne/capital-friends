@@ -12,6 +12,18 @@ function history() {
   return { times, navs }
 }
 
+// the same fall, then a steady recovery (+1% a day) from Mon 26 Oct to `end`
+function recovery(end) {
+  const times = [], navs = []; let v = 100
+  for (let t = Date.parse('2025-01-02T00:00:00Z'); t <= Date.parse(end + 'T00:00:00Z'); t += 864e5) {
+    const d = new Date(t), s = d.toISOString().slice(0, 10); if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue
+    v *= s >= '2026-10-26' ? 1.01 : s >= '2026-10-19' ? 0.98 : 1.0005
+    times.push(t / 1000); navs.push(v)
+  }
+  return { times, navs }
+}
+const H_OPT = { floor: 0.2, floorFrom: '2026-10-28', lifts: [['2026-11-03', '2026-11-04', 0.013]] }
+
 describe('fund rule (G and H)', () => {
   afterEach(() => vi.useRealTimers())
 
@@ -59,5 +71,35 @@ describe('fund rule (G and H)', () => {
     const R = replay(hh, 0.7, WORDS_STOCKS)
     expect(nextDue(hh, R, 0.7, WORDS_STOCKS)).toBe(null)
     expect(checks(R, null, 0.7).fgap).toBe(R.fgap)
+  })
+
+  it('H: never below 20% in stocks, taken from the liquid fund first, then gold', () => {
+    const near = (w, f, g, l) => { expect(w.fund).toBeCloseTo(f); expect(w.gold).toBeCloseTo(g); expect(w.liq).toBeCloseTo(l) }
+    near(targets(0.2, 0.5, false, false, 0.7, 0.2), 0.2, 0.6, 0.2)     // guard on at the low base share: 10% would be in stocks
+    near(targets(0.5, 1, false, true, 0.7, 0.2), 0.2, 0.5, 0.3)        // sharp fall: 20% stays in stocks
+    near(targets(0.2, 0.5, false, false, 0.7, 0.5), 0.5, 0.5, 0)       // a higher floor takes the liquid first, then gold
+    near(targets(0.5, 0.5, false, false, 0.7, 0.2), 0.25, 0.6, 0.15)   // above the floor: unchanged
+    expect(checks({ e: 0.2, x: 0.5, up: false, fast: false }, null, 0.7, 0.2).goldOver).toBeCloseTo(0.2)
+  })
+
+  it('H: the 20% minimum from its start, and a follow-through day from the paper book lifts the guards', () => {
+    const h = recovery('2026-11-06'), plain = replay(h, 0.7, WORDS_STOCKS), R = replay(h, 0.7, WORDS_STOCKS, H_OPT)
+    expect(plain.x).toBe(0.5)                                    // without it the guard is still on
+    expect(R.x).toBe(1)
+    expect(R.lift[0]).toBe('2026-11-03')
+    const at = (d) => R.log.find((l) => l.date === d)
+    expect(at('2026-10-26').target.fund).toBe(0)                 // before the rule start: all stock money in liquid
+    expect(at('2026-10-28').target.fund).toBeCloseTo(0.2)        // from it: 20% stays in stocks
+    expect(at('2026-11-04').target.fund).toBeCloseTo(0.5)
+    expect(at('2026-11-04').why).toMatch(/Follow-through day on 3 Nov 2026/)
+  })
+
+  it('H: a follow-through day at the next NAV shows as the switch due', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-04T04:30:00Z'))   // Wed 4 Nov, NAVs to Tue 3 Nov
+    const h = recovery('2026-11-03'), R = replay(h, 0.7, WORDS_STOCKS, H_OPT), N = nextDue(h, R, 0.7, WORDS_STOCKS, H_OPT)
+    expect(R.target.fund).toBeCloseTo(0.2)
+    expect(N.date).toBe('2026-11-04')
+    expect(N.target.fund).toBeCloseTo(0.5)
+    expect(nextDue(h, R, 0.7, WORDS_STOCKS, { ...H_OPT, lifts: [] })).toBe(null)   // mid-week: nothing else due
   })
 })
