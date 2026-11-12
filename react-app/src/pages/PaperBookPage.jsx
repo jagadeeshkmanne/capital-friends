@@ -13,7 +13,7 @@ import { RULE, WORDS_STOCKS, replay, nextDue, checks, fundShare, split, ap, day 
 
 // Hidden admin page (/admin/paper): the STOCK rule, book H. 15 momentum stocks from the 1000 most-traded NSE stocks, with the
 // stock / gold / liquid split from the fund rule (G) on the Midcap150 Momentum 50 index fund, stocks never above 70% and (from
-// 11 Nov 2026) never below 20%, a follow-through day lifting the guards early.
+// 11 Nov 2026) never below 20%.
 // Same three tabs as the Fund rule page: Live (what to hold now), Paper (₹10 lakh book H, run each morning by paper.py and
 // pushed here as a snapshot), Rule (why today's split, how the stocks are picked, the back-test). Information, not advice.
 const CAP = 0.70                       // stocks never above 70% of the money (paper.py book_smax)
@@ -237,8 +237,8 @@ export default function PaperBookPage() {
     return () => clearInterval(id)
   }, [data])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the rule (G's, stocks 20–70%) from the index fund's NAVs, with the follow-through days the paper book found (the NAVs have
-  // no traded value); a switch due at the next close is known a day early
+  // the rule (G's, stocks 20–70%) from the index fund's NAVs, plus any follow-through days the paper book records (none while
+  // paper.py's book_ftd is off, as since 12 Nov 2026); a switch due at the next close is known a day early
   const ruleState = data?.books?.H?.rule_state || null
   const liftsKey = JSON.stringify(ruleState?.ftd_lifts || [])
   const ruleOpt = useMemo(() => ({ floor: FLOOR, floorFrom: FLOOR_FROM, lifts: JSON.parse(liftsKey) }), [liftsKey])
@@ -247,7 +247,6 @@ export default function PaperBookPage() {
   const C = R ? checks(R, N, CAP, FLOOR) : null   // the Rule tab's four checks (the newer ones when a switch is due)
   const atFloor = !!C && C.x < 1 && fundShare(C.e, C.x, C.up, CAP) < FLOOR   // the guard's half is below the 20% minimum
   const fastLifted = !!C?.lift && !C.fast && C.fgap < -RULE.fastBand
-  const ftdNow = ruleState?.ftd?.on ? ` (now watching: low on ${day(ruleState.ftd.low_day)}${ruleState.ftd.att ? `, rally day 1 on ${day(ruleState.ftd.att)}` : ', no rally day yet'})` : ruleState?.ftd_last ? ` (the last one: ${day(ruleState.ftd_last)})` : ''
   const b = data?.books?.H || null
 
   const view = useMemo(() => {
@@ -532,7 +531,7 @@ export default function PaperBookPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-[var(--text-dim)] -mt-1">{N ? `Checks from the ${day(R.asOf)} close; the switch is at the ${day(N.date)} close. ` : ''}The same checks as the Fund rule page, on the Midcap150 Momentum 50 index fund's price: the week's last close and the month's last close{N ? '' : '; the switch is at the next close'}. Stocks are capped at 70% instead of 80% and, from 11 Nov 2026, never below 20% (taken from liquid first, then gold). A follow-through day lifts the guards early: while a guard is on, the index up 1.25% or more on higher NSE traded value, at least 4 days into a rally from its low. The NAVs have no traded value, so this page takes those days from the paper book{ftdNow}.</p>
+          <p className="text-xs text-[var(--text-dim)] -mt-1">{N ? `Checks from the ${day(R.asOf)} close; the switch is at the ${day(N.date)} close. ` : ''}The same checks as the Fund rule page, on the Midcap150 Momentum 50 index fund's price: the week's last close and the month's last close{N ? '' : '; the switch is at the next close'}. Stocks are capped at 70% instead of 80% and, from 11 Nov 2026, never below 20% (taken from liquid first, then gold).</p>
         </> : <p className="text-sm text-[var(--text-dim)]">{hist === undefined ? 'Loading the index fund\'s prices…' : 'The index fund\'s prices did not load, so the four checks are not shown.'}</p>}
 
         <div className={`${CARD} overflow-hidden`}>
@@ -569,7 +568,7 @@ export default function PaperBookPage() {
               </tbody>
             </table>
           </div>
-          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Rolling: the worst 3 years still made 16.7% a year (median 30.1%), the worst 5 years 20.6% (median 35.0%). Before the delays from circuit limits (about 1.6 points a year) and without dividends. These are for the rule before 11 Nov 2026: in the rule research (2015–26) the 20% minimum and the follow-through day added about 2.5 points a year, with the worst fall about 1.3 points deeper. A back-test, not a forecast{isAdmin ? <>; <a href={REPORT_URL} target="_blank" rel="noreferrer" className="font-semibold text-sky-300 hover:text-sky-200">full report</a></> : ''}.</p>
+          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Rolling: the worst 3 years still made 16.7% a year (median 30.1%), the worst 5 years 20.6% (median 35.0%). Before the delays from circuit limits (about 1.6 points a year) and without dividends. These are for the rule before 11 Nov 2026: in a re-test with the paper book’s own stock picks, the 20% minimum added about 1 point a year (31.3% vs 30.3%, 2015–26), with the worst fall about 1.5 points deeper. A back-test, not a forecast{isAdmin ? <>; <a href={REPORT_URL} target="_blank" rel="noreferrer" className="font-semibold text-sky-300 hover:text-sky-200">full report</a></> : ''}.</p>
         </div>
 
         {R && R.log.length > 0 && <div className={`${CARD} overflow-hidden`}>
