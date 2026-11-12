@@ -18,6 +18,7 @@ import { RULE, WORDS_STOCKS, replay, nextDue, checks, fundShare, split, ap, day 
 // pushed here as a snapshot), Rule (why today's split, how the stocks are picked, the back-test). Information, not advice.
 const CAP = 0.70                       // stocks never above 70% of the money (paper.py book_smax)
 const FLOOR = 0.20, FLOOR_FROM = '2026-11-11'   // and never below 20% from the 11 Nov 2026 close (paper.py book_smin)
+const KEEP = 45                        // a held stock stays while in the top 45 (paper.py book_buf; 30 until 12 Nov 2026)
 const LS = 'cf-stock-rule'
 const K = ['fund', 'gold', 'liq']      // 'fund' = the stock part (the shared rule calls it the fund share)
 const NAMES = { fund: 'Stocks', gold: 'Gold', liq: 'Liquid fund' }
@@ -297,6 +298,7 @@ export default function PaperBookPage() {
   const tot = Math.max(1, view.liveNav)
   // this month's picks: the paper book's target list (kept even while the rule has 0% in stocks), else what it holds
   const rankNow = Object.fromEntries((data.ranks || []).map((r) => [r[0], r[1]]))
+  const ranksN = (data.ranks || []).length || 40   // how far the snapshot's rank list goes (top 50 from 12 Nov 2026)
   const picks = (b.target?.length ? b.target.map((t) => ({ s: t[0], rank: t[2] })) : view.hold.filter((h) => isStock(h.row[0])).map((h) => ({ s: h.row[0], rank: h.row[7] })))
     .sort((x, y) => (rankNow[x.s] ?? 999) - (rankNow[y.s] ?? 999) || (x.rank ?? 999) - (y.rank ?? 999))   // strongest today first
   const each = picks.length ? (amount * tgt.fund) / picks.length : 0
@@ -397,12 +399,12 @@ export default function PaperBookPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {picks.map((p) => { const price = livePx(p.s) ?? lastClose(data, p.s); const rn = rankNow[p.s]; return (
               <button key={p.s} onClick={() => setChartSym(p.s)} className="flex items-center gap-3 px-4 py-2 text-left border-b border-[var(--border-row)] hover:bg-[var(--bg-hover)] min-w-0">
-                <span className={`w-7 shrink-0 text-right text-xs font-semibold tabular-nums ${rn == null || rn > 30 ? 'text-amber-400' : 'text-[var(--text-dim)]'}`} title="Momentum rank today (kept while in the top 30)">{rn ?? '>40'}</span>
+                <span className={`w-7 shrink-0 text-right text-xs font-semibold tabular-nums ${rn == null || rn > KEEP ? 'text-amber-400' : 'text-[var(--text-dim)]'}`} title={`Momentum rank today (kept while in the top ${KEEP})`}>{rn ?? `>${ranksN}`}</span>
                 <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{p.s}</span>
                 <span className="ml-auto shrink-0 text-xs text-[var(--text-dim)] tabular-nums">{price ? `₹${num(price)}` : ''}{tgt.fund > 1e-9 && price ? ` · ≈ ${Math.floor(each / price)} sh` : ''}</span>
               </button>) })}
           </div>
-          <p className="px-4 py-2.5 text-[11px] text-[var(--text-dim)]">Left: momentum rank today; a stock that drops below 30 is replaced on {day(data.next_rebalance)}. Tap a stock for its chart.{tgt.fund > 1e-9 ? ` Share counts are rounded down at the ${Object.keys(live?.prices || {}).length ? 'live' : 'last'} price.` : ''}</p>
+          <p className="px-4 py-2.5 text-[11px] text-[var(--text-dim)]">Left: momentum rank today; a stock that drops below {KEEP} is replaced on {day(data.next_rebalance)}. Tap a stock for its chart.{tgt.fund > 1e-9 ? ` Share counts are rounded down at the ${Object.keys(live?.prices || {}).length ? 'live' : 'last'} price.` : ''}</p>
         </div>
       </>)}
 
@@ -440,7 +442,7 @@ export default function PaperBookPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border-light)] bg-[var(--bg-inset)]">
-                  <SortTh k="rank" sort={sort} setSort={setSort} cls="text-right sm:w-12" title="Momentum rank today (replaced at the next rebalance if below 30)"><span className="max-sm:hidden">Rank</span><span className="sm:hidden">#</span></SortTh>
+                  <SortTh k="rank" sort={sort} setSort={setSort} cls="text-right sm:w-12" title={`Momentum rank today (replaced at the next rebalance if below ${KEEP})`}><span className="max-sm:hidden">Rank</span><span className="sm:hidden">#</span></SortTh>
                   <SortTh k="stock" sort={sort} setSort={setSort} cls="text-left">Stock</SortTh><th className={`${TH} ${PH} text-right`}>Qty</th><th className={`${TH} ${PH} text-right`}>Avg</th>
                   <th className={`${TH} text-right`}>Price</th><SortTh k="today" sort={sort} setSort={setSort} cls="text-right">Today</SortTh>
                   <SortTh k="value" sort={sort} setSort={setSort} cls={`${PH} text-right`}>Value</SortTh><SortTh k="pnl" sort={sort} setSort={setSort} cls={`${PH} text-right`} title="Sorts by rupee gain or loss (▲ biggest gain first, ▼ biggest loss first); click % to sort by percent">P&amp;L</SortTh><SortTh k="pnlPct" sort={sort} setSort={setSort} cls="text-right" title="Sorts by % gain or loss">%</SortTh>
@@ -455,7 +457,7 @@ export default function PaperBookPage() {
                   const w = Math.round((value / tot) * 1000) / 10
                   return (
                     <tr key={s} onClick={() => !lq && setChartSym(s)} className={`border-b border-[var(--border-row)] last:border-0 hover:bg-[var(--bg-hover)] ${lq ? '' : 'cursor-pointer'} ${g ? 'bg-amber-500/5' : lq ? 'bg-sky-500/5' : ''}`}>
-                      <td className={`${TD} text-right font-semibold ${g || lq ? 'text-[var(--text-dim)]' : rank == null || rank > 40 ? 'text-[var(--accent-rose)]' : rank > 30 ? 'text-amber-400' : 'text-[var(--text-primary)]'}`}>{g || lq ? '—' : rank == null ? 'out' : rank}</td>
+                      <td className={`${TD} text-right font-semibold ${g || lq ? 'text-[var(--text-dim)]' : rank == null || rank > KEEP ? 'text-[var(--accent-rose)]' : rank > KEEP - 10 ? 'text-amber-400' : 'text-[var(--text-primary)]'}`}>{g || lq ? '—' : rank == null ? 'out' : rank}</td>
                       <td className={`${TD} text-left font-semibold ${g ? 'text-amber-400' : lq ? 'text-sky-400' : 'text-[var(--text-primary)]'}`}>{s}{lq && <span className="ml-1.5 text-[10px] font-medium text-[var(--text-dim)] max-sm:hidden">liquid</span>}</td>
                       <td className={`${TDS} ${PH} text-right`}>{num(q)}</td>
                       <td className={`${TDS} ${PH} text-right`}>{num(avg)}</td>
@@ -539,7 +541,7 @@ export default function PaperBookPage() {
           <ol className="px-4 py-3 space-y-1.5 text-sm text-[var(--text-secondary)] list-decimal list-inside">
             <li><span className="font-semibold text-[var(--text-primary)]">List:</span> the 1000 most-traded NSE stocks (6-month median), only those trading at least ₹2 crore a day.</li>
             <li><span className="font-semibold text-[var(--text-primary)]">Score:</span> the 6-month return divided by its volatility, so steady risers rank above jumpy ones.</li>
-            <li><span className="font-semibold text-[var(--text-primary)]">Keep:</span> a stock held stays while it ranks in the top 30.</li>
+            <li><span className="font-semibold text-[var(--text-primary)]">Keep:</span> a stock held stays while it ranks in the top {KEEP}.</li>
             <li><span className="font-semibold text-[var(--text-primary)]">New buys:</span> the best-ranked fresh names (not in the top 100 three months ago), skipping one that moves too closely with two already picked.</li>
             <li><span className="font-semibold text-[var(--text-primary)]">Weights:</span> equal, 1/15 of the stock money each.</li>
           </ol>
@@ -568,7 +570,7 @@ export default function PaperBookPage() {
               </tbody>
             </table>
           </div>
-          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Rolling: the worst 3 years still made 16.7% a year (median 30.1%), the worst 5 years 20.6% (median 35.0%). Before the delays from circuit limits (about 1.6 points a year) and without dividends. These are for the rule before 11 Nov 2026: in a re-test with the paper book’s own stock picks, the 20% minimum added about 1 point a year (31.3% vs 30.3%, 2015–26), with the worst fall about 1.5 points deeper. A back-test, not a forecast{isAdmin ? <>; <a href={REPORT_URL} target="_blank" rel="noreferrer" className="font-semibold text-sky-300 hover:text-sky-200">full report</a></> : ''}.</p>
+          <p className="px-4 pb-3 text-[11px] text-[var(--text-dim)]">Rolling: the worst 3 years still made 16.7% a year (median 30.1%), the worst 5 years 20.6% (median 35.0%). Before the delays from circuit limits (about 1.6 points a year) and without dividends. These are for the rule before 11 Nov 2026: in a re-test with the paper book’s own stock picks, the 20% minimum added about 1 point a year (31.3% vs 30.3%, 2015–26), with the worst fall about 1.5 points deeper; keeping stocks while in the top 45 instead of 30 (from 12 Nov 2026) added about 1.3 points more (32.6%), with the same worst fall. A back-test, not a forecast{isAdmin ? <>; <a href={REPORT_URL} target="_blank" rel="noreferrer" className="font-semibold text-sky-300 hover:text-sky-200">full report</a></> : ''}.</p>
         </div>
 
         {R && R.log.length > 0 && <div className={`${CARD} overflow-hidden`}>
