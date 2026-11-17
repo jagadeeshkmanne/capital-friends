@@ -49,6 +49,7 @@ Capital Friends tracks everything an Indian family owns and owes — mutual fund
 | Mutual funds | Import each member's CAMS + KFintech CAS PDF: every purchase, SIP, switch, STP and redemption with its date. Real money-in (switches are not new money), XIRR and CAGR per fund, portfolio, member and family. NAVs update daily from AMFI. |
 | Stocks | Holdings from a broker Excel file or a CDSL/NSDL statement, per demat account; prices update daily. |
 | Everything else | Fixed deposits, PPF, EPF, NPS, bonds, gold and silver by weight at today's rate, property. Loans with EMI and months left. Insurance with nominees and a coverage check. |
+| Family | Add spouse, parents and children; see each person on their own or the whole family together. Add a family member's Google account so they can sign in with their own account and see the family view. |
 | Family net worth | One dashboard: net worth, allocation, funds below their own all-time high, portfolios that need a rebalance, goals on track. |
 | Rebalancing | A target allocation per portfolio; fix drift by splitting the SIP, adding a lump sum, or buy-and-sell. |
 | Goals | Goals funded from the money you already have, with a glide path that moves equity to safety on time. |
