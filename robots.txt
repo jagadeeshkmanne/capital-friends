@@ -13,5 +13,6 @@ Disallow: /reports
 Disallow: /reminders
 Disallow: /health-check
 Disallow: /more
+Disallow: /gviz/
 
 Sitemap: https://capitalfriends.in/sitemap.xml
