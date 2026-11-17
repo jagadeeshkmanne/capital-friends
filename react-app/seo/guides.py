@@ -10,7 +10,8 @@ def defs(items): return '<dl class="defs">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>
 
 ORDER = ['your-data-in-your-google-drive', 'family-members-and-accounts', 'financial-health-check', 'cams-cas-import', 'mutual-fund-portfolio-tracker',
          'portfolio-rebalancing', 'stock-portfolio-tracker', 'track-fd-ppf-epf-gold-property', 'insurance-tracker', 'goal-based-investing',
-         'retirement-bucket-strategy', 'family-net-worth-tracker', 'family-financial-blueprint-email']
+         'retirement-bucket-strategy', 'family-net-worth-tracker', 'family-financial-blueprint-email',
+         'best-free-portfolio-tracker-india']
 
 def register(add, feat):
     # ───────────────────────── 1. data & privacy ─────────────────────────
@@ -476,3 +477,44 @@ def register(add, feat):
           ('Are PAN and account numbers in the email?', 'They are masked. The email tells the family which bank and which platform; it is not a document for identity theft.'),
           ('What if I stop using the app?', 'Switch off daily updates in Settings and delete the sheet from your Drive. The emails stop and no data remains.')],
      related=['your-data-in-your-google-drive', 'family-net-worth-tracker', 'insurance-tracker', 'financial-health-check'])
+
+    # ───────────────────────── 14. compared with other apps ─────────────────────────
+    add('best-free-portfolio-tracker-india', guide=True, nav='Free portfolio trackers compared', blurb='Capital Friends, INDmoney, Kuvera and Value Research: what each is for, and when to pick which.',
+     title='Best Free Portfolio Tracker in India – Capital Friends vs INDmoney vs Kuvera vs Value Research',
+     desc='An honest comparison of free mutual fund and family portfolio trackers in India: Capital Friends, INDmoney, Kuvera and Value Research Online. What each one is for, where your data lives, what it costs, and when Capital Friends is not the right pick.',
+     h1='Free portfolio trackers in India, compared', lead='Written by the person who built Capital Friends, so read it with that in mind. Each of these apps is good at a different job. This page says which job, where your data lives, and when Capital Friends is the wrong choice.',
+     body="""<h2 id="short">The short answer</h2>
+""" + table(['If you want', 'Look at'], [
+    ['To invest and track in the same app', 'INDmoney or Kuvera'],
+    ['Fund research and ratings, with a portfolio tracker', 'Value Research Online'],
+    ['A free tracker for the whole family that keeps the data in your own Google Drive and also covers FDs, EPF, gold, insurance, loans, goals and retirement buckets', 'Capital Friends']]) + """
+<h2 id="table">Side by side</h2>
+""" + table(['', 'Capital Friends', 'INDmoney', 'Kuvera', 'Value Research Online'], [
+    ['Main job', 'Tracking and planning only', 'Investing app that also tracks', 'Direct mutual fund investing that also tracks', 'Fund research and ratings, with a portfolio tracker'],
+    ['Where your data lives', 'One Google Sheet in your own Google Drive', 'Your account with the company', 'Your account with the company', 'Your account with the company'],
+    ['Open source', 'Yes, on GitHub', 'No', 'No', 'No'],
+    ['Cost', 'Free, no ads, no paid tier', 'Free to use; see their site for charges', 'Free to use; see their site for charges', 'Free tracker; some research tools are paid']]) + NOTE('Details about the other apps are from their own websites as of November 2026. Features and fees change, so check <a href="https://www.indmoney.com/" rel="nofollow noopener" target="_blank">INDmoney</a>, <a href="https://kuvera.in/" rel="nofollow noopener" target="_blank">Kuvera</a> and <a href="https://www.valueresearchonline.com/" rel="nofollow noopener" target="_blank">Value Research Online</a> before you decide. Capital Friends is not connected with any of them.') + """
+<h2 id="different">What Capital Friends does differently</h2>
+""" + feat([('The whole family, everything', 'Every member\'s mutual funds and stocks, plus FDs, PPF, EPF, NPS, bonds, gold and silver by weight, property, insurance and loans, in one family net worth.'),
+            ('Real numbers from your statement', 'Import a CAMS + KFintech CAS PDF and every purchase, SIP, switch and redemption comes in with its date. Switches are not counted as new money, so money-in, XIRR and CAGR are right.'),
+            ('Your data in your Drive', 'No bank or broker password and no server database. The app works on one Google Sheet in your own Drive; download it as Excel any time.'),
+            ('Planning, not just tracking', 'Target allocation and rebalancing three ways, goals with a glide path, the three-bucket retirement strategy and a financial health check.'),
+            ('An email for the family', 'A daily or monthly email to the people you choose, with where everything is.'),
+            ('Free and open source', 'No ads and no paid tier. The code is on GitHub.')]) + """
+<h2 id="falls-short">Where Capital Friends falls short</h2>
+<ul>
+<li><strong>No account linking.</strong> Holdings come from statements and files you import, or what you type in. A fresh CAS each month keeps it current; NAVs and prices update daily on their own.</li>
+<li><strong>No investing.</strong> You buy and sell where you do today and record it in the app.</li>
+<li><strong>A web app, not a native one.</strong> It works in the phone browser; there is no Play Store or App Store app.</li>
+<li><strong>India only.</strong> Rupees, AMFI NAVs and NSE prices.</li>
+<li><strong>No research or ratings.</strong> It shows facts about your own money, not which fund to buy.</li>
+</ul>
+<h2 id="together">Using it alongside your investing app</h2>
+<p>You do not have to switch. Keep investing wherever you do today. One CAMS + KFintech CAS import per family member brings their mutual funds into Capital Friends, next to the FDs, EPF, gold, insurance and loans; the <a href="/cams-cas-import/">CAS import guide</a> shows the steps.</p>""",
+     cta='default', preview=(['networth'], 'The whole family in one view', 'Every member\'s funds, stocks, FDs, EPF, gold and loans, from your own Google Sheet.'),
+     faq=[('Which is the best free portfolio tracker in India?', 'It depends on the job. To invest and track in one app, INDmoney and Kuvera are popular. For fund research with a tracker, Value Research Online. For a free tracker for the whole family that keeps the data in your own Google Drive and also covers FDs, EPF, gold, insurance, loans, goals and retirement buckets, Capital Friends.'),
+          ('Is Capital Friends an alternative to INDmoney, Kuvera or Value Research?', 'For tracking and planning, yes. For investing or fund research, no: Capital Friends does not sell or recommend funds. Many families use it alongside the app they invest with.'),
+          ('Does Capital Friends need my bank or broker login?', 'No. It never asks for passwords and does not link accounts. Holdings come from your CAMS + KFintech CAS, a broker Excel or CDSL/NSDL statement, or what you type in.'),
+          ('Can I track my whole family in one place?', 'Yes. Add each member, import each member\'s CAS, and see every portfolio on its own and the family total together, with goals and insurance for each person.'),
+          ('Why is Capital Friends free?', 'It was built by an investor for his own family and shared openly. There are no ads and no paid tier; you can support it with a voluntary donation.')],
+     related=['mutual-fund-portfolio-tracker', 'family-net-worth-tracker', 'cams-cas-import', 'your-data-in-your-google-drive'])

@@ -1,18 +1,25 @@
 # Capital Friends
 
-**Free, open-source family portfolio tracker — your data stays in your own Google Drive.**
+**Free, open-source family portfolio tracker for India. Your data stays in a Google Sheet in your own Google Drive.**
 
-🌐 Live app: **[capitalfriends.in](https://capitalfriends.in)**
+🌐 Live app: **[capitalfriends.in](https://capitalfriends.in)** · [Guides](https://capitalfriends.in/guides/) · [Demo videos](https://www.youtube.com/@capitalfriendsin)
 
-Capital Friends lets an Indian family track everything they own and owe in one place — mutual funds, stocks, fixed deposits, gold, real estate, PPF/EPF/NPS, insurance policies, loans and financial goals — for every family member, with a combined family view. There is no server and no database: the app writes to a Google Spreadsheet that lives in **your** Google Drive, and the developer has no access to it.
+Capital Friends tracks everything an Indian family owns and owes — mutual funds, stocks, fixed deposits, PPF, EPF, NPS, gold and silver, property, insurance and loans — for every family member, with one combined family view. Import a CAMS + KFintech consolidated account statement (CAS) and every purchase, SIP, switch and redemption comes in with its real date, so invested amount, XIRR and CAGR are right. There is no server database and no bank or broker login: the app works on one Google Sheet in **your** Drive, as you, and the developer has no access to it.
 
 > Sign in with Google → a private spreadsheet is created in your Drive → the app reads and writes only that sheet, as you.
+
+**Free forever, no ads, no paid tier.** Built by an investor for his own family, and shared for families like his.
 
 ---
 
 ## Table of contents
 
+- [Who it's for](#who-its-for)
 - [Features](#features)
+- [How it compares](#how-it-compares)
+- [Trade-offs](#trade-offs)
+- [Get started](#get-started)
+- [FAQ](#faq)
 - [How it works](#how-it-works)
 - [Repository layout](#repository-layout)
   - [react-app — the frontend](#react-app--the-frontend)
@@ -23,37 +30,71 @@ Capital Friends lets an Indian family track everything they own and owe in one p
 - [Running it yourself](#running-it-yourself)
 - [Deployment](#deployment)
 - [Known limitations](#known-limitations)
+- [License](#license)
 - [Support the project](#support-the-project)
 - [Author](#author)
 
 ---
 
+## Who it's for
+
+- Families who want every member's investments — parents, spouse, children — in one place: each person on their own, and the family together.
+- People who want a tracker and planner, not another app that sells them funds.
+- Anyone who would rather keep their financial data in their own Google Drive than on someone else's server.
+
 ## Features
 
-**Track every asset and liability, per family member**
-
-| Area | What you can record |
+| Area | What you get |
 |---|---|
-| Mutual funds | Holdings across AMCs and platforms; SIP and lumpsum purchases, redemptions and switches; units, NAV, current value, P&L and XIRR per fund, per portfolio and per member |
-| Stocks | Holdings across brokers; buy/sell transactions, average cost, realised and unrealised P&L per scrip and per portfolio |
-| Other investments | Fixed deposits, gold / SGB, real estate, PPF, EPF, NPS, crypto and anything else, with invested amount, current value, maturity date and expected return |
-| Insurance | Term life, health, motor, home and travel policies with sum assured, premium and maturity for each member |
-| Loans & liabilities | Home, car and personal loans, credit cards — outstanding balance, EMI, interest rate and tenure |
-| Bank & investment accounts | Bank accounts, demat accounts, MF platforms, broker and direct-AMC accounts |
-| Family | Add spouse, parents and children; view combined or individual net worth, goals, insurance and loans; invite family members to see the shared view |
+| Mutual funds | Import each member's CAMS + KFintech CAS PDF: every purchase, SIP, switch, STP and redemption with its date. Real money-in (switches are not new money), XIRR and CAGR per fund, portfolio, member and family. NAVs update daily from AMFI. |
+| Stocks | Holdings from a broker Excel file or a CDSL/NSDL statement, per demat account; prices update daily. |
+| Everything else | Fixed deposits, PPF, EPF, NPS, bonds, gold and silver by weight at today's rate, property. Loans with EMI and months left. Insurance with nominees and a coverage check. |
+| Family net worth | One dashboard: net worth, allocation, funds below their own all-time high, portfolios that need a rebalance, goals on track. |
+| Rebalancing | A target allocation per portfolio; fix drift by splitting the SIP, adding a lump sum, or buy-and-sell. |
+| Goals | Goals funded from the money you already have, with a glide path that moves equity to safety on time. |
+| Retirement buckets | Income (2 years of expenses), Stability (the next 5 years), Growth (the rest). Filled quarterly from five years before retirement, with refill rules for good, bad and recovery years, so you never have to sell equity in a crash. |
+| Financial health check | Seven yes/no questions most families miss (term and health cover, emergency fund, nominees, a will…) turned into action items. |
+| Family email | A daily or monthly email to the family members you choose, with where everything is. |
+| Privacy | No passwords, no server database, and a mask that hides names and numbers on screen. |
 
-**Decide what to do next**
+Every feature has a plain-English guide at [capitalfriends.in/guides](https://capitalfriends.in/guides/). The app shows facts about your own money; it is not investment advice.
 
-- **ATH Buy Signals** — every fund is compared with its all-time-high NAV, refreshed daily from AMFI data. Funds are flagged *Strong Buy* (≥20 % below ATH), *Good Buy* (10–20 %) or *Watch* (5–10 %), so you know when a dip is worth topping up.
-- **Smart rebalancing, three modes** — set a target allocation per fund and get the exact SIP adjustment, lumpsum top-up, or buy/sell units needed when the portfolio drifts past your threshold.
-- **Goals with glide-path de-risking** — link portfolios to goals; the equity percentage is checked against the years left and a de-risk alert fires when you are above the recommended path.
-- **Retirement bucket strategy** — split the corpus into B3 (equity), B2 (hybrid) and B1 (liquid), with B3→B1 direct routing that avoids unnecessary capital-gains tax on each refill cycle.
-- **Financial health check** — a guided checklist covering health and term insurance adequacy, emergency fund, nominees, will, and whether the family knows where everything is.
+## How it compares
 
-**Stay on top of dates**
+Capital Friends does tracking and planning only. It does not sell or recommend funds, and you cannot invest through it.
 
-- **Reminders** — insurance renewals, FD maturities, SIP due dates and loan EMIs, sorted by urgency, with e-mail notifications inside the advance-notice window.
-- **Reports** — an HTML family-wealth dashboard e-mailed on a schedule (or on demand, as PDF) to the whole family.
+| | Capital Friends | Investing apps that also track (e.g. INDmoney, Kuvera) | Research sites with a tracker (e.g. Value Research Online) |
+|---|---|---|---|
+| Main job | Track and plan for the whole family | Invest, and track what you hold | Fund research and ratings |
+| Where your data lives | A Google Sheet in your own Drive | Your account with the company | Your account with the company |
+| Open source | Yes | No | No |
+| Cost | Free, no ads, no paid tier | See their sites | Free tracker; some tools paid |
+
+Many families use it alongside the app they invest with. A longer comparison: [Free portfolio trackers in India, compared](https://capitalfriends.in/best-free-portfolio-tracker-india/).
+
+## Trade-offs
+
+- **No account linking.** Holdings come from statements and files you import, or what you type in. A fresh CAS each month keeps everything current; NAVs and prices update daily on their own.
+- **A web app, not a native app.** It works in the phone browser; there is no Play Store or App Store app.
+- **India only.** Rupees, AMFI NAVs and NSE prices.
+
+## Get started
+
+1. Open [capitalfriends.in](https://capitalfriends.in) and sign in with Google. A private Google Sheet is created in your Drive.
+2. Add family members and their bank and investment accounts.
+3. Import each member's CAMS + KFintech CAS ([how to get it](https://capitalfriends.in/cams-cas-import/)) and stock statements, then add FDs, EPF, gold, insurance and loans.
+
+## FAQ
+
+**Is it really free?** Yes. No ads and no paid tier; you can support it with a voluntary donation.
+
+**Can the developer see my data?** No. The data is in a Google Sheet in your Drive, and the app reads and writes it as you. There is no server database.
+
+**Does it need my bank or broker password?** No. It never asks for passwords and does not link accounts.
+
+**Can I export my data?** It is already a Google Sheet in your Drive; download it as Excel any time.
+
+**Does it work on a phone?** Yes, in the phone's browser.
 
 ---
 
@@ -127,7 +168,7 @@ Main routes:
 | `/family` | Family members and sharing / invitations |
 | `/accounts/bank`, `/accounts/investment` | Bank, demat, broker and MF-platform accounts |
 | `/investments/mutual-funds` | Portfolios, transactions (invest / redeem / switch), allocations, rebalancing plans |
-| `/investments/funds` | "All Funds" view across portfolios and members with ATH buy signals, XIRR and CAGR |
+| `/investments/funds` | "All Funds" view across portfolios and members with how far each fund is below its own high, XIRR and CAGR |
 | `/investments/stocks` | Stock portfolios, buy/sell, holdings, live prices |
 | `/investments/other` | FDs, gold, real estate, PPF/EPF/NPS, crypto |
 | `/insurance` | Policies per member |
@@ -168,7 +209,7 @@ A second Apps Script project bound to a developer-owned Google Sheet that is sha
 | File | Role |
 |---|---|
 | `Code.js` | Builds the `MF_Data` sheet: ~8,500 mutual-fund schemes with names, categories and daily NAVs from [mfapi.in](https://www.mfapi.in/); daily refresh trigger |
-| `ATH.js` | Tracks each fund's all-time-high NAV in `MF_ATH`; pulls history for new funds, and every day raises the ATH when NAV makes a new high. This powers the ATH buy signals in the app |
+| `ATH.js` | Tracks each fund's all-time-high NAV in `MF_ATH`; pulls history for new funds, and every day raises the ATH when NAV makes a new high. This powers the below-high markers in the app |
 | `MasterDB_StockImport.js` | Imports the NSE stock master list (~5,300 scrips) into `Stock_Data` |
 | `MarketData.js` | Prices, RSI, DMA and returns via `GOOGLEFINANCE` formulas in a hidden helper sheet, processed in chunks to stay within Apps Script limits |
 | `AdminWebApp.js` | A small admin endpoint (shared-secret POST) so `gas-webapp` can ask the master DB to refresh on demand |
@@ -255,10 +296,17 @@ Backend changes never require a React redeploy — the frontend calls the pinned
 
 ## Known limitations
 
-- **Triggers run as the deploying account.** Time-driven triggers in `gas-webapp` currently fire under the developer's identity, so scheduled jobs must iterate over registered users explicitly rather than relying on `Session.getEffectiveUser()`. See `gas-webapp/README-TRIGGERS.md` for the planned fix.
 - **Apps Script quotas.** Long jobs (market-data updates, screener checks) are chunked and auto-continued to stay inside the 6-minute execution limit, but very large portfolios will feel it.
 - **India-first.** Fund data comes from AMFI via mfapi.in and stock data from NSE; amounts are in ₹.
 - The stock screener in `master-mf-db` is experimental and admin-only for now.
+
+---
+
+## License
+
+Capital Friends is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). You can use, study, change and share it. If you run a changed version for other people, for example as a website, you must publish your changed source code under the same licence.
+
+Copyright © 2025–2026 Jagadeesh Manne
 
 ---
 

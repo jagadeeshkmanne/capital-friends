@@ -40,3 +40,7 @@ npm-debug.log*
 .claude/
 .cache/
 .remotion/
+
+# Python bytecode (seo/gen.py)
+__pycache__/
+*.pyc

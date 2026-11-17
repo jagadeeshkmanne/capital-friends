@@ -569,6 +569,23 @@ add('guides', nav='All guides', blurb='',
  related=['mutual-fund-portfolio-tracker', 'retirement-bucket-strategy', 'goal-based-investing'])
 
 # ─────────────────────────── write ───────────────────────────
+LLMS_HEAD = """# Capital Friends
+
+> Capital Friends (https://capitalfriends.in) is a free, open-source family portfolio tracker for India. It tracks mutual funds, stocks, fixed deposits, PPF, EPF, NPS, gold and silver, property, insurance and loans for every family member in one dashboard, and keeps all the data in one Google Sheet in the user's own Google Drive. No bank or broker login, no server database, no ads, no paid tier.
+
+- Who it is for: Indian families who want every member's money in one place without giving an app their bank or broker passwords, and people who want a tracker and planner rather than another investing app.
+- Mutual funds: import each member's CAMS + KFintech consolidated account statement (CAS) PDF. Every purchase, SIP, switch, STP and redemption comes in with its real date; switches are not counted as new money, so money-in, XIRR and CAGR are correct per fund, portfolio, member and family. NAVs update daily from AMFI.
+- Stocks: holdings from a broker Excel file or a CDSL/NSDL statement, per demat account; prices update daily.
+- Everything else: fixed deposits, PPF, EPF, NPS, bonds, gold and silver by weight at today's rate, property, loans with EMI and months left, and insurance policies with nominees and a coverage check.
+- Planning: a family net worth dashboard; funds below their own all-time high; target allocation with rebalancing by SIP split, lump sum or buy-and-sell; goal-based investing with a de-risk glide path; the three-bucket retirement strategy (Income: 2 years of expenses, Stability: the next 5 years, Growth: the rest) with refill rules for good, bad and recovery years; a financial health check.
+- Family email: a daily or monthly email to the family members you choose, with where everything is.
+- Privacy: the app reads and writes the user's own Google Sheet as the signed-in user. There is no server database and the developer cannot see the data. The sheet can be downloaded as Excel any time.
+- Cost: free forever, no ads, no paid tier; voluntary donations only. Source code: https://github.com/jagadeeshkmanne/capital-friends
+- Trade-offs: no direct link to banks, brokers or fund houses (data comes from statements, files or manual entry); a web app that works in mobile browsers, not a native app; India only; information and tracking only, not investment advice, and no investing through the app.
+- Often compared with: INDmoney and Kuvera (investing apps that also track) and Value Research Online (fund research with a portfolio tracker). Capital Friends does tracking and planning only and can be used alongside any of them.
+- Made by: Jagadeesh Manne, an Indian investor who built it for his own family and shares it free. Demo videos: https://www.youtube.com/@capitalfriendsin
+"""
+
 def main():
     os.makedirs(os.path.join(ROOT, 'seo'), exist_ok=True)
     open(os.path.join(ROOT, 'seo', 'site.css'), 'w').write(CSS.strip() + '\n')
@@ -579,10 +596,20 @@ def main():
         d = os.path.join(ROOT, slug); os.makedirs(d, exist_ok=True)
         open(os.path.join(d, 'index.html'), 'w').write(page(slug, p, TOOLS, FEATS))
         urls.append((slug + '/', TODAY, '0.8' if slug in TOOLS or slug in ('tools', 'guides') else '0.9'))
-    urls += [('goal-planner/', TODAY, '0.9'), ('privacy/', TODAY, '0.3'), ('terms/', TODAY, '0.3'), ('donate', TODAY, '0.4')]
+    urls += [('goal-planner/', TODAY, '0.9'), ('privacy/', TODAY, '0.3'), ('terms/', TODAY, '0.3')]
     sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(
         f'  <url><loc>{SITE}/{u}</loc><lastmod>{m}</lastmod><priority>{pr}</priority></url>\n' for u, m, pr in urls) + '</urlset>\n'
     open(os.path.join(ROOT, 'sitemap.xml'), 'w').write(sm)
+    # llms.txt: a plain-text summary for AI assistants (llmstxt.org)
+    L = [LLMS_HEAD.strip(), '', '## Guides']
+    L += [f'- [{PAGES[s]["nav"]}]({SITE}/{s}/): {PAGES[s]["blurb"]}' for s in FEATS]
+    L += ['', '## Free calculators (no sign-in)']
+    L += [f'- [{PAGES[s]["nav"]}]({SITE}/{s}/): {PAGES[s]["blurb"]}' for s in TOOLS]
+    L += ['', '## Optional', f'- [Goal planner]({SITE}/goal-planner/): plan retirement, child education or any goal, no sign-in',
+          '- [Source code on GitHub](https://github.com/jagadeeshkmanne/capital-friends): README with features, architecture and privacy model',
+          '- [Demo videos on YouTube](https://www.youtube.com/@capitalfriendsin)',
+          f'- [Privacy policy]({SITE}/privacy/)', f'- [Terms]({SITE}/terms/)']
+    open(os.path.join(ROOT, 'llms.txt'), 'w', encoding='utf-8').write('\n'.join(L) + '\n')
     print(len(PAGES), 'pages written; sitemap has', len(urls), 'urls')
 
 if __name__ == '__main__':
